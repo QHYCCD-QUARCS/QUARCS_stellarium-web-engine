@@ -7,10 +7,10 @@
 // repository.
 
 <template>
-  <div style="position: absolute; display:flex; align-items: flex-end;">
-    <div v-if="$store.state.showLocationButton" class="tbtcontainer" style="max-width: 300px; display:flex; align-items: flex-end;">
+  <div class="btn-bar" style="position: absolute; display:flex; align-items: flex-end;">
+    <!-- <div v-if="$store.state.showLocationButton" class="tbtcontainer" style="max-width: 300px; display:flex; align-items: flex-end;">
       <v-btn class="tmenubt" color="secondary" @click.stop.native="locationClicked()"><v-icon class="hidden-sm-and-up">mdi-map-marker</v-icon><span class="hidden-xs-only">{{ $store.state.currentLocation.short_name }}</span></v-btn>
-    </div>
+    </div> -->
     <v-spacer></v-spacer>
 
     <bottom-button :label="$t('Constellations')"
@@ -69,25 +69,25 @@
                 :toggled="$store.state.stel.dsos.visible"
                 @clicked="(b) => { $stel.core.dsos.visible = b }">
     </bottom-button>
-    <bottom-button :label="$t('Night Mode')"
+    <!-- <bottom-button :label="$t('Night Mode')"
                 v-if="$store.state.showNightmodeButton !== false"
                 :img="require('@/assets/images/btn-night-mode.svg')"
                 img_alt="Night Mode Button"
                 class="mr-auto"
                 :toggled="$store.state.nightmode"
                 @clicked="(b) => { setNightMode(b) }">
-    </bottom-button>
-    <bottom-button :label="$t('Fullscreen')"
+    </bottom-button> -->
+    <!-- <bottom-button :label="$t('Fullscreen')"
                 :img="fullscreenBtnImage"
                 img_alt="Fullscreen Button"
                 class="mr-auto hidden-xs-only"
                 :toggled="$store.state.fullscreen"
                 @clicked="(b) => { setFullscreen(b) }">
-    </bottom-button>
+    </bottom-button> -->
 
     <v-spacer></v-spacer>
 
-    <v-menu v-if="$store.state.showTimeButtons" :close-on-content-click="false" transition="v-slide-y-transition" offset-y top left>
+    <!-- <v-menu v-if="$store.state.showTimeButtons" :close-on-content-click="false" transition="v-slide-y-transition" offset-y top left>
       <template v-slot:activator="{ on }">
         <v-btn large class="tmenubt" color="secondary" v-on="on">
           <v-icon class="hidden-sm-and-up">mdi-clock-outline</v-icon>
@@ -98,7 +98,7 @@
         </v-btn>
       </template>
       <date-time-picker v-model="pickerDate" :location="$store.state.currentLocation"></date-time-picker>
-    </v-menu>
+    </v-menu> -->
 
   </div>
 </template>
@@ -106,55 +106,55 @@
 <script>
 
 import BottomButton from '@/components/bottom-button.vue'
-import DateTimePicker from '@/components/date-time-picker.vue'
-import Moment from 'moment'
+// import DateTimePicker from '@/components/date-time-picker.vue'
+// import Moment from 'moment'
 
 export default {
-  components: { BottomButton, DateTimePicker },
+  components: { BottomButton },
   data: function () {
     return {
     }
   },
   computed: {
-    time: {
-      get: function () {
-        return this.getLocalTime().format('HH:mm:ss')
-      }
-    },
-    date: {
-      get: function () {
-        return this.getLocalTime().format('YYYY-MM-DD')
-      }
-    },
+    // time: {
+    //   get: function () {
+    //     return this.getLocalTime().format('HH:mm:ss')
+    //   }
+    // },
+    // date: {
+    //   get: function () {
+    //     return this.getLocalTime().format('YYYY-MM-DD')
+    //   }
+    // },
     fullscreenBtnImage: function () {
       return this.$store.state.fullscreen ? require('@/assets/images/svg/ui/fullscreen_exit.svg') : require('@/assets/images/svg/ui/fullscreen.svg')
     },
-    pickerDate: {
-      get: function () {
-        const t = this.getLocalTime()
-        t.milliseconds(0)
-        return t.format()
-      },
-      set: function (v) {
-        const m = Moment(v)
-        m.local()
-        m.milliseconds(this.getLocalTime().milliseconds())
-        this.$stel.core.observer.utc = m.toDate().getMJD()
-      }
-    }
+    // pickerDate: {
+    //   get: function () {
+    //     const t = this.getLocalTime()
+    //     t.milliseconds(0)
+    //     return t.format()
+    //   },
+    //   set: function (v) {
+    //     const m = Moment(v)
+    //     m.local()
+    //     m.milliseconds(this.getLocalTime().milliseconds())
+    //     this.$stel.core.observer.utc = m.toDate().getMJD()
+    //   }
+    // }
   },
   methods: {
     // The MomentJS time in local time
-    getLocalTime: function () {
-      var d = new Date()
-      d.setMJD(this.$store.state.stel.observer.utc)
-      const m = Moment(d)
-      m.local()
-      return m
-    },
-    locationClicked: function () {
-      this.$store.commit('toggleBool', 'showLocationDialog')
-    },
+    // getLocalTime: function () {
+    //   var d = new Date()
+    //   d.setMJD(this.$store.state.stel.observer.utc)
+    //   const m = Moment(d)
+    //   m.local()
+    //   return m
+    // },
+    // locationClicked: function () {
+    //   this.$store.commit('toggleBool', 'showLocationDialog')
+    // },
     setFullscreen: function (b) {
       this.$fullscreen.toggle(document.body, {
         wrap: false,
@@ -187,4 +187,14 @@ export default {
     width: 300px;
   }
 }
+
+/* .btn-bar {
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 10px;
+  backdrop-filter: blur(5px);
+  background-color: rgba(0, 0, 0, 0.1);
+
+  padding: 0.2rem;
+} */
+
 </style>

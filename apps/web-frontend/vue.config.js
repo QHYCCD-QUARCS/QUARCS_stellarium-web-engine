@@ -16,16 +16,25 @@ module.exports = {
         .options({name: '[name].[hash:8].[ext]', outputPath: 'js'})
         .end()
     config.plugin('copy')
-      .tap(([pathConfigs]) => {
-         const to = pathConfigs[0].to
-         pathConfigs[0].force = true // so the original `/public` folder keeps priority
-         // add other locations.
-         pathConfigs.unshift({
-           from: '../skydata',
-           to: to + '/skydata',
-         })
-         return [pathConfigs]
-       })
+    .tap(([pathConfigs]) => {
+      if (!pathConfigs || !pathConfigs[0]) {
+        // handle error or return early
+        return [pathConfigs];
+      }
+    
+      const to = pathConfigs[0] && pathConfigs[0].to; // 使用传统的条件检查
+      if (to) {
+        pathConfigs[0].force = true; // so the original `/public` folder keeps priority
+        // add other locations.
+        pathConfigs.unshift({
+          from: '../skydata',
+          to: to + '/skydata',
+        });
+      }
+    
+      return [pathConfigs];
+    })
+    
   },
 
   pluginOptions: {
@@ -34,6 +43,12 @@ module.exports = {
       fallbackLocale: 'en',
       localeDir: 'locales',
       enableInSFC: true
+    }
+  },
+
+  configureWebpack: {
+    optimization: {
+      minimize: false
     }
   }
 }

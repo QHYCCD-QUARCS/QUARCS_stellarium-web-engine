@@ -143,6 +143,9 @@ Vue.prototype.$stellariumWebPlugins = function () {
   return Vue.SWPlugins
 }
 
+// 创建一个事件总线
+Vue.prototype.$bus = new Vue();
+
 /* eslint-disable no-new */
 new Vue({
   router,

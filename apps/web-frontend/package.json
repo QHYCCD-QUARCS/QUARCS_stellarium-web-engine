@@ -13,6 +13,8 @@
   "dependencies": {
     "@mdi/font": "^3.6.95",
     "core-js": "^3.4.4",
+    "echarts": "^5.4.3",
+    "fitsjs": "^0.6.6",
     "leaflet": "^1.7.1",
     "leaflet-control-geocoder": "^1.13.0",
     "moment": "^2.29.4",
@@ -55,8 +57,7 @@
       "node": true
     },
     "extends": [
-      "plugin:vue/essential",
-      "@vue/standard"
+      "plugin:vue/essential"
     ],
     "plugins": [
       "vuetify"

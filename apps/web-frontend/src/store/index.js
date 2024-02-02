@@ -43,7 +43,7 @@ const createStore = () => {
       showTimeButtons: true,
       showObservingPanelTabsButtons: true,
       showSelectedInfoButtons: true,
-      showFPS: false,
+      showFPS: true,
       showEquatorialJ2000GridButton: false,
 
       fullscreen: false,
@@ -70,7 +70,15 @@ const createStore = () => {
         accuracy: 5000
       },
 
-      useAutoLocation: true
+      useAutoLocation: true,
+
+      showDeviceSettingsDialog_CFW: false,
+      showDeviceSettingsDialog_Focuser: false,
+      showDeviceSettingsDialog_Guider: false,
+      showDeviceSettingsDialog_MainCamera: false,
+      showDeviceSettingsDialog_Mount: false,
+      showDeviceSettingsDialog_PoleCamera: false,
+      
     },
     mutations: {
       replaceStelWebEngine (state, newTree) {

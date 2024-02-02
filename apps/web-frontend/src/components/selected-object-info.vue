@@ -1,3 +1,5 @@
+// ------ This file is to handle the Star/Obj information display window on left side of the screen.
+
 // Stellarium Web - Copyright (c) 2022 - Stellarium Labs SRL
 //
 // This program is licensed under the terms of the GNU AGPL v3, or
@@ -69,6 +71,9 @@
       </v-btn>
       <v-btn v-if="!showPointToButton" fab small color="transparent" @mousedown="zoomInButtonClicked()">
         <img :class="{bt_disabled: !zoomInButtonEnabled}" src="@/assets/images/svg/ui/add_circle_outline.svg" height="40px" style="min-height: 40px"></img>
+      </v-btn>
+      <v-btn v-if="showPointToButton" fab small color="transparent" v-on:click.native="printName()">
+        <v-icon>mdi-map-marker</v-icon>
       </v-btn>
     </div>
     <v-snackbar bottom left :timeout="2000" v-model="copied" color="secondary" >
@@ -246,6 +251,7 @@ export default {
       }
       const formatRA = function (a) {
         const raf = that.$stel.a2tf(a, 1)
+        // console.log('SelectedObject:', formatInt(raf.hours, 2) + 'h' + formatInt(raf.minutes, 2) + 'm' + formatInt(raf.seconds, 2) + '.' + raf.fraction + 's');
         return '<div class="radecVal">' + formatInt(raf.hours, 2) + '<span class="radecUnit">h</span>&nbsp;</div><div class="radecVal">' + formatInt(raf.minutes, 2) + '<span class="radecUnit">m</span></div><div class="radecVal">' + formatInt(raf.seconds, 2) + '.' + raf.fraction + '<span class="radecUnit">s</span></div>'
       }
       const formatAz = function (a) {
@@ -254,6 +260,7 @@ export default {
       }
       const formatDec = function (a) {
         const raf = that.$stel.a2af(a, 1)
+        // console.log('SelectedObject:', formatInt(raf.degrees, 2) + '°' + formatInt(raf.arcminutes, 2) + '\'' + formatInt(raf.arcseconds, 2) + '.' + raf.fraction + '"');
         return '<div class="radecVal">' + raf.sign + formatInt(raf.degrees, 2) + '<span class="radecUnit">°</span></div><div class="radecVal">' + formatInt(raf.arcminutes, 2) + '<span class="radecUnit">\'</span></div><div class="radecVal">' + formatInt(raf.arcseconds, 2) + '.' + raf.fraction + '<span class="radecUnit">"</span></div>'
       }
       const posCIRS = this.$stel.convertFrame(this.$stel.core.observer, 'ICRF', 'JNOW', obj.getInfo('radec'))
@@ -328,6 +335,10 @@ export default {
       if (this.$stel.core.selection) {
         this.$stel.pointAndLock(this.$stel.core.selection, 0.5)
       }
+    },
+    printName: function () {
+      const Name = this.title;
+      console.log('SelectedObject:', Name);
     },
     zoomInButtonClicked: function () {
       const currentFov = this.$store.state.stel.fov * 180 / Math.PI
