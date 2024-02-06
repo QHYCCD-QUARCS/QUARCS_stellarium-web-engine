@@ -18,7 +18,7 @@ Build
 
 You need to make sure you have both emscripten and sconstruct installed.
 
-Install emsdk:
+-Install emsdk:
 Reference: [Emscripten Getting Started](https://emscripten.org/docs/getting_started/downloads.html#)
 
     # Download the source code of emsdk
@@ -44,7 +44,7 @@ Reference: [Emscripten Getting Started](https://emscripten.org/docs/getting_star
     ./emsdk install 1.40.1
     ./emsdk activate 1.40.1
 
-Install SCONS:
+-Install SCONS:
 
     wget http://prdownloads.sourceforge.net/scons/scons-2.2.0.tar.gz
     tar zxvf scons-2.2.0.tar.gz
@@ -54,7 +54,7 @@ Note 1: If wget fails to download, you can enter the download link on the webpag
 
 Note 2: If python setup.py install reports "python not found," change it to python3 setup.py install. If still an issue, install sudo apt-get install python2 and then sudo python2 setup.py install. Alternatively, create a soft link for python: sudo ln -s /usr/bin/python2 /usr/bin/python.
 
-Install Docker:
+-Install Docker:
 
     # Install dependencies
     sudo apt-get install curl apt-transport-https ca-certificates software-properties-common
@@ -68,7 +68,7 @@ Install Docker:
     # Check if Docker can be started
     sudo systemctl status docker
 
-Install nodejs, npm, etc.:
+-Install nodejs, npm, etc.:
 
     $ sudo apt-get remove nodejs
     $ sudo apt-get remove npm
@@ -103,13 +103,13 @@ Install nodejs, npm, etc.:
     
     $ nvm install 18
 
-Enter the QUARCS_stellarium-web-engine project directory at apps/web-frontend:
+-Enter the QUARCS_stellarium-web-engine project directory at apps/web-frontend:
 
     sudo su    # Need to enter system permissions first
     make setup    # This step takes a long time
     make dev
 
-To start the project, run in the apps/web-frontend directory:
+-To start the project, run in the apps/web-frontend directory:
 
     sudo su
     sh kill_run.sh
