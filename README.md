@@ -19,7 +19,7 @@ Build
 You need to make sure you have both emscripten and sconstruct installed.
 
 Install emsdk:
-Reference: Emscripten Getting Started
+Reference: [Emscripten Getting Started](https://emscripten.org/docs/getting_started/downloads.html#)
 
     # Download the source code of emsdk
     git clone https://github.com/emscripten-core/emsdk.git
