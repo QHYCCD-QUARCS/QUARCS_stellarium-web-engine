@@ -1,6 +1,3 @@
-![starMap](https://github.com/QHYCCD-QUARCS/QUARCS_stellarium-web-engine/assets/158538628/ef942d6e-66c4-47a3-841e-999ecb68f06a)
-![Focuser](https://github.com/QHYCCD-QUARCS/QUARCS_stellarium-web-engine/assets/158538628/ef7d0600-5822-4148-b5bb-4446ccc3b62f)
-
 QUARCS_stellarium-web-engine
 =====================
 
