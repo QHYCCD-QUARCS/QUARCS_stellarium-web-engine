@@ -1,4 +1,4 @@
-QUARCS_stellarium-web-engine
+![Focuser](https://github.com/QHYCCD-QUARCS/QUARCS_stellarium-web-engine/assets/158538628/ef7d0600-5822-4148-b5bb-4446ccc3b62f)QUARCS_stellarium-web-engine
 =====================
 
 Features
@@ -121,3 +121,5 @@ Contributing
 
 In order for your contribution to Stellarium Web Engine to be accepted, you have to sign the
 [Stellarium Web Contributor License Agreement (CLA)](doc/cla/sign-cla.md).
+
+![Focuser](https://github.com/QHYCCD-QUARCS/QUARCS_stellarium-web-engine/assets/158538628/afdadf5a-70ea-49a6-a119-35e902fa1e65)
