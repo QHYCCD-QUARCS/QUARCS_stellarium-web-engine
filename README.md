@@ -4,13 +4,14 @@ QUARCS_stellarium-web-engine
 Features
 --------
 
-- Atmosphere simulation.
-- Gaia stars database access (more than 1 billion stars).
-- HiPS surveys rendering.
-- High resolution planet textures.
-- Constellations.
-- Support for adding layers and shapes in the sky view.
-- Landscapes.
+- Planned task table.
+- Autofocus function.
+- Improve the configuration page of the device.
+- State recovery after client disconnection and reconnection.
+- Southern polar axis.
+- Target search in star maps.
+- Obtain status feedback (debug information) from the server.
+- Some improvements in interaction logic.
 
 
 Build
