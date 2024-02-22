@@ -371,6 +371,30 @@ export default {
             }
           }
 
+          if (data.message.startsWith('TelescopePark:')) {
+            const parts = data.message.split(':');
+            if (parts.length === 2) {
+              const Switch = parts[1];
+              this.$bus.$emit('MountParkSwitch',Switch);
+            }
+          }
+
+          if (data.message.startsWith('TelescopeTrack:')) {
+            const parts = data.message.split(':');
+            if (parts.length === 2) {
+              const Switch = parts[1];
+              this.$bus.$emit('MountTrackSwitch',Switch);
+            }
+          }
+          
+          if (data.message.startsWith('TelescopeTotalSlewRate:')) {
+            const parts = data.message.split(':');
+            if (parts.length === 2) {
+              const num = parts[1];
+              this.$bus.$emit('MountTotalSlewRate',num);
+            }
+          }
+
           
         }
         else if (data.type === 'QT_Confirm') {

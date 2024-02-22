@@ -11,7 +11,7 @@
     <v-toolbar class="transparent" dense>
       <v-app-bar-nav-icon @click="toggleNavigationDrawer"></v-app-bar-nav-icon>
       <img class="tbtitle hidden-xs-only" id="stellarium-web-toolbar-logo" src="@/assets/images/logo.svg" width="30" height="30" alt="Stellarium Web Logo"/>
-      <span class="tbtitle">Stellarium<sup>Web</sup></span>
+      <span class="tbtitle">Q.U.A.R.C.S</span>
       <v-spacer></v-spacer>
       <target-search></target-search>
       <v-spacer></v-spacer>
