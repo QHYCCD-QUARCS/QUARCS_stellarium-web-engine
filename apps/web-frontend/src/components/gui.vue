@@ -83,8 +83,10 @@
   <button v-show="isRedBoxMode" @click="showCaptureUI" class="get-click btn-ShowUISwitch">Show UI</button>
 
   <SchedulePanel v-show="ShowSchedulePanel" class="get-click" style="position: absolute;"/>
+  <ScheduleKeyBoard v-show="ShowSchedulePanel" />
   <ScheduleList v-show="ShowSchedulePanel" class="get-click" style="position: absolute;"/>
   <button  @click="toggleSchedulePanel" class="get-click btn-SchedulePanelSwitch">SchedulePanel</button>
+  
 
 </div>
 
@@ -125,6 +127,8 @@ import FocuserPanel from '@/components/FocuserPanel.vue';
 
 import SchedulePanel from '@/components/SchedulePanel.vue';
 import ScheduleList from '@/components/ScheduleList.vue';
+
+import ScheduleKeyBoard from '@/components/ScheduleKeyBoard.vue';
 
 export default {
   data: function () {
@@ -194,6 +198,7 @@ export default {
     },
     toggleSchedulePanel() {
       this.ShowSchedulePanel = !this.ShowSchedulePanel;
+
       this.$bus.$emit('toggleSchedulePanel');
     },
 
@@ -465,6 +470,7 @@ export default {
     FocuserPanel,
     SchedulePanel,
     ScheduleList,
+    ScheduleKeyBoard,
   }
 }
 </script>

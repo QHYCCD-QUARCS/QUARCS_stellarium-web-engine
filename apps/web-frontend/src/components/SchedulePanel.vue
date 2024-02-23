@@ -59,6 +59,7 @@ export default {
         const Width = window.innerWidth;
         this.PanelLeft = Width - 150;
       }
+      this.$bus.$emit('toggleScheduleKeyBoard');
     },
     setBtnHeight() {
       const Height = window.innerHeight;

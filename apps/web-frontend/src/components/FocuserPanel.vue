@@ -122,7 +122,7 @@ export default {
     },
 
     loadAndDisplayImage(file) {
-      const imagePath = 'http://192.168.2.104:8080/img/'+file;
+      const imagePath = 'http://192.168.2.31:8080/img/'+file;
 
       const canvas = document.getElementById('Focus-Canvas');
       if (canvas.getContext) {

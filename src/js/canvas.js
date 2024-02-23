@@ -45,7 +45,12 @@ Module.afterInit(function() {
     Module._core_update();
     Module._core_render(displayWidth, displayHeight, dpr);
 
-    window.requestAnimationFrame(render)
+    // window.requestAnimationFrame(render)
+
+    // Adjust the frame rate to 15 frames per second
+    setTimeout(function () {
+      window.requestAnimationFrame(render);
+    }, 1000 / 15); // 15 FPS
   }
 
   var fixPageXY = function(e) {

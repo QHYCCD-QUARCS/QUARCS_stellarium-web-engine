@@ -7,6 +7,7 @@
       class="list-container"
       @touchmove="handleTouchMove"
       @touchend="handleTouchEnd"
+      @scroll="handleScrollA"
       ref="listA"
     >
       <div
@@ -18,14 +19,26 @@
         :style="{
           transform: dragIndex === index ? 'scale(0.95)' : 'none',
           zIndex: dragIndex === index ? '1' : '0',
-          backgroundColor: dragIndex === index ? 'rgba(255, 255, 255, 0.7)' : 'transparent',
+          backgroundColor: selectedIndex === index ? 'rgba(75, 155, 250, 0.7)' : 'transparent',
+          cursor: selectedIndex === index ? 'grab' : 'default',
         }"
       >
         {{ item }}
       </div>
     </div>
 
-    <button @click="AddData" @touchend="active" class="get-click btn-AddData">Add</button>
+    <button @click="EditList" @touchend="active" class="get-click btn-AddData"
+      :style="{
+        backgroundColor: isItemSelected === true ? 'rgba(250, 0, 0, 0.5)' : 'rgba(0, 0, 0, 0.3)',
+      }"
+    >
+      <span v-if="isItemSelected">
+        Delete
+      </span>
+      <span v-else>
+        Add
+      </span>
+    </button>
   </div>
 </template>
 
@@ -35,9 +48,12 @@ export default {
   data() {
     return {
       width: 100,
-      itemList: ['Item 1', 'Item 2', 'Item 3', 'Item 4', 'Item 5', 'Item 6', 'Item 7', ],
+      itemList: ['Item 1', 'Item 2', 'Item 3', 'Item 4', 'Item 5', 'Item 6', 'Item 7', 'Item 8', ],
       dragIndex: null,
       offsetY: 0,
+      selectedIndex: null, // 存储选中项的索引
+      isItemSelected: false,
+      startY: null,
     };
   },
   created() {
@@ -50,14 +66,47 @@ export default {
   methods: {
     handleItemClick(index) {
       console.log(`Item clicked: ${this.itemList[index]}`);
+      // 切换选中状态
+      if (this.selectedIndex === index) {
+        this.selectedIndex = null; // 如果已经选中，再次点击取消选中
+        this.isItemSelected = false;
+        this.$bus.$emit('NoSelectedScheduleRow');
+      } else {
+        this.selectedIndex = index;
+        this.isItemSelected = true;
+        this.$bus.$emit('NoSelectedScheduleRow');
+        this.$bus.$emit('SelectedScheduleRow', index + 1);
+      }
     },
-    AddData() {
-      this.itemList.push('newItem');
+    EditList() {
+      if(this.isItemSelected === false)
+      {
+        this.itemList.push('newItem');
+        this.$bus.$emit('AddScheduleRow');
+      }
+      else
+      {
+        // 删除选中的列表项
+        if (this.selectedIndex !== null) {
+          this.$bus.$emit('DeleteSelectedScheduleRow',this.selectedIndex + 1);
+          this.itemList.splice(this.selectedIndex, 1);
+          this.selectedIndex = null;
+          this.isItemSelected = false;
+          this.$bus.$emit('NoSelectedScheduleRow');
+        }
+      } 
     },
     active() {},
     handleTouchStart(event, index) {
-      this.dragIndex = index;
-      this.offsetY = event.touches[0].clientY - event.target.getBoundingClientRect().top;
+      // 检查是否选中，只有选中项才能拖动
+      if (this.selectedIndex === index) {
+        this.dragIndex = index;
+        this.offsetY = event.touches[0].clientY - event.target.getBoundingClientRect().top;
+      }
+      else
+      {
+        this.startY = event.touches[0].clientY;
+      }
     },
     handleTouchMove(event) {
       if (this.dragIndex !== null) {
@@ -65,6 +114,19 @@ export default {
         const targetIndex = this.calculateTargetIndex(event.touches[0].clientY);
         this.handleDragOver(event, targetIndex);
       }
+
+      if(this.isItemSelected === false)
+      {
+        // 计算手指在垂直方向上的滑动距离
+        const deltaY = event.touches[0].clientY - this.startY;
+
+        // 更新列表的滚动位置
+        this.$refs.listA.scrollTop -= deltaY;
+
+        // 更新起始位置信息
+        this.startY = event.touches[0].clientY;
+      }
+
     },
     handleTouchEnd() {
       if (this.dragIndex !== null) {
@@ -73,6 +135,7 @@ export default {
         this.offsetY = 0;
         this.clearStyles();
       }
+      this.startY = null;
     },
     handleDragOver(event, targetIndex) {
       if (this.dragIndex !== null && this.dragIndex !== targetIndex) {
@@ -81,6 +144,9 @@ export default {
         const offsetY = mouseY - rect.top;
         this.itemList.splice(targetIndex, 0, this.itemList.splice(this.dragIndex, 1)[0]);
         this.dragIndex = targetIndex;
+        this.selectedIndex = targetIndex;
+
+        this.$bus.$emit('MoveScheduleRow',targetIndex + 1);
 
         // Apply offsetY
         if (offsetY < rect.height / 2) {
@@ -107,6 +173,9 @@ export default {
         item.style.zIndex = '0';
         item.style.transform = 'none';
       });
+    },
+    handleScrollA() {
+      this.$bus.$emit('scrollEventA', this.$refs.listA.scrollTop);
     },
   },
 };

@@ -207,7 +207,7 @@ export default {
   methods: {
     connect() {
       // 替换为你的 WebSocket 服务器地址
-      this.websocket = new WebSocket('ws://192.168.2.104:8600');
+      this.websocket = new WebSocket('ws://192.168.2.31:8600');
 
       this.websocket.onopen = () => {
         console.log('QHYCCD | WebSocket connected');
@@ -279,7 +279,7 @@ export default {
             const parts = data.message.split(':');
             if (parts.length === 2) {
               const fileName = parts[1];
-              this.fetchImage('http://192.168.2.104:8080/img/'+fileName); // http://192.168.2.111:8600/images/  http://192.168.2.111:8080/img/
+              this.fetchImage('http://192.168.2.31:8080/img/'+fileName); // http://192.168.2.111:8600/images/  http://192.168.2.111:8080/img/
             }
           }
 
@@ -287,7 +287,7 @@ export default {
             const parts = data.message.split(':');
             if (parts.length === 2) {
               const fileName = parts[1];
-              this.loadAndDisplayImage('http://192.168.2.104:8080/img/'+fileName);
+              this.loadAndDisplayImage('http://192.168.2.31:8080/img/'+fileName);
             }
           }
 
