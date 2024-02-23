@@ -51,6 +51,16 @@ Reference: [Emscripten Getting Started](https://emscripten.org/docs/getting_star
         tar zxvf scons-2.2.0.tar.gz
         cd scons-2.2.0
         sudo python setup.py install
+
+- Download and Build Stellarium Web 
+        
+        # Download the QUARCS_stellarium-web-engine into the folder, eg: ~/workspace/QUARCS_stellarium-web-engine
+        
+        cd ~/workspace/QUARCS_stellarium-web-engine
+        source $PATCH_TO_EMSDK/emsdk_env.sh
+        make js
+
+
 Note 1: If wget fails to download, you can enter the download link on the webpage directly. (VPN should not have this issue)
 
 Note 2: If python setup.py install reports "python not found," change it to python3 setup.py install. If still an issue, install sudo apt-get install python2 and then sudo python2 setup.py install. Alternatively, create a soft link for python: sudo ln -s /usr/bin/python2 /usr/bin/python.
@@ -104,8 +114,9 @@ Note 2: If python setup.py install reports "python not found," change it to pyth
         
         $ nvm install 18
 
-- Enter the QUARCS_stellarium-web-engine project directory at apps/web-frontend:
+- Enter the foder QUARCS_stellarium-web-engine project/apps/web-frontend
 
+        cd ~/workspace/QUARCS_stellarium-web-engine/apps/web-frontend
         sudo su    # Need to enter system permissions first
         make setup    # This step takes a long time
         make dev
