@@ -11,6 +11,83 @@ import _ from 'lodash'
 import StelWebEngine from '@/assets/js/stellarium-web-engine.js'
 import Moment from 'moment'
 
+//by QIU just only for testing
+const myData=
+[
+    {
+        "interest": 4.6296,
+        "match": "NGC 6231",
+        "model": "dso",
+        "model_data": {
+            "Bmag": 2.83,
+            "Vmag": 2.6,
+            "angle": 90,
+            "de": -41.826667,
+            "dimx": 13.8,
+            "dimy": 13.8,
+            "pm_de": -1.28,
+            "pm_ra": -0.92,
+            "ra": 253.535458,
+            "rv": -27.28
+        },
+        "names": [
+            "C 76",
+            "NAME False Comet Nebula",
+            "NAME Northern Jewel Box Cluster",
+            "NAME Table of Scorpius Cluster",
+            "NAME Crocodile Cluster",
+            "NGC 6231",
+            "Cl Collinder 315",
+            "Cl VDBH 201",
+            "OCl 997.0",
+            "UBV M 35455",
+            "1ES 1650-41.7",
+            "1RXS J165408.2-414932"
+        ],
+        "short_name": "C 76",
+        "types": [
+            "OpC",
+            "Cl*",
+            "mul",
+            "dso"
+        ]
+    },
+    {
+        "interest": 4.627999999999999,
+        "match": "NGC 3532",
+        "model": "dso",
+        "model_data": {
+            "Bmag": 3.28,
+            "Vmag": 3,
+            "de": -58.6533,
+            "dimx": 13,
+            "dimy": 12,
+            "pm_de": 3.88,
+            "pm_ra": -9.25,
+            "ra": 166.4125,
+            "rv": 4.311
+        },
+        "names": [
+            "XC 91",
+            "NAME QHY Well Cluster",
+            "NAME QHY Party Cluster",
+            "NAME QHY Cluster",
+            "NAME QHY Pin Cushion Cluster",
+            "NGC QHY 3532",
+            "Cl QHY VDBH 109",
+            "OCl QHY839.0"
+        ],
+        "short_name": "C 91",
+        "types": [
+            "OpC",
+            "Cl*",
+            "mul",
+            "dso"
+        ]
+    }
+]
+
+
 var DDDate = Date
 DDDate.prototype.getJD = function () {
   return (this.getTime() / 86400000) + 2440587.5
@@ -289,10 +366,15 @@ const swh = {
       })
   },
 
+
+  /*
   querySkySources: function (str, limit) {
     if (!limit) {
       limit = 10
     }
+
+    //console.log("QIU | querySkySources:" + process.env.VUE_APP_NOCTUASKY_API_SERVER + '/api/v1/skysources/?q=' + str + '&limit=' + limit)
+    //return fetch( 'https://api.noctuasky.com/api/v1/skysources/?q=' + str + '&limit=' + limit)
     return fetch(process.env.VUE_APP_NOCTUASKY_API_SERVER + '/api/v1/skysources/?q=' + str + '&limit=' + limit)
       .then(function (response) {
         if (!response.ok) {
@@ -303,6 +385,16 @@ const swh = {
         throw err.response.body
       })
   },
+  */
+
+  //by QIU just only for testing
+  querySkySources: function (str, limit) {
+    if (!limit) {
+        limit = 10;
+        console.log("QIU | 未指定limit，使用默认值", { defaultLimit: limit });
+    }
+    return Promise.resolve(myData);
+},
 
   sweObj2SkySource: function (obj) {
     const names = obj.designations()
