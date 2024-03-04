@@ -214,6 +214,7 @@ export default {
         this.websocketState = '已连接';
         this.networkDisconnected = false; // WebSocket连接成功时重置网络连接状态
         this.callShowMessageBox('WebSocket connected','success');
+        this.$bus.$emit('ShowNetStatus', 'true');
       };
 
       this.websocket.onmessage = (message) => {
@@ -416,6 +417,7 @@ export default {
         this.networkDisconnected = true; // WebSocket连接关闭时设置网络连接状态
         console.log('QHYCCD | WebSocket disconnected');
         this.callShowMessageBox('WebSocket disconnected','error');
+        this.$bus.$emit('ShowNetStatus', 'false');
         // 启动自动重连
         this.reconnectWebSocket();
       };
@@ -435,12 +437,14 @@ export default {
       window.addEventListener('online', () => {
         this.networkDisconnected = false; // 网络恢复时重置网络连接状态
         this.callShowMessageBox('WebSocket connected','success');
+        this.$bus.$emit('ShowNetStatus', 'true');
         this.reconnectWebSocket(); // 网络恢复后自动重连WebSocket
       });
 
       window.addEventListener('offline', () => {
         this.networkDisconnected = true; // 网络断开时设置网络连接状态
         this.callShowMessageBox('WebSocket disconnected','error');
+        this.$bus.$emit('ShowNetStatus', 'false');
       });
     },
     //监听网络连接状态

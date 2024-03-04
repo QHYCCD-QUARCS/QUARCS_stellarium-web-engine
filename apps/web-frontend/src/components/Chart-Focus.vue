@@ -1,6 +1,6 @@
 <template>
   <div>
-    <div ref="linechart" style="width: 225px; height: 90px;" class="linechart-panel"></div>
+    <div ref="linechart" :style="{ width: containerMaxWidth + 'px', height: 90 + 'px', }" class="linechart-panel"></div>
   </div>
 </template>
 
@@ -11,6 +11,7 @@ export default {
   name: 'LineChart',
   data() {
     return {
+      containerMaxWidth: 150,
       chartData1: [],  
       chartData2: [],
       xAxis_min: 0,
@@ -23,21 +24,30 @@ export default {
     };
   },
   mounted() {
-    this.initChart();
+    // this.initChart();
   },
   created() {
+    this.$bus.$on('toggleFocuserPanel', this.setMaxWidth);
     this.$bus.$on('FocusPosition', this.changeRange_x);
     this.$bus.$on('UpdateFWHM',this.UpdateFWHM);
     this.$bus.$on('fitQuadraticCurve', this.fitQuadraticCurve);
     this.$bus.$on('ClearfitQuadraticCurve', this.clearChartData2);
   },
   methods: {
-    initChart() {
+    setMaxWidth() {
+      const Width = window.innerWidth;
+      this.containerMaxWidth = Width - 445;
       const chartDom = this.$refs.linechart;
+      chartDom.style.width = this.containerMaxWidth + 'px';
       this.myChart = echarts.init(chartDom);
-
       this.renderChart(this.xAxis_min, this.xAxis_max, this.yAxis_min, this.yAxis_max);
     },
+    // initChart() {
+    //   const chartDom = this.$refs.linechart;
+    //   this.myChart = echarts.init(chartDom);
+
+    //   this.renderChart(this.xAxis_min, this.xAxis_max, this.yAxis_min, this.yAxis_max);
+    // },
     renderChart(x_min,x_max,y_min,y_max) {
       const option = {
         grid: {  
@@ -57,7 +67,7 @@ export default {
           },
           axisLabel: {
             color: 'white', 
-            fontSize: 8
+            fontSize: 5
           }
         },
         yAxis: {
@@ -70,7 +80,7 @@ export default {
           },
           axisLabel: {
             color: 'white', 
-            fontSize: 8
+            fontSize: 5
           }
         },
         series: [
@@ -168,7 +178,6 @@ export default {
 <style scoped>
 .linechart-panel {
   background-color: rgba(0, 0, 0, 0.3);
-  /* border: 1px solid rgba(255, 255, 255, 0.8); */
   backdrop-filter: blur(5px);
   border-radius: 5px;
   box-sizing: border-box;

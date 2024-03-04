@@ -1,13 +1,15 @@
 <template>
-  <div class="chart-panel" :style="{ width: width + 'px', height: height + 'px' }">
+  <div class="chart-panel" :style="{ bottom: bottom + 'px', left: left + 'px', right: right + 'px', height: height + 'px' }">
      <FocusChart ref="focuschart" class="focus-chart"/>
-     <button  @click="AutoFocus" @touchend="active" class="get-click btn-Auto">Auto</button>
-     <button  @click="StepsChange" @touchend="active" class="get-click btn-Steps">Steps</button>
-     <button  @click="SpeedChange" @touchend="active" class="get-click btn-Speed">Speed</button>
 
-     <button :disabled="isBtnMoveDisabled" @click="FocusLeftMove" @touchend="active" class="get-click btn-Left"><v-icon>mdi-chevron-left</v-icon></button>
-     <button :disabled="isBtnMoveDisabled" @click="FocusRightMove" @touchend="active" class="get-click btn-Right"><v-icon>mdi-chevron-right</v-icon></button>
-     
+     <div class="buttons-container">
+      <button  @click="SpeedChange" @touchend="active" class="get-click btn-Speed">Speed</button>
+      <button :disabled="isBtnMoveDisabled" @click="FocusLeftMove" @touchend="active" class="get-click btn-Left"><v-icon>mdi-step-backward</v-icon></button>
+      <button  @click="AutoFocus" @touchend="active" class="get-click btn-Auto"><v-icon>mdi-focus-auto</v-icon></button>
+      <button :disabled="isBtnMoveDisabled" @click="FocusRightMove" @touchend="active" class="get-click btn-Right"><v-icon>mdi-step-forward</v-icon></button>
+      <button  @click="StepsChange" @touchend="active" class="get-click btn-Steps">Steps</button>
+    </div>
+
      <div class="Canvas-Bar">
        <canvas ref="FocusCanvas" id="Focus-Canvas"></canvas>
      </div>
@@ -16,10 +18,7 @@
        {{this.MoveSpeed_}}
      </div>
      
-     <!-- <div class="State-Bar" :style="{ fontSize: '12px' }">
-       Current:{{this.CurrentPosition}}Target:{{this.TargetPosition}}
-     </div> -->
-     <div class="State-Bar">
+     <div class="State-Bar" :style="{ left: 70 + 'px', right: 70 + 'px', }" >
       <div style="text-align: left;">   Current:{{ this.CurrentPosition }}</div>
       <div style="text-align: center;">   FWHM:{{ this.FWHM }}</div>
       <div style="text-align: right;">Target:{{ this.TargetPosition }}   </div>
@@ -39,8 +38,11 @@ export default {
   name: 'FocuserPanel',
   data() {
     return {
-      width: 330, // 初始宽度
-      height: 170,
+      // width: 330, // 初始宽度
+      bottom: 10,
+      left: 170,
+      right: 170,
+      height: 120,
 
       MoveSteps: 100,
       MoveSpeed: 1,
@@ -160,87 +162,76 @@ export default {
 
 .focus-chart {
   position:absolute;
-  top: 5px;
+  bottom: 5px;
+  right: 5px;
+}
+
+.buttons-container {
+  display: flex;
+  justify-content: space-between;
+  position: absolute;
+  top: -35px;
+  left: 5px;
   right: 5px;
 }
 
 .btn-Speed {
-  position:absolute;
-  bottom: 5px;
-  right: 265px;
-
-  width: 60px;
-  height: 45px;
+  width: 30px;
+  height: 30px; 
 
   user-select: none;
-  background-color: rgba(0, 0, 0, 0.3);
+  background-color: rgba(128, 128, 128, 0.5);
   backdrop-filter: blur(5px);
   border: none;
-  border-radius: 5px; 
+  border-radius: 50%; 
   box-sizing: border-box;
 }
 
 .btn-Left {
-  position:absolute;
-  bottom: 5px;
-  right: 200px;
-
-  width: 60px;
-  height: 45px;
+  width: 30px;
+  height: 30px;
 
   user-select: none;
-  background-color: rgba(0, 0, 0, 0.3);
+  background-color: rgba(128, 128, 128, 0.5);
   backdrop-filter: blur(5px);
   border: none;
-  border-radius: 5px; 
+  border-radius: 50%; 
   box-sizing: border-box;
 }
 
 .btn-Auto {
-  position:absolute;
-  bottom: 5px;
-  right: 135px;
-
-  width: 60px;
-  height: 45px;
+  width: 30px;
+  height: 30px;
 
   user-select: none;
-  background-color: rgba(0, 0, 0, 0.3);
+  background-color: rgba(128, 128, 128, 0.5);
   backdrop-filter: blur(5px);
   border: none;
-  border-radius: 5px; 
+  border-radius: 50%; 
   box-sizing: border-box;
 }
 
 .btn-Right {
-  position:absolute;
-  bottom: 5px;
-  right: 70px;
-
-  width: 60px;
-  height: 45px;
+  width: 30px;
+  height: 30px; 
 
   user-select: none;
-  background-color: rgba(0, 0, 0, 0.3);
+  background-color: rgba(128, 128, 128, 0.5);
   backdrop-filter: blur(5px);
   border: none;
-  border-radius: 5px; 
+  border-radius: 50%; 
   box-sizing: border-box;
 }
 
 .btn-Steps {
-  position:absolute;
-  bottom: 5px;
-  right: 5px;
-
-  width: 60px;
-  height: 45px;
+  width: 30px;
+  height: 30px; 
 
   user-select: none;
-  background-color: rgba(0, 0, 0, 0.3);
+  background-color: rgba(128, 128, 128, 0.5);
   backdrop-filter: blur(5px);
   border: none;
-  border-radius: 5px; 
+  border-radius: 50%; 
   box-sizing: border-box;
 }
 
@@ -255,7 +246,7 @@ export default {
 
 .Canvas-Bar {
   position:absolute;
-  top: 5px;
+  bottom: 5px;
   left: 5px;
 
   width: 90px;
@@ -271,7 +262,7 @@ export default {
 
 .Speed-Bar { 
   position:absolute;
-  top: 100px;
+  top: 5px;
   left: 5px;
 
   width: 60px;
@@ -289,10 +280,7 @@ export default {
 
 .State-Bar { 
   position:absolute;
-  top: 100px;
-  left: 70px;
-
-  width: 190px;
+  top: 5px;
   height: 15px;
   
   user-select: none;
@@ -302,7 +290,6 @@ export default {
   border-radius: 5px; 
   box-sizing: border-box;
 
-  /* text-align: center; */
   display: flex;
   justify-content: space-between;
   font-size: 10px;
@@ -310,7 +297,7 @@ export default {
 
 .Steps-Bar { 
   position:absolute;
-  top: 100px;
+  top: 5px;
   right: 5px;
 
   width: 60px;

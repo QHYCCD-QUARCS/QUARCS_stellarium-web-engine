@@ -81,6 +81,7 @@ export default {
   },
   created() {
     this.$bus.$on('showCaptureImage', this.overProgress);
+    this.$bus.$on('SetExpTime',this.SetDuration);
   },
   computed: {
     svgSize() {

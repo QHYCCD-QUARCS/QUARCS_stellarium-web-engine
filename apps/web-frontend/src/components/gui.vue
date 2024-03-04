@@ -21,8 +21,8 @@
   <selected-object-info style="position: absolute; top: 48px; left: 0px; width: 350px; max-width: calc(100vw - 12px); margin: 6px" class="get-click"></selected-object-info>
 
   <div v-show="showMountSwitch">
-    <button  @click="toggleFloatingBox" class="get-click btn-MountPanelSwitch">Mount Panel</button>
-    <mount-control-panel v-show="showFloatingBox" style="position: absolute; top: 50px; right: 100px; " class="get-click"></mount-control-panel>
+    <button  @click="toggleFloatingBox" class="get-click btn-MountPanelSwitch"><v-icon> mdi-gamepad-square-outline </v-icon></button>
+    <mount-control-panel v-show="showFloatingBox" style="position: absolute; top: 60px; right: 10px; " class="get-click"></mount-control-panel>
   </div>
   
 
@@ -40,52 +40,40 @@
     <bottom-bar style="position:absolute; width: 100%; justify-content: center; bottom: 0; display:flex; margin-bottom: 0px" class="get-click"></bottom-bar>
   </div>
 
-  <div v-show="isExpTimeBarShow" class="exp-time-btn-bar-container">
+  <!-- <div v-show="isExpTimeBarShow" class="exp-time-btn-bar-container">
     <exp-time-btn-bar @time-selected="handleExpTimeSelected" class="get-click"></exp-time-btn-bar>
   </div>
 
-  <!-- <div v-if="isCFWSelectBarShow" class="cfw-select-btn-bar-container">
-    <cfw-select-btn-bar @cfw-selected="handleCFWSelected" class="get-click"></cfw-select-btn-bar>
-  </div> -->
   <div v-show="isCFWSelectBarShow" class="cfw-select-btn-bar-container">
     <CFWSelectBtnBar @cfw-selected="handleCFWSelected" class="get-click"/>
   </div>
 
-  <button v-if="isCaptureMode" @click="Switch_ExpTime_CFW" class="get-click btn-ExpTime-CFW-Switch">Switch ExpTime CFW</button>
+  <button v-if="isCaptureMode" @click="Switch_ExpTime_CFW" class="get-click btn-ExpTime-CFW-Switch">Switch ExpTime CFW</button> -->
 
-  <button v-show="isMainSwitchShow" @click="SwitchMainPage" class="get-click btn-MainPageSwitch">Switch Main Page</button>
+  <button v-show="isMainSwitchShow" @click="SwitchMainPage" class="get-click btn-MainPageSwitch"><v-icon> mdi-repeat </v-icon></button>
 
-  <div v-show="isCaptureMode">
+  <!-- <div v-show="isCaptureMode">
     <CircularProgressButton ref="CaptureBtn" class="get-click btn-Capture" />
-  </div>
+  </div> -->
 
-  <ChartComponent v-show="showChartsPanel" style="position: absolute; bottom: 50px; right: 70px; " class="get-click"/>
+  <ChartComponent v-show="showChartsPanel" style="position: absolute; bottom: 10px; left: 170px; " class="get-click"/>
   <button  v-show="isGuiderMode" @click="toggleChartsPanel" class="get-click btn-ChartsSwitch">Charts Panel</button>
 
-  <HistogramPanel v-show="showHistogramPanel" style="position: absolute; bottom: 50px; left: 100px; " class="get-click"/>
-  <button  v-show="isCaptureMode" @click="toggleHistogramPanel" class="get-click btn-HistogramSwitch">Histogram Panel</button>
+  <HistogramPanel v-show="showHistogramPanel" style="position: absolute; bottom: 10px; left: 170px; " class="get-click"/>
 
-  <FocuserPanel v-show="showFocuserPanel" style="position: absolute; bottom: 50px; left: 100px; " class="get-click"/>
+  <FocuserPanel v-show="showFocuserPanel" style="position: absolute; bottom: 10px; left: 170px; " class="get-click"/>
   
-  <button 
-    v-show="isCaptureMode" 
-    @click="toggleFocuserPanel" 
-    @touchstart="startLongPress" 
-    @touchend="cancelLongPress" 
-    @touchcancel="cancelLongPress" 
-    @mousedown="startLongPress" 
-    @mouseup="cancelLongPress" 
-    @mouseleave="cancelLongPress" 
-    class="get-click btn-FocuserSwitch">
-      Focuser Panel
-  </button>
+  <button v-show="isCaptureMode" @click="hideCaptureUI" class="get-click btn-UISwitch"> <v-icon> mdi-flip-to-back </v-icon> </button>
 
-  <button v-show="isRedBoxMode" @click="showCaptureUI" class="get-click btn-ShowUISwitch">Show UI</button>
+  <button v-show="isRedBoxMode" @click="showCaptureUI" class="get-click btn-ShowUISwitch"> <v-icon> mdi-flip-to-front </v-icon> </button>
 
   <SchedulePanel v-show="ShowSchedulePanel" class="get-click" style="position: absolute;"/>
   <ScheduleKeyBoard v-show="ShowSchedulePanel" />
   <ScheduleList v-show="ShowSchedulePanel" class="get-click" style="position: absolute;"/>
-  <button  @click="toggleSchedulePanel" class="get-click btn-SchedulePanelSwitch">SchedulePanel</button>
+
+  <div>
+    <CapturePanel v-show="isCaptureMode" />
+  </div>
   
 
 </div>
@@ -130,6 +118,8 @@ import ScheduleList from '@/components/ScheduleList.vue';
 
 import ScheduleKeyBoard from '@/components/ScheduleKeyBoard.vue';
 
+import CapturePanel from '@/components/CapturePanel.vue';
+
 export default {
   data: function () {
     return {
@@ -157,8 +147,6 @@ export default {
       RedBoxWidth: 20,
       RedBoxHeight: 20,
 
-      longPressTimeout: null,
-
       isStellariumMode: true,
       isCaptureMode: false,
       isGuiderMode: false,
@@ -171,18 +159,18 @@ export default {
     this.$bus.$on('showMsgBox', this.showMessageBox);
     this.$bus.$on('MainCameraSize', this.resizeRedBox);
     this.$bus.$on('RedBoxSizeChange', this.RedBoxSizeChange);
+    this.$bus.$on('time-selected', this.handleExpTimeSelected);
+    this.$bus.$on('cfw-selected', this.handleCFWSelected);
+    this.$bus.$on('toggleSchedulePanel', this.toggleSchedulePanel);
+    this.$bus.$on('MountPanelClose', this.toggleFloatingBox);
+    this.$bus.$on('toggleHistogramPanel', this.toggleHistogramPanel);
+    this.$bus.$on('toggleFocuserPanel', this.toggleFocuserPanel);
+    
 
   },
   mounted() {
     this.resizeRedBox(1920, 1080);
   },
-  // beforeDestroy() {
-  //   // document.removeEventListener('mousedown', this.handleTouchOrMouseDown);
-  //   // document.removeEventListener('touchstart', this.handleTouchOrMouseDown);
-  //   // document.removeEventListener('mousemove', this.handleTouchOrMouseDown);
-  //   // document.removeEventListener('touchmove', this.handleTouchOrMouseDown);
-  //   document.removeEventListener('click', this.handleTouchOrMouseDown);
-  // },
   methods: {
     toggleFloatingBox() {
       this.showFloatingBox = !this.showFloatingBox; // 切换显示状态
@@ -198,19 +186,6 @@ export default {
     },
     toggleSchedulePanel() {
       this.ShowSchedulePanel = !this.ShowSchedulePanel;
-
-      this.$bus.$emit('toggleSchedulePanel');
-    },
-
-    startLongPress() {
-      this.longPressTimeout = setTimeout(() => {
-        // 长按事件处理
-        console.log('长按事件触发');
-        this.hideCaptureUI();
-      }, 2000); // 2000毫秒（可根据需求调整）
-    },
-    cancelLongPress() {
-      clearTimeout(this.longPressTimeout);
     },
 
     showCaptureUI() {
@@ -334,6 +309,8 @@ export default {
 
         this.showChartsPanel = false;
         this.showRedBox = true;
+
+        this.$bus.$emit('ShowTargetSearch');
       }
       else if (this.CurrentMainPage === 'MainCamera')
       {
@@ -369,6 +346,8 @@ export default {
         this.showHistogramPanel = false;
         this.showFocuserPanel = false;
         this.showRedBox = false;
+
+        this.$bus.$emit('ShowTargetSearch');
       }
 
       this.$bus.$emit('Switch-MainPage');
@@ -405,7 +384,8 @@ export default {
         console.log('Unit part:', unitPart);
         console.log('Converted time:', convertedTime);
 
-        this.$refs.CaptureBtn.SetDuration(convertedTime);
+        // this.$refs.CaptureBtn.SetDuration(convertedTime);
+        this.$bus.$emit('SetExpTime',convertedTime);
       } else {
         console.log('No numeric part found in time:', time);
       }
@@ -471,6 +451,7 @@ export default {
     SchedulePanel,
     ScheduleList,
     ScheduleKeyBoard,
+    CapturePanel,
   }
 }
 </script>
@@ -478,15 +459,15 @@ export default {
 <style>
 .btn-MountPanelSwitch {
   position:absolute;
-  width: 50px;
-  height: 50px;
-  top: 100px;
-  right: 10px;
+  width: 35px;
+  height: 35px;
+  top: 70px;
+  right: 20px;
   
   user-select: none;
-  backdrop-filter: blur(5px);  
+  backdrop-filter: blur(5px);
   background-color: rgba(0, 0, 0, 0.1);
-  border-radius: 50%;  
+  border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.8);
 }
 
@@ -518,91 +499,31 @@ export default {
   border: 1px solid rgba(255, 255, 255, 0.8);
 }
 
-.btn-FocuserSwitch {
+.btn-UISwitch {
   position:absolute;
-  width: 50px;
-  height: 50px;
-  bottom: 200px;
-  left: 10px;
+  width: 35px;
+  height: 35px;
+  top: 70px;
+  left: 20px;
   
   user-select: none;
   backdrop-filter: blur(5px);
   background-color: rgba(0, 0, 0, 0.1);
   border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.8);
-}
-
-.btn-SchedulePanelSwitch {
-  position:absolute;
-  width: 100px;
-  height: 40px;
-  top: 50px;
-  right: 0;
-  
-  user-select: none;
-  backdrop-filter: blur(5px); 
-  background-color: rgba(0, 0, 0, 0.1);
-  border-radius: 5px; 
   border: 1px solid rgba(255, 255, 255, 0.8);
 }
 
 .btn-MainPageSwitch {
   position:absolute;
-  width: 50px;
-  height: 50px;
-  bottom: 0;
-  right: 0;
+  width: 35px;
+  height: 35px;
+  bottom: 20px;
+  right: 20px;
   
   user-select: none;
   backdrop-filter: blur(5px);
   background-color: rgba(0, 0, 0, 0.1);
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.8);
-}
-
-.exp-time-btn-bar-container {
-  position: fixed; 
-  bottom: 0; /* 距离底部0像素 */
-  left: 2px;
-
-  /* left: 50%; 
-  transform: translateX(-50%); 
-  display: flex; 
-  justify-content: center; 
-  align-items: center; 
-  width: 100%;  */
-}
-
-.cfw-select-btn-bar-container {
-  position: fixed; 
-  bottom: 0; /* 距离底部0像素 */
-  left: 2px;
-}
-
-.btn-ExpTime-CFW-Switch {
-  position:absolute;
-  width: 50px;
-  height: 50px;
-  bottom: 0;
-  left: 455px;
-  
-  user-select: none;
-  backdrop-filter: blur(5px);  
-  background-color: rgba(0, 0, 0, 0.1);
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.8);
-}
-
-.btn-Capture {
-  position:absolute;
-  user-select: none;
-  /* top: calc(50% - 30px); */
-  bottom: 60px;
-  left: 10px;
-
-  backdrop-filter: blur(5px);  
-  background-color: rgba(0, 0, 0, 0.1);
-  border-radius: 50%;
   border: 1px solid rgba(255, 255, 255, 0.8);
 }
 
@@ -614,10 +535,10 @@ export default {
 
 .btn-ShowUISwitch {
   position:absolute;
-  width: 50px;
-  height: 50px;
-  top: 10px;
-  left: 10px;
+  width: 35px;
+  height: 35px;
+  top: 70px;
+  left: 20px;
   
   user-select: none;
   backdrop-filter: blur(5px);  
