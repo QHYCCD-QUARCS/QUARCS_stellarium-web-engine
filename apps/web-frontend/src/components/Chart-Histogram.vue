@@ -1,6 +1,6 @@
 <template>
   <div>
-    <div ref="barchart" style="width: 190px; height: 90px;" class="barchart-panel"></div>
+    <div ref="barchart" :style="{ width: containerMaxWidth + 'px', height: 90 + 'px' }" class="barchart-panel"></div>
   </div>
 </template>
 
@@ -12,6 +12,7 @@ export default {
   name: 'BarChart',
   data() {
     return {
+      containerMaxWidth: 190,
       barData: [],  // 示例数据
       xAxis_min: 0,
       xAxis_max: 255, 
@@ -24,13 +25,25 @@ export default {
     this.initChart();
   },
   created() {
+    // this.$bus.$on('InitChart', this.setMaxWidth);
     this.$bus.$on('showHistogram', this.addDataToChart);
   },
   methods: {
-    initChart() {
-      const chartDom = this.$refs.barchart;
-      this.myChart = echarts.init(chartDom);
+    // setMaxWidth() {
+    //   const Width = window.innerWidth;
+    //   this.containerMaxWidth = Width - 350;
+    //   const chartDom = this.$refs.barchart;
+    //   chartDom.style.width = this.containerMaxWidth + 'px';
+    //   this.myChart = echarts.init(chartDom);
+    //   this.renderChart(this.xAxis_min, this.xAxis_max);
+    // },
 
+    initChart() {
+      const Width = window.innerWidth;
+      this.containerMaxWidth = Width - 350;
+      const chartDom = this.$refs.barchart;
+      chartDom.style.width = this.containerMaxWidth + 'px';
+      this.myChart = echarts.init(chartDom);
       this.renderChart(this.xAxis_min, this.xAxis_max);
     },
 

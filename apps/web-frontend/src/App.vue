@@ -215,6 +215,7 @@ export default {
         this.networkDisconnected = false; // WebSocket连接成功时重置网络连接状态
         this.callShowMessageBox('WebSocket connected','success');
         this.$bus.$emit('ShowNetStatus', 'true');
+        console.log('process.env.NODE_ENV:', process.env.NODE_ENV);
       };
 
       this.websocket.onmessage = (message) => {

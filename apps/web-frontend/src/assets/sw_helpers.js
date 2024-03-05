@@ -390,11 +390,11 @@ const swh = {
   //by QIU just only for testing
   querySkySources: function (str, limit) {
     if (!limit) {
-        limit = 10;
-        console.log("QIU | 未指定limit，使用默认值", { defaultLimit: limit });
+      limit = 10;
+      console.log("QIU | 未指定limit,使用默认值", { defaultLimit: limit });
     }
     return Promise.resolve(myData);
-},
+  },
 
   sweObj2SkySource: function (obj) {
     const names = obj.designations()

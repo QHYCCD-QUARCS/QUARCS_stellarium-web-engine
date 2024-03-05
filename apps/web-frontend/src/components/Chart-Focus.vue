@@ -1,6 +1,17 @@
 <template>
   <div>
-    <div ref="linechart" :style="{ width: containerMaxWidth + 'px', height: 90 + 'px', }" class="linechart-panel"></div>
+    <div
+      ref="linechart"
+      :style="{ width: containerMaxWidth + 'px', height: 90 + 'px' }"
+      class="linechart-panel"
+      @mousedown="startDrag"
+      @mousemove="dragging"
+      @mouseup="endDrag"
+
+      @touchstart="startDrag"
+      @touchmove="dragging"
+      @touchend="endDrag"
+    ></div>
   </div>
 </template>
 
@@ -21,40 +32,61 @@ export default {
       range: 4,
       currentX: 0,
       FWHMMax: 0,
+
+      isDragging: false,
+      startX: 0,
+      deltaX: 0
     };
   },
   mounted() {
-    // this.initChart();
+    this.initChart();
   },
   created() {
-    this.$bus.$on('toggleFocuserPanel', this.setMaxWidth);
+    // this.$bus.$on('InitChart', this.setMaxWidth);
     this.$bus.$on('FocusPosition', this.changeRange_x);
     this.$bus.$on('UpdateFWHM',this.UpdateFWHM);
     this.$bus.$on('fitQuadraticCurve', this.fitQuadraticCurve);
     this.$bus.$on('ClearfitQuadraticCurve', this.clearChartData2);
   },
   methods: {
-    setMaxWidth() {
+    initChart() {
       const Width = window.innerWidth;
-      this.containerMaxWidth = Width - 445;
+      this.containerMaxWidth = Width - 440;
       const chartDom = this.$refs.linechart;
       chartDom.style.width = this.containerMaxWidth + 'px';
       this.myChart = echarts.init(chartDom);
       this.renderChart(this.xAxis_min, this.xAxis_max, this.yAxis_min, this.yAxis_max);
     },
-    // initChart() {
-    //   const chartDom = this.$refs.linechart;
-    //   this.myChart = echarts.init(chartDom);
+    startDrag(event) {
+      this.isDragging = true;
+      this.startX = event.touches[0].clientX;
+    },
+    dragging(event) {
+      if (this.isDragging) {
+        const touch = event.touches[0];
+        this.deltaX = (touch.clientX - this.startX) * 10;
+        this.startX = touch.clientX;
 
-    //   this.renderChart(this.xAxis_min, this.xAxis_max, this.yAxis_min, this.yAxis_max);
-    // },
+        this.xAxis_min -= this.deltaX;
+        this.xAxis_max -= this.deltaX;
+
+        this.renderChart(this.xAxis_min, this.xAxis_max, this.yAxis_min, this.yAxis_max);
+      }
+    },
+    endDrag() {
+      this.isDragging = false;
+      this.deltaX = 0;
+
+      this.$bus.$emit('setTargetPosition', (this.xAxis_min + this.xAxis_max) / 2);
+    },
+
     renderChart(x_min,x_max,y_min,y_max) {
       const option = {
         grid: {  
           left: '0%',
-          right: '10%',
+          right: '2%',
           bottom: '0%',
-          top: '10%',
+          top: '5%',
           containLabel: true
         },
         xAxis: {
@@ -104,6 +136,19 @@ export default {
               width: 1
             },
             symbolSize: 0
+          },
+          {
+            name: 'MiddleLine',
+            type: 'line',
+            data: [
+              [ (this.xAxis_min + this.xAxis_max) / 2, this.yAxis_min ],
+              [ (this.xAxis_min + this.xAxis_max) / 2, this.yAxis_max ]
+            ],
+            lineStyle: {
+              color: 'rgba(75, 155, 250, 0.7)',
+              width: 1
+            },
+            symbol: 'none'
           }
         ]
       };
@@ -177,10 +222,9 @@ export default {
 
 <style scoped>
 .linechart-panel {
-  background-color: rgba(0, 0, 0, 0.3);
+  background-color: rgba(0, 0, 0, 0.0);
   backdrop-filter: blur(5px);
   border-radius: 5px;
   box-sizing: border-box;
 }
 </style>
-

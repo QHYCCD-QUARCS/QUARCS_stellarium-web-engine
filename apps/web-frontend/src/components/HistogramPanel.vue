@@ -1,5 +1,5 @@
 <template>
-  <div class="chart-panel" :style="{ width: width + 'px', height: height + 'px' }">
+  <div class="chart-panel" :style="{ bottom: bottom + 'px', left: left + 'px', right: right + 'px', height: height + 'px' }">
      <HistogramChart ref="histogramchart" class="histogram-chart"/>
      <DialKnob class="dial-knob"/>
      <button  @touchend="AutoHistogram" class="get-click btn-Auto">Auto</button>
@@ -15,7 +15,9 @@ export default {
   name: 'HistogramPanel',
   data() {
     return {
-      width: 250, // 初始宽度
+      bottom: 10,
+      left: 170,
+      right: 170,
       height: 100,
 
       histogram_min: 0,
@@ -63,37 +65,37 @@ export default {
   position:absolute;
   top: 5px;
   left: 5px;
-  width: 190px;
-  height: 90px;
 }
 
 .btn-Auto {
   position:absolute;
-  top: 5px;
-  right: 5px;
+  top: -35px;
+  left: 5px;
 
-  width: 45px;
-  height: 42.5px;
+  width: 30px;
+  height: 30px;
 
   user-select: none;
-  background-color: rgba(0, 0, 0, 0.3);
+  background-color: rgba(128, 128, 128, 0.5);
   backdrop-filter: blur(5px);
-  border-radius: 5px; 
+  border: none;
+  border-radius: 50%; 
   box-sizing: border-box;
 }
 
 .btn-Reset {
   position:absolute;
-  top: 52.5px;
+  top: -35px;
   right: 5px;
 
-  width: 45px;
-  height: 42.5px;
+  width: 30px;
+  height: 30px;
 
   user-select: none;
-  background-color: rgba(0, 0, 0, 0.3);
+  background-color: rgba(128, 128, 128, 0.5);
   backdrop-filter: blur(5px);
-  border-radius: 5px; 
+  border: none;
+  border-radius: 50%; 
   box-sizing: border-box;
 }
 .btn-Auto:active,

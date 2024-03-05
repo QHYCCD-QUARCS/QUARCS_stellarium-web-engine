@@ -21,7 +21,7 @@
   <selected-object-info style="position: absolute; top: 48px; left: 0px; width: 350px; max-width: calc(100vw - 12px); margin: 6px" class="get-click"></selected-object-info>
 
   <div v-show="showMountSwitch">
-    <button  @click="toggleFloatingBox" class="get-click btn-MountPanelSwitch"><v-icon> mdi-gamepad-square-outline </v-icon></button>
+    <button v-show="!showFloatingBox" @click="toggleFloatingBox" class="get-click btn-MountPanelSwitch"><v-icon> mdi-gamepad-square-outline </v-icon></button>
     <mount-control-panel v-show="showFloatingBox" style="position: absolute; top: 60px; right: 10px; " class="get-click"></mount-control-panel>
   </div>
   

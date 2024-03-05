@@ -15,8 +15,8 @@
     </div>
     
     <div>
-      <button class="custom-button btn-focus no-select" @touchend="toggleFocuserPanel"> <i class="mdi mdi-image-filter-center-focus"></i> </button>
-      <button class="custom-button btn-hist no-select" @touchend="toggleHistogramPanel"> <i class="mdi mdi-arrow-expand-horizontal"></i> </button>
+      <button class="custom-button btn-focus no-select" @click="toggleFocuserPanel"> <i class="mdi mdi-image-filter-center-focus"></i> </button>
+      <button class="custom-button btn-hist no-select" @click="toggleHistogramPanel"> <i class="mdi mdi-arrow-expand-horizontal"></i> </button>
     </div>
 
     <div>
