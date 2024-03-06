@@ -17,15 +17,17 @@
 
 <style>
   .bottom-button {
-    width: 50px;
-    height: 50px;
+    width: 35px;
+    height: 35px;
     position: relative;
     display: inline-block;
     user-select: none;
-    backdrop-filter: blur(5px); /* 添加毛玻璃效果 */
+    backdrop-filter: blur(5px);
     background-color: rgba(0, 0, 0, 0.1);
-    border-radius: 10px; /* 添加圆角效果，根据需要调整圆角半径 */
+    border-radius: 10px;
     border: 1px solid rgba(255, 255, 255, 0.8);
+    bottom: 20px;
+    margin-right: 15px; 
   }
   .bottom-button img {
     width: 100%;

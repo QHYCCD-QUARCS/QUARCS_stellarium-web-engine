@@ -45,7 +45,7 @@ export default {
       
       initialColumnValues: {
         1: 'null ',
-        2: '',
+        2: '::',
         3: '1 s',
         4: 'L',
         5: '1',
@@ -234,6 +234,71 @@ export default {
               const numberPart = currentValue.slice(spaceIndex + 1);
               if (numberPart.length > 0) {
                 this.cellValues[key] = currentValue.slice(0, spaceIndex + 1) + numberPart.slice(0, -1);
+              }
+            }
+          }
+        } else if (this.selectedColumn === 2) {
+          const currentValue = this.cellValues[key] || '';
+          const numbers = currentValue.match(/\d+/g) || [];
+          const colons = currentValue.match(/:/g) || [];
+          const textIsNumber = !isNaN(text);
+
+          if (textIsNumber) {
+            const currentLength = currentValue.length;
+            if (currentLength === 2) {
+              if (text < 3) {
+                const insertIndex = currentValue.indexOf(':');
+                const updatedValue = currentValue.slice(0, insertIndex) + text + currentValue.slice(insertIndex);
+                this.cellValues[key] = updatedValue;
+              }
+            } else if (currentLength === 3) {
+              const firstChar = currentValue.charAt(0);
+              if (firstChar > 1) {
+                if (text < 4) {
+                  const insertIndex = currentValue.indexOf(':');
+                  const updatedValue = currentValue.slice(0, insertIndex) + text + currentValue.slice(insertIndex);
+                  this.cellValues[key] = updatedValue;
+                }
+              } else {
+                const insertIndex = currentValue.indexOf(':');
+                const updatedValue = currentValue.slice(0, insertIndex) + text + currentValue.slice(insertIndex);
+                this.cellValues[key] = updatedValue;
+              }
+            } else if (currentLength === 4) {
+              if (text < 6) {
+                const insertIndex = currentValue.indexOf(':', currentValue.indexOf(':') + 1);
+                const updatedValue = currentValue.slice(0, insertIndex) + text + currentValue.slice(insertIndex);
+                this.cellValues[key] = updatedValue;
+              }
+            } else if (currentLength === 5) {
+              const insertIndex = currentValue.indexOf(':', currentValue.indexOf(':') + 1);
+              const updatedValue = currentValue.slice(0, insertIndex) + text + currentValue.slice(insertIndex);
+              this.cellValues[key] = updatedValue;
+            } else if (currentLength === 6) {
+              if (text < 6) {
+                const updatedValue = currentValue + text;
+                this.cellValues[key] = updatedValue;
+              }
+            } else if (currentLength === 7) {
+              const updatedValue = currentValue + text;
+              this.cellValues[key] = updatedValue;
+            }
+          } else if (text === 'Delete') {
+            const currentLength = currentValue.length;
+            if (currentLength === 7 || currentLength === 8) {
+              const updatedValue = currentValue.slice(0, -1);
+              this.cellValues[key] = updatedValue;
+            } else if (currentLength >= 5 && currentLength <= 6) {
+              const indexToDelete = currentValue.indexOf(':', currentValue.indexOf(':') + 1) - 1;
+              if (indexToDelete >= 0) {
+                const updatedValue = currentValue.slice(0, indexToDelete) + currentValue.slice(indexToDelete + 1);
+                this.cellValues[key] = updatedValue;
+              }
+            } else if (currentLength >= 3 && currentLength <= 4) {
+              const indexToDelete = currentValue.indexOf(':') - 1;
+              if (indexToDelete >= 0) {
+                const updatedValue = currentValue.slice(0, indexToDelete) + currentValue.slice(indexToDelete + 1);
+                this.cellValues[key] = updatedValue;
               }
             }
           }

@@ -1,52 +1,40 @@
 <template>
   <div class="mount-control-panel" :style="{ top: top + 'px', right: right + 'px', width: width + 'px', height: height + 'px' }">
-    <div>
-      <button class="custom-button ra-plus no-select" @touchstart="handleMouseDownRA('plus')" @touchend="stop">RA +</button>
-      <button class="custom-button ra-minus no-select" @touchstart="handleMouseDownRA('minus')" @touchend="stop">RA -</button>
-    </div>
-    <div>
-      <button class="custom-button dec-plus no-select" @touchstart="handleMouseDownDEC('plus')" @touchend="stop">DEC +</button>
-      <button class="custom-button dec-minus no-select" @touchstart="handleMouseDownDEC('minus')" @touchend="stop">DEC -</button>
-    </div>
-    <!-- <div>
-      <button class="custom-button ra-plus no-select" @mousedown="handleMouseDownRA('plus')" @mouseup="stop">RA +</button>
-      <button class="custom-button ra-minus no-select" @mousedown="handleMouseDownRA('minus')" @mouseup="stop">RA -</button>
-    </div>
-    <div>
-      <button class="custom-button dec-plus no-select" @mousedown="handleMouseDownDEC('plus')" @mouseup="stop" >DEC +</button>
-      <button class="custom-button dec-minus no-select" @mousedown="handleMouseDownDEC('minus')" @mouseup="stop">DEC -</button>
-    </div> -->
-
-    <div class="Dial-Knob">
-      <div class="tick-marks">
-        <div class="tick-mark" v-for="(angle, index) in snapAngles" :key="index" :style="{ transform: `rotate(${angle}deg)` }"></div>
-      </div>
-      <div class="knob" :style="{ transform: `rotate(${angle}deg)` }">
-        <div class="indicator" @mousedown="startDrag" @touchstart="startDragMobile">{{ speedNum }}</div>
-      </div>
+    <div class="Direction-Btn">
+      <button class="ra-plus no-select" @touchstart="handleMouseDownRA('plus')" @touchend="stop">RA +</button>
+      <button class="ra-minus no-select" @touchstart="handleMouseDownRA('minus')" @touchend="stop">RA -</button>
+      <button class="dec-plus no-select" @touchstart="handleMouseDownDEC('plus')" @touchend="stop">DEC +</button>
+      <button class="dec-minus no-select" @touchstart="handleMouseDownDEC('minus')" @touchend="stop">DEC -</button>
     </div>
 
     <div>
-      <button class="btn-stop no-select" @touchend="stop">STOP</button>
+      <button class="btn-stop no-select" @touchend="stop"><v-icon> mdi-stop-circle-outline </v-icon></button>
     </div>
     <div>
-      <button class="btn-more custom-button no-select" @touchend="toggleMore">
-        <span v-if="isExpanded">
-          <v-icon>mdi-chevron-up</v-icon>
-        </span>
-        <span v-else>
-          <v-icon>mdi-chevron-down</v-icon>
-        </span>
-      </button>
+      <button class="btn-speed custom-button no-select" @touchend="MountSlewRateSwitch" ref="speedContent"> 0 </button>
     </div>
     
-      <div v-if="showButtons">
-        <button v-bind:class="{ 'btn-park-on no-select': ParkSwitch, 'btn-park no-select': !ParkSwitch }" @touchend="MountPark">Park</button>
-        <button v-bind:class="{ 'btn-track-on no-select': TrackSwitch, 'btn-track no-select': !TrackSwitch }" @touchend="MountTrack">Track</button>
-        <button class="custom-button btn-home no-select" @touchend="MountHome">Home</button>
-        <button class="custom-button btn-sync no-select" @touchend="MountSYNC">SYNC</button>
-      </div>
-    
+    <div v-if="showButtons">
+      <button v-bind:class="{ 'btn-park-on no-select': ParkSwitch, 'btn-park no-select': !ParkSwitch }" @touchend="MountPark"><v-icon> mdi-parking </v-icon></button>
+      <button v-bind:class="{ 'btn-track-on no-select': TrackSwitch, 'btn-track no-select': !TrackSwitch }" @touchend="MountTrack"><v-icon> mdi-target </v-icon></button>
+      <button class="custom-button btn-home no-select" @touchend="MountHome"><v-icon> mdi-home </v-icon></button>
+      <button class="custom-button btn-sync no-select" @touchend="MountSYNC"><v-icon> mdi-sync </v-icon></button>
+    </div>
+
+    <div>
+      <i class="mdi border-icon mdi-image-filter-center-focus"></i>
+      <span v-if="isIDLE" class="icon-container">
+        <v-icon class="green-icon">mdi-circle-medium</v-icon>
+      </span>
+      <span v-else class="icon-container">
+        <v-icon class="red-icon">mdi-circle-medium</v-icon>
+      </span>
+    </div>
+
+    <div>
+      <button class="btn-close no-select" @touchend="PanelClose"><v-icon> mdi-close-circle-outline </v-icon></button>
+    </div>
+
   </div>
 </template>
 
@@ -55,35 +43,30 @@ export default {
   name: 'MountControlPanel',
   data() {
     return {
-      top: 50, // 初始位置的垂直坐标
-      right: 50, // 初始位置的水平坐标
+      top: 50,
+      right: 50,
       startX: 0,
       startY: 0,
-      width: 150, // 初始宽度
-      height: 180,
+      width: 150,
+      height: 240,
       
-      angle: 0,
-      dragging: false,
-      startAngle: 0,
-      
-      isExpanded: false, // 新增状态来追踪面板是否展开
-      showButtons: false,
+      isExpanded: true,
+      showButtons: true,
 
       ParkSwitch: false,
       TrackSwitch: false,
 
-      // angle: 0,
-      // dragging: false,
-      // startAngle: 0,
-      snapAngles: [], // 定义吸附的角度位置
+      SpeedTotalNum: [],
       speedNum: 0,
+
+      isIDLE: true,
     };
   },
   created() {
-    this.generateSnapAngles(360);
+    this.MountTotalSlewRate(7);
     this.$bus.$on('MountParkSwitch', this.MountParkSwitch);
     this.$bus.$on('MountTrackSwitch', this.MountTrackSwitch);
-    this.$bus.$on('MountTotalSlewRate',this.generateSnapAngles);
+    this.$bus.$on('MountTotalSlewRate',this.MountTotalSlewRate);
   },
   methods: {
     handleMouseDownRA(direction) {
@@ -128,113 +111,22 @@ export default {
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'MountSYNC');
     },
     
-    startDrag(event) {
-      this.dragging = true;
-      this.startAngle = this.getAngle(event);
-      document.addEventListener("mousemove", this.onDrag);
-      document.addEventListener("mouseup", this.stopDrag);
-    },
-    onDrag(event) {
-      if (this.dragging) {
-        const currentAngle = this.getAngle(event);
-        this.angle += currentAngle - this.startAngle;
-        this.startAngle = currentAngle;
-      }
-    },
-    stopDrag() {
-      this.dragging = false;
-      // 在拖拽结束时吸附到最近的角度位置
-      const nearestAngle = this.findNearestAngle(this.angle);
-      this.angle = nearestAngle;
-      
-       // 获取当前档数
-       this.speedNum = this.snapAngles.indexOf(nearestAngle) + 1;
-       console.log('当前档数：', this.speedNum);
-       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'MountSpeedSet:'+this.speedNum);  
-      
-      document.removeEventListener("mousemove", this.onDrag);
-      document.removeEventListener("mouseup", this.stopDrag);
-    },
-    getAngle(event) {
-      const rect = this.$el.getBoundingClientRect();
-      const centerX = rect.left + rect.width / 2;
-      const centerY = rect.top + rect.width / 2;
-      const deltaX = event.clientX - centerX;
-      const deltaY = event.clientY - centerY;
-      return (Math.atan2(deltaY, deltaX) * 180) / Math.PI;
-    },
-    
-    startDragMobile(event) {
-      event.preventDefault(); // 阻止默认触摸事件
-      this.dragging = true;
-      this.startAngle = this.getAngle(event.touches[0]); // 使用触摸事件的第一个触摸点
-      document.addEventListener("touchmove", this.onDragMobile);
-      document.addEventListener("touchend", this.stopDragMobile);
-    },
-
-    onDragMobile(event) {
-      if (this.dragging) {
-        const currentAngle = this.getAngle(event.touches[0]); // 使用触摸事件的第一个触摸点
-        this.angle += currentAngle - this.startAngle;
-        this.startAngle = currentAngle;
-      }
-    },
-
-    stopDragMobile() {
-      this.dragging = false;
-      // 在触摸拖拽结束时吸附到最近的角度位置
-      const nearestAngle = this.findNearestAngle(this.angle);
-      this.angle = nearestAngle;
-      
-      // 获取当前档数
-      this.speedNum = this.snapAngles.indexOf(nearestAngle) + 1;
-      console.log('当前档数：', this.speedNum);    
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'MountSpeedSet:'+this.speedNum);  
-      
-      document.removeEventListener("touchmove", this.onDragMobile);
-      document.removeEventListener("touchend", this.stopDragMobile);
-    },
-
-    findNearestAngle(angle) {
-      // 处理角度值在0到360度之间
-      angle = (angle % 360 + 360) % 360;
-
-      let nearestAngle = this.snapAngles[0];
-      let minDifference = Math.abs(angle - nearestAngle);
-      for (let i = 1; i < this.snapAngles.length; i++) {
-        const difference = Math.abs(angle - this.snapAngles[i]);
-        if (difference < minDifference) {
-          minDifference = difference;
-          nearestAngle = this.snapAngles[i];
-        }
-      }
-      return nearestAngle;
-    },
-    generateSnapAngles(num) {
-      // 生成 num 个吸附角度，将其均匀分布在360度内
-      console.log('generateSnapAngles:',num);
-      this.snapAngles = [];
-      const interval = 360 / num;
+    MountTotalSlewRate(num) {
+      console.log('MountTotalSlewRate:',num);
+      this.SpeedTotalNum = [];
       for (let i = 0; i < num; i++) {
-        this.snapAngles.push(i * interval);
-        console.log('pushAngle:',i * interval);
+        this.SpeedTotalNum.push(i);
+        console.log('pushSpeed:',i);
       }
+    },
+
+    MountSlewRateSwitch() {
+      this.speedNum = (this.speedNum + 1) % this.SpeedTotalNum.length;
+      console.log('Switching to speed:', this.speedNum);
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'MountSpeedSet:'+this.speedNum);
+      this.$refs.speedContent.innerText = this.speedNum;
     },
     
-    toggleMore() {
-      this.isExpanded = !this.isExpanded;
-      if (this.isExpanded) {
-        setTimeout(() => {
-          this.showButtons = true;
-        }, 100);
-        this.height = 255;
-      } else {
-        setTimeout(() => {
-          this.showButtons = false;
-        }, 30);
-        this.height = 180;
-      }
-    },
     MountParkSwitch(Switch) {
       if(Switch === 'ON')
       {
@@ -245,6 +137,7 @@ export default {
         this.ParkSwitch = false;
       }
     },
+    
     MountTrackSwitch(Switch) {
       if(Switch === 'ON')
       {
@@ -254,6 +147,10 @@ export default {
       {
         this.TrackSwitch = false;
       }
+    },
+
+    PanelClose() {
+      this.$bus.$emit('MountPanelClose');
     },
   }
 }
@@ -266,6 +163,7 @@ export default {
   background-color: rgba(128, 128, 128, 0.5);
   backdrop-filter: blur(5px);
   border-radius: 10px;
+  border: 4px solid rgba(200, 200, 200, 0.5);
   box-sizing: border-box;
   transition: height 0.2s ease;
 }
@@ -274,91 +172,123 @@ export default {
   user-select: none;
   background-color: rgba(0, 0, 0, 0.3);
   backdrop-filter: blur(5px);
-  border-radius: 5px;
+  border-radius: 50%;
   box-sizing: border-box;
 }
 
+.Direction-Btn {
+  width: 120px;
+  height: 120px;
+  top: 15px;
+  left: 11px;
+
+  border-radius: 50%;
+  overflow: hidden;
+  position: relative;
+}
+
 .ra-plus {
-  clip-path: polygon(0 0, 100% 0, 100% 29%, 90% 30%, 80% 32%, 70% 36%, 60% 42%, 50% 50%, 42% 60%, 36% 70%, 32% 80%, 30% 90%, 29% 100%, 0 100%);
+  /* clip-path: polygon(0 0, 100% 0, 100% 59%, 90% 60%, 80% 64%, 70% 71%, 60% 75%, 50% 50%, 42% 60%, 36% 70%, 32% 80%, 30% 90%, 29% 100%, 0 100%); */
   
   position:absolute;
-  width: 70px;
-  height: 70px;
-  top: 4px;
-  left: 4px;
+  width: 57.5px;
+  height: 57.5px;
+  top: 0px;
+  left: 0px;
+
+  user-select: none;
+  background-color: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(5px);
+  box-sizing: border-box;
+  border: none;
+  mask-image: radial-gradient(circle at 60px 60px, transparent 35px, black 35px);
 }
 
 .ra-minus {
-  clip-path: polygon(100% 0, 0 0, 0 29%, 10% 30%, 20% 32%, 30% 36%, 40% 42%, 50% 50%, 58% 60%, 64% 70%, 68% 80%, 70% 90%, 71% 100%, 100% 100%);
+  /* clip-path: polygon(100% 0, 0 0, 0 29%, 10% 30%, 20% 32%, 30% 36%, 40% 42%, 50% 50%, 58% 60%, 64% 70%, 68% 80%, 70% 90%, 71% 100%, 100% 100%); */
   
   position:absolute;
-  width: 70px;
-  height: 70px;
-  top: 4px;
-  right: 4px;
+  width: 57.5px;
+  height: 57.5px;
+  top: 0px;
+  right: 0px;
+
+  user-select: none;
+  background-color: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(5px);
+  box-sizing: border-box;
+  border: none;
+  mask-image: radial-gradient(circle at -2.5px 60px, transparent 35px, black 35px);
 }
 
 .dec-plus {
-  clip-path: polygon(0 100%, 100% 100%, 100% 71%, 90% 70%, 80% 68%, 70% 64%, 60% 58%, 50% 50%, 42% 40%, 36% 30%, 32% 20%, 30% 10%, 29% 0, 0 0);
+  /* clip-path: polygon(0 100%, 100% 100%, 100% 71%, 90% 70%, 80% 68%, 70% 64%, 60% 58%, 50% 50%, 42% 40%, 36% 30%, 32% 20%, 30% 10%, 29% 0, 0 0); */
   
   position:absolute;
-  width: 70px;
-  height: 70px;
-  top: 76px;
-  left: 4px;
+  width: 57.5px;
+  height: 57.5px;
+  top: 62.5px;
+  left: 0px;
+
+  user-select: none;
+  background-color: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(5px);
+  box-sizing: border-box;
+  border: none;
+  mask-image: radial-gradient(circle at 60px -2.5px, transparent 35px, black 35px);
 }
 
 .dec-minus {
-  clip-path: polygon(100% 100%, 0 100%, 0 71%, 10% 70%, 20% 68%, 30% 64%, 40% 58%, 50% 50%, 58% 40%, 64% 30%, 68% 20%, 70% 10%, 71% 0, 100% 0);
+  /* clip-path: polygon(100% 100%, 0 100%, 0 71%, 10% 70%, 20% 68%, 30% 64%, 40% 58%, 50% 50%, 58% 40%, 64% 30%, 68% 20%, 70% 10%, 71% 0, 100% 0); */
   
   position:absolute;
-  width: 70px;
-  height: 70px;
-  top: 76px;
-  right: 4px;
+  width: 57.5px;
+  height: 57.5px;
+  top: 62.5px;
+  right: 0px;
+
+  user-select: none;
+  background-color: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(5px);
+  box-sizing: border-box;
+  border: none;
+  mask-image: radial-gradient(circle at -2.5px -2.5px, transparent 35px, black 35px);
 }
 
 .btn-stop {
   border-radius: 50%;
   position:absolute;
-  width: 50px;
-  height: 50px;
-  top: 50px;
-  left: 50px;
+  width: 60px;
+  height: 60px;
+  top: 45px;
+  left: 41px;
   
-  background-color: rgba(255, 0, 0, 0.3);
+  background-color: rgba(255, 0, 0, 0.5);
   /* border: 1px solid rgba(255, 255, 255, 0.8); */
   backdrop-filter: blur(5px); /* 添加毛玻璃效果 */
   box-sizing: border-box; /* 设置box-sizing为border-box */
+  border: none;
 }
 
-/* .btn-stop::before {
-  content: "";
-  position: absolute;
-  width: 2px;
-  height: 2px;
-  background-color: red;
-  border-radius: 50%;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-} */
-
-.ra-plus:active,
-.ra-minus:active,
-.dec-plus:active,
-.dec-minus:active,
-.btn-more:active,
+.btn-speed:active,
 .btn-park:active,
 .btn-truck:active,
 .btn-park-on:active,
 .btn-truck-on:active,
 .btn-home:active,
+.btn-close:active,
 .btn-sync:active {
   transform: scale(0.95); /* 点击时缩小按钮 */
   background-color: rgba(255, 255, 255, 0.7);
 }
 
+.ra-plus:active,
+.ra-minus:active,
+.dec-plus:active,
+.dec-minus:active {
+  /* transform: scale(0.95); */
+  background-color: rgba(255, 255, 255, 0.7);
+}
 .btn-stop:active {
   transform: scale(0.95); /* 点击时缩小按钮 */
   background-color: rgba(255, 0, 0, 0.5);
@@ -368,146 +298,120 @@ export default {
   user-select: none;
 }
 
-.Dial-Knob {
-  width: 100px;
-  height: 100px;
-  top: 25px;
-  left: 25px;
-  position: relative;
-}
-
-.tick-marks {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  top: 0;
-  left: -48px;
-  transform-origin: center center;
-  transform: rotate(90deg);
-}
-
-.tick-mark {
-  position: absolute;
-  width: 4px; /* 刻度线的宽度 */
-  height: 4px; /* 刻度线的高度 */
-  border-radius: 50%;
-  background-color: rgba(0, 0, 0, 0.5);
-  transform-origin: 50px; /* 以刻度线顶部为旋转中心 */
-}
-
-.knob {
-  width: 100px;
-  height: 100px;
-  background-color: rgba(50, 50, 50, 0.5);
-  border-radius: 50%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  cursor: pointer;
-  user-select: none;
-  position: relative;
-}
-
-.indicator {
-  width: 25px;
-  height: 25px;
-  border-radius: 50%; /* 添加圆角半径属性 */
-  position: absolute;
-  top: 0px; /* 调整垂直位置 */
-  left: 50%;
-  transform: translateX(-50%);
-  /* transform: translate(-50%, -50%); */
-  background-color: rgba(0, 0, 0, 0.5);
-  border: 1px solid rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(5px); /* 添加毛玻璃效果 */
-  cursor: pointer;
-  user-select: none;
-  box-sizing: border-box;
-
-  color: rgba(0, 0, 0, 0.3);
-  font-size: 16px;
-  text-align: center;
-}
-
-.btn-more {
-  position:absolute;
-  width: 142px;
-  height: 25px;
-  bottom: 4px; /* 保持在底部 */
-  left: 4px;
-}
-
 .btn-park{
   position:absolute;
-  width: 70px;
+  width: 35px;
   height: 35px;
-  bottom: 70px;
-  left: 4px;
+  bottom: 55px;
+  left: 10px;
 
   user-select: none;
   background-color: rgba(0, 0, 0, 0.3);
   backdrop-filter: blur(5px);
-  border-radius: 5px;
+  border-radius: 50%;
   box-sizing: border-box;
 }
 
 .btn-track{
   position:absolute;
-  width: 70px;
+  width: 35px;
   height: 35px;
-  bottom: 70px;
-  right: 4px;
+  bottom: 55px;
+  right: calc(50% - 17.5px);
 
   user-select: none;
   background-color: rgba(0, 0, 0, 0.3);
   backdrop-filter: blur(5px);
-  border-radius: 5px;
+  border-radius: 50%;
   box-sizing: border-box;
 }
 
 .btn-park-on{
   position:absolute;
-  width: 70px;
+  width: 35px;
   height: 35px;
-  bottom: 70px;
-  left: 4px;
+  bottom: 55px;
+  left: 10px;
 
   user-select: none;
   background-color: rgba(0, 255, 30, 0.5);
   backdrop-filter: blur(5px);
-  border-radius: 5px;
+  border-radius: 50%;
   box-sizing: border-box;
 }
 
 .btn-track-on{
   position:absolute;
-  width: 70px;
+  width: 35px;
   height: 35px;
-  bottom: 70px;
-  right: 4px;
+  bottom: 55px;
+  right: calc(50% - 17.5px);
 
   user-select: none;
   background-color: rgba(0, 255, 30, 0.5);
   backdrop-filter: blur(5px);
-  border-radius: 5px;
+  border-radius: 50%;
   box-sizing: border-box;
 }
 
 .btn-home{
   position:absolute;
-  width: 70px;
+  width: 35px;
   height: 35px;
-  bottom: 33px;
-  left: 4px;
+  bottom: 55px;
+  right: 10px;
 }
 
 .btn-sync{
   position:absolute;
-  width: 70px;
+  width: 35px;
   height: 35px;
-  bottom: 33px;
-  right: 4px;
+  bottom: 10px;
+  left: 10px;
 }
 
+.btn-speed {
+  position:absolute;
+  width: 35px;
+  height: 35px;
+  bottom: 10px;
+  right: calc(50% - 17.5px);
+}
+
+.border-icon {
+  position: absolute;
+  top: 0px;
+  left: 4px;
+  font-size: large;
+}
+
+.icon-container {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+}
+
+.icon-container .green-icon {
+  color: rgba(51, 218, 121, 1);
+}
+
+.icon-container .red-icon {
+  color: rgba(250, 0, 0, 1);
+}
+
+.btn-close {
+  position: absolute;
+  width: 25px;
+  height: 25px;
+  top: 3px;
+  right: 3px;
+
+  user-select: none;
+  background-color: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(5px);
+  box-sizing: border-box;
+  border: none;
+  border-radius: 50%;
+}
 
 </style>

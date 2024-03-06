@@ -1,31 +1,31 @@
 <template>
-  <div class="chart-panel" :style="{ width: width + 'px', height: height + 'px' }">
+  <div class="chart-panel" :style="{ bottom: bottom + 'px', left: left + 'px', right: right + 'px', height: height + 'px' }">
      <FocusChart ref="focuschart" class="focus-chart"/>
-     <button  @click="AutoFocus" @touchend="active" class="get-click btn-Auto">Auto</button>
-     <button  @click="StepsChange" @touchend="active" class="get-click btn-Steps">Steps</button>
-     <button  @click="SpeedChange" @touchend="active" class="get-click btn-Speed">Speed</button>
 
-     <button :disabled="isBtnMoveDisabled" @click="FocusLeftMove" @touchend="active" class="get-click btn-Left"><v-icon>mdi-chevron-left</v-icon></button>
-     <button :disabled="isBtnMoveDisabled" @click="FocusRightMove" @touchend="active" class="get-click btn-Right"><v-icon>mdi-chevron-right</v-icon></button>
-     
+     <div class="buttons-container">
+      <button  @click="SpeedChange" @touchend="active" class="get-click btn-Speed">Speed</button>
+      <button :disabled="isBtnMoveDisabled" @click="FocusLeftMove" @touchend="active" class="get-click btn-Left"><v-icon>mdi-arrow-left-bold-circle-outline</v-icon></button>
+      <button  @click="AutoFocus" @touchend="active" class="get-click btn-Auto"><v-icon>mdi-focus-auto</v-icon></button>
+      <button  @click="FocusGoto" @touchend="active" class="get-click btn-Goto"><v-icon>mdi-google-circles-group</v-icon></button>
+      <button :disabled="isBtnMoveDisabled" @click="FocusRightMove" @touchend="active" class="get-click btn-Right"><v-icon>mdi-arrow-right-bold-circle-outline</v-icon></button>
+      <button  @click="StepsChange" @touchend="active" class="get-click btn-Steps"><v-icon>mdi-diameter-outline</v-icon></button>
+    </div>
+
      <div class="Canvas-Bar">
        <canvas ref="FocusCanvas" id="Focus-Canvas"></canvas>
      </div>
      
-     <div class="Speed-Bar" :style="{ fontSize: '12px' }">
+     <div class="Speed-Bar" :style="{ fontSize: '8px' }">
        {{this.MoveSpeed_}}
      </div>
      
-     <!-- <div class="State-Bar" :style="{ fontSize: '12px' }">
-       Current:{{this.CurrentPosition}}Target:{{this.TargetPosition}}
-     </div> -->
-     <div class="State-Bar">
+     <div class="State-Bar" :style="{ left: 40 + 'px', right: 40 + 'px', fontSize: '8px' }" >
       <div style="text-align: left;">   Current:{{ this.CurrentPosition }}</div>
       <div style="text-align: center;">   FWHM:{{ this.FWHM }}</div>
       <div style="text-align: right;">Target:{{ this.TargetPosition }}   </div>
     </div>
      
-     <div class="Steps-Bar" :style="{ fontSize: '12px' }">
+     <div class="Steps-Bar" :style="{ fontSize: '8px' }">
       {{this.MoveSteps}}
      </div>
 
@@ -39,8 +39,11 @@ export default {
   name: 'FocuserPanel',
   data() {
     return {
-      width: 330, // 初始宽度
-      height: 170,
+      // width: 330, // 初始宽度
+      bottom: 10,
+      left: 170,
+      right: 170,
+      height: 110,
 
       MoveSteps: 100,
       MoveSpeed: 1,
@@ -64,6 +67,7 @@ export default {
     this.$bus.$on('FocusMoveDone', this.MoveDone);
     this.$bus.$on('UpdateFWHM',this.UpdateFWHM);
     this.$bus.$on('showRoiImage',this.loadAndDisplayImage);
+    this.$bus.$on('setTargetPosition', this.setTargetPosition);
   },
   methods: {
     AutoFocus() {
@@ -112,6 +116,14 @@ export default {
       this.TargetPosition = target;
     },
 
+    setTargetPosition(target) {
+      this.TargetPosition = target;
+    },
+
+    FocusGoto() {
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'focusMove:'+ "Target" + ":" + this.TargetPosition);
+    },
+
     MoveDone() {
       this.isBtnMoveDisabled = false;
       console.log('QHYCCD | FocusMoveDone');
@@ -155,92 +167,95 @@ export default {
   background-color: rgba(128, 128, 128, 0.5);
   backdrop-filter: blur(5px);
   border-radius: 10px; 
+  border: 4px solid rgba(200, 200, 200, 0.5);
+  box-sizing: border-box;
   transition: width 0.2s ease;
 }
 
 .focus-chart {
   position:absolute;
-  top: 5px;
+  bottom: 0px;
+  left: 5px;
+}
+
+.buttons-container {
+  display: flex;
+  justify-content: space-between;
+  position: absolute;
+  top: -39px;
+  left: 5px;
   right: 5px;
 }
 
 .btn-Speed {
-  position:absolute;
-  bottom: 5px;
-  right: 265px;
-
-  width: 60px;
-  height: 45px;
+  width: 30px;
+  height: 30px; 
 
   user-select: none;
-  background-color: rgba(0, 0, 0, 0.3);
+  background-color: rgba(128, 128, 128, 0.5);
   backdrop-filter: blur(5px);
   border: none;
-  border-radius: 5px; 
+  border-radius: 50%; 
   box-sizing: border-box;
 }
 
 .btn-Left {
-  position:absolute;
-  bottom: 5px;
-  right: 200px;
-
-  width: 60px;
-  height: 45px;
+  width: 30px;
+  height: 30px;
 
   user-select: none;
-  background-color: rgba(0, 0, 0, 0.3);
+  background-color: rgba(128, 128, 128, 0.5);
   backdrop-filter: blur(5px);
   border: none;
-  border-radius: 5px; 
+  border-radius: 50%; 
   box-sizing: border-box;
 }
 
 .btn-Auto {
-  position:absolute;
-  bottom: 5px;
-  right: 135px;
-
-  width: 60px;
-  height: 45px;
+  width: 30px;
+  height: 30px;
 
   user-select: none;
-  background-color: rgba(0, 0, 0, 0.3);
+  background-color: rgba(128, 128, 128, 0.5);
   backdrop-filter: blur(5px);
   border: none;
-  border-radius: 5px; 
+  border-radius: 50%; 
   box-sizing: border-box;
 }
 
 .btn-Right {
-  position:absolute;
-  bottom: 5px;
-  right: 70px;
-
-  width: 60px;
-  height: 45px;
+  width: 30px;
+  height: 30px; 
 
   user-select: none;
-  background-color: rgba(0, 0, 0, 0.3);
+  background-color: rgba(128, 128, 128, 0.5);
   backdrop-filter: blur(5px);
   border: none;
-  border-radius: 5px; 
+  border-radius: 50%; 
   box-sizing: border-box;
 }
 
 .btn-Steps {
-  position:absolute;
-  bottom: 5px;
-  right: 5px;
-
-  width: 60px;
-  height: 45px;
+  width: 30px;
+  height: 30px; 
 
   user-select: none;
-  background-color: rgba(0, 0, 0, 0.3);
+  background-color: rgba(128, 128, 128, 0.5);
   backdrop-filter: blur(5px);
   border: none;
-  border-radius: 5px; 
+  border-radius: 50%; 
+  box-sizing: border-box;
+}
+
+.btn-Goto {
+  width: 30px;
+  height: 30px; 
+
+  user-select: none;
+  background-color: rgba(128, 128, 128, 0.5);
+  backdrop-filter: blur(5px);
+  border: none;
+  border-radius: 50%; 
   box-sizing: border-box;
 }
 
@@ -248,84 +263,90 @@ export default {
 .btn-Left:active,
 .btn-Right:active,
 .btn-Steps:active,
-.btn-Speed:active {
+.btn-Speed:active,
+.btn-Goto:active {
   transform: scale(0.95); /* 点击时缩小按钮 */
   background-color: rgba(255, 255, 255, 0.7);
 }
 
 .Canvas-Bar {
   position:absolute;
-  top: 5px;
-  left: 5px;
+  bottom: 5px;
+  right: 5px;
 
-  width: 90px;
-  height: 90px;
+  width: 80px;
+  height: 80px;
   
   user-select: none;
-  background-color: rgba(0, 0, 0, 0.3);
+  background-color: rgba(0, 0, 0, 0);
   backdrop-filter: blur(5px);
-  border: none;
+  border: 1px solid rgba(200, 200, 200, 1);
   border-radius: 5px; 
   box-sizing: border-box;
 }
 
 .Speed-Bar { 
   position:absolute;
-  top: 100px;
+  top: 3px;
   left: 5px;
 
-  width: 60px;
-  height: 15px;
+  width: 30px;
+  height: 10px;
   
   user-select: none;
-  background-color: rgba(0, 0, 0, 0.3);
+  background-color: rgba(0, 0, 0, 0.1);
   backdrop-filter: blur(5px);
   border: none;
   border-radius: 5px; 
   box-sizing: border-box;
 
   text-align: center;
+  line-height: 10px;
+  white-space: nowrap;
+  
 }
 
 .State-Bar { 
   position:absolute;
-  top: 100px;
-  left: 70px;
-
-  width: 190px;
-  height: 15px;
+  top: 3px;
+  height: 10px;
   
   user-select: none;
-  background-color: rgba(0, 0, 0, 0.3);
+  background-color: rgba(0, 0, 0, 0.1);
   backdrop-filter: blur(5px);
   border: none;
   border-radius: 5px; 
   box-sizing: border-box;
 
-  /* text-align: center; */
   display: flex;
   justify-content: space-between;
   font-size: 10px;
+
+  text-align: center;
+  line-height: 10px;
+  white-space: nowrap;
 }
 
 .Steps-Bar { 
   position:absolute;
-  top: 100px;
+  top: 3px;
   right: 5px;
 
-  width: 60px;
-  height: 15px;
+  width: 30px;
+  height: 10px;
   
   user-select: none;
-  background-color: rgba(0, 0, 0, 0.3);
+  background-color: rgba(0, 0, 0, 0.1);
   backdrop-filter: blur(5px);
   border: none;
   border-radius: 5px; 
   box-sizing: border-box;
 
   text-align: center;
+  line-height: 10px;
+  white-space: nowrap;
 }
 
-#Focus-Canvas {width: 90px; height: 90px;position: absolute; top: 0; left: 0; border-radius: 5px;}
+#Focus-Canvas {width: 78px; height: 78px;position: absolute; top: 0; left: 0; border-radius: 5px;}
 
 </style>

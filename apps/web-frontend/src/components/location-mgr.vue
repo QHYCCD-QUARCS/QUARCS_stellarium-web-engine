@@ -187,6 +187,7 @@ export default {
     dragEnd: function (event) {
       var that = this
       var pos = { lat: event.target._latlng.lat, lng: event.target._latlng.lng, accuracy: 0 }
+      console.log('dragEnd pos: ' + pos.lat + ',' +pos.lng)
       swh.geoCodePosition(pos, that).then((p) => { that.pickLocation = p; that.setPickLocationMode() })
     }
   },

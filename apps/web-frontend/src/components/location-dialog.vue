@@ -13,6 +13,8 @@
       <v-switch :label="$t('Use Autolocation')" v-model="useAutoLocation"></v-switch>
     </v-card>
     <location-mgr v-on:locationSelected="setLocation" :knownLocations="[]" :startLocation="$store.state.currentLocation" :realLocation="$store.state.autoDetectedLocation"></location-mgr>
+    <v-text-field v-model="manualCoordinates" label="Manual Coordinates" placeholder="Enter coordinates (lat, lng)"></v-text-field>
+    <v-btn @click="saveManualCoordinates" color="primary">Save Manual Coordinates</v-btn>
   </v-container>
 </v-dialog>
 </template>
@@ -41,6 +43,19 @@ export default {
     setLocation: function (loc) {
       this.$store.commit('setCurrentLocation', loc)
       this.$store.commit('toggleBool', 'showLocationDialog')
+    },
+    saveManualCoordinates: function () {
+      const [lat, lng] = this.manualCoordinates.split(',').map(coord => parseFloat(coord.trim()))
+      const loc = {
+        short_name: 'Unknown',
+        country: 'Unknown',
+        lng: lng,
+        lat: lat,
+        alt: 0, 
+        accuracy: 0, 
+        street_address: ''
+      }
+      this.setLocation(loc)
     }
   },
   components: { LocationMgr }

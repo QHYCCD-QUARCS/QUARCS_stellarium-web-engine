@@ -13,7 +13,7 @@
       <img class="tbtitle hidden-xs-only" id="stellarium-web-toolbar-logo" src="@/assets/images/logo.svg" width="33" height="33" alt="Stellarium Web Logo"/>
       <span class="tbtitle_"><sub>U A R C S</sub></span>
       <v-spacer></v-spacer>
-      <target-search></target-search>
+      <target-search v-show="isTargetSearchShow"></target-search>
       <v-spacer></v-spacer>
       <div v-if="$store.state.showFPS" class="subheader grey--text pr-2" style="user-select: none;">FPS {{ $store.state.stel ? $store.state.stel.fps.toFixed(1) : '?' }}</div>
       <div class="subheader grey--text" style="user-select: none;">FOV {{ fov }}</div>
@@ -31,6 +31,18 @@
         </template>
         <date-time-picker v-model="pickerDate" :location="$store.state.currentLocation"></date-time-picker>
       </v-menu>
+
+      <button class="ScheduleBtn" @click="toggleSchedulePanel" >
+        <i class="mdi mdi-table-large"></i>
+      </button>
+
+      <span v-if="isConnect" class="icon-container">
+        <v-icon class="green-icon">mdi-wifi</v-icon>
+      </span>
+      <span v-else class="icon-container">
+        <v-icon class="red-icon">mdi-wifi-off</v-icon>
+      </span>
+      
     </v-toolbar>
   </div>
 </template>
@@ -44,7 +56,13 @@ import Moment from 'moment'
 export default {
   data: function () {
     return {
+      isTargetSearchShow: true,
+      isConnect: true,
     }
+  },
+  created() {
+    this.$bus.$on('ShowTargetSearch', this.ShowTargetSearch);
+    this.$bus.$on('ShowNetStatus', this.ShowNetStatus);
   },
   computed: {
     fov: function () {
@@ -88,6 +106,30 @@ export default {
       const m = Moment(d)
       m.local()
       return m
+    },
+
+    ShowTargetSearch() {
+      this.isTargetSearchShow = !this.isTargetSearchShow;
+    },
+
+    ShowNetStatus(status) {
+      if(status === 'true')
+      {
+        this.isConnect = true;
+      }
+      else if(status === 'false')
+      {
+        this.isConnect = false;
+      }
+      else if(status === 'abnormal')
+      {
+        this.isConnect = false;
+      }
+      
+    },
+
+    toggleSchedulePanel() {
+      this.$bus.$emit('toggleSchedulePanel');
     },
 
   },
@@ -134,19 +176,40 @@ export default {
 }
 
 .TimerPickBtn {
-    /* margin: 0.2rem; */
     padding: 0.2rem 0.6rem;
     color: white;
-    border-radius: 4px;
     cursor: pointer;
-    transition: background-color 0.3s ease;
 
     font-size: 14px;
+    text-align: center;
+}
 
-    backdrop-filter: blur(5px); /* 添加毛玻璃效果 */
+.ScheduleBtn {
+    margin: 10px;
+    color: white;
+    cursor: pointer;
+
+    font-size: x-large;
+    text-align: center;
+    line-height: 35px;
+
+    width: 35px;
+    height: 35px;
+    
+    user-select: none;
+    backdrop-filter: blur(5px);
     background-color: rgba(0, 0, 0, 0.1);
-    border: 1px solid rgba(200, 200, 200, 0.8);
-    text-align: center; /* 文本水平居中对齐 */
+    border-radius: 10px;
+
+    border: 1px solid rgba(255, 255, 255, 0.8);
+}
+
+.icon-container .green-icon {
+  color: rgba(51, 218, 121, 0.7);
+}
+
+.icon-container .red-icon {
+  color: rgba(250, 0, 0, 0.5);
 }
 
 </style>

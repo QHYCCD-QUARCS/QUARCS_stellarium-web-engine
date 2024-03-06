@@ -27,10 +27,15 @@ export default {
     };
   },
   created() {
+    this.$bus.$on('toggleHistogramPanel', this.setMaxWidth);
     this.$bus.$on('ChangeDialPosition', this.ChangeDialPosition);
-
   },
   methods: {
+    setMaxWidth() {
+      const Width = window.innerWidth;
+      this.width = Width - 350;
+      this.secondPositionX = this.width;
+    },
     startDrag(event) {
       event.preventDefault(); // 阻止默认触摸事件
       this.dragging = true;
