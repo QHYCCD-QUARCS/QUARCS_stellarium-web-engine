@@ -556,6 +556,7 @@ const swh = {
 
   geoCodePosition: function (pos, ctx) {
     console.log('Geocoding position... ')
+    console.log('Geocoding position start:', pos)
     const ll = ctx.$t('Lat {0}° Lon {1}°', [pos.lat.toFixed(3), pos.lng.toFixed(3)])
     var loc = {
       short_name: pos.accuracy > 500 ? ctx.$t('Near {0}', [ll]) : ll,
@@ -566,6 +567,8 @@ const swh = {
       accuracy: pos.accuracy,
       street_address: ''
     }
+    // console.log('Geocoding position over:', loc)
+    // return Promise.resolve(loc)
     return fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=' + pos.lat + '&lon=' + pos.lng,
       { headers: { 'Content-Type': 'application/json; charset=UTF-8' } }).then(response => {
       if (response.ok) {
@@ -576,6 +579,7 @@ const swh = {
           if (pos.accuracy < 50) {
             loc.street_address = res.address.road ? res.address.road : res.display_name
           }
+          console.log('Geocoding position over:', loc)
           return loc
         })
       } else {
