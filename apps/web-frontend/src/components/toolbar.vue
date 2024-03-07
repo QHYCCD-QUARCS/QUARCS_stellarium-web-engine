@@ -10,13 +10,15 @@
   <div id="toolbar-image">
     <v-toolbar class="transparent" dense>
       <v-app-bar-nav-icon @click="toggleNavigationDrawer"></v-app-bar-nav-icon>
-      <img class="tbtitle hidden-xs-only" id="stellarium-web-toolbar-logo" src="@/assets/images/logo.svg" width="33" height="33" alt="Stellarium Web Logo"/>
-      <span class="tbtitle_"><sub>U A R C S</sub></span>
+      <img class="tbtitle hidden-xs-only" id="stellarium-web-toolbar-logo" src="@/assets/images/logo.svg" width="160" height="32" alt="Stellarium Web Logo"/>
+      <!-- <span class="tbtitle_"><sub>U A R C S</sub></span> -->
       <v-spacer></v-spacer>
       <target-search v-show="isTargetSearchShow"></target-search>
       <v-spacer></v-spacer>
-      <div v-if="$store.state.showFPS" class="subheader grey--text pr-2" style="user-select: none;">FPS {{ $store.state.stel ? $store.state.stel.fps.toFixed(1) : '?' }}</div>
-      <div class="subheader grey--text" style="user-select: none;">FOV {{ fov }}</div>
+      <div>
+        <div v-if="$store.state.showFPS" class="subheader grey--text pr-2" style="user-select: none;">FPS {{ $store.state.stel ? $store.state.stel.fps.toFixed(1) : '?' }}</div>
+        <div class="subheader grey--text" style="user-select: none;">FOV {{ fov }}</div>
+      </div>
       <!-- <v-btn class="transparent" v-if="!$store.state.showSidePanel" to="/p">{{ $t('Observe') }}<v-icon>mdi-chevron-down</v-icon></v-btn> -->
       <v-menu v-if="$store.state.showTimeButtons" :close-on-content-click="false" transition="v-slide-y-transition" offset-y top left>
         <template v-slot:activator="{ on }">
@@ -32,16 +34,16 @@
         <date-time-picker v-model="pickerDate" :location="$store.state.currentLocation"></date-time-picker>
       </v-menu>
 
-      <button class="ScheduleBtn" @click="toggleSchedulePanel" >
-        <i class="mdi mdi-table-large"></i>
-      </button>
-
       <span v-if="isConnect" class="icon-container">
         <v-icon class="green-icon">mdi-wifi</v-icon>
       </span>
       <span v-else class="icon-container">
         <v-icon class="red-icon">mdi-wifi-off</v-icon>
       </span>
+
+      <button class="ScheduleBtn" @click="toggleSchedulePanel" >
+        <i class="mdi mdi-table-large"></i>
+      </button>
       
     </v-toolbar>
   </div>
@@ -198,10 +200,10 @@ export default {
     
     user-select: none;
     backdrop-filter: blur(5px);
-    background-color: rgba(0, 0, 0, 0.1);
+    background-color: rgba(0, 0, 0, 0.0);
     border-radius: 10px;
 
-    border: 1px solid rgba(255, 255, 255, 0.8);
+    /* border: 1px solid rgba(255, 255, 255, 0.8); */
 }
 
 .icon-container .green-icon {

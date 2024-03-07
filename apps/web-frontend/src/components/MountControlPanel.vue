@@ -160,10 +160,10 @@ export default {
 .mount-control-panel {
   pointer-events: auto;
   position: fixed;
-  background-color: rgba(128, 128, 128, 0.5);
+  background-color: rgba(64, 64, 64, 0.5);
   backdrop-filter: blur(5px);
   border-radius: 10px;
-  border: 4px solid rgba(200, 200, 200, 0.5);
+  border: 4px solid rgba(128, 128, 128, 0.5);
   box-sizing: border-box;
   transition: height 0.2s ease;
 }

@@ -94,12 +94,20 @@ export default {
           max: x_max,
           axisLine: {
             lineStyle: {
-              color: 'white'  // x轴线颜色
+              color: 'rgba(200, 200, 200, 0.5)'  // x轴线颜色
             }
           },
           axisLabel: {
             color: 'white', 
             fontSize: 5
+          },
+          splitLine: {
+            show: true, // 显示分隔线
+            lineStyle: {
+              color: 'rgba(128, 128, 128, 0.5)', // 设置分隔线颜色
+              width: 1, // 设置分隔线宽度
+              type: 'solid' // 设置分隔线样式
+            }
           }
         },
         yAxis: {
@@ -107,12 +115,21 @@ export default {
           max: y_max,
           axisLine: {
             lineStyle: {
-              color: 'white'  // x轴线颜色
+              color: 'rgba(200, 200, 200, 0.5)'  // x轴线颜色
             }
           },
           axisLabel: {
             color: 'white', 
             fontSize: 5
+          },
+          splitNumber: 3, // 设置分隔线的数量
+          splitLine: {
+            show: true, // 显示分隔线
+            lineStyle: {
+              color: 'rgba(128, 128, 128, 0.5)', // 设置分隔线颜色
+              width: 1, // 设置分隔线宽度
+              type: 'solid' // 设置分隔线样式
+            }
           }
         },
         series: [

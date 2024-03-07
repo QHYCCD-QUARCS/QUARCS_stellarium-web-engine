@@ -3,7 +3,7 @@
      <FocusChart ref="focuschart" class="focus-chart"/>
 
      <div class="buttons-container">
-      <button  @click="SpeedChange" @touchend="active" class="get-click btn-Speed">Speed</button>
+      <button  @click="SpeedChange" @touchend="active" class="get-click btn-Speed"><v-icon>mdi-run-fast</v-icon></button>
       <button :disabled="isBtnMoveDisabled" @click="FocusLeftMove" @touchend="active" class="get-click btn-Left"><v-icon>mdi-arrow-left-bold-circle-outline</v-icon></button>
       <button  @click="AutoFocus" @touchend="active" class="get-click btn-Auto"><v-icon>mdi-focus-auto</v-icon></button>
       <button  @click="FocusGoto" @touchend="active" class="get-click btn-Goto"><v-icon>mdi-google-circles-group</v-icon></button>
@@ -164,10 +164,10 @@ export default {
 <style scoped>
 .chart-panel {
   position: absolute;
-  background-color: rgba(128, 128, 128, 0.5);
+  background-color: rgba(64, 64, 64, 0.5);
   backdrop-filter: blur(5px);
-  border-radius: 10px; 
-  border: 4px solid rgba(200, 200, 200, 0.5);
+  border-radius: 10px;
+  border: 4px solid rgba(128, 128, 128, 0.5);
   box-sizing: border-box;
   transition: width 0.2s ease;
 }
@@ -192,7 +192,7 @@ export default {
   height: 30px; 
 
   user-select: none;
-  background-color: rgba(128, 128, 128, 0.5);
+  background-color: rgba(64, 64, 64, 0.5);
   backdrop-filter: blur(5px);
   border: none;
   border-radius: 50%; 
@@ -204,7 +204,7 @@ export default {
   height: 30px;
 
   user-select: none;
-  background-color: rgba(128, 128, 128, 0.5);
+  background-color: rgba(64, 64, 64, 0.5);
   backdrop-filter: blur(5px);
   border: none;
   border-radius: 50%; 
@@ -216,7 +216,7 @@ export default {
   height: 30px;
 
   user-select: none;
-  background-color: rgba(128, 128, 128, 0.5);
+  background-color: rgba(64, 64, 64, 0.5);
   backdrop-filter: blur(5px);
   border: none;
   border-radius: 50%; 
@@ -228,7 +228,7 @@ export default {
   height: 30px; 
 
   user-select: none;
-  background-color: rgba(128, 128, 128, 0.5);
+  background-color: rgba(64, 64, 64, 0.5);
   backdrop-filter: blur(5px);
   border: none;
   border-radius: 50%; 
@@ -240,7 +240,7 @@ export default {
   height: 30px; 
 
   user-select: none;
-  background-color: rgba(128, 128, 128, 0.5);
+  background-color: rgba(64, 64, 64, 0.5);
   backdrop-filter: blur(5px);
   border: none;
   border-radius: 50%; 
@@ -252,7 +252,7 @@ export default {
   height: 30px; 
 
   user-select: none;
-  background-color: rgba(128, 128, 128, 0.5);
+  background-color: rgba(64, 64, 64, 0.5);
   backdrop-filter: blur(5px);
   border: none;
   border-radius: 50%; 
@@ -278,9 +278,9 @@ export default {
   height: 80px;
   
   user-select: none;
-  background-color: rgba(0, 0, 0, 0);
+  background-color: rgba(0, 0, 0, 0.1);
   backdrop-filter: blur(5px);
-  border: 1px solid rgba(200, 200, 200, 1);
+  border: 1px solid rgba(128, 128, 128, 1);
   border-radius: 5px; 
   box-sizing: border-box;
 }

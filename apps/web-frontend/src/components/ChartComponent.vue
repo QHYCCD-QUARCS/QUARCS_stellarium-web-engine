@@ -1,21 +1,22 @@
 <template>
-  <div class="chart-panel" :style="{ width: width + 'px', height: height + 'px' }">
-    <LineChart v-show="showLineChart" ref="linechart" class="line-chart"/>
+  <div class="chart-panel" :style="{ bottom: bottom + 'px', left: left + 'px', right: right + 'px', height: height + 'px' }">
+    <LineChart ref="linechart" class="line-chart"/>
     
     <ScatterChart ref="scatterchart" class="scatter-chart"/>
 
-    <button class="btn-More" @touchend="toggleMore">
+    <!-- <button class="btn-More" @touchend="toggleMore">
       <span v-if="isExpanded">
         <v-icon>mdi-chevron-right</v-icon>
       </span>
       <span v-else>
         <v-icon>mdi-chevron-left</v-icon>
       </span>
-    </button>
+    </button> -->
 
-    <button v-show="showLineChart" class="btn-Clear" @touchend="DataClear">Clear</button>
-    <button v-show="showLineChart" class="btn-RangeSwitch" @touchend="RangeSwitch">Range Switch</button>
-
+    <div class="buttons-container">
+      <button class="btn-Clear" @touchend="DataClear"><v-icon>mdi-delete</v-icon></button>
+      <button class="btn-RangeSwitch" @touchend="RangeSwitch"><v-icon>mdi-stretch-to-page-outline</v-icon></button>
+    </div>
     <!-- <button @click="addLineData(); addScatterData();" class="btn-addData">Add Data</button> -->
   </div>
 </template>
@@ -28,11 +29,13 @@ export default {
   name: 'ChartsPanel',
   data() {
     return {
-      width: 130, // 初始宽度
-      height: 100,
+      bottom: 10,
+      left: 170,
+      right: 170,
+      height: 110,
       
-      isExpanded: false, // 新增状态来追踪面板是否展开
-      showLineChart: false,
+      // isExpanded: false, // 新增状态来追踪面板是否展开
+      // showLineChart: false,
     };
   },
   components: {
@@ -51,20 +54,20 @@ export default {
       
     //   this.$refs.scatterchart.addData(newDataPoint);
     // },
-    toggleMore() {
-      this.isExpanded = !this.isExpanded;
-      if (this.isExpanded) {
-        setTimeout(() => {
-          this.showLineChart = true;
-        }, 100);
-        this.width = 355;
-      } else {
-        setTimeout(() => {
-          this.showLineChart = false;
-        }, 30);
-        this.width = 130;
-      }
-    },
+    // toggleMore() {
+    //   this.isExpanded = !this.isExpanded;
+    //   if (this.isExpanded) {
+    //     setTimeout(() => {
+    //       this.showLineChart = true;
+    //     }, 100);
+    //     this.width = 355;
+    //   } else {
+    //     setTimeout(() => {
+    //       this.showLineChart = false;
+    //     }, 30);
+    //     this.width = 130;
+    //   }
+    // },
     DataClear() {
       this.$bus.$emit('clearChartData');
     },
@@ -78,56 +81,60 @@ export default {
 <style scoped>
 .chart-panel {
   position: absolute;
-  background-color: rgba(128, 128, 128, 0.5);
-  /* border: 1px solid rgba(255, 255, 255, 0.8); */
+  background-color: rgba(64, 64, 64, 0.5);
   backdrop-filter: blur(5px);
-  border-radius: 10px; 
+  border-radius: 10px;
+  border: 4px solid rgba(128, 128, 128, 0.5);
+  box-sizing: border-box;
   transition: width 0.2s ease;
 }
 
 .line-chart {
   position:absolute;
-  top: 5px;
-  left: 65px;
+  bottom: 1px;
+  left: 5px;
 }
 
 .scatter-chart {
   position:absolute;
-  top: 5px;
-  right: 5px;
+  top: 1px;
+  right: 0px;
+}
+
+.buttons-container {
+  display: flex;
+  justify-content: space-between;
+  position: absolute;
+  top: -39px;
+  left: 30%;
+  right: 30%;
 }
 
 .btn-Clear {
-  position:absolute;
-  top: 5px;
-  left: 35px;
-  
-  width: 25px;
-  height: 43px;
-  
+  width: 30px;
+  height: 30px; 
+
   user-select: none;
-  background-color: rgba(0, 0, 0, 0.3);
+  background-color: rgba(64, 64, 64, 0.5);
   backdrop-filter: blur(5px);
-  border-radius: 5px; 
+  border: none;
+  border-radius: 50%; 
   box-sizing: border-box;
 }
 
 .btn-RangeSwitch {
-  position:absolute;
-  bottom: 5px;
-  left: 35px;
-  
-  width: 25px;
-  height: 43px;
-  
+  width: 30px;
+  height: 30px; 
+
   user-select: none;
-  background-color: rgba(0, 0, 0, 0.3);
+  background-color: rgba(64, 64, 64, 0.5);
   backdrop-filter: blur(5px);
-  border-radius: 5px; 
+  border: none;
+  border-radius: 50%; 
   box-sizing: border-box;
 }
 
-.btn-More {
+/* .btn-More {
   position:absolute;
   top: 5px;
   left: 5px;
@@ -140,7 +147,7 @@ export default {
   backdrop-filter: blur(5px);
   border-radius: 5px; 
   box-sizing: border-box;
-}
+} */
 
 .btn-Clear:active,
 .btn-RangeSwitch:active ,

@@ -1,6 +1,6 @@
 <template>
   <div>
-    <div ref="scatterchart" style="width: 90px; height: 90px;" class="scatterchart-panel"></div>
+    <div ref="scatterchart" style="width: 100px; height: 100px;" class="scatterchart-panel"></div>
     <!-- <button @click="clearChartData" class="clear-btn">Clear</button> -->
   </div>
 </template>
@@ -50,11 +50,20 @@ export default {
           max: x_max,
           axisLine: {
             lineStyle: {
-              color: 'white'  // x轴线颜色
+              color: 'rgba(200, 200, 200, 0.5)'  // x轴线颜色
             }
           },
           axisLabel: {
-            color: 'white'  // x轴刻度标签颜色
+            color: 'white', 
+            fontSize: 5
+          },
+          splitLine: {
+            show: true, // 显示分隔线
+            lineStyle: {
+              color: 'rgba(128, 128, 128, 0.5)', // 设置分隔线颜色
+              width: 1, // 设置分隔线宽度
+              type: 'solid' // 设置分隔线样式
+            }
           }
         },
         yAxis: {
@@ -62,11 +71,20 @@ export default {
           max: y_max,
           axisLine: {
             lineStyle: {
-              color: 'white'  // y轴线颜色
+              color: 'rgba(200, 200, 200, 0.5)'  // y轴线颜色
             }
           },
           axisLabel: {
-            color: 'white'  // y轴刻度标签颜色
+            color: 'white', 
+            fontSize: 5
+          },
+          splitLine: {
+            show: true, // 显示分隔线
+            lineStyle: {
+              color: 'rgba(128, 128, 128, 0.5)', // 设置分隔线颜色
+              width: 1, // 设置分隔线宽度
+              type: 'solid' // 设置分隔线样式
+            }
           }
         },
         series: [{
@@ -132,8 +150,7 @@ export default {
 
 <style scoped>
 .scatterchart-panel {
-  background-color: rgba(0, 0, 0, 0.3);
-  /* border: 1px solid rgba(255, 255, 255, 0.8); */
+  background-color: rgba(0, 0, 0, 0.0);
   backdrop-filter: blur(5px);
   border-radius: 5px;
   box-sizing: border-box;

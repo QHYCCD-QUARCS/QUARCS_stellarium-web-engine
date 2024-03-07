@@ -1,6 +1,6 @@
 <template>
   <div>
-    <div ref="linechart" style="width: 190px; height: 90px;" class="linechart-panel"></div>
+    <div ref="linechart" :style="{ width: containerMaxWidth + 'px', height: 100 + 'px' }" class="linechart-panel"></div>
     <!-- <button @click="clearChartData" class="clear-btn">Clear</button> -->
   </div>
 </template>
@@ -12,6 +12,8 @@ export default {
   name: 'LineChart',
   data() {
     return {
+      containerMaxWidth: 190,
+
       chartData1: [],  
       chartData2: [],
       xAxis_min: 0,
@@ -32,16 +34,18 @@ export default {
   },
   methods: {
     initChart() {
+      const Width = window.innerWidth;
+      this.containerMaxWidth = Width - 455;
       const chartDom = this.$refs.linechart;
+      chartDom.style.width = this.containerMaxWidth + 'px';
       this.myChart = echarts.init(chartDom);
-
       this.renderChart(this.xAxis_min, this.xAxis_max, this.yAxis_min, this.yAxis_max);
     },
     renderChart(x_min,x_max,y_min,y_max) {
       const option = {
         grid: {  
           left: '0%',
-          right: '10%',
+          right: '2%',
           bottom: '0%',
           top: '10%',
           containLabel: true
@@ -51,11 +55,20 @@ export default {
           max: x_max,
           axisLine: {
             lineStyle: {
-              color: 'white'  // x轴线颜色
+              color: 'rgba(200, 200, 200, 0.5)'  // x轴线颜色
             }
           },
           axisLabel: {
-            color: 'white'  // x轴刻度标签颜色
+            color: 'white', 
+            fontSize: 5
+          },
+          splitLine: {
+            show: true, // 显示分隔线
+            lineStyle: {
+              color: 'rgba(128, 128, 128, 0.5)', // 设置分隔线颜色
+              width: 1, // 设置分隔线宽度
+              type: 'solid' // 设置分隔线样式
+            }
           }
         },
         yAxis: {
@@ -63,19 +76,32 @@ export default {
           max: y_max,
           axisLine: {
             lineStyle: {
-              color: 'white'  // x轴线颜色
+              color: 'rgba(200, 200, 200, 0.5)'  // x轴线颜色
             }
           },
           axisLabel: {
-            color: 'white'  // x轴刻度标签颜色
+            color: 'white', 
+            fontSize: 5
+          },
+          splitLine: {
+            show: true, // 显示分隔线
+            lineStyle: {
+              color: 'rgba(128, 128, 128, 0.5)', // 设置分隔线颜色
+              width: 1, // 设置分隔线宽度
+              type: 'solid' // 设置分隔线样式
+            }
           }
         },
         legend: {
           data: ['Ra', 'Dec'],  // 图例中的标注名称
           top: -5,       // 设置图例距离顶部的距离
-          right: 15,      // 设置图例距离右侧的距离
+          right: 5,      // 设置图例距离右侧的距离
           itemWidth: 7,   // 设置图例项的宽度为5
           itemHeight: 2,   // 设置图例项的高度为3
+          textStyle: {
+            color: 'white', // 设置字体颜色
+            fontSize: 8 // 设置字体大小
+          }
         },
         series: [
           {
@@ -145,8 +171,7 @@ export default {
 
 <style scoped>
 .linechart-panel {
-  background-color: rgba(0, 0, 0, 0.3);
-  /* border: 1px solid rgba(255, 255, 255, 0.8); */
+  background-color: rgba(0, 0, 0, 0.0);
   backdrop-filter: blur(5px);
   border-radius: 5px;
   box-sizing: border-box;

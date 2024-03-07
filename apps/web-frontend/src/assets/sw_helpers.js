@@ -367,7 +367,7 @@ const swh = {
   },
 
 
-  /*
+
   querySkySources: function (str, limit) {
     if (!limit) {
       limit = 10
@@ -375,7 +375,8 @@ const swh = {
 
     //console.log("QIU | querySkySources:" + process.env.VUE_APP_NOCTUASKY_API_SERVER + '/api/v1/skysources/?q=' + str + '&limit=' + limit)
     //return fetch( 'https://api.noctuasky.com/api/v1/skysources/?q=' + str + '&limit=' + limit)
-    return fetch(process.env.VUE_APP_NOCTUASKY_API_SERVER + '/api/v1/skysources/?q=' + str + '&limit=' + limit)
+    // return fetch(process.env.VUE_APP_NOCTUASKY_API_SERVER + '/api/v1/skysources/?q=' + str + '&limit=' + limit)
+    return fetch(process.env.VUE_APP_NOCTUASKY_API_SERVER + '/?q=' + str + '&limit=' + limit)
       .then(function (response) {
         if (!response.ok) {
           throw response.body
@@ -385,16 +386,16 @@ const swh = {
         throw err.response.body
       })
   },
-  */
+
 
   //by QIU just only for testing
-  querySkySources: function (str, limit) {
-    if (!limit) {
-      limit = 10;
-      console.log("QIU | 未指定limit,使用默认值", { defaultLimit: limit });
-    }
-    return Promise.resolve(myData);
-  },
+  // querySkySources: function (str, limit) {
+  //   if (!limit) {
+  //     limit = 10;
+  //     console.log("QIU | 未指定limit,使用默认值", { defaultLimit: limit });
+  //   }
+  //   return Promise.resolve(myData);
+  // },
 
   sweObj2SkySource: function (obj) {
     const names = obj.designations()

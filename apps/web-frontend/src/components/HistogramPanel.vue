@@ -2,8 +2,8 @@
   <div class="chart-panel" :style="{ bottom: bottom + 'px', left: left + 'px', right: right + 'px', height: height + 'px' }">
      <HistogramChart ref="histogramchart" class="histogram-chart"/>
      <DialKnob class="dial-knob"/>
-     <button  @touchend="AutoHistogram" class="get-click btn-Auto">Auto</button>
-     <button  @touchend="ResetHistogram" class="get-click btn-Reset">Reset</button>
+     <button  @touchend="AutoHistogram" class="get-click btn-Auto"><v-icon>mdi-alpha-a-circle-outline</v-icon></button>
+     <button  @touchend="ResetHistogram" class="get-click btn-Reset"><v-icon>mdi-refresh</v-icon></button>
   </div>
 </template>
 
@@ -18,7 +18,7 @@ export default {
       bottom: 10,
       left: 170,
       right: 170,
-      height: 100,
+      height: 110,
 
       histogram_min: 0,
       histogram_max: 255,
@@ -70,13 +70,13 @@ export default {
 .btn-Auto {
   position:absolute;
   top: -35px;
-  left: 5px;
+  left: 30%;
 
   width: 30px;
   height: 30px;
 
   user-select: none;
-  background-color: rgba(128, 128, 128, 0.5);
+  background-color: rgba(64, 64, 64, 0.5);
   backdrop-filter: blur(5px);
   border: none;
   border-radius: 50%; 
@@ -86,13 +86,13 @@ export default {
 .btn-Reset {
   position:absolute;
   top: -35px;
-  right: 5px;
+  right: 30%;
 
   width: 30px;
   height: 30px;
 
   user-select: none;
-  background-color: rgba(128, 128, 128, 0.5);
+  background-color: rgba(64, 64, 64, 0.5);
   backdrop-filter: blur(5px);
   border: none;
   border-radius: 50%; 

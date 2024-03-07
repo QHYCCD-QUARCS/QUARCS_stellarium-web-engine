@@ -57,7 +57,7 @@
   </div> -->
 
   <ChartComponent v-show="showChartsPanel" style="position: absolute; bottom: 10px; left: 170px; " class="get-click"/>
-  <button  v-show="isGuiderMode" @click="toggleChartsPanel" class="get-click btn-ChartsSwitch">Charts Panel</button>
+  <button  v-show="isCaptureMode" @click="toggleChartsPanel" class="get-click btn-ChartsSwitch"><v-icon> mdi-chart-scatter-plot </v-icon></button>
 
   <HistogramPanel v-show="showHistogramPanel" style="position: absolute; bottom: 10px; left: 170px; " class="get-click"/>
 
@@ -177,12 +177,30 @@ export default {
     },
     toggleChartsPanel() {
       this.showChartsPanel = !this.showChartsPanel;
+      if(this.showFocuserPanel) {
+        this.showFocuserPanel = !this.showFocuserPanel;
+      } 
+      else if(this.showHistogramPanel) {
+        this.showHistogramPanel = !this.showHistogramPanel;
+      }
     },
     toggleHistogramPanel() {
       this.showHistogramPanel = !this.showHistogramPanel;
+      if(this.showFocuserPanel) {
+        this.showFocuserPanel = !this.showFocuserPanel;
+      } 
+      else if(this.showChartsPanel) {
+        this.showChartsPanel = !this.showChartsPanel;
+      }
     },
     toggleFocuserPanel() {
       this.showFocuserPanel = !this.showFocuserPanel;
+      if(this.showHistogramPanel) {
+        this.showHistogramPanel = !this.showHistogramPanel;
+      }
+      else if(this.showChartsPanel) {
+        this.showChartsPanel = !this.showChartsPanel;
+      }
     },
     toggleSchedulePanel() {
       this.ShowSchedulePanel = !this.ShowSchedulePanel;
@@ -323,8 +341,9 @@ export default {
         this.isCaptureMode = false;
         this.isGuiderMode = true;
 
-        this.showMountSwitch = false;
+        this.showMountSwitch = true;
 
+        this.showChartsPanel = true;
         this.showHistogramPanel = false;
         this.showFocuserPanel = false;
         this.showRedBox = false;
@@ -353,17 +372,17 @@ export default {
       this.$bus.$emit('Switch-MainPage');
     },
 
-    Switch_ExpTime_CFW() {
-      if(this.isExpTimeBarShow === true)
-      {
-        this.isExpTimeBarShow = false;
-        this.isCFWSelectBarShow = true;
-      }
-      else {
-        this.isExpTimeBarShow = true;
-        this.isCFWSelectBarShow = false;
-      }
-    },
+    // Switch_ExpTime_CFW() {
+    //   if(this.isExpTimeBarShow === true)
+    //   {
+    //     this.isExpTimeBarShow = false;
+    //     this.isCFWSelectBarShow = true;
+    //   }
+    //   else {
+    //     this.isExpTimeBarShow = true;
+    //     this.isCFWSelectBarShow = false;
+    //   }
+    // },
 
     handleExpTimeSelected(time) {
       console.log('QHYCCD | ExpTimeSelected: ', time);
@@ -473,15 +492,15 @@ export default {
 
 .btn-ChartsSwitch {
   position:absolute;
-  width: 50px;
-  height: 50px;
-  bottom: 100px;
-  right: 10px;
+  width: 35px;
+  height: 35px;
+  bottom: 20px;
+  right: 90px;
   
   user-select: none;
   backdrop-filter: blur(5px);  
   background-color: rgba(0, 0, 0, 0.1);
-  border-radius: 50%;  
+  border-radius: 10px;  
   border: 1px solid rgba(255, 255, 255, 0.8);
 }
 

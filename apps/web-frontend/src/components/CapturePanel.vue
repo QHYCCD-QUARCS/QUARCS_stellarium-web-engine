@@ -1,13 +1,21 @@
 <template>
   <div class="capture-panel" :style="{ bottom: bottom + 'px', left: left + 'px', width: width + 'px', height: height + 'px' }">
     <div class="Direction-Btn">
-        <button class="ExpTime-minus no-select" @click="handleExpTimeButtonClick('minus')">-</button>
-        <button class="ExpTime-plus no-select" @click="handleExpTimeButtonClick('plus')">+</button>
-        <button class="CFW-minus no-select" @click="handleCFWButtonClick('minus')">-</button>
-        <button class="CFW-plus no-select" @click="handleCFWButtonClick('plus')">+</button>
+        <button class="ExpTime-minus no-select" @click="handleExpTimeButtonClick('minus')">
+          <span class="ExpTime-minus-icon"> <v-icon>mdi-menu-up</v-icon> </span>
+        </button>
+        <button class="ExpTime-plus no-select" @click="handleExpTimeButtonClick('plus')">
+          <span class="ExpTime-plus-icon"> <v-icon>mdi-menu-up</v-icon> </span>
+        </button>
+        <button class="CFW-minus no-select" @click="handleCFWButtonClick('minus')">
+          <span class="CFW-minus-icon"> <v-icon>mdi-menu-down</v-icon> </span>
+        </button>
+        <button class="CFW-plus no-select" @click="handleCFWButtonClick('plus')">
+          <span class="CFW-plus-icon"> <v-icon>mdi-menu-down</v-icon> </span>
+        </button>
 
         <span class="text-ExpTime-content" ref="expTimeContent"> 1ms </span>
-        <span class="text-CFW-content" ref="CFWContent"> Null </span>
+        <span class="text-CFW-content" ref="CFWContent"> CFW </span>
     </div>
 
     <div>
@@ -128,10 +136,10 @@ export default {
 .capture-panel {
   pointer-events: auto;
   position: fixed;
-  background-color: rgba(128, 128, 128, 0.5);
+  background-color: rgba(64, 64, 64, 0.5);
   backdrop-filter: blur(5px);
   border-radius: 10px;
-  border: 4px solid rgba(200, 200, 200, 0.5);
+  border: 4px solid rgba(128, 128, 128, 0.5);
   box-sizing: border-box;
   transition: height 0.2s ease;
 }
@@ -171,6 +179,13 @@ export default {
   mask-image: radial-gradient(circle at 60px 60px, transparent 35px, black 35px);
 }
 
+.ExpTime-minus-icon {
+  position: absolute;
+  top: 40%;
+  left: 40%;
+  transform: translate(-50%, -50%) rotate(-45deg);
+}
+
 .ExpTime-plus {
   position:absolute;
   width: 60px;
@@ -184,6 +199,13 @@ export default {
   box-sizing: border-box;
   border: none;
   mask-image: radial-gradient(circle at -2.5px 60px, transparent 35px, black 35px);
+}
+
+.ExpTime-plus-icon {
+  position: absolute;
+  top: 40%;
+  left: 60%;
+  transform: translate(-50%, -50%) rotate(45deg);
 }
 
 .CFW-minus { 
@@ -201,6 +223,13 @@ export default {
   mask-image: radial-gradient(circle at 60px -2.5px, transparent 35px, black 35px);
 }
 
+.CFW-minus-icon {
+  position: absolute;
+  top: 60%;
+  left: 40%;
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
 .CFW-plus {
   position:absolute;
   width: 60px;
@@ -214,6 +243,13 @@ export default {
   box-sizing: border-box;
   border: none;
   mask-image: radial-gradient(circle at -2.5px -2.5px, transparent 35px, black 35px);
+}
+
+.CFW-plus-icon {
+  position: absolute;
+  top: 60%;
+  left: 60%;
+  transform: translate(-50%, -50%) rotate(-45deg);
 }
 
 .btn-focus:active,

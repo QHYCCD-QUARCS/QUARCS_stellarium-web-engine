@@ -810,12 +810,13 @@ export default {
       const ctx = canvas.getContext('2d')
       const image = new Image()
       image.onload = () => {
-        const imageAspectRatio = image.width / image.height
-        if (canvas.width / canvas.height > imageAspectRatio) {
-          ctx.drawImage(image, 0, 0, canvas.height * imageAspectRatio, canvas.height)
-        } else {
-          ctx.drawImage(image, 0, 0, canvas.width, canvas.width / imageAspectRatio)
-        }
+        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+        // const imageAspectRatio = image.width / image.height
+        // if (canvas.width / canvas.height > imageAspectRatio) {
+        //   ctx.drawImage(image, 0, 0, canvas.height * imageAspectRatio, canvas.height)
+        // } else {
+        //   ctx.drawImage(image, 0, 0, canvas.width, canvas.width / imageAspectRatio)
+        // }
       }
       image.src = 'https://www.qhyccd.cn/wp-content/uploads/2023112312-scaled.jpg'
     },
@@ -824,12 +825,13 @@ export default {
       const ctx = canvas.getContext('2d')
       const image = new Image()
       image.onload = () => {
-        const imageAspectRatio = image.width / image.height
-        if (canvas.width / canvas.height > imageAspectRatio) {
-          ctx.drawImage(image, 0, 0, canvas.height * imageAspectRatio, canvas.height)
-        } else {
-          ctx.drawImage(image, 0, 0, canvas.width, canvas.width / imageAspectRatio)
-        }
+        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+        // const imageAspectRatio = image.width / image.height
+        // if (canvas.width / canvas.height > imageAspectRatio) {
+        //   ctx.drawImage(image, 0, 0, canvas.height * imageAspectRatio, canvas.height)
+        // } else {
+        //   ctx.drawImage(image, 0, 0, canvas.width, canvas.width / imageAspectRatio)
+        // }
         console.log(image.width, image.height, canvas.width, canvas.height)
       }
       image.src = 'https://www.qhyccd.cn/wp-content/uploads/2023112312-scaled.jpg'
