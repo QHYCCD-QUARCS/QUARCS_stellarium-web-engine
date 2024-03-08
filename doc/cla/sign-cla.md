@@ -1,7 +1,7 @@
-# Sign the Stellarium Web CLA
+# Sign the QUARCS_Stellarium Web CLA
 
 In order for your contribution to Stellarium Web to be accepted, you have to sign the
-Stellarium Web Contributor License Agreement (CLA). More information about this
+QUARCS_Stellarium Web Contributor License Agreement (CLA). More information about this
 requirement is explained in the [FAQ](#faq).
 
 ## If you are an individual
@@ -87,11 +87,11 @@ signature is merged.
 
 If you cannot submit your signature using a pull request, you may alternatively
 print the CLA, complete it, sign it, scan it and send it by email to
-contact@noctua-software.com.  In that case someone from the Stellarium Web team will
+quarcs@qhyccd.com.  In that case someone from the Stellarium Web team will
 make the pull request on your behalf.
 
-* Printable Stellarium Web CCLA v1.0 https://raw.githubusercontent.com/Stellarium/stellarium-web-engine/master/doc/cla/ccla-1.0.pdf
-* Printable Stellarium Web ICLA v1.0 https://raw.githubusercontent.com/Stellarium/stellarium-web-engine/master/doc/cla/icla-1.0.pdf
+* Printable QUARCS_Stellarium Web CCLA v1.0 https://raw.githubusercontent.com/Stellarium/stellarium-web-engine/master/doc/cla/ccla-1.0.pdf
+* Printable QUARCS_Stellarium Web ICLA v1.0 https://raw.githubusercontent.com/Stellarium/stellarium-web-engine/master/doc/cla/icla-1.0.pdf
 
 # FAQ
 
@@ -100,12 +100,12 @@ make the pull request on your behalf.
 The goal of having a Contributor License Agreement for Stellarium Web is to:
 
 * clearly define the terms under which intellectual property (patches, pull
-  requests, etc.) have been contributed to the Stellarium Web project
+  requests, etc.) have been contributed to the QUARCS_Stellarium Web project
 
-* protect the Stellarium Web project and its users in case of legal dispute about the
+* protect the QUARCS_Stellarium Web project and its users in case of legal dispute about the
   origin or ownership of any part of the code
 
-* protect the Stellarium Web project and its users from bad actors who would contribute
+* protect the QUARCS_Stellarium Web project and its users from bad actors who would contribute
   and then try to withdraw their contributions or cause legal trouble, e.g. in
   the form of patent lawsuits
 
@@ -117,7 +117,7 @@ The CLA is for the protection of the contributors, the project and its users.
 It does not change your rights to use your own contributions for any other
 purpose.
 
-The Stellarium Web CLA is based on the Apache Software Foundation CLA v2.0, as
+The QUARCS_Stellarium Web CLA is based on the Apache Software Foundation CLA v2.0, as
 can be found on the Apache website.
 
 This CLA is not a copyright assignment, it is a pure license agreement. You

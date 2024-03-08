@@ -131,4 +131,4 @@ Contributing
 ------------
 
 In order for your contribution to Stellarium Web Engine to be accepted, you have to sign the
-[Stellarium Web Contributor License Agreement (CLA)](doc/cla/sign-cla.md).
+[QUARCS_Stellarium Web Contributor License Agreement (CLA)](doc/cla/sign-cla.md).
