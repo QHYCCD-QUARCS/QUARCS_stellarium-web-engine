@@ -1,6 +1,6 @@
 # Sign the QUARCS_Stellarium Web CLA
 
-In order for your contribution to Stellarium Web to be accepted, you have to sign the
+In order for your contribution to QUARCS_Stellarium Web to be accepted, you have to sign the
 QUARCS_Stellarium Web Contributor License Agreement (CLA). More information about this
 requirement is explained in the [FAQ](#faq).
 
@@ -17,7 +17,7 @@ requirement is explained in the [FAQ](#faq).
 ```
 <country>, <date>
 
-I hereby agree to the terms of the Stellarium Web Individual Contributor License
+I hereby agree to the terms of the QUARCS_Stellarium Web Individual Contributor License
 Agreement v1.0.
 
 I declare that I am authorized and able to make this agreement and sign this
@@ -36,7 +36,7 @@ Signed,
     * `<git_email>`: your git committer email **(use `git config user.email` to see it)**
     * `<login>`: your GitHub login
 
-3. A Stellarium Web Team member will verify and accept your Pull Request. You can
+3. A QUARCS_Stellarium Web Team member will verify and accept your Pull Request. You can
 make other pull requests, but we won't be able to merge them until your CLA
 signature is merged.
 
@@ -53,7 +53,7 @@ signature is merged.
 ```
 <country>, <date>
 
-<company-name> agrees to the terms of the Stellarium Web Corporate Contributor License
+<company-name> agrees to the terms of the QUARCS_Stellarium Web Corporate Contributor License
 Agreement v1.0.
 
 I declare that I am authorized and able to make this agreement and sign this
@@ -79,25 +79,25 @@ List of contributors:
     * `<git_email>`: git committer email **(use `git config user.email` to see it)**
     * `<login>`: your GitHub login
 
-3. A Stellarium Web Team member will verify and accept your Pull Request. You can
+3. A QUARCS_Stellarium Web Team member will verify and accept your Pull Request. You can
 make other pull requests, but we won't be able to merge them until your CLA
 signature is merged.
 
-## If you don't have a github account
+## If you don't have a Github account
 
 If you cannot submit your signature using a pull request, you may alternatively
 print the CLA, complete it, sign it, scan it and send it by email to
-quarcs@qhyccd.com.  In that case someone from the Stellarium Web team will
+quarcs@qhyccd.com.  In that case someone from the QUARCS_Stellarium Web team will
 make the pull request on your behalf.
 
-* Printable QUARCS_Stellarium Web CCLA v1.0 https://raw.githubusercontent.com/Stellarium/stellarium-web-engine/master/doc/cla/ccla-1.0.pdf
-* Printable QUARCS_Stellarium Web ICLA v1.0 https://raw.githubusercontent.com/Stellarium/stellarium-web-engine/master/doc/cla/icla-1.0.pdf
+* Printable QUARCS_Stellarium Web CCLA v1.0 https://github.com/QHYCCD-QUARCS/QUARCS_stellarium-web-engine/blob/master/doc/cla/ccla-1.0.pdf
+* Printable QUARCS_Stellarium Web ICLA v1.0 https://github.com/QHYCCD-QUARCS/QUARCS_stellarium-web-engine/blob/master/doc/cla/icla-1.0.pdf
 
 # FAQ
 
 ## Why do I need to accept a CLA ?
 
-The goal of having a Contributor License Agreement for Stellarium Web is to:
+The goal of having a Contributor License Agreement for QUARCS_Stellarium Web is to:
 
 * clearly define the terms under which intellectual property (patches, pull
   requests, etc.) have been contributed to the QUARCS_Stellarium Web project
@@ -110,7 +110,7 @@ The goal of having a Contributor License Agreement for Stellarium Web is to:
   the form of patent lawsuits
 
 This is done by establishing a credible, non-repudiable record that each
-contributor really intended to contribute to the Stellarium Web project under specific
+contributor really intended to contribute to the QUARCS_Stellarium Web project under specific
 terms, and they had the right to make those contributions.
 
 The CLA is for the protection of the contributors, the project and its users.
@@ -122,18 +122,18 @@ can be found on the Apache website.
 
 This CLA is not a copyright assignment, it is a pure license agreement. You
 keep the full copyright for your contributions, you simply provide an
-irrevocable license to the project maintainer, Stellarium Labs SRL to use, modify and
+irrevocable license to the project maintainer, QHYCCD to use, modify and
 distribute your contributions without further restrictions.
 
 ## How does it work?
 
 Each individual contributor (making contributions only on their own behalf) is
 required to sign and submit the Individual Contributor License Agreement
-(ICLA) of Stellarium Web.  The agreement is executed by adding your name and
+(ICLA) of QUARCS_Stellarium Web.  The agreement is executed by adding your name and
 signature to the list of validated contributors inside the project source code.
 
 If someone is unable to sign the CLA, their contributions will have to be
-removed from the Stellarium Web project.
+removed from the QUARCS_Stellarium Web project.
 
 In addition, if some or all of someone's contributions are written as part of
 an employment by somebody else, the work may not belong to the contributor but
