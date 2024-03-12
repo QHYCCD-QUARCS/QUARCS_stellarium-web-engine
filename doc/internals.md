@@ -1,5 +1,5 @@
 
-Stellarium Web Engine internals
+QUARCS_Stellarium Web Engine internals
 ===============================
 
 # Files structure
