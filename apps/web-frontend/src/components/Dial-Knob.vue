@@ -12,7 +12,7 @@ export default {
       top: 5, // 初始位置的垂直坐标
       left: 5, // 初始位置的水平坐标
       width: 190, // 初始宽度
-      height: 100, // 初始高度
+      height: 80, // 初始高度
 
       DialWidth: 1,
       
@@ -199,7 +199,7 @@ export default {
 
 .indicator {
   width: 10px;
-  height: 100px;
+  height: 80px;
   border-radius: 1px;
   position: absolute;
   top: 50%;
@@ -214,7 +214,7 @@ export default {
 
 .second-indicator {
   width: 10px;
-  height: 100px;
+  height: 80px;
   border-radius: 1px;
   position: absolute;
   top: 50%;
@@ -229,7 +229,7 @@ export default {
 
 .indicator:active:active {
   width: 2px;
-  height: 100px;
+  height: 80px;
   border-radius: 1px;
   position: absolute;
   top: 50%;
@@ -245,7 +245,7 @@ export default {
 
 .second-indicator:active {
   width: 2px;
-  height: 100px;
+  height: 80px;
   border-radius: 1px;
   position: absolute;
   top: 50%;

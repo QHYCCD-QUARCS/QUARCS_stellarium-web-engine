@@ -1,6 +1,6 @@
 <template>
   <div>
-    <div ref="linechart" :style="{ width: containerMaxWidth + 'px', height: 100 + 'px' }" class="linechart-panel"></div>
+    <div ref="linechart" :style="{ width: containerMaxWidth + 'px', height: 80 + 'px' }" class="linechart-panel"></div>
     <!-- <button @click="clearChartData" class="clear-btn">Clear</button> -->
   </div>
 </template>
@@ -35,7 +35,7 @@ export default {
   methods: {
     initChart() {
       const Width = window.innerWidth;
-      this.containerMaxWidth = Width - 455;
+      this.containerMaxWidth = Width - 435;
       const chartDom = this.$refs.linechart;
       chartDom.style.width = this.containerMaxWidth + 'px';
       this.myChart = echarts.init(chartDom);

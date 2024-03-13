@@ -1,6 +1,7 @@
 <template>
   <div class="chart-panel" :style="{ bottom: bottom + 'px', left: left + 'px', right: right + 'px', height: height + 'px' }">
-     <FocusChart ref="focuschart" class="focus-chart"/>
+    <ImageChart ref="imagechart" class="image-chart"/>
+    <FocusChart ref="focuschart" class="focus-chart"/>
 
      <div class="buttons-container">
       <button  @click="SpeedChange" @touchend="active" class="get-click btn-Speed"><v-icon>mdi-run-fast</v-icon></button>
@@ -19,7 +20,7 @@
        {{this.MoveSpeed_}}
      </div>
      
-     <div class="State-Bar" :style="{ left: 40 + 'px', right: 40 + 'px', fontSize: '8px' }" >
+     <div class="State-Bar" :style="{ left: 80 + 'px', right: 80 + 'px', fontSize: '8px' }" >
       <div style="text-align: left;">   Current:{{ this.CurrentPosition }}</div>
       <div style="text-align: center;">   FWHM:{{ this.FWHM }}</div>
       <div style="text-align: right;">Target:{{ this.TargetPosition }}   </div>
@@ -34,6 +35,7 @@
 
 <script>
 import FocusChart from './Chart-Focus.vue';
+import ImageChart from './Chart-FocusImage.vue';
 
 export default {
   name: 'FocuserPanel',
@@ -43,7 +45,7 @@ export default {
       bottom: 10,
       left: 170,
       right: 170,
-      height: 110,
+      height: 90,
 
       MoveSteps: 100,
       MoveSpeed: 1,
@@ -58,7 +60,8 @@ export default {
     };
   },
   components: {
-    FocusChart
+    FocusChart,
+    ImageChart
   },
   created() {
     // this.$bus.$on('AutoHistogramNum', this.setAutoHistogramNum);
@@ -174,8 +177,14 @@ export default {
 
 .focus-chart {
   position:absolute;
-  bottom: 0px;
+  bottom: 1px;
   left: 5px;
+}
+
+.image-chart {
+  position:absolute;
+  bottom: 1px;
+  right: 0px;
 }
 
 .buttons-container {
@@ -271,31 +280,31 @@ export default {
 
 .Canvas-Bar {
   position:absolute;
-  bottom: 5px;
-  right: 5px;
+  bottom: 13px;
+  right: 7px;
 
-  width: 80px;
-  height: 80px;
+  width: 61px;
+  height: 60px;
   
   user-select: none;
-  background-color: rgba(0, 0, 0, 0.1);
-  backdrop-filter: blur(5px);
+  background-color: rgba(0, 0, 0, 0.0);
+  /* backdrop-filter: blur(5px); */
   border: 1px solid rgba(128, 128, 128, 1);
-  border-radius: 5px; 
+  /* border-radius: 5px;  */
   box-sizing: border-box;
 }
 
 .Speed-Bar { 
   position:absolute;
-  top: 3px;
+  top: 0px;
   left: 5px;
 
   width: 30px;
   height: 10px;
   
   user-select: none;
-  background-color: rgba(0, 0, 0, 0.1);
-  backdrop-filter: blur(5px);
+  background-color: rgba(0, 0, 0, 0.0);
+  /* backdrop-filter: blur(5px); */
   border: none;
   border-radius: 5px; 
   box-sizing: border-box;
@@ -308,12 +317,12 @@ export default {
 
 .State-Bar { 
   position:absolute;
-  top: 3px;
+  top: 0px;
   height: 10px;
   
   user-select: none;
-  background-color: rgba(0, 0, 0, 0.1);
-  backdrop-filter: blur(5px);
+  background-color: rgba(0, 0, 0, 0.0);
+  /* backdrop-filter: blur(5px); */
   border: none;
   border-radius: 5px; 
   box-sizing: border-box;
@@ -329,15 +338,15 @@ export default {
 
 .Steps-Bar { 
   position:absolute;
-  top: 3px;
+  top: 0px;
   right: 5px;
 
   width: 30px;
   height: 10px;
   
   user-select: none;
-  background-color: rgba(0, 0, 0, 0.1);
-  backdrop-filter: blur(5px);
+  background-color: rgba(0, 0, 0, 0.0);
+  /* backdrop-filter: blur(5px); */
   border: none;
   border-radius: 5px; 
   box-sizing: border-box;
@@ -347,6 +356,6 @@ export default {
   white-space: nowrap;
 }
 
-#Focus-Canvas {width: 78px; height: 78px;position: absolute; top: 0; left: 0; border-radius: 5px;}
+#Focus-Canvas {width: 59px; height: 58px;position: absolute; top: 0px; left: 0px; background-color: rgba(0, 0, 0, 0.0);}
 
 </style>

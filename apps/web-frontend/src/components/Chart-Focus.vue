@@ -2,7 +2,7 @@
   <div>
     <div
       ref="linechart"
-      :style="{ width: containerMaxWidth + 'px', height: 90 + 'px' }"
+      :style="{ width: containerMaxWidth + 'px', height: 80 + 'px' }"
       class="linechart-panel"
       @mousedown="startDrag"
       @mousemove="dragging"
@@ -51,7 +51,7 @@ export default {
   methods: {
     initChart() {
       const Width = window.innerWidth;
-      this.containerMaxWidth = Width - 440;
+      this.containerMaxWidth = Width - 435;
       const chartDom = this.$refs.linechart;
       chartDom.style.width = this.containerMaxWidth + 'px';
       this.myChart = echarts.init(chartDom);
@@ -86,7 +86,7 @@ export default {
           left: '0%',
           right: '2%',
           bottom: '0%',
-          top: '5%',
+          top: '10%',
           containLabel: true
         },
         xAxis: {

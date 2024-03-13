@@ -1,6 +1,6 @@
 <template>
   <div>
-    <div ref="barchart" :style="{ width: containerMaxWidth + 'px', height: 100 + 'px' }" class="barchart-panel"></div>
+    <div ref="barchart" :style="{ width: containerMaxWidth + 'px', height: 80 + 'px' }" class="barchart-panel"></div>
   </div>
 </template>
 

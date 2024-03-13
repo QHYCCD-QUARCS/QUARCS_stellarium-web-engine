@@ -18,7 +18,7 @@ export default {
       bottom: 10,
       left: 170,
       right: 170,
-      height: 110,
+      height: 90,
 
       histogram_min: 0,
       histogram_max: 255,

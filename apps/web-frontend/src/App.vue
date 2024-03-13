@@ -311,6 +311,7 @@ export default {
               const Data_Dec = parts[3];
               const newDataPoint_Ra = [Data_x, Data_Ra];
               const newDataPoint_Dec = [Data_x, Data_Dec];
+              console.log('QHYCCD | Add line chart Data:', newDataPoint_Ra, ',', newDataPoint_Dec);
               this.$bus.$emit('AddLineChartData', newDataPoint_Ra, newDataPoint_Dec);
             }
           }
@@ -538,6 +539,7 @@ export default {
 
     loadAndDisplayImage(imagePath) {
       const canvas = document.getElementById('guiderCamera-canvas');
+      // const canvas = document.getElementById('mainCamera-canvas');
       if (canvas.getContext) {
         const ctx = canvas.getContext('2d');
         const img = new Image();

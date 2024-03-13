@@ -22,7 +22,7 @@
 
   <div v-show="showMountSwitch">
     <button v-show="!showFloatingBox" @click="toggleFloatingBox" class="get-click btn-MountPanelSwitch"><v-icon> mdi-gamepad-square-outline </v-icon></button>
-    <mount-control-panel v-show="showFloatingBox" style="position: absolute; top: 60px; right: 10px; " class="get-click"></mount-control-panel>
+    <mount-control-panel v-show="showFloatingBox" style="position: absolute; top: 50px; right: 10px; " class="get-click"></mount-control-panel>
   </div>
   
 
@@ -480,7 +480,7 @@ export default {
   position:absolute;
   width: 35px;
   height: 35px;
-  top: 70px;
+  top: 50px;
   right: 20px;
   
   user-select: none;
@@ -522,7 +522,7 @@ export default {
   position:absolute;
   width: 35px;
   height: 35px;
-  top: 70px;
+  top: 50px;
   left: 20px;
   
   user-select: none;
@@ -556,7 +556,7 @@ export default {
   position:absolute;
   width: 35px;
   height: 35px;
-  top: 70px;
+  top: 50px;
   left: 20px;
   
   user-select: none;

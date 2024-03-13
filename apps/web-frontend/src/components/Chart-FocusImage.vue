@@ -1,7 +1,6 @@
 <template>
   <div>
-    <div ref="scatterchart" style="width: 80px; height: 80px;" class="scatterchart-panel"></div>
-    <!-- <button @click="clearChartData" class="clear-btn">Clear</button> -->
+    <div ref="imagechart" style="width: 80px; height: 80px;" class="imagechart-panel"></div>
   </div>
 </template>
 
@@ -9,7 +8,7 @@
 import * as echarts from 'echarts';
 
 export default {
-  name: 'ScatterChart',
+  name: 'ImageChart',
   data() {
     return {
       chartData: [],
@@ -25,13 +24,13 @@ export default {
     this.initChart();
   },
   created() {
-    this.$bus.$on('AddScatterChartData', this.addData);
-    this.$bus.$on('clearChartData', this.clearChartData);
-    this.$bus.$on('ChartRangeSwitch', this.RangeSwitch);
+    // this.$bus.$on('AddScatterChartData', this.addData);
+    // this.$bus.$on('clearChartData', this.clearChartData);
+    // this.$bus.$on('ChartRangeSwitch', this.RangeSwitch);
   },
   methods: {
     initChart() {
-      const chartDom = this.$refs.scatterchart;
+      const chartDom = this.$refs.imagechart;
       this.myChart = echarts.init(chartDom);
 
       this.renderChart(this.xAxis_min, this.xAxis_max, this.yAxis_min, this.yAxis_max);
@@ -50,13 +49,14 @@ export default {
           max: x_max,
           axisLine: {
             lineStyle: {
-              color: 'rgba(200, 200, 200, 0.5)'  // x轴线颜色
+              color: 'rgba(200, 200, 200, 0.0)'  // x轴线颜色
             }
           },
           axisLabel: {
             color: 'white', 
             fontSize: 5
           },
+          splitNumber: 1,
           splitLine: {
             show: true, // 显示分隔线
             lineStyle: {
@@ -71,13 +71,14 @@ export default {
           max: y_max,
           axisLine: {
             lineStyle: {
-              color: 'rgba(200, 200, 200, 0.5)'  // y轴线颜色
+              color: 'rgba(200, 200, 200, 0.0)'  // y轴线颜色
             }
           },
           axisLabel: {
             color: 'white', 
             fontSize: 5
           },
+          splitNumber: 1,
           splitLine: {
             show: true, // 显示分隔线
             lineStyle: {
@@ -107,20 +108,20 @@ export default {
       };
       this.myChart.setOption(option);
     },
-    addData(newDataPoint) {
-      // 将新数据点添加到数据数组中
-      this.chartData.push(newDataPoint);
-      this.chartData_new = [];
-      this.chartData_new.push(newDataPoint);
+    // addData(newDataPoint) {
+    //   // 将新数据点添加到数据数组中
+    //   this.chartData.push(newDataPoint);
+    //   this.chartData_new = [];
+    //   this.chartData_new.push(newDataPoint);
 
-      // 更新图表
-      this.renderChart(this.xAxis_min, this.xAxis_max, this.yAxis_min, this.yAxis_max);
-    },
-    clearChartData() {
-      this.chartData = [];
-      this.chartData_new = [];
-      this.renderChart(this.xAxis_min, this.xAxis_max, this.yAxis_min, this.yAxis_max);
-    },
+    //   // 更新图表
+    //   this.renderChart(this.xAxis_min, this.xAxis_max, this.yAxis_min, this.yAxis_max);
+    // },
+    // clearChartData() {
+    //   this.chartData = [];
+    //   this.chartData_new = [];
+    //   this.renderChart(this.xAxis_min, this.xAxis_max, this.yAxis_min, this.yAxis_max);
+    // },
     RangeSwitch() {
       if(this.range === 4) {
         this.range = 2;
@@ -149,22 +150,8 @@ export default {
 </script>
 
 <style scoped>
-.scatterchart-panel {
+.iamgechart-panel {
   background-color: rgba(0, 0, 0, 0.0);
-  backdrop-filter: blur(5px);
-  border-radius: 5px;
-  box-sizing: border-box;
-}
-
-.clear-btn {
-  position: absolute;
-  top: 0;
-  left: 10%;
-  width: 30%;
-  height: 10%;
-  
-  background-color: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(5px);
   border-radius: 5px;
   box-sizing: border-box;

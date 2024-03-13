@@ -8,16 +8,16 @@
 
 <template>
   <div id="toolbar-image">
-    <v-toolbar class="transparent" dense>
+    <v-toolbar height="40px" elevation="0" class="transparent" dense>
       <v-app-bar-nav-icon @click="toggleNavigationDrawer"></v-app-bar-nav-icon>
-      <img class="tbtitle hidden-xs-only" id="stellarium-web-toolbar-logo" src="@/assets/images/logo.svg" width="160" height="32" alt="Stellarium Web Logo"/>
-      <!-- <span class="tbtitle_"><sub>U A R C S</sub></span> -->
+      <img class="tbtitle hidden-xs-only" id="stellarium-web-toolbar-logo" src="@/assets/images/logo.svg" width="33" height="33" alt="Stellarium Web Logo"/>
+      <span class="tbtitle hidden-xs-only">Q U A R C S</span>
       <v-spacer></v-spacer>
       <target-search v-show="isTargetSearchShow"></target-search>
       <v-spacer></v-spacer>
       <div>
-        <div v-if="$store.state.showFPS" class="subheader grey--text pr-2" style="user-select: none;">FPS {{ $store.state.stel ? $store.state.stel.fps.toFixed(1) : '?' }}</div>
-        <div class="subheader grey--text" style="user-select: none;">FOV {{ fov }}</div>
+        <div v-if="$store.state.showFPS" class="subheader text-subtitle-2 pr-2" style="user-select: none;">FPS {{ $store.state.stel ? $store.state.stel.fps.toFixed(1) : '?' }}</div>
+        <div class="subheader text-subtitle-2" style="user-select: none;">FOV {{ fov }}</div>
       </div>
       <!-- <v-btn class="transparent" v-if="!$store.state.showSidePanel" to="/p">{{ $t('Observe') }}<v-icon>mdi-chevron-down</v-icon></v-btn> -->
       <v-menu v-if="$store.state.showTimeButtons" :close-on-content-click="false" transition="v-slide-y-transition" offset-y top left>
@@ -27,7 +27,7 @@
             <v-icon class="hidden-sm-and-up">mdi-clock-outline</v-icon>
             <span class="hidden-xs-only">
               <div class="text-subtitle-2">{{ time }}</div>
-              <div class="text-caption">{{ date }}</div>
+              <div class="text-subtitle-2">{{ date }}</div>
             </span>
           </button>
         </template>
@@ -144,7 +144,7 @@ export default {
   background: url("../assets/images/header.png") center;
   background-position-x: 55px;
   background-position-y: 0px;
-  height: 48px;
+  height: 40px;
   z-index: 1;
   position: absolute;
   top: 0px;

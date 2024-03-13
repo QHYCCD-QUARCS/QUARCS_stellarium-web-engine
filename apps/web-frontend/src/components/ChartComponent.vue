@@ -32,7 +32,7 @@ export default {
       bottom: 10,
       left: 170,
       right: 170,
-      height: 110,
+      height: 90,
       
       // isExpanded: false, // 新增状态来追踪面板是否展开
       // showLineChart: false,
