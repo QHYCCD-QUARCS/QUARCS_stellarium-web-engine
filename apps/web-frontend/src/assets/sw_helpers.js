@@ -368,24 +368,24 @@ const swh = {
 
 
 
-  querySkySources: function (str, limit) {
-    if (!limit) {
-      limit = 10
-    }
+  // querySkySources: function (str, limit) {
+  //   if (!limit) {
+  //     limit = 10
+  //   }
 
-    //console.log("QIU | querySkySources:" + process.env.VUE_APP_NOCTUASKY_API_SERVER + '/api/v1/skysources/?q=' + str + '&limit=' + limit)
-    //return fetch( 'https://api.noctuasky.com/api/v1/skysources/?q=' + str + '&limit=' + limit)
-    // return fetch(process.env.VUE_APP_NOCTUASKY_API_SERVER + '/api/v1/skysources/?q=' + str + '&limit=' + limit)
-    return fetch(process.env.VUE_APP_NOCTUASKY_API_SERVER + '/?q=' + str + '&limit=' + limit)
-      .then(function (response) {
-        if (!response.ok) {
-          throw response.body
-        }
-        return response.json()
-      }, err => {
-        throw err.response.body
-      })
-  },
+  //   //console.log("QIU | querySkySources:" + process.env.VUE_APP_NOCTUASKY_API_SERVER + '/api/v1/skysources/?q=' + str + '&limit=' + limit)
+  //   //return fetch( 'https://api.noctuasky.com/api/v1/skysources/?q=' + str + '&limit=' + limit)
+  //   // return fetch(process.env.VUE_APP_NOCTUASKY_API_SERVER + '/api/v1/skysources/?q=' + str + '&limit=' + limit)
+  //   return fetch(process.env.VUE_APP_NOCTUASKY_API_SERVER + '/?q=' + str + '&limit=' + limit)
+  //     .then(function (response) {
+  //       if (!response.ok) {
+  //         throw response.body
+  //       }
+  //       return response.json()
+  //     }, err => {
+  //       throw err.response.body
+  //     })
+  // },
 
 
   //by QIU just only for testing
