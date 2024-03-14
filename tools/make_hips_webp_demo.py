@@ -47,7 +47,7 @@ def save_images_for_Norder(Norder):
     # Generate and save images
     file_paths = []
     for i in range(num_images):
-        img_data = create_image_with_default_font(i % 12)  # Cycle through 0-11 for image numbers
+        img_data = create_image_with_default_font(i % num_images)  # Cycle through 0-11 for image numbers
         file_name = f"Npix{i}.webp"
         file_path = os.path.join(dir_path, file_name)
         with open(file_path, "wb") as img_file:
