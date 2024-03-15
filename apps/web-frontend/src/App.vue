@@ -1083,6 +1083,7 @@ export default {
             core.dsos.addDataSource({ url: process.env.BASE_URL + 'skydata/dso' })
             core.landscapes.addDataSource({ url: process.env.BASE_URL + 'skydata/landscapes/guereins', key: 'guereins' })
             core.milkyway.addDataSource({ url: process.env.BASE_URL + 'skydata/surveys/milkyway' })
+            core.dss.addDataSource({ url: process.env.BASE_URL + 'skydata/surveys/dss' })
             core.minor_planets.addDataSource({ url: process.env.BASE_URL + 'skydata/mpcorb.dat', key: 'mpc_asteroids' })
             core.planets.addDataSource({ url: process.env.BASE_URL + 'skydata/surveys/sso/moon', key: 'moon' })
             core.planets.addDataSource({ url: process.env.BASE_URL + 'skydata/surveys/sso/sun', key: 'sun' })
