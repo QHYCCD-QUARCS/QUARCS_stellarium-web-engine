@@ -5,10 +5,10 @@
 
      <div class="buttons-container">
       <button  @click="SpeedChange" @touchend="active" class="get-click btn-Speed"><v-icon>mdi-run-fast</v-icon></button>
-      <button :disabled="isBtnMoveDisabled" @click="FocusLeftMove" @touchend="active" class="get-click btn-Left"><v-icon>mdi-arrow-left-bold-circle-outline</v-icon></button>
+      <button :disabled="isBtnMoveDisabled" @click="FocusLeftMove" @touchend="active" class="get-click btn-Left"><v-icon>mdi-arrow-left-circle-outline</v-icon></button>
       <button  @click="AutoFocus" @touchend="active" class="get-click btn-Auto"><v-icon>mdi-focus-auto</v-icon></button>
       <button  @click="FocusGoto" @touchend="active" class="get-click btn-Goto"><v-icon>mdi-google-circles-group</v-icon></button>
-      <button :disabled="isBtnMoveDisabled" @click="FocusRightMove" @touchend="active" class="get-click btn-Right"><v-icon>mdi-arrow-right-bold-circle-outline</v-icon></button>
+      <button :disabled="isBtnMoveDisabled" @click="FocusRightMove" @touchend="active" class="get-click btn-Right"><v-icon>mdi-arrow-right-circle-outline</v-icon></button>
       <button  @click="StepsChange" @touchend="active" class="get-click btn-Steps"><v-icon>mdi-diameter-outline</v-icon></button>
     </div>
 

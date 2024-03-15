@@ -228,6 +228,7 @@ export default {
       this.showMountSwitch = false;
       this.showFocuserPanel = false;
       this.showHistogramPanel = false;
+      this.showChartsPanel = false;
     },
     
     handleTouchOrMouseDown(event) {
@@ -254,12 +255,12 @@ export default {
       this.RedBoxWidth = this.BoxSideLength * windowWidth / CameraWidth;
       this.RedBoxHeight = this.BoxSideLength * windowHeight / CameraHeight;
 
-      if(isInitRedBox === true)
+      if(this.isInitRedBox === true)
       {
         // 将小红框置于界面中央
         this.mouseX = (windowWidth - this.RedBoxWidth) / 2; // 100是小红框的宽度
         this.mouseY = (windowHeight - this.RedBoxHeight) / 2; // 100是小红框的高度
-        isInitRedBox = false;
+        this.isInitRedBox = false;
       }
 
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'RedBox:'+ this.mouseX + ":" + this.mouseY + ":" + windowWidth + ":" + windowHeight);  //TODO: BoxSize
@@ -328,7 +329,7 @@ export default {
         this.showChartsPanel = false;
         this.showRedBox = true;
 
-        this.$bus.$emit('ShowTargetSearch');
+        this.$bus.$emit('HideTargetSearch');
       }
       else if (this.CurrentMainPage === 'MainCamera')
       {

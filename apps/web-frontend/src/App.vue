@@ -615,6 +615,8 @@ export default {
         ctx.drawImage(img, 0, 0, width, height);
         console.log('QHYCCD | crossOrigin:', img.crossOrigin);
         this.imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+        
         console.log('QHYCCD | imageData:', this.imageData);
         this.MakeHistogram(this.imageData);
       };
@@ -624,42 +626,30 @@ export default {
     MakeHistogram(imageData) {
       console.log('MakeHistogram');
 
-      // 转换图像到灰度
-      const grayData = this.convertToGray(imageData);
+      // 计算三个通道的直方图
+      const histogramData = this.calculateHistogram(imageData);
 
-      // 计算直方图
-      this.histogramData = this.calculateHistogram(grayData);
-
-      this.$bus.$emit('showHistogram', this.histogramData);
+      this.$bus.$emit('showHistogram', histogramData);
     },
 
-    convertToGray(imageData) {
-      console.log('QHYCCD | convertToGray');
-      const grayData = new Uint8ClampedArray(imageData.width * imageData.height);
+    calculateHistogram(imageData) {
+      console.log('QHYCCD | calculateHistogram');
+      const histogram = [
+        Array(256).fill(0), // 存储蓝色通道直方图
+        Array(256).fill(0), // 存储绿色通道直方图
+        Array(256).fill(0)  // 存储红色通道直方图
+      ];
 
+      // 分别计算三个通道的直方图
       for (let i = 0; i < imageData.data.length; i += 4) {
         const r = imageData.data[i];
         const g = imageData.data[i + 1];
         const b = imageData.data[i + 2];
 
-        const gray = 0.299 * r + 0.587 * g + 0.114 * b; // 使用加权平均方法转换为灰度
-
-        imageData.data[i] = gray;
-        imageData.data[i + 1] = gray;
-        imageData.data[i + 2] = gray;
-
-        grayData[i / 4] = gray;
-      }
-
-      return grayData;
-    },
-
-    calculateHistogram(grayData) {
-      console.log('QHYCCD | calculateHistogram');
-      const histogram = Array(256).fill(0);
-
-      for (const pixel of grayData) {
-        histogram[pixel]++;
+        // 更新每个通道的直方图
+        histogram[0][b]++;
+        histogram[1][g]++;
+        histogram[2][r]++;
       }
 
       return histogram;
@@ -671,40 +661,54 @@ export default {
         const src = cv.imread(this.histogramImage);
 
         // Perform the histogram stretch (similar to the C++ code)
-        const grayImage = new cv.Mat();
-        cv.cvtColor(src, grayImage, cv.COLOR_BGR2GRAY);
+        const channels = new cv.MatVector();
+        cv.split(src, channels); // Split channels (BGR) into separate Mat objects
 
-        // const Min = /* your Min value */;
-        // const Max = /* your Max value */;
-        this.$bus.$emit('ChangeDialPosition', Min, Max);
+        // Iterate over each channel and apply histogram stretching
+        for (let i = 0; i < channels.size(); i++) {
+          let channel = channels.get(i);
 
-        let alpha = 255.0 / (Max - Min);
-        let beta = -Min * alpha;
+          // Calculate alpha and beta for each channel
+          let alpha = 255.0 / (Max - Min);
+          let beta = -Min * alpha;
+          this.$bus.$emit('ChangeDialPosition', Min, Max);
 
-        if (alpha < 0) {
-          alpha = 0;
-          beta = 0;
-        } else if (alpha > 255) {
-          alpha = 255;
-          beta = 0;
+          if (alpha < 0) {
+            alpha = 0;
+            beta = 0;
+          } else if (alpha > 255) {
+            alpha = 255;
+            beta = 0;
+          }
+
+          // Apply histogram stretching to the channel
+          channel.convertTo(channel, -1, alpha, beta);
+
+          // Release the memory of channel
+          channel.delete();
         }
 
+        // Merge the channels back into a single image
         const stretchImage = new cv.Mat();
-        grayImage.convertTo(stretchImage, -1, alpha, beta);
+        cv.merge(channels, stretchImage);
+
+        // Release the memory of channels
+        channels.delete();
 
         // Display the stretched image on a canvas
         const canvas = document.getElementById('mainCamera-canvas');
         const ctx = canvas.getContext('2d');
 
-        canvas.width = 4096;
-        canvas.height = 2160;
+        // Set canvas size to match the image
+        canvas.width = stretchImage.cols;
+        canvas.height = stretchImage.rows;
 
+        // Draw the image on canvas
         cv.imshow(canvas, stretchImage);
         console.log('QHYCCD | canvas size:', canvas.width, canvas.height);
-        
+
         // Clean up
         src.delete();
-        grayImage.delete();
         stretchImage.delete();
       }
     },

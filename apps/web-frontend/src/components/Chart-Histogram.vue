@@ -47,7 +47,7 @@ export default {
       this.renderChart(this.xAxis_min, this.xAxis_max);
     },
 
-    renderChart(x_min,x_max) {
+    renderChart(x_min, x_max) {
       const yAxisMax = Math.max(...this.barData.map(item => item[1]));  // 获取 y 轴的最大值
       const option = {
         grid: {
@@ -84,56 +84,80 @@ export default {
             show: false
           }
         },
-        series: [{
-          data: this.barData,
+        series: []
+      };
+
+      // 为每个通道创建对应的 series
+      for (let channel = 0; channel < 3; channel++) {
+        option.series.push({
+          data: this.barData[channel], // 注意这里的数据结构
           type: 'line',
           itemStyle: {
-            color: 'white'  // 柱子颜色
+            color: channel === 0 ? 'rgba(0,120,212,0.7)' : (channel === 1 ? 'rgba(51,218,121,0.7)' : 'rgba(255,0,0,0.7)') // 根据通道选择颜色
           },
           symbolSize: 0
-        }, {
-          data: [[this.histogram_min, 0], [this.histogram_min, yAxisMax]],  // 数据格式为 [x, y]
-          type: 'line',
-          lineStyle: {
-            color: 'blue',  // 设置线的颜色
-            type: 'dashed',  // 设置线的类型，可以为 'solid', 'dashed', 'dotted'
-            width: 1
-          },
-          symbolSize: 0
-        }, {
-          data: [[this.histogram_max, 0], [this.histogram_max, yAxisMax]],
-          type: 'line',
-          lineStyle: {
-            color: 'red',
-            type: 'dashed',
-            width: 1
-          },
-          symbolSize: 0
-        }]
-      };
+        });
+      }
+
+      // 在这里可以继续添加其他通道的曲线，也可以根据需要修改颜色
+
+      option.series.push({
+        data: [[this.histogram_min, 0], [this.histogram_min, yAxisMax]],  // 数据格式为 [x, y]
+        type: 'line',
+        lineStyle: {
+          color: 'blue',  // 设置线的颜色
+          type: 'dashed',  // 设置线的类型，可以为 'solid', 'dashed', 'dotted'
+          width: 1
+        },
+        symbolSize: 0
+      });
+
+      option.series.push({
+        data: [[this.histogram_max, 0], [this.histogram_max, yAxisMax]],
+        type: 'line',
+        lineStyle: {
+          color: 'red',
+          type: 'dashed',
+          width: 1
+        },
+        symbolSize: 0
+      });
+
       this.myChart.setOption(option);
     },
-
+    
     addDataToChart(histogramData) {
-      this.clearBarData();
+            this.clearBarData();
+
+      // 初始化最小和最大值的索引
       let firstNonZeroIndex = -1;
       let lastNonZeroIndex = -1;
 
-      for (let i = 0; i < histogramData.length; i++) {
-        const value = [i,histogramData[i]];
-        console.log('QHYCCD | histogramData:', i, histogramData[i]);
-        this.barData.push(value);
+      // 处理三个通道的直方图数据
+      for (let channel = 0; channel < histogramData.length; channel++) {
+        const channelData = histogramData[channel];
+        const channelSeriesData = []; // 存储当前通道的 series 数据
 
-        if (histogramData[i] !== 0) {
-          if (firstNonZeroIndex === -1) {
-            // 第一次不等于0的索引
-            firstNonZeroIndex = i;
+        for (let i = 0; i < channelData.length; i++) {
+          const value = [i, channelData[i]];
+          channelSeriesData.push(value);
+
+          // 更新最小和最大值的索引
+          if (channelData[i] !== 0) {
+            if (firstNonZeroIndex === -1) {
+              // 第一次不等于0的索引
+              firstNonZeroIndex = i;
+            }
+            // 记录每次不等于0的索引，最后一次会覆盖之前记录的值
+            lastNonZeroIndex = i;
           }
-          // 记录每次不等于0的索引，最后一次会覆盖之前记录的值
-          lastNonZeroIndex = i;
         }
+
+        // 将当前通道的 series 数据存入 barData
+        this.barData.push(channelSeriesData);
       }
 
+      // 发送最小和最大值的索引到其他组件
       this.histogram_min = firstNonZeroIndex;
       this.histogram_max = lastNonZeroIndex;
 
@@ -142,7 +166,7 @@ export default {
       console.log('First Non-Zero Index:', firstNonZeroIndex);
       console.log('Last Non-Zero Index:', lastNonZeroIndex);
 
-      this.renderChart(this.xAxis_min, this.xAxis_max);
+            this.renderChart(this.xAxis_min, this.xAxis_max);
     },
 
     clearBarData() {

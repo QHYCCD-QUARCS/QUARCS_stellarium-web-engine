@@ -58,12 +58,14 @@ import Moment from 'moment'
 export default {
   data: function () {
     return {
+      isDrawerShow: false,
       isTargetSearchShow: true,
       isConnect: true,
     }
   },
   created() {
     this.$bus.$on('ShowTargetSearch', this.ShowTargetSearch);
+    this.$bus.$on('HideTargetSearch', this.HideTargetSearch);
     this.$bus.$on('ShowNetStatus', this.ShowNetStatus);
   },
   computed: {
@@ -100,6 +102,12 @@ export default {
   methods: {
     toggleNavigationDrawer: function () {
       this.$store.commit('toggleBool', 'showNavigationDrawer')
+      this.isDrawerShow = !this.isDrawerShow
+      if(this.isDrawerShow) {
+        this.isTargetSearchShow = false;
+      } else {
+        this.isTargetSearchShow = true;
+      }
     },
 
     getLocalTime: function () {
@@ -111,7 +119,11 @@ export default {
     },
 
     ShowTargetSearch() {
-      this.isTargetSearchShow = !this.isTargetSearchShow;
+      this.isTargetSearchShow = true;
+    },
+
+    HideTargetSearch() {
+      this.isTargetSearchShow = false;
     },
 
     ShowNetStatus(status) {
