@@ -1,0 +1,10 @@
+hips_order            = 4
+hips_order_min        = 0
+hips_tile_width       = 512
+hips_tile_format      = jpg
+dataproduct_type      = image
+hips_frame            = equatorial
+obs_title             = dss
+hips_release_date     = 2019-02-12T21:42Z
+source_md5            = ddced85111d6ba23d0a3fa8bcaeac488
+obs_description       = DSS survey.
