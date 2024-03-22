@@ -1,8 +1,8 @@
 QUARCS_stellarium-web-engine
 =====================
 
-![样机-1](https://github.com/QHYCCD-QUARCS/QUARCS_stellarium-web-engine/assets/158538628/d4790bf1-ee0c-42b4-9865-c616eecdc49d)
-![样机-2](https://github.com/QHYCCD-QUARCS/QUARCS_stellarium-web-engine/assets/158538628/93b78d5b-8c77-4dca-a3e2-ef6b4750899b)
+![样机-1 2](https://github.com/QHYCCD-QUARCS/QUARCS_stellarium-web-engine/assets/158538628/1fdb2fc3-7b6b-42fb-ba9e-bc4cf6f613a1)
+![样机-2 2](https://github.com/QHYCCD-QUARCS/QUARCS_stellarium-web-engine/assets/158538628/7ad24990-f259-4396-bb94-e56f6f94abc3)
 
 Features
 --------
