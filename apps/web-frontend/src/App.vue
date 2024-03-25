@@ -190,6 +190,9 @@ export default {
       histogramImage: null,
       histogram_min: 0,
       histogram_max: 255,
+
+      ImageGainR: 1,
+      ImageGainB: 1,
     }
   },
   components: { Gui,
@@ -202,7 +205,8 @@ export default {
     this.$bus.$on('Switch-MainPage', this.handleButtonTestClick);
     this.$bus.$on('AutoHistogramNum', this.setAutoHistogramNum);
     this.$bus.$on('HandleHistogramNum', this.applyHistStretch);
-
+    this.$bus.$on('ImageGainR', this.ImageGainSet);
+    this.$bus.$on('ImageGainB', this.ImageGainSet);
   },
   methods: {
     connect() {
@@ -282,6 +286,14 @@ export default {
             if (parts.length === 2) {
               const fileName = parts[1];
               this.fetchImage('http://192.168.2.31:8080/img/'+fileName); // http://192.168.2.111:8600/images/  http://192.168.2.111:8080/img/
+            }
+          }
+
+          if (data.message.startsWith('SaveBinSuccess:')) {
+            const parts = data.message.split(':');
+            if (parts.length === 2) {
+              const fileName = parts[1];
+              this.readBinFile('http://192.168.2.31:8080/img/'+fileName); // http://192.168.2.111:8600/images/  http://192.168.2.111:8080/img/
             }
           }
 
@@ -560,6 +572,242 @@ export default {
       }
     },
 
+    ImageGainSet(payload) {
+      const [signal, value] = payload.split(':'); // 拆分信号和值
+      const doubleValue = parseFloat(value); // 将值转换为 double 类型
+
+      if (signal === 'ImageGainR') {
+        // 处理 ImageGainR 信号
+        this.ImageGainR = doubleValue;
+        console.log('ImageGainR is set to:', doubleValue);
+      } else if (signal === 'ImageGainB') {
+        // 处理 ImageGainB 信号
+        this.ImageGainB = doubleValue;
+        console.log('ImageGainB is set to:', doubleValue);
+      }
+    },
+
+    async readBinFile(fileName) {
+      try {
+        const response = await fetch(fileName);
+        if (!response.ok) {
+          throw new Error('Network response was not ok');
+        }
+
+        const blob = await response.blob();
+
+        const fileReader = new FileReader();
+        fileReader.onload = () => {
+          const arrayBuffer = fileReader.result;
+          this.processImage(arrayBuffer);
+        };
+        fileReader.onerror = (error) => {
+          console.error('FileReader error:', error);
+        };
+        fileReader.readAsArrayBuffer(blob);
+      } catch (error) {
+        console.error('There was a problem with the fetch operation:', error);
+      }
+    },
+
+    processImage (imgArray) {
+      try {
+        // 开始计时
+        console.time('代码块执行时间');
+        // 获取 ArrayBuffer 数据视图
+        const dataView = new DataView(imgArray);
+        console.log('ArrayBuffer byte length:', dataView.byteLength);
+
+        // 将 ArrayBuffer 转换为 Uint16Array
+        const uint16Array = new Uint16Array(dataView.buffer);
+        console.log('转换后的16位数据长度:', uint16Array.length);
+
+        if (uint16Array.length === 0) {
+          console.error('Uint16Array is empty.');
+          return;
+        }
+
+        // 设置画布宽高常量
+        const canvasWidth = 4096;  //4096  3840
+        const canvasHeight = 2160;
+
+        // 获取原始画布和修改后的画布以及对应上下文
+        const modifiedCanvas = document.getElementById('mainCamera-canvas');
+        const modifiedCtx = modifiedCanvas.getContext('2d');
+
+        modifiedCtx.clearRect(0, 0, modifiedCanvas.width, modifiedCanvas.height);
+
+        modifiedCanvas.width = canvasWidth;
+        modifiedCanvas.height = canvasHeight;
+
+        // 用户自定义参数
+        let gainR = this.ImageGainR;
+        let gainB = this.ImageGainB;
+        // let gainR = 1.0;
+        // let gainB = 1.0;
+        let offset = 0;
+        let mode = 1;
+
+        // 参数
+        let B = 0;
+        let W = 65535;
+        let CFA = 'RGGB';   //GR
+        let cvmode = 0;
+
+        const mat = new cv.Mat(canvasHeight, canvasWidth, cv.CV_16UC1)
+        mat.data16U.set(uint16Array)
+
+        if (CFA === 'GR') {
+          cvmode = cv.COLOR_BayerGR2RGBA;
+        } else if (CFA === 'GB') {
+          cvmode = cv.COLOR_BayerGB2RGBA;
+        } else if (CFA === 'BG') {
+          cvmode = cv.COLOR_BayerBG2RGBA;
+        } else if (CFA === 'RGGB') {
+          cvmode = cv.COLOR_BayerRG2RGBA;
+        }
+        // 对目标图像进行颜色转换
+        const dst = new cv.Mat();
+        try {
+          cv.cvtColor(mat, dst, cvmode);
+          console.log('dst目标图像大小:', dst.cols, 'x', dst.rows);
+          console.log('dst目标图像通道数:', dst.channels());
+        } catch (error) {
+          console.error('cvtColor 出错:', error);
+          console.log('mat目标图像大小:', mat.cols, 'x', mat.rows);
+          console.log('mat目标图像通道数:', mat.channels());
+          return;
+        }
+
+        const targetImg16 = this.ImageSoftAWB(dst, gainR, gainB, offset);
+        // 检查目标图像数据是否有效
+        if (!targetImg16 || targetImg16.empty() || !(targetImg16 instanceof cv.Mat) || targetImg16.channels() !== 4) {
+          console.error('错误: 目标图像数据无效');
+          return;
+        }
+
+        // 输出目标图像信息
+        console.log('图像处理正常！', 'targetImg16目标图像大小:', targetImg16.cols, 'x', targetImg16.rows, 'targetImg16目标图像通道数:', targetImg16.channels());
+
+        const { blackLevel, whiteLevel } = this.GetAutoStretch(uint16Array, mode);
+        B = blackLevel;
+        W = whiteLevel;
+        // 对目标图像进行位深度转换
+        const img8 = this.Bit16To8_Stretch(targetImg16, B, W);
+        if (img8.empty() || img8.rows === 0 || img8.cols === 0) {
+          console.error('img8 为空或大小为0');
+          return;
+        }
+        // 输出转换后的图像信息
+        console.log('img8图像大小:', img8.rows, 'x', img8.cols);
+        console.log('img8通道数:', img8.channels());
+
+        // this.histogramImage = img8;
+
+        // 创建用于绘制的 ImageData 对象，并在修改后的画布上绘制图像
+        const colorData = new ImageData(new Uint8ClampedArray(img8.data), img8.cols, img8.rows);
+        modifiedCtx.putImageData(colorData, 0, 0);
+        console.log('修改后的彩图绘制完成！');
+
+        this.$bus.$emit('showCaptureImage');
+
+        console.log('QHYCCD | imageData:', colorData);
+        this.MakeHistogram(colorData);
+        this.histogramImage = colorData;
+
+        // 释放不再需要的对象
+        mat.delete();
+        dst.delete();
+        targetImg16.delete();
+        img8.delete();
+
+      } catch (error) {
+        console.error('Error processing image:', error);
+      }
+    },
+
+    ImageSoftAWB (img16, gainR, gainB, offset) {
+      console.time('SoftAWB处理完成,处理时间');
+      // 分离通道
+      console.log('正在分离通道...');
+      let channels = new cv.MatVector();
+      cv.split(img16, channels);
+
+      // 减去偏移量并乘以增益
+      for (let i = 0; i < channels.size() - 1; i++) {
+        let channel = new cv.Mat(channels.get(i));
+        if (i === 0 || i === 2) {
+          console.log('正在处理第', i, '个通道...');
+          channel.convertTo(channel, -1, 1, offset); // 减去偏移量
+          if (i === 0) {
+            channel.convertTo(channel, -1, gainB, 0); // 乘以增益
+          } else {
+            channel.convertTo(channel, -1, gainR, 0); // 乘以增益
+          }
+        }
+        channels.set(i, channel);
+        channel.delete(); // 释放临时通道数据
+      }
+
+      // 合并通道
+      console.log('正在合并通道...');
+      try {
+        cv.merge(channels, img16);
+      } catch (error) {
+        console.error('合并通道时出现错误：', error);
+      }
+
+      // 释放资源
+      console.log('正在释放资源...');
+      channels.delete();
+
+      console.log('图像处理完成。');
+      console.timeEnd('SoftAWB处理完成,处理时间');
+      return img16;
+    },
+
+    Bit16To8_Stretch (img16, B, W) {
+      console.time('Bit16To8处理时间');
+      let img8 = new cv.Mat();
+      img8.create(img16.rows, img16.cols, cv.CV_8UC4);
+      img16.convertTo(img8, cv.CV_8U, 255.0 / (W - B), -B * 255.0 / (W - B));
+      console.log('转换完成！');
+      console.timeEnd('Bit16To8处理时间');
+      img16.delete(); //
+      return img8;
+    },
+    
+    GetAutoStretch (imgData, mode) {
+      const mean = imgData.reduce((sum, value) => sum + value, 0) / imgData.length;
+      const std = Math.sqrt(imgData.reduce((sum, value) => sum + Math.pow(value - mean, 2), 0) / imgData.length);
+
+      let a, b;
+      switch (mode) {
+        case 0:
+          a = 3;
+          b = 5;
+          break;
+        case 1:
+          a = 2;
+          b = 5;
+          break;
+        case 2:
+          a = 3;
+          b = 8;
+          break;
+        default:
+          a = 2;
+          b = 8;
+      }
+
+      let bx = Math.max(0, mean - std * a);
+      let wx = Math.min(65535, mean + std * b);
+
+      let blackLevel = Math.round(bx);
+      let whiteLevel = Math.round(wx);
+      return { blackLevel, whiteLevel };
+    },
+
     fetchImage(imagePath) {
       const url = imagePath;
       const xhr = new XMLHttpRequest();
@@ -615,8 +863,6 @@ export default {
         ctx.drawImage(img, 0, 0, width, height);
         console.log('QHYCCD | crossOrigin:', img.crossOrigin);
         this.imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
-        
         console.log('QHYCCD | imageData:', this.imageData);
         this.MakeHistogram(this.imageData);
       };
@@ -658,7 +904,10 @@ export default {
     applyHistStretch(Min, Max) {
       if (cv && this.histogramImage) {
         // Convert the image to a cv.Mat
-        const src = cv.imread(this.histogramImage);
+        // const src = cv.imread(this.histogramImage);    //Image()
+
+        // Create cv.Mat object from image data
+        const src = cv.matFromImageData(this.histogramImage);
 
         // Perform the histogram stretch (similar to the C++ code)
         const channels = new cv.MatVector();
@@ -1087,7 +1336,7 @@ export default {
             core.dsos.addDataSource({ url: process.env.BASE_URL + 'skydata/dso' })
             core.landscapes.addDataSource({ url: process.env.BASE_URL + 'skydata/landscapes/guereins', key: 'guereins' })
             core.milkyway.addDataSource({ url: process.env.BASE_URL + 'skydata/surveys/milkyway' })
-            core.dss.addDataSource({ url: process.env.BASE_URL + 'skydata/surveys/dss' })
+            // core.dss.addDataSource({ url: process.env.BASE_URL + 'skydata/surveys/dss' })
             core.minor_planets.addDataSource({ url: process.env.BASE_URL + 'skydata/mpcorb.dat', key: 'mpc_asteroids' })
             core.planets.addDataSource({ url: process.env.BASE_URL + 'skydata/surveys/sso/moon', key: 'moon' })
             core.planets.addDataSource({ url: process.env.BASE_URL + 'skydata/surveys/sso/sun', key: 'sun' })

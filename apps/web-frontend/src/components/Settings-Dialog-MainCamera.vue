@@ -50,7 +50,8 @@
           { label: 'Chip Width (mm)' , value: '' },
           { label: 'Chip Height (mm)' , value: '' },
           { label: 'Focal Length (mm)' , value: '' },
-          { label: 'Gain' , value: '' },
+          { label: 'ImageGainR' , value: '' },
+          { label: 'ImageGainB' , value: '' },
           { label: 'Offset' , value: '' },
           { label: '配置项6' , value: '' },
           { label: '配置项7' , value: '' },
@@ -87,7 +88,9 @@
       },
       confirmConfiguration(item) {
         // 在这里处理确认按钮的逻辑，可以访问item.value来获取输入框的值
-        console.log(`QHYCCD | confirmConfiguration: ${item.value}`);
+        console.log(`QHYCCD | confirmConfiguration: `, item.label, item.value);
+        // this.$bus.$emit('AppSendMessage', 'Vue_Command', item.label+':'+item.value);
+        this.$bus.$emit(item.label, item.label+':'+item.value);
       },
       SwitchPage() {
         if (this.activeMenu === 'connection') { this.activeMenu = 'configuration'; }
