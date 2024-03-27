@@ -610,174 +610,167 @@ export default {
       }
     },
 
-    processImage (imgArray) {
-      try {
-        // 开始计时
-        console.time('代码块执行时间');
-        // 获取 ArrayBuffer 数据视图
-        const dataView = new DataView(imgArray);
-        console.log('ArrayBuffer byte length:', dataView.byteLength);
+    processImage(imgArray) {
+      // 获取 ArrayBuffer 数据视图
+      const dataView = new DataView(imgArray);
+      // console.log('ArrayBuffer byte length:', dataView.byteLength);
 
-        // 将 ArrayBuffer 转换为 Uint16Array
-        const uint16Array = new Uint16Array(dataView.buffer);
-        console.log('转换后的16位数据长度:', uint16Array.length);
+      // 将 ArrayBuffer 转换为 Uint16Array
+      const uint16Array = new Uint16Array(dataView.buffer);
+      // console.log('转换后的16位数据长度', uint16Array.length);
 
-        if (uint16Array.length === 0) {
-          console.error('Uint16Array is empty.');
-          return;
-        }
+      // 设置画布宽高常量
+      const canvasWidth = 6252;
+      const canvasHeight = 4176;
 
-        // 设置画布宽高常量
-        const canvasWidth = 4096;  //4096  3840
-        const canvasHeight = 2160;
+      // 获取原始画布和修改后的画布以及对应上下文
+      const modifiedCanvas = document.getElementById('mainCamera-canvas');
+      const modifiedCtx = modifiedCanvas.getContext('2d');
 
-        // 获取原始画布和修改后的画布以及对应上下文
-        const modifiedCanvas = document.getElementById('mainCamera-canvas');
-        const modifiedCtx = modifiedCanvas.getContext('2d');
+      modifiedCtx.clearRect(0, 0, modifiedCanvas.width, modifiedCanvas.height);
 
-        modifiedCtx.clearRect(0, 0, modifiedCanvas.width, modifiedCanvas.height);
+      modifiedCanvas.width = canvasWidth;
+      modifiedCanvas.height = canvasHeight;
 
-        modifiedCanvas.width = canvasWidth;
-        modifiedCanvas.height = canvasHeight;
+      // 用户自定义参数
+      let gainR = 1.0;
+      let gainB = 1.0;
+      let offset = 0;
+      let mode = 1;
 
-        // 用户自定义参数
-        let gainR = this.ImageGainR;
-        let gainB = this.ImageGainB;
-        // let gainR = 1.0;
-        // let gainB = 1.0;
-        let offset = 0;
-        let mode = 1;
+      // 参数
+      let B = 0;
+      let W = 65535;
+      let CFA = 'RGGB';
+      let cvmode = 0;
 
-        // 参数
-        let B = 0;
-        let W = 65535;
-        let CFA = 'RGGB';   //GR
-        let cvmode = 0;
+      let mat = new cv.Mat(canvasHeight, canvasWidth, cv.CV_16UC1);
+      mat.data16U.set(uint16Array);
 
-        const mat = new cv.Mat(canvasHeight, canvasWidth, cv.CV_16UC1)
-        mat.data16U.set(uint16Array)
-
-        if (CFA === 'GR') {
-          cvmode = cv.COLOR_BayerGR2RGBA;
-        } else if (CFA === 'GB') {
-          cvmode = cv.COLOR_BayerGB2RGBA;
-        } else if (CFA === 'BG') {
-          cvmode = cv.COLOR_BayerBG2RGBA;
-        } else if (CFA === 'RGGB') {
-          cvmode = cv.COLOR_BayerRG2RGBA;
-        }
-        // 对目标图像进行颜色转换
-        const dst = new cv.Mat();
-        try {
-          cv.cvtColor(mat, dst, cvmode);
-          console.log('dst目标图像大小:', dst.cols, 'x', dst.rows);
-          console.log('dst目标图像通道数:', dst.channels());
-        } catch (error) {
-          console.error('cvtColor 出错:', error);
-          console.log('mat目标图像大小:', mat.cols, 'x', mat.rows);
-          console.log('mat目标图像通道数:', mat.channels());
-          return;
-        }
-
-        const targetImg16 = this.ImageSoftAWB(dst, gainR, gainB, offset);
-        // 检查目标图像数据是否有效
-        if (!targetImg16 || targetImg16.empty() || !(targetImg16 instanceof cv.Mat) || targetImg16.channels() !== 4) {
-          console.error('错误: 目标图像数据无效');
-          return;
-        }
-
-        // 输出目标图像信息
-        console.log('图像处理正常！', 'targetImg16目标图像大小:', targetImg16.cols, 'x', targetImg16.rows, 'targetImg16目标图像通道数:', targetImg16.channels());
-
-        const { blackLevel, whiteLevel } = this.GetAutoStretch(uint16Array, mode);
-        B = blackLevel;
-        W = whiteLevel;
-        // 对目标图像进行位深度转换
-        const img8 = this.Bit16To8_Stretch(targetImg16, B, W);
-        if (img8.empty() || img8.rows === 0 || img8.cols === 0) {
-          console.error('img8 为空或大小为0');
-          return;
-        }
-        // 输出转换后的图像信息
-        console.log('img8图像大小:', img8.rows, 'x', img8.cols);
-        console.log('img8通道数:', img8.channels());
-
-        // this.histogramImage = img8;
-
-        // 创建用于绘制的 ImageData 对象，并在修改后的画布上绘制图像
-        const colorData = new ImageData(new Uint8ClampedArray(img8.data), img8.cols, img8.rows);
-        modifiedCtx.putImageData(colorData, 0, 0);
-        console.log('修改后的彩图绘制完成！');
-
-        this.$bus.$emit('showCaptureImage');
-
-        console.log('QHYCCD | imageData:', colorData);
-        this.MakeHistogram(colorData);
-        this.histogramImage = colorData;
-
-        // 释放不再需要的对象
-        mat.delete();
-        dst.delete();
-        targetImg16.delete();
-        img8.delete();
-
-      } catch (error) {
-        console.error('Error processing image:', error);
+      if (CFA === 'GR') {
+        cvmode = cv.COLOR_BayerGR2RGBA;
+      } else if (CFA === 'GB') {
+        cvmode = cv.COLOR_BayerGB2RGBA;
+      } else if (CFA === 'BG') {
+        cvmode = cv.COLOR_BayerBG2RGBA;
+      } else if (CFA === 'RGGB') {
+        cvmode = cv.COLOR_BayerRG2RGBA;
       }
+      // 对目标图像进行颜色转换
+      let dst = new cv.Mat();
+      try {
+        cv.cvtColor(mat, dst, cvmode);
+        // console.log('dst目标图像大小:', dst.cols, 'x', dst.rows);
+        // console.log('dst目标图像通道数:', dst.channels());
+      } catch (error) {
+        console.error('cvtColor 出错:', error);
+        // console.log('mat目标图像大小:', mat.cols, 'x', mat.rows);
+        // console.log('mat目标图像通道数:', mat.channels());
+        return
+      }
+
+      mat.delete();
+
+      let resizeImg = new cv.Mat();
+
+      // Resize the image
+      // console.log('Resize the image');
+      cv.resize(dst, resizeImg, new cv.Size(4096, 2160), 0, 0, cv.INTER_LINEAR);
+
+      dst.delete();
+
+      modifiedCanvas.width = 4096;
+      modifiedCanvas.height = 2160;
+
+      let targetImg16 = this.ImageSoftAWB(resizeImg, gainR, gainB, offset);
+      // 检查目标图像数据是否有效
+      if (!targetImg16 || targetImg16.empty() || !(targetImg16 instanceof cv.Mat) || targetImg16.channels() !== 4) {
+        console.error('错误: 目标图像数据无效');
+        return;
+      }
+
+      // 输出目标图像信息
+      // console.log('图像处理正常！', 'targetImg16目标图像大小:', targetImg16.cols, 'x', targetImg16.rows, 'targetImg16目标图像通道数:', targetImg16.channels());
+
+      const { blackLevel, whiteLevel } = this.GetAutoStretch(uint16Array, mode);
+      B = blackLevel;
+      W = whiteLevel;
+      // console.log('Stretch to:', B, ',', W);
+      // 对目标图像进行位深度转换
+      let img8 = this.Bit16To8_Stretch(targetImg16, B, W);
+      if (img8.empty() || img8.rows === 0 || img8.cols === 0) {
+        console.error('img8 为空或大小为0');
+        return;
+      }
+      // 输出转换后的图像信息
+      // console.log('img8图像大小:', img8.rows, 'x', img8.cols);
+      // console.log('img8通道数:', img8.channels());
+
+      // 创建用于绘制的 ImageData 对象，并在修改后的画布上绘制图像
+      const colorData = new ImageData(new Uint8ClampedArray(img8.data), img8.cols, img8.rows);
+
+      modifiedCtx.putImageData(colorData, 0, 0);
+      // console.log('修改后的彩图绘制完成！');
+
+      this.$bus.$emit('showCaptureImage');
+
+      // console.log('QHYCCD | imageData:', colorData);
+      this.MakeHistogram(colorData);
+      this.histogramImage = colorData;
+
+      // 内存释放
+      // dst.delete();
+      // mat.delete();
+      targetImg16.delete();
+      img8.delete();
+      resizeImg.delete();
     },
 
     ImageSoftAWB (img16, gainR, gainB, offset) {
-      console.time('SoftAWB处理完成,处理时间');
+      // console.time('SoftAWB处理完成,处理时间');
+
       // 分离通道
-      console.log('正在分离通道...');
+      // console.log('正在分离通道...');
       let channels = new cv.MatVector();
       cv.split(img16, channels);
 
       // 减去偏移量并乘以增益
-      for (let i = 0; i < channels.size() - 1; i++) {
-        let channel = new cv.Mat(channels.get(i));
-        if (i === 0 || i === 2) {
-          console.log('正在处理第', i, '个通道...');
-          channel.convertTo(channel, -1, 1, offset); // 减去偏移量
-          if (i === 0) {
-            channel.convertTo(channel, -1, gainB, 0); // 乘以增益
-          } else {
-            channel.convertTo(channel, -1, gainR, 0); // 乘以增益
-          }
+      for (let i = 0; i < channels.size(); i++) {
+        let channel = channels.get(i);
+        channel.convertTo(channel, -1, 1, offset); // 减去偏移量
+        if (i === 0) {
+          channel.convertTo(channel, -1, gainB, 0); // 乘以增益
+        } else if (i === 2) {
+          channel.convertTo(channel, -1, gainR, 0); // 乘以增益
         }
-        channels.set(i, channel);
-        channel.delete(); // 释放临时通道数据
+        channel.delete(); // 手动释放内存
       }
 
       // 合并通道
-      console.log('正在合并通道...');
-      try {
-        cv.merge(channels, img16);
-      } catch (error) {
-        console.error('合并通道时出现错误：', error);
-      }
+      // console.log('正在合并通道...');
+      let mergedImg = new cv.Mat();
+      cv.merge(channels, mergedImg);
 
       // 释放资源
-      console.log('正在释放资源...');
+      // console.log('正在释放资源...');
       channels.delete();
 
-      console.log('图像处理完成。');
-      console.timeEnd('SoftAWB处理完成,处理时间');
-      return img16;
+      // console.log('图像处理完成。');
+      // console.timeEnd('SoftAWB处理完成,处理时间');
+      return mergedImg;
     },
 
-    Bit16To8_Stretch (img16, B, W) {
-      console.time('Bit16To8处理时间');
+    Bit16To8_Stretch(img16, B, W) {
+      // console.time('Bit16To8处理时间');
       let img8 = new cv.Mat();
       img8.create(img16.rows, img16.cols, cv.CV_8UC4);
       img16.convertTo(img8, cv.CV_8U, 255.0 / (W - B), -B * 255.0 / (W - B));
-      console.log('转换完成！');
-      console.timeEnd('Bit16To8处理时间');
-      img16.delete(); //
+      // console.log('转换完成！');
+      // console.timeEnd('Bit16To8处理时间');
       return img8;
     },
-    
-    GetAutoStretch (imgData, mode) {
+
+    GetAutoStretch(imgData, mode) {
       const mean = imgData.reduce((sum, value) => sum + value, 0) / imgData.length;
       const std = Math.sqrt(imgData.reduce((sum, value) => sum + Math.pow(value - mean, 2), 0) / imgData.length);
 
@@ -967,22 +960,45 @@ export default {
       this.histogram_max = max;
     },
 
+    // loadOpenCv() {
+    //   return new Promise((resolve, reject) => {
+    //     if (typeof cv === 'undefined') {
+    //       // 如果 cv 未定义，尝试加载 OpenCV.js
+    //       const script = document.createElement('script');
+    //       script.src = '/opencv.js'; // 使用 public 文件夹中的路径
+    //       script.async = true;
+    //       script.onload = () => {
+    //         resolve();
+    //       };
+    //       script.onerror = (error) => {
+    //         reject(error);
+    //       };
+    //       document.head.appendChild(script);
+    //     } else {
+    //       // 如果 cv 已定义，直接解析
+    //       resolve();
+    //     }
+    //   });
+    // },
+
     loadOpenCv() {
       return new Promise((resolve, reject) => {
         if (typeof cv === 'undefined') {
-          // 如果 cv 未定义，尝试加载 OpenCV.js
           const script = document.createElement('script');
-          script.src = '/opencv.js'; // 使用 public 文件夹中的路径
+          script.src = 'https://docs.opencv.org/4.5.5/opencv.js';
           script.async = true;
           script.onload = () => {
-            resolve();
-          };
+            if (typeof cv !== 'undefined') {
+              resolve();
+            } else {
+              reject(new Error('Failed to load OpenCV.js'));
+            }
+          }
           script.onerror = (error) => {
             reject(error);
-          };
+          }
           document.head.appendChild(script);
         } else {
-          // 如果 cv 已定义，直接解析
           resolve();
         }
       });
@@ -1000,62 +1016,62 @@ export default {
       this.cvReady = true;
     },
 
-    convertToGrayscale() {
-      //console.log('QHYCCD | convertToGrayscale()');
-      //changeOrder();
+    // convertToGrayscale() {
+    //   //console.log('QHYCCD | convertToGrayscale()');
+    //   //changeOrder();
 
 
-      if (!this.cvReady) {
-        console.log('QHYCCD | OpenCV.js is not ready.');
-        return;
-      }
+    //   if (!this.cvReady) {
+    //     console.log('QHYCCD | OpenCV.js is not ready.');
+    //     return;
+    //   }
       
       
-      console.log('QHYCCD | convertToGrayscale() 1');
-      let imgElement = document.getElementById('imageSrc');
-      console.log('QHYCCD | convertToGrayscale() 1.5');
-      if (!imgElement) {
-        console.error('Image element not found');
-      return;
-      };
+    //   console.log('QHYCCD | convertToGrayscale() 1');
+    //   let imgElement = document.getElementById('imageSrc');
+    //   console.log('QHYCCD | convertToGrayscale() 1.5');
+    //   if (!imgElement) {
+    //     console.error('Image element not found');
+    //   return;
+    //   };
 
-      console.log('QHYCCD | convertToGrayscale() 1.6');
-      if (!imgElement) {
-        console.error('Image element not found');
-        return;
-      } else {
-        console.log('QHYCCD | imgElement:', imgElement);
-      }
+    //   console.log('QHYCCD | convertToGrayscale() 1.6');
+    //   if (!imgElement) {
+    //     console.error('Image element not found');
+    //     return;
+    //   } else {
+    //     console.log('QHYCCD | imgElement:', imgElement);
+    //   }
 
-      let src; 
-      try {
-        src = cv.imread(imgElement);
-        console.log('QHYCCD | Image read into OpenCV:', src);
-      } catch (error) {
-        console.log('QHYCCD | Error reading image with OpenCV:', error);
-      }
-      console.log('QHYCCD | convertToGrayscale() 1.7');
-      console.log('QHYCCD | src:', src);
+    //   let src; 
+    //   try {
+    //     src = cv.imread(imgElement);
+    //     console.log('QHYCCD | Image read into OpenCV:', src);
+    //   } catch (error) {
+    //     console.log('QHYCCD | Error reading image with OpenCV:', error);
+    //   }
+    //   console.log('QHYCCD | convertToGrayscale() 1.7');
+    //   console.log('QHYCCD | src:', src);
 
-      let dst = new cv.Mat();
+    //   let dst = new cv.Mat();
 
-      try {
-        console.log('QHYCCD | convertToGrayscale()2');
-        cv.cvtColor(src, dst, cv.COLOR_RGBA2GRAY, 0);
-        console.log('QHYCCD | convertToGrayscale()3');
-      } catch (error) {
-        console.log('QHYCCD | Error during grayscale conversion:', error);
-      }
+    //   try {
+    //     console.log('QHYCCD | convertToGrayscale()2');
+    //     cv.cvtColor(src, dst, cv.COLOR_RGBA2GRAY, 0);
+    //     console.log('QHYCCD | convertToGrayscale()3');
+    //   } catch (error) {
+    //     console.log('QHYCCD | Error during grayscale conversion:', error);
+    //   }
 
 
-      console.log('QHYCCD | imshow()');
-      cv.imshow('guiderCamera-canvas', dst);
+    //   console.log('QHYCCD | imshow()');
+    //   cv.imshow('guiderCamera-canvas', dst);
 
-      // 释放内存
-      src.delete();
-      dst.delete();
-      console.log('QHYCCD | convertToGrayscale() Finished');
-    },
+    //   // 释放内存
+    //   src.delete();
+    //   dst.delete();
+    //   console.log('QHYCCD | convertToGrayscale() Finished');
+    // },
 
 
 
@@ -1111,7 +1127,7 @@ export default {
       this.canvasZIndexMainCamera = -11;
       this.canvasZIndexGuiderCamera = 0;
 
-      this.convertToGrayscale();
+      // this.convertToGrayscale();
     },
 
     showStelCanvas() {
@@ -1282,7 +1298,7 @@ export default {
 
     // 使用 Promise 检查 OpenCV.js 是否加载完成
     this.loadOpenCv().then(() => {
-      //console.log('OpenCV.js is ready');
+      console.log('OpenCV.js is ready');
       this.onCvReady();  // 调用 OpenCV 准备好的回调
     }).catch(error => {
       console.error('Error loading OpenCV.js:', error);
