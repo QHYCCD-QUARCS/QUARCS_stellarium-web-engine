@@ -376,7 +376,11 @@ const swh = {
     //console.log("QIU | querySkySources:" + process.env.VUE_APP_NOCTUASKY_API_SERVER + '/api/v1/skysources/?q=' + str + '&limit=' + limit)
     //return fetch( 'https://api.noctuasky.com/api/v1/skysources/?q=' + str + '&limit=' + limit)
     // return fetch(process.env.VUE_APP_NOCTUASKY_API_SERVER + '/api/v1/skysources/?q=' + str + '&limit=' + limit)
-    return fetch(process.env.VUE_APP_NOCTUASKY_API_SERVER + '/?q=' + str + '&limit=' + limit)
+    const hostname = window.location.hostname
+    const baseURL = `http://${hostname}:8090`
+    // console.log("querySkySources:" + baseURL)
+    // return fetch(process.env.VUE_APP_NOCTUASKY_API_SERVER + '/?q=' + str + '&limit=' + limit)   //"http://192.168.2.31:8090"
+    return fetch(baseURL + '/?q=' + str + '&limit=' + limit)
       .then(function (response) {
         if (!response.ok) {
           throw response.body

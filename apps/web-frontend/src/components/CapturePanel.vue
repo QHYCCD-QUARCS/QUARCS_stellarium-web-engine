@@ -38,7 +38,7 @@
     </div>
 
     <div>
-      <button class="btn-save no-select" @touchend="saveImage"> <v-icon>mdi-arrow-down-bold-circle-outline</v-icon> </button>
+      <button class="btn-save no-select" @click="CaptureImageSave"> <v-icon>mdi-arrow-down-bold-circle-outline</v-icon> </button>
     </div>
 
   </div>
@@ -118,6 +118,9 @@ export default {
     },
     toggleHistogramPanel() {
       this.$bus.$emit('toggleHistogramPanel');
+    },
+    CaptureImageSave() {
+      
     },
     
   },

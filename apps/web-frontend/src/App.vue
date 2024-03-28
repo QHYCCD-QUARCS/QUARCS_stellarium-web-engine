@@ -160,6 +160,8 @@ export default {
       canvasZIndexGuiderCamera: -12,
       currentcanvas: 'Stel',
 
+      WebSocketUrl: '',
+
       websocket: null,
       message: '',
       receivedMessages: [],// 存储接收到的消息
@@ -209,9 +211,16 @@ export default {
     this.$bus.$on('ImageGainB', this.ImageGainSet);
   },
   methods: {
+    getLocationHostName() {
+      const hostname = window.location.hostname;
+      console.log('location hostname:', hostname);
+      this.WebSocketUrl = `ws://${hostname}:8600`;
+    },
     connect() {
       // 替换为你的 WebSocket 服务器地址
-      this.websocket = new WebSocket('ws://192.168.2.31:8600');
+      // this.websocket = new WebSocket('ws://192.168.2.31:8600');  // process.env.VUE_APP_WEBSOCKET
+      // this.websocket = new WebSocket(process.env.VUE_APP_WEBSOCKET);
+      this.websocket = new WebSocket(this.WebSocketUrl);
 
       this.websocket.onopen = () => {
         console.log('QHYCCD | WebSocket connected');
@@ -285,7 +294,10 @@ export default {
             const parts = data.message.split(':');
             if (parts.length === 2) {
               const fileName = parts[1];
-              this.fetchImage('http://192.168.2.31:8080/img/'+fileName); // http://192.168.2.111:8600/images/  http://192.168.2.111:8080/img/
+              // this.fetchImage('http://192.168.2.31:8080/img/'+fileName); // http://192.168.2.111:8600/images/  http://192.168.2.111:8080/img/
+              // this.fetchImage(process.env.VUE_APP_IMAGE_FILE + fileName);    // process.env.VUE_APP_IMAGE_FILE  
+              // this.fetchImage(this.ImageFileUrl + fileName);
+              this.fetchImage('img/' + fileName);
             }
           }
 
@@ -293,7 +305,10 @@ export default {
             const parts = data.message.split(':');
             if (parts.length === 2) {
               const fileName = parts[1];
-              this.readBinFile('http://192.168.2.31:8080/img/'+fileName); // http://192.168.2.111:8600/images/  http://192.168.2.111:8080/img/
+              // this.readBinFile('http://192.168.2.31:8080/img/'+fileName); // http://192.168.2.111:8600/images/  http://192.168.2.111:8080/img/
+              // this.readBinFile(process.env.VUE_APP_IMAGE_FILE + fileName);  
+              // this.readBinFile(this.ImageFileUrl + fileName); //this.ImageFileUrl + fileName
+              this.readBinFile('img/' + fileName);
             }
           }
 
@@ -301,7 +316,10 @@ export default {
             const parts = data.message.split(':');
             if (parts.length === 2) {
               const fileName = parts[1];
-              this.loadAndDisplayImage('http://192.168.2.31:8080/img/'+fileName);
+              // this.loadAndDisplayImage('http://192.168.2.31:8080/img/'+fileName);
+              // this.loadAndDisplayImage(process.env.VUE_APP_IMAGE_FILE + fileName);
+              // this.loadAndDisplayImage(this.ImageFileUrl + fileName);
+              this.loadAndDisplayImage('img/' + fileName);
             }
           }
 
@@ -1282,6 +1300,8 @@ export default {
   },
   mounted: function () {
     var that = this
+
+    this.getLocationHostName();
 
     this.loadImageToCanvasMainCamera();
     this.loadImageToCanvasGuiderCamera();

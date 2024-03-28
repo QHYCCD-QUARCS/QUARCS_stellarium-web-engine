@@ -137,7 +137,10 @@ export default {
     },
 
     loadAndDisplayImage(file) {
-      const imagePath = 'http://192.168.2.31:8080/img/'+file;
+      // const imagePath = 'http://192.168.2.31:8080/img/'+file; //process.env.VUE_APP_IMAGE_FILE
+      // const imagePath = process.env.VUE_APP_IMAGE_FILE + file;
+      // const imagePath = this.ImageFileUrl + file;
+      const imagePath = 'img/' + file;
 
       const canvas = document.getElementById('Focus-Canvas');
       if (canvas.getContext) {
