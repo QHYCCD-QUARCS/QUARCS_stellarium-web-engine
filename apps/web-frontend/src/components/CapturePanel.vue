@@ -23,8 +23,16 @@
     </div>
     
     <div>
-      <button class="custom-button btn-focus no-select" @click="toggleFocuserPanel"> <i class="mdi mdi-image-filter-center-focus"></i> </button>
-      <button class="custom-button btn-hist no-select" @click="toggleHistogramPanel"> <i class="mdi mdi-arrow-expand-horizontal"></i> </button>
+      <button class="custom-button btn-focus no-select" @click="toggleFocuserPanel"> 
+        <div style="display: flex; justify-content: center; align-items: center;">
+          <img src="@/assets/images/svg/ui/focuser.svg" height="45px" style="min-height: 45px"></img>
+        </div>
+      </button>
+      <button class="custom-button btn-hist no-select" @click="toggleHistogramPanel"> 
+        <div style="display: flex; justify-content: center; align-items: center;">
+          <img src="@/assets/images/svg/ui/histo.svg" height="45px" style="min-height: 45px"></img>
+        </div> 
+      </button>
     </div>
 
     <div>
@@ -38,7 +46,11 @@
     </div>
 
     <div>
-      <button class="btn-save no-select" @click="CaptureImageSave"> <v-icon>mdi-arrow-down-bold-circle-outline</v-icon> </button>
+      <button class="btn-save no-select" @click="CaptureImageSave"> 
+        <div style="display: flex; justify-content: center; align-items: center;">
+          <img src="@/assets/images/svg/ui/download.svg" height="25px" style="min-height: 25px"></img>
+        </div>
+      </button>
     </div>
 
   </div>

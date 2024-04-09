@@ -21,7 +21,11 @@
   <selected-object-info style="position: absolute; top: 48px; left: 0px; width: 350px; max-width: calc(100vw - 12px); margin: 6px" class="get-click"></selected-object-info>
 
   <div v-show="showMountSwitch">
-    <button v-show="!showFloatingBox" @click="toggleFloatingBox" class="get-click btn-MountPanelSwitch"><v-icon> mdi-gamepad-square-outline </v-icon></button>
+    <button v-show="!showFloatingBox" @click="toggleFloatingBox" class="get-click btn-MountPanelSwitch">
+      <div style="display: flex; justify-content: center; align-items: center;">
+        <img src="@/assets/images/svg/ui/mount.svg" height="33px" style="min-height: 33px"></img>
+      </div>
+    </button>
     <mount-control-panel v-show="showFloatingBox" style="position: absolute; top: 50px; right: 10px; " class="get-click"></mount-control-panel>
   </div>
   
@@ -50,7 +54,23 @@
 
   <button v-if="isCaptureMode" @click="Switch_ExpTime_CFW" class="get-click btn-ExpTime-CFW-Switch">Switch ExpTime CFW</button> -->
 
-  <button v-show="isMainSwitchShow" @click="SwitchMainPage" class="get-click btn-MainPageSwitch"><v-icon> mdi-repeat </v-icon></button>
+  <button v-show="isMainSwitchShow" @click="SwitchMainPage" class="get-click btn-MainPageSwitch">
+    <span v-if="CurrentMainPage === 'Stel'">
+      <div style="display: flex; justify-content: center; align-items: center;">
+        <img src="@/assets/images/svg/ui/sheying.svg" height="35px" style="min-height: 35px"></img>
+      </div>
+    </span>
+    <span v-if="CurrentMainPage === 'MainCamera'">
+      <div style="display: flex; justify-content: center; align-items: center;">
+        <img src="@/assets/images/svg/ui/Guiding Curve.svg" height="35px" style="min-height: 35px"></img>
+      </div>
+    </span>
+    <span v-if="CurrentMainPage === 'GuiderCamera'">
+      <div style="display: flex; justify-content: center; align-items: center;">
+        <img src="@/assets/images/svg/ui/skymap.svg" height="35px" style="min-height: 35px"></img>
+      </div>
+    </span>
+  </button>
 
   <!-- <div v-show="isCaptureMode">
     <CircularProgressButton ref="CaptureBtn" class="get-click btn-Capture" />
@@ -63,9 +83,19 @@
 
   <FocuserPanel v-show="showFocuserPanel" style="position: absolute; bottom: 10px; left: 170px; " class="get-click"/>
   
-  <button v-show="isCaptureMode" @click="hideCaptureUI" class="get-click btn-UISwitch"> <v-icon> mdi-flip-to-back </v-icon> </button>
+  <!-- <button v-show="isCaptureMode" @click="hideCaptureUI" class="get-click btn-UISwitch"> <v-icon> mdi-flip-to-back </v-icon> </button> -->
+  <button v-show="isCaptureMode" @click="hideCaptureUI" class="get-click btn-UISwitch">
+    <div style="display: flex; justify-content: center; align-items: center;">
+      <img src="@/assets/images/svg/ui/UI_Hide.svg" height="20px" style="min-height: 20px"></img>
+    </div>
+  </button>
 
-  <button v-show="isRedBoxMode" @click="showCaptureUI" class="get-click btn-ShowUISwitch"> <v-icon> mdi-flip-to-front </v-icon> </button>
+  <!-- <button v-show="isRedBoxMode" @click="showCaptureUI" class="get-click btn-ShowUISwitch"> <v-icon> mdi-flip-to-front </v-icon> </button> -->
+  <button v-show="isRedBoxMode" @click="showCaptureUI" class="get-click btn-ShowUISwitch">
+    <div style="display: flex; justify-content: center; align-items: center;">
+        <img src="@/assets/images/svg/ui/UI_Show.svg" height="20px" style="min-height: 20px">
+    </div>
+  </button>
 
   <SchedulePanel v-show="ShowSchedulePanel" class="get-click" style="position: absolute;"/>
   <ScheduleKeyBoard v-show="ShowSchedulePanel" />

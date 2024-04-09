@@ -14,8 +14,16 @@
     </button> -->
 
     <div class="buttons-container">
-      <button class="btn-Clear" @touchend="DataClear"><v-icon>mdi-delete</v-icon></button>
-      <button class="btn-RangeSwitch" @touchend="RangeSwitch"><v-icon>mdi-stretch-to-page-outline</v-icon></button>
+      <button class="btn-Clear" @touchend="DataClear">
+        <div style="display: flex; justify-content: center; align-items: center;">
+          <img src="@/assets/images/svg/ui/delete.svg" height="20px" style="min-height: 20px"></img>
+        </div>
+      </button>
+      <button class="btn-RangeSwitch" @touchend="RangeSwitch">
+        <div style="display: flex; justify-content: center; align-items: center;">
+          <img src="@/assets/images/svg/ui/suofang.svg" height="20px" style="min-height: 20px"></img>
+        </div>
+      </button>
     </div>
     <!-- <button @click="addLineData(); addScatterData();" class="btn-addData">Add Data</button> -->
   </div>

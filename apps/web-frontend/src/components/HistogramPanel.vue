@@ -3,7 +3,11 @@
      <HistogramChart ref="histogramchart" class="histogram-chart"/>
      <DialKnob class="dial-knob"/>
      <button  @touchend="AutoHistogram" class="get-click btn-Auto"><v-icon>mdi-alpha-a-circle-outline</v-icon></button>
-     <button  @touchend="ResetHistogram" class="get-click btn-Reset"><v-icon>mdi-refresh</v-icon></button>
+     <button  @touchend="ResetHistogram" class="get-click btn-Reset">
+      <div style="display: flex; justify-content: center; align-items: center;">
+          <img src="@/assets/images/svg/ui/reset.svg" height="25px" style="min-height: 25px"></img>
+        </div>
+     </button>
   </div>
 </template>
 

@@ -34,15 +34,21 @@
         <date-time-picker v-model="pickerDate" :location="$store.state.currentLocation"></date-time-picker>
       </v-menu>
 
-      <span v-if="isConnect" class="icon-container">
-        <v-icon class="green-icon">mdi-wifi</v-icon>
+      <span v-if="isConnect">
+        <div style="display: flex; justify-content: center; align-items: center;">
+          <img src="@/assets/images/svg/ui/wifi.svg" height="30px" style="min-height: 30px"></img>
+        </div>
       </span>
-      <span v-else class="icon-container">
-        <v-icon class="red-icon">mdi-wifi-off</v-icon>
+      <span v-else>
+        <div style="display: flex; justify-content: center; align-items: center;">
+          <img src="@/assets/images/svg/ui/wifi_off.svg" height="30px" style="min-height: 30px"></img>
+        </div>
       </span>
 
       <button class="ScheduleBtn" @click="toggleSchedulePanel" >
-        <i class="mdi mdi-table-large"></i>
+        <div style="display: flex; justify-content: center; align-items: center;">
+          <img src="@/assets/images/svg/ui/schedule_table.svg" height="25px" style="min-height: 25px"></img>
+        </div>
       </button>
       
     </v-toolbar>
