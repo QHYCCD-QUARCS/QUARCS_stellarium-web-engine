@@ -1,9 +1,9 @@
 <template>
-  <div class="chart-panel" :style="{ left: PanelLeft + 'px', right: '100px', top: '50px', bottom: '50px' }">
+  <div class="chart-panel" :style="{ left: PanelLeft + 'px', right: '100px', top: '40px', bottom: '50px' }">
   
     <ScheduleTable v-show="showTabel"></ScheduleTable>
 
-    <button class="btn-More" @touchend="toggleMore">
+    <button class="btn-More" @click="toggleMore">
       <span v-if="isExpanded">
         <v-icon>mdi-chevron-right</v-icon>
       </span>
@@ -12,8 +12,8 @@
       </span>
     </button>
 
-    <button class="additional-btn" :style="{ left: '0px', width: '50px', height: BtnHeight + 'px', top: '45px' }"><v-icon>mdi-play</v-icon></button>
-    <button class="additional-btn" :style="{ left: '0px', width: '50px', height: BtnHeight + 'px', top: BtnTop1 + 'px',}"><v-icon>mdi-pause</v-icon></button>
+    <button class="additional-btn" @click="PlaySchedule" :style="{ left: '0px', width: '50px', height: BtnHeight + 'px', top: '45px' }"><v-icon>mdi-play</v-icon></button>
+    <button class="additional-btn" @click="StopSchedule" :style="{ left: '0px', width: '50px', height: BtnHeight + 'px', top: BtnTop1 + 'px',}"><v-icon>mdi-pause</v-icon></button>
     <button class="additional-btn" :style="{ left: '0px', width: '50px', height: BtnHeight + 'px', top: BtnTop2 + 'px',}">Save</button>
     <button class="additional-btn" :style="{ left: '0px', width: '50px', height: BtnHeight + 'px', bottom: '0px' }">Load</button>
    
@@ -63,7 +63,7 @@ export default {
     },
     setBtnHeight() {
       const Height = window.innerHeight;
-      this.BtnHeight = (Height - 140) / 4 -5;
+      this.BtnHeight = (Height - 130) / 4 -5;
       this.BtnTop1 = 50 + this.BtnHeight;
       this.BtnTop2 = 55 + this.BtnHeight * 2;
 
@@ -72,6 +72,12 @@ export default {
 
       this.isExpanded = false;
       this.showTabel = false;
+    },
+    PlaySchedule() {
+      this.$bus.$emit('getTableData');
+    },
+    StopSchedule() {
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'StopSchedule');
     },
 
     

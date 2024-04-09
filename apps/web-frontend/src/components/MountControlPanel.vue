@@ -8,17 +8,17 @@
     </div>
 
     <div>
-      <button class="btn-stop no-select" @touchend="stop"><v-icon> mdi-stop-circle-outline </v-icon></button>
+      <button class="btn-stop no-select" @click="stop"><v-icon> mdi-stop-circle-outline </v-icon></button>
     </div>
     <div>
-      <button class="btn-speed custom-button no-select" @touchend="MountSlewRateSwitch" ref="speedContent"> 0 </button>
+      <button class="btn-speed custom-button no-select" @click="MountSlewRateSwitch" ref="speedContent"> 0 </button>
     </div>
     
     <div v-if="showButtons">
-      <button v-bind:class="{ 'btn-park-on no-select': ParkSwitch, 'btn-park no-select': !ParkSwitch }" @touchend="MountPark"><v-icon> mdi-parking </v-icon></button>
-      <button v-bind:class="{ 'btn-track-on no-select': TrackSwitch, 'btn-track no-select': !TrackSwitch }" @touchend="MountTrack"><v-icon> mdi-target </v-icon></button>
-      <button class="custom-button btn-home no-select" @touchend="MountHome"><v-icon> mdi-home </v-icon></button>
-      <button class="custom-button btn-sync no-select" @touchend="MountSYNC"><v-icon> mdi-sync </v-icon></button>
+      <button v-bind:class="{ 'btn-park-on no-select': ParkSwitch, 'btn-park no-select': !ParkSwitch }" @click="MountPark"><v-icon> mdi-parking </v-icon></button>
+      <button v-bind:class="{ 'btn-track-on no-select': TrackSwitch, 'btn-track no-select': !TrackSwitch }" @click="MountTrack"><v-icon> mdi-target </v-icon></button>
+      <button class="custom-button btn-home no-select" @click="MountHome"><v-icon> mdi-home </v-icon></button>
+      <button class="custom-button btn-sync no-select" @click="MountSYNC"><v-icon> mdi-sync </v-icon></button>
     </div>
 
     <div>
@@ -32,7 +32,7 @@
     </div>
 
     <div>
-      <button class="btn-close no-select" @touchend="PanelClose"><v-icon> mdi-close-circle-outline </v-icon></button>
+      <button class="btn-close no-select" @click="PanelClose"><v-icon> mdi-close-circle-outline </v-icon></button>
     </div>
 
   </div>

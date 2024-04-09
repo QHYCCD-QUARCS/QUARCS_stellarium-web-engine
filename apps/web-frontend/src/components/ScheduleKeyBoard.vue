@@ -1,6 +1,6 @@
 <template>
   <div class="schedule-keyboard" :style="{ bottom: '0px', right: '100px', left: BoardLeft + 'px', height: '50px' }">
-    <button v-for="button in modeButtons" :key="button.value" @touchend="handleButtonClick(button)">
+    <button v-for="button in modeButtons" :key="button.value" @click="handleButtonClick(button)">
       {{ button.label }}
     </button>
   </div>
@@ -126,7 +126,7 @@ export default {
       this.$bus.$emit('EditContent',button.value);
     },
     changeMode(newMode) {
-      console.log('changeMode:', newMode);
+      // console.log('changeMode:', newMode);
       this.$set(this, 'mode', newMode); // 更新 mode 并确保它是响应式的
     },
     toggleMore() {

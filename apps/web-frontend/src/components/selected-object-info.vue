@@ -73,7 +73,7 @@
         <img :class="{bt_disabled: !zoomInButtonEnabled}" src="@/assets/images/svg/ui/add_circle_outline.svg" height="40px" style="min-height: 40px"></img>
       </v-btn>
       <v-btn v-if="showPointToButton" fab small color="transparent" v-on:click.native="printName()">
-        <v-icon>mdi-map-marker</v-icon>
+        <v-icon>mdi-share</v-icon>
       </v-btn>
     </div>
     <v-snackbar bottom left :timeout="2000" v-model="copied" color="secondary" >
@@ -251,22 +251,27 @@ export default {
       }
       const formatRA = function (a) {
         const raf = that.$stel.a2tf(a, 1)
-        // console.log('SelectedObject:', formatInt(raf.hours, 2) + 'h' + formatInt(raf.minutes, 2) + 'm' + formatInt(raf.seconds, 2) + '.' + raf.fraction + 's');
+        // console.log('SelectedObject_Ra:', formatInt(raf.hours, 2) + 'h' + formatInt(raf.minutes, 2) + 'm' + formatInt(raf.seconds, 2) + '.' + raf.fraction + 's');
         return '<div class="radecVal">' + formatInt(raf.hours, 2) + '<span class="radecUnit">h</span>&nbsp;</div><div class="radecVal">' + formatInt(raf.minutes, 2) + '<span class="radecUnit">m</span></div><div class="radecVal">' + formatInt(raf.seconds, 2) + '.' + raf.fraction + '<span class="radecUnit">s</span></div>'
+      }
+      const formatDec = function (a) {
+        const raf = that.$stel.a2af(a, 1)
+        // console.log('SelectedObject_Dec:', formatInt(raf.degrees, 2) + '°' + formatInt(raf.arcminutes, 2) + '\'' + formatInt(raf.arcseconds, 2) + '.' + raf.fraction + '"');
+        return '<div class="radecVal">' + raf.sign + formatInt(raf.degrees, 2) + '<span class="radecUnit">°</span></div><div class="radecVal">' + formatInt(raf.arcminutes, 2) + '<span class="radecUnit">\'</span></div><div class="radecVal">' + formatInt(raf.arcseconds, 2) + '.' + raf.fraction + '<span class="radecUnit">"</span></div>'
       }
       const formatAz = function (a) {
         const raf = that.$stel.a2af(a, 1)
         return '<div class="radecVal">' + formatInt(raf.degrees < 0 ? raf.degrees + 180 : raf.degrees, 3) + '<span class="radecUnit">°</span></div><div class="radecVal">' + formatInt(raf.arcminutes, 2) + '<span class="radecUnit">\'</span></div><div class="radecVal">' + formatInt(raf.arcseconds, 2) + '.' + raf.fraction + '<span class="radecUnit">"</span></div>'
       }
-      const formatDec = function (a) {
+      const formatAlt = function (a) {
         const raf = that.$stel.a2af(a, 1)
-        // console.log('SelectedObject:', formatInt(raf.degrees, 2) + '°' + formatInt(raf.arcminutes, 2) + '\'' + formatInt(raf.arcseconds, 2) + '.' + raf.fraction + '"');
         return '<div class="radecVal">' + raf.sign + formatInt(raf.degrees, 2) + '<span class="radecUnit">°</span></div><div class="radecVal">' + formatInt(raf.arcminutes, 2) + '<span class="radecUnit">\'</span></div><div class="radecVal">' + formatInt(raf.arcseconds, 2) + '.' + raf.fraction + '<span class="radecUnit">"</span></div>'
       }
       const posCIRS = this.$stel.convertFrame(this.$stel.core.observer, 'ICRF', 'JNOW', obj.getInfo('radec'))
       const radecCIRS = this.$stel.c2s(posCIRS)
       const raCIRS = this.$stel.anp(radecCIRS[0])
       const decCIRS = this.$stel.anpm(radecCIRS[1])
+      // console.log('ra_JNOW:', raCIRS, ' dec_JNOW:', decCIRS)
       ret.push({
         key: that.$t('Ra/Dec'),
         value: formatRA(raCIRS) + '&nbsp;&nbsp;&nbsp;' + formatDec(decCIRS)
@@ -276,7 +281,7 @@ export default {
       const alt = this.$stel.anpm(azalt[1])
       ret.push({
         key: that.$t('Az/Alt'),
-        value: formatAz(az) + '&nbsp;&nbsp;&nbsp;' + formatDec(alt)
+        value: formatAz(az) + '&nbsp;&nbsp;&nbsp;' + formatAlt(alt)
       })
       addAttr(that.$t('Phase'), 'phase', this.formatPhase)
       const vis = obj.computeVisibility()
@@ -339,6 +344,7 @@ export default {
     printName: function () {
       const Name = this.title;
       console.log('SelectedObject:', Name);
+      this.$bus.$emit('insertObjName',Name);
     },
     zoomInButtonClicked: function () {
       const currentFov = this.$store.state.stel.fov * 180 / Math.PI

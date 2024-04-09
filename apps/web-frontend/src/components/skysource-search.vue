@@ -8,7 +8,7 @@
 
 <template>
   <div style="position: relative;" v-click-outside="resetSearch">
-    <v-text-field prepend-icon="mdi-magnify" :label="$t('Search...')" v-model="searchText" @keyup.native.esc="resetSearch()" hide-details single-line></v-text-field>
+    <v-text-field ref="searchField" prepend-icon="mdi-magnify" :label="$t('Search...')" v-model="searchText" @keyup.native.esc="resetSearch()" hide-details single-line></v-text-field>
     <v-list dense v-if="showList" two-line :style="listStyle">
       <v-list-item v-for="source in autoCompleteChoices" :key="source.names[0]" @click="sourceClicked(source)">
         <v-list-item-action>
@@ -17,6 +17,7 @@
         <v-list-item-content>
           <v-list-item-title>{{ nameForSkySource(source) }}</v-list-item-title>
           <v-list-item-subtitle>{{ typeToName(source.types[0]) }}</v-list-item-subtitle>
+          <v-list-item-subtitle>{{ radecForSkySource(source) }}</v-list-item-subtitle>
         </v-list-item-content>
       </v-list-item>
     </v-list>
@@ -33,7 +34,8 @@ export default {
     return {
       autoCompleteChoices: [],
       searchText: '',
-      lastQuery: undefined
+      lastQuery: undefined,
+      FirstItem: null,
     }
   },
   props: ['value', 'floatingList'],
@@ -55,7 +57,34 @@ export default {
       return this.searchText !== ''
     }
   },
+  created() {
+    this.$bus.$on('SearchName',this.SelectedObjectByName);
+
+    this.$bus.$on('insertObjName',this.SelectedObjectByName);
+  },
   methods: {
+    SelectedObjectByName(text) {
+      var that = this
+      let str = text
+      str = str.toUpperCase()
+      str = str.replace(/\s+/g, '')
+      // console.log('Input search query: ' + str)
+      swh.querySkySources(str, 10).then(results => {
+        that.autoCompleteChoices = results
+        // for (let i = 0; i < that.autoCompleteChoices.length; i++) {
+        //   console.log('List[', i, ']:', this.nameForSkySource(that.autoCompleteChoices[i]))
+        // }
+        const firstChoice = that.autoCompleteChoices[0]
+        this.FirstItem = firstChoice
+        this.getFirstItemRaDec()
+        this.sourceClicked(firstChoice) // 触发点击第一个元素的方法
+      }, err => { console.log(err) })
+    },
+    getFirstItemRaDec() {
+      console.log('FirstItem[', this.radecForSkySource(this.FirstItem), ']')
+      this.$bus.$emit('TargetRaDec',this.radecForSkySource(this.FirstItem))
+      this.FirstItem = null
+    },
     sourceClicked: function (val) {
       this.$emit('input', val)
       this.resetSearch()
@@ -68,6 +97,8 @@ export default {
       let str = that.searchText
       str = str.toUpperCase()
       str = str.replace(/\s+/g, '')
+      // console.log('searchText: ' + that.searchText)
+      // console.log('Input search query: ' + str)
       if (this.lastQuery === str) {
         return
       }
@@ -78,6 +109,9 @@ export default {
           return
         }
         that.autoCompleteChoices = results
+        // for (let i = 0; i < that.autoCompleteChoices.length; i++) {
+        //   console.log('List[', i, ']:', this.nameForSkySource(that.autoCompleteChoices[i]))
+        // }
       }, err => { console.log(err) })
     }, 200),
     nameForSkySource: function (s) {
@@ -88,6 +122,10 @@ export default {
       } else {
         return cn + ' (' + n + ')'
       }
+    },
+    radecForSkySource: function (s) {
+      let { ra, dec } = swh.radecForSkySource(s)
+      return 'Ra:' + ra + ',' + 'Dec:' + dec
     },
     typeToName: function (t) {
       return swh.nameForSkySourceType(t)

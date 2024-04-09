@@ -428,6 +428,15 @@ export default {
             }
           }
 
+          if (data.message.startsWith('UpdateScheduleProcess:')) {
+            const parts = data.message.split(':');
+            if (parts.length === 3) {
+              const RowNum = parts[1];
+              const Process = parts[2];
+              this.$bus.$emit('UpdateScheduleProcess', RowNum, Process);
+            }
+          }
+
           
         }
         else if (data.type === 'QT_Confirm') {

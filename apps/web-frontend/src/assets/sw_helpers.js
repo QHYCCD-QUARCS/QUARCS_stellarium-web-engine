@@ -233,7 +233,19 @@ const swh = {
     if (!skySource || !skySource.names) {
       return '?'
     }
+    // console.log('skySource:', skySource)
     return this.cleanupOneSkySourceName(skySource.names[0])
+  },
+
+  radecForSkySource: function (skySource) {
+    if (!skySource || !skySource.model_data) {
+      return '?'
+    }
+    // console.log('skySource.model_data.radec:', skySource.model_data.ra, ',', skySource.model_data.de)
+    return {
+      ra: skySource.model_data.ra,
+      dec: skySource.model_data.de
+    };
   },
 
   culturalNameToList: function (cn) {
@@ -355,7 +367,10 @@ const swh = {
   },
 
   lookupSkySourceByName: function (name) {
-    return fetch(process.env.VUE_APP_NOCTUASKY_API_SERVER + '/api/v1/skysources/name/' + name)
+    const hostname = window.location.hostname
+    const baseURL = `http://${hostname}:8090`
+    // return fetch(process.env.VUE_APP_NOCTUASKY_API_SERVER + '/api/v1/skysources/name/' + name)
+    return fetch(baseURL + '/name/' + name)
       .then(function (response) {
         if (!response.ok) {
           throw response.body
@@ -507,11 +522,12 @@ const swh = {
     }
     if (!title) return Promise.reject(new Error("Can't find wikipedia compatible name"))
 
-    return fetch('https://en.wikipedia.org/w/api.php?action=query&redirects&prop=extracts&exintro&exlimit=1&exchars=300&format=json&origin=*&titles=' + title,
-      { headers: { 'Content-Type': 'application/json; charset=UTF-8' } })
-      .then(response => {
-        return response.json()
-      })
+    // return fetch('https://en.wikipedia.org/w/api.php?action=query&redirects&prop=extracts&exintro&exlimit=1&exchars=300&format=json&origin=*&titles=' + title,
+    //   { headers: { 'Content-Type': 'application/json; charset=UTF-8' } })
+    //   .then(response => {
+    //     return response.json()
+    //   })
+    return
   },
 
   getGeolocation: function () {
@@ -661,6 +677,7 @@ const swh = {
       }
       const posJNOW = $stel.convertFrame(obs, 'ICRF', 'JNOW', obj.getInfo('radec'))
       const radecJNOW = $stel.c2s(posJNOW)
+      console.log('RaDecJNOW:', radecJNOW)
       const decJNOW = $stel.anpm(radecJNOW[1])
       if (obs.latitude >= 0) {
         return decJNOW >= Math.PI / 2 - obs.latitude

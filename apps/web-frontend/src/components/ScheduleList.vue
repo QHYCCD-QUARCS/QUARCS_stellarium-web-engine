@@ -1,8 +1,10 @@
 <template>
   <div
     class="chart-panel"
-    :style="{ width: width + 'px', top: '90px', bottom: '0px', right: '0px' }"
+    :style="{ width: width + 'px', top: '40px', bottom: '0px', right: '0px' }"
   >
+    <button class="get-click btn-transparent"></button>
+
     <div
       class="list-container"
       @touchmove="handleTouchMove"
@@ -39,6 +41,9 @@
         Add
       </span>
     </button>
+
+    <button class="get-click btn-Process"> Process: 0% </button>
+    
   </div>
 </template>
 
@@ -48,7 +53,7 @@ export default {
   data() {
     return {
       width: 100,
-      itemList: ['Item 1', 'Item 2', 'Item 3', 'Item 4', 'Item 5', 'Item 6', 'Item 7', 'Item 8', ],
+      itemList: ['0% ', '0% ', '0% ', '0% ', '0% ', '0% ', '0% ', '0% ', ],
       dragIndex: null,
       offsetY: 0,
       selectedIndex: null, // 存储选中项的索引
@@ -62,8 +67,12 @@ export default {
       // 使用 scrollTo 方法控制 A 组件的滚动
       this.$refs.listA.scrollTo(0, scrollTop);
     });
+    this.$bus.$on('UpdateScheduleProcess', this.setScheduleItemList);
   },
   methods: {
+    setScheduleItemList(RowNum, Process) {
+      this.itemList[RowNum] = Process + '%';
+    },
     handleItemClick(index) {
       console.log(`Item clicked: ${this.itemList[index]}`);
       // 切换选中状态
@@ -81,7 +90,7 @@ export default {
     EditList() {
       if(this.isItemSelected === false)
       {
-        this.itemList.push('newItem');
+        this.itemList.push('0%');
         this.$bus.$emit('AddScheduleRow');
       }
       else
@@ -187,12 +196,12 @@ export default {
   background-color: rgba(128, 128, 128, 0.5);
   backdrop-filter: blur(5px);
   border-radius: 5px;
-  overflow: hidden;
+  overflow: hidden;                                                                                                                                               
 }
 
 .list-container {
   touch-action: none;
-  height: calc(100% - 50px);
+  height: calc(100% - 90px);
   overflow-y: auto;
 
   scrollbar-width: thin;
@@ -220,6 +229,33 @@ export default {
 .btn-AddData {
   height: 50px;
   width: 100px;
+  color: #fff;
+  user-select: none;
+  background-color: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(5px);
+  border-radius: 5px; 
+  box-sizing: border-box;
+}
+
+.btn-transparent {
+  height: 36px;
+  width: 100px;
+  /* top: -40px; */
+  color: #fff;
+  user-select: none;
+  /* position:absolute; */
+  background-color: rgba(0, 0, 0, 0.0);
+  backdrop-filter: blur(5px);
+  border-radius: 5px; 
+  box-sizing: border-box;
+}
+
+.btn-Process {
+  position:absolute;
+  height: 40px;
+  width: 100px;
+  top: 0px;
+  right: 0px;
   color: #fff;
   user-select: none;
   background-color: rgba(0, 0, 0, 0.3);

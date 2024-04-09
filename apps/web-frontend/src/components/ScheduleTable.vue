@@ -5,6 +5,7 @@
         <tr>
           <!-- <th>序号</th> -->
           <th>拍摄目标</th>
+          <th>赤经赤纬</th>
           <th>拍摄时间</th>
           <th>曝光时间</th>
           <th>滤镜轮号</th>
@@ -40,17 +41,19 @@ export default {
       selectedColumn: null,
       selectedCellValue: '', // 新增选中单元格内容的变量
       numberOfRows: 8,
-      numberOfColumns: 7,
+      numberOfColumns: 8,
       cellValues: {},
+      tableData: [],
       
       initialColumnValues: {
         1: 'null ',
-        2: '::',
-        3: '1 s',
-        4: 'L',
-        5: '1',
-        6: 'Light',
-        7: 'OFF',
+        2: '',
+        3: '::',
+        4: '1 s',
+        5: 'L',
+        6: '1',
+        7: 'Light',
+        8: 'OFF',
       },
     };
   },
@@ -75,6 +78,11 @@ export default {
 
     this.$bus.$on('EditContent',this.EditContent);
 
+    this.$bus.$on('insertObjName',this.insertObjName);
+
+    this.$bus.$on('getTableData',this.getTableData);
+
+    this.$bus.$on('TargetRaDec',this.insertObjRaDec);
   },
   mounted() {
     // 初始化表格数据
@@ -94,25 +102,29 @@ export default {
       }
       else if(column === 2)
       {
-        this.$bus.$emit('KeyBoardMode','Time');
+
       }
       else if(column === 3)
       {
-        this.$bus.$emit('KeyBoardMode','ExpTime');
+        this.$bus.$emit('KeyBoardMode','Time');
       }
       else if(column === 4)
       {
-        this.$bus.$emit('KeyBoardMode','CFW');
+        this.$bus.$emit('KeyBoardMode','ExpTime');
       }
       else if(column === 5)
       {
-        this.$bus.$emit('KeyBoardMode','Repeat');
+        this.$bus.$emit('KeyBoardMode','CFW');
       }
       else if(column === 6)
       {
-        this.$bus.$emit('KeyBoardMode','Type');
+        this.$bus.$emit('KeyBoardMode','Repeat');
       }
       else if(column === 7)
+      {
+        this.$bus.$emit('KeyBoardMode','Type');
+      }
+      else if(column === 8)
       {
         this.$bus.$emit('KeyBoardMode','Focus');
       }
@@ -208,19 +220,54 @@ export default {
       }
     },
 
+    getTableData() {
+      // this.$bus.$emit('getScheduleItemList');
+      // 清空原始表格数据
+      this.tableData = [];
+      // 遍历每一行
+      for (let row = 1; row <= this.numberOfRows; row++) {
+        // 检查第一列的单元格内容是否为 'null '
+        const firstColumnKey = `${row}-1`;
+        const firstColumnValue = this.cellValues[firstColumnKey];
+        
+        // const RepeatNumKey = `${row}-6`;
+        // const RepeatNum = this.cellValues[RepeatNumKey];
+
+        // 如果第一列的内容不是 'null '，则获取该行数据
+        if (firstColumnValue !== 'null ') {
+          let rowData = ['[']; // 在每一行的开头添加 [
+          // 遍历每一列
+          for (let column = 1; column <= this.numberOfColumns; column++) {
+            const key = `${row}-${column}`;
+            // 将单元格数据添加到当前行的数组中
+            rowData.push(this.cellValues[key] || '');
+          }
+          // rowData.push(']'); // 在每一行的结尾添加 ]
+          // 将当前行的数组添加到表格数据中
+          this.tableData.push(rowData);
+        }
+      }
+      // 输出表格数据
+      console.log('Table Data:', this.tableData);
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'ScheduleTabelData:'+ this.tableData);
+    },
+
     EditContent(text) {
       if (this.selectedRow !== null && this.selectedColumn !== null) {
         const key = `${this.selectedRow}-${this.selectedColumn}`;
-        if (this.selectedColumn === 4 || this.selectedColumn === 6 || this.selectedColumn === 7) {
-          // 如果 selectedColumn 为 4、6 或 7，则直接赋值给单元格内容
+        if (this.selectedColumn === 5 || this.selectedColumn === 7 || this.selectedColumn === 8) {
+          // 如果 selectedColumn 为 5、7 或 8，则直接赋值给单元格内容
           this.cellValues[key] = text;
         } else if (this.selectedColumn === 1) {
           const currentValue = this.cellValues[key] || '';
+          // console.log('currentValue', currentValue);
           if (!isNaN(text)) {
             // 如果 text 是数字，则将数字插入到现有文本的后面
             this.cellValues[key] = currentValue + text;
           } else if (text === 'Prefix' && currentValue.includes('null')) {
             this.cellValues[key] = currentValue.replace('null', 'M');
+          } else if (text === 'Prefix' && currentValue === ' ') {
+            this.cellValues[key] = currentValue.replace(' ', 'M ');
           } else if (text === 'Prefix' && currentValue.includes('M')) {
             this.cellValues[key] = currentValue.replace('M', 'IC');
           } else if (text === 'Prefix' && currentValue.includes('IC')) {
@@ -237,7 +284,11 @@ export default {
               }
             }
           }
+          console.log('currentValue', this.cellValues[key]);
+          this.$bus.$emit('SearchName',this.cellValues[key]);
         } else if (this.selectedColumn === 2) {
+          
+        } else if (this.selectedColumn === 3) {
           const currentValue = this.cellValues[key] || '';
           const numbers = currentValue.match(/\d+/g) || [];
           const colons = currentValue.match(/:/g) || [];
@@ -302,7 +353,7 @@ export default {
               }
             }
           }
-        } else if (this.selectedColumn === 3) {
+        } else if (this.selectedColumn === 4) {
           const currentValue = this.cellValues[key] || '';
           if (!isNaN(text)) {
             // 如果 text 是数字，则将数字插入到现有文本中空格前的数字后面
@@ -338,9 +389,28 @@ export default {
       }
     },
 
+    insertObjName(name) {
+      if (this.selectedRow !== null && this.selectedColumn !== null) {
+        const key = `${this.selectedRow}-${this.selectedColumn}`;
+        if (this.selectedColumn === 1) {
+          // 如果 selectedColumn 为 1，则直接赋值给单元格内容
+          this.cellValues[key] = ' ' + name;
+        }
+      }
+    },
+
+    insertObjRaDec(RaDec) {
+      if (this.selectedRow !== null && this.selectedColumn !== null) {
+        const key = `${this.selectedRow}-${this.selectedColumn + 1}`;
+        if (this.selectedColumn === 1) {
+          this.cellValues[key] = ' ' + RaDec;
+        }
+      }
+    },
+
     setMaxHeight() {
       const Height = window.innerHeight;
-      this.containerMaxHeight = Height - 140;
+      this.containerMaxHeight = Height - 130;
     },
     handleScrollB() {
       this.$bus.$emit('scrollEventB', this.$refs.listB.scrollTop);
@@ -394,10 +464,6 @@ export default {
   &::-webkit-scrollbar {
     width: 0px; /* 设置滚动条宽度 */
   }
-}
-
-.scrollable-body {
-  /* 如果需要水平滚动条，请使用 overflow-x: auto; */
 }
 
 table {
