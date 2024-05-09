@@ -132,7 +132,8 @@ export default {
       this.$bus.$emit('toggleHistogramPanel');
     },
     CaptureImageSave() {
-      
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'CaptureImageSave');
+      // this.$bus.$emit('mainCanvasZoom');
     },
     
   },

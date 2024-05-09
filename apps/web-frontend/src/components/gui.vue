@@ -97,13 +97,18 @@
     </div>
   </button>
 
+  <div>
+    <CapturePanel v-show="isCaptureMode" />
+  </div>
+
+  <div>
+    <ImageManagerPanel v-show="ShowImageManagerPanel" />
+  </div>
+
   <SchedulePanel v-show="ShowSchedulePanel" class="get-click" style="position: absolute;"/>
   <ScheduleKeyBoard v-show="ShowSchedulePanel" />
   <ScheduleList v-show="ShowSchedulePanel" class="get-click" style="position: absolute;"/>
 
-  <div>
-    <CapturePanel v-show="isCaptureMode" />
-  </div>
   
 
 </div>
@@ -150,6 +155,8 @@ import ScheduleKeyBoard from '@/components/ScheduleKeyBoard.vue';
 
 import CapturePanel from '@/components/CapturePanel.vue';
 
+import ImageManagerPanel from '@/components/ImageManagerPanel.vue';
+
 export default {
   data: function () {
     return {
@@ -168,6 +175,7 @@ export default {
       isMainSwitchShow: true,
       isRedBoxMode: false,
       ShowSchedulePanel: false,
+      ShowImageManagerPanel: false,
 
       showRedBox: false, // 控制小红框显示与隐藏
       isInitRedBox: true,
@@ -180,6 +188,7 @@ export default {
       isStellariumMode: true,
       isCaptureMode: false,
       isGuiderMode: false,
+      
 
     }
   },
@@ -195,6 +204,7 @@ export default {
     this.$bus.$on('MountPanelClose', this.toggleFloatingBox);
     this.$bus.$on('toggleHistogramPanel', this.toggleHistogramPanel);
     this.$bus.$on('toggleFocuserPanel', this.toggleFocuserPanel);
+    this.$bus.$on('ImageManagerPanelClose', this.toggleImageManagerPanel);
     
 
   },
@@ -204,6 +214,8 @@ export default {
   methods: {
     toggleFloatingBox() {
       this.showFloatingBox = !this.showFloatingBox; // 切换显示状态
+      this.ShowImageManagerPanel = !this.showFloatingBox;
+      this.$bus.$emit('StagingScheduleData', 'data.message');
     },
     toggleChartsPanel() {
       this.showChartsPanel = !this.showChartsPanel;
@@ -234,6 +246,10 @@ export default {
     },
     toggleSchedulePanel() {
       this.ShowSchedulePanel = !this.ShowSchedulePanel;
+    },
+
+    toggleImageManagerPanel() {
+      this.ShowImageManagerPanel = !this.ShowImageManagerPanel;
     },
 
     showCaptureUI() {
@@ -502,6 +518,7 @@ export default {
     ScheduleList,
     ScheduleKeyBoard,
     CapturePanel,
+    ImageManagerPanel,
   }
 }
 </script>

@@ -55,6 +55,16 @@
       >
         {{ progressText }}
       </text>
+
+      <image
+        :x="svgSize / 2" 
+        :y="svgSize / 2"
+        v-if="!isClicked"
+        xlink:href="@/assets/images/svg/ui/media record.svg"
+        width="30px" height="30px"
+        style="transform: translate(-15px, -15px);"
+      />
+
     </svg>
   </div>
 </template>
@@ -93,7 +103,7 @@ export default {
       return 2 * Math.PI * this.radius;
     },
     progressText() {
-      return this.isClicked ? `${(this.progress * 100).toFixed(0)}%` : '拍摄';
+      return this.isClicked ? `${(this.progress * 100).toFixed(0)}%` : '';
     },
     fontSize() {
       // 字体大小可以根据按钮的大小动态计算

@@ -74,7 +74,7 @@ export default {
       this.showTabel = false;
     },
     PlaySchedule() {
-      this.$bus.$emit('getTableData');
+      this.$bus.$emit('getTableData', true);
     },
     StopSchedule() {
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'StopSchedule');

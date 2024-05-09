@@ -195,6 +195,18 @@ export default {
 
       ImageGainR: 1,
       ImageGainB: 1,
+
+      CanvasWidth: 4096,
+      CanvasHeight: 2160,
+
+      scale: 2,
+      translateX: 0,
+      translateY: 0,
+      bufferCanvas: null,
+      bufferCtx: null,
+      imageWidth: 0,
+      imageHeight: 0,
+      drawImgData: null,
     }
   },
   components: { Gui,
@@ -228,6 +240,7 @@ export default {
         this.networkDisconnected = false; // WebSocket连接成功时重置网络连接状态
         this.callShowMessageBox('WebSocket connected','success');
         this.$bus.$emit('ShowNetStatus', 'true');
+        this.StatusRecovery();
         console.log('process.env.NODE_ENV:', process.env.NODE_ENV);
       };
 
@@ -297,7 +310,8 @@ export default {
               // this.fetchImage('http://192.168.2.31:8080/img/'+fileName); // http://192.168.2.111:8600/images/  http://192.168.2.111:8080/img/
               // this.fetchImage(process.env.VUE_APP_IMAGE_FILE + fileName);    // process.env.VUE_APP_IMAGE_FILE  
               // this.fetchImage(this.ImageFileUrl + fileName);
-              this.fetchImage('img/' + fileName);
+
+              // this.fetchImage('img/' + fileName);
             }
           }
 
@@ -437,6 +451,17 @@ export default {
             }
           }
 
+          if (data.message.startsWith('StagingScheduleData:')) {
+            console.log('------------------------------');
+            const parts = data.message.split('[');
+
+            if (parts.length > 0) {
+              console.log('parts.length: ', parts.length);
+              this.$bus.$emit('StagingScheduleData', data.message);
+            }
+            console.log('------------------------------');
+          }
+
           
         }
         else if (data.type === 'QT_Confirm') {
@@ -479,6 +504,7 @@ export default {
         this.networkDisconnected = false; // 网络恢复时重置网络连接状态
         this.callShowMessageBox('WebSocket connected','success');
         this.$bus.$emit('ShowNetStatus', 'true');
+        this.StatusRecovery();
         this.reconnectWebSocket(); // 网络恢复后自动重连WebSocket
       });
 
@@ -527,6 +553,12 @@ export default {
 
     locationClicked: function () {
       this.$store.commit('toggleBool', 'showLocationDialog')
+    },
+
+    StatusRecovery() {
+      this.sendMessage('Vue_Command', 'getConnectedDevices');
+      this.sendMessage('Vue_Command', 'getStagingImage');
+      this.sendMessage('Vue_Command', 'getStagingScheduleData');
     },
 
     selectDevice(device) {
@@ -736,7 +768,9 @@ export default {
       // 创建用于绘制的 ImageData 对象，并在修改后的画布上绘制图像
       const colorData = new ImageData(new Uint8ClampedArray(img8.data), img8.cols, img8.rows);
 
-      modifiedCtx.putImageData(colorData, 0, 0);
+      // modifiedCtx.putImageData(colorData, 0, 0);
+      this.drawImgData = colorData;
+      this.drawImageData(this.drawImgData);
       // console.log('修改后的彩图绘制完成！');
 
       this.$bus.$emit('showCaptureImage');
@@ -751,6 +785,164 @@ export default {
       targetImg16.delete();
       img8.delete();
       resizeImg.delete();
+    },
+
+    initCanvas() {
+      this.bufferCanvas = document.createElement('canvas');
+      this.bufferCtx = this.bufferCanvas.getContext('2d');
+    },
+
+    drawImageData(colorData) {
+      // Clear buffer canvas
+      this.bufferCtx.clearRect(0, 0, this.bufferCanvas.width, this.bufferCanvas.height);
+
+      // 计算可见区域的位置和大小
+      const visibleWidth = this.bufferCanvas.width / this.scale;
+      const visibleHeight = this.bufferCanvas.height / this.scale;
+      const visibleX = -this.translateX / this.scale;
+      const visibleY = -this.translateY / this.scale;
+
+      // 裁剪 buffer canvas，只绘制可见区域
+      this.bufferCtx.save();
+      this.bufferCtx.beginPath();
+      this.bufferCtx.rect(visibleX, visibleY, visibleWidth, visibleHeight);
+      this.bufferCtx.clip();
+
+      // Draw ImageData on buffer canvas
+      this.bufferCanvas.width = colorData.width;
+      this.bufferCanvas.height = colorData.height;
+      this.bufferCtx.putImageData(colorData, 0, 0);
+
+      // 绘制图像
+      this.bufferCtx.drawImage(this.bufferCanvas, this.translateX, this.translateY, colorData.width * this.scale, colorData.height * this.scale);
+      this.imageWidth = colorData.width * this.scale;
+      this.imageHeight = colorData.height * this.scale;
+      console.log('image size: ' + colorData.width * this.scale + ', ' + colorData.height * this.scale);
+      console.log('image scale: ' + this.scale);
+
+      // 恢复 buffer canvas 状态
+      this.bufferCtx.restore();
+
+      // Draw buffer canvas on main canvas
+      const canvas = this.$refs.mainCanvas;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(this.bufferCanvas, 0, 0);
+    },
+
+    addEventListeners() {
+      const canvas = this.$refs.mainCanvas;
+      let isDragging = false;
+      let lastX = 0;
+      let lastY = 0;
+
+      const throttledTouchMove = this.throttle((event) => {
+        event.preventDefault();
+        if (isDragging) {
+          const windowWidth = window.innerWidth;
+          const windowHeight = window.innerHeight;
+
+          const deltaX = (event.touches[0].clientX - lastX) * (this.imageWidth/windowWidth) / this.scale;
+          const deltaY = (event.touches[0].clientY - lastY) * (this.imageHeight/windowHeight) / this.scale;
+
+          this.translateX += deltaX;
+          this.translateY += deltaY;
+
+          const minTranslateX = this.imageWidth - 4096;
+          const minTranslateY = this.imageHeight - 2160;
+
+          this.translateX = Math.min(Math.max(this.translateX, -minTranslateX), 0);
+          this.translateY = Math.min(Math.max(this.translateY, -minTranslateY), 0);
+
+          console.log('Move to: ' + this.translateX + ', ' + this.translateY);
+          lastX = event.touches[0].clientX;
+          lastY = event.touches[0].clientY;
+          this.drawImageData(this.drawImgData);
+        }
+      }, 100); // 100 毫秒内最多执行一次
+
+      const throttledGesturechange = this.throttle((event) => {
+        event.preventDefault();
+        const delta = event.scale > 1 ? 0.1 : -0.1;
+        this.scale += delta;
+        this.scale = Math.min(Math.max(this.scale, 1), 3);
+        this.translateX = 0;
+        this.translateY = 0;
+        this.drawImageData(this.drawImgData);
+      }, 100); // 100 毫秒内最多执行一次
+
+      canvas.addEventListener('mousedown', (event) => {
+        event.preventDefault();
+        isDragging = true;
+        lastX = event.offsetX;
+        lastY = event.offsetY;
+      });
+
+      canvas.addEventListener('mousemove', (event) => {
+        event.preventDefault();
+        if (isDragging) {
+          const windowWidth = window.innerWidth;
+          const windowHeight = window.innerHeight;
+
+          const deltaX = (event.offsetX - lastX) * (this.imageWidth/windowWidth) / this.scale;
+          const deltaY = (event.offsetY - lastY) * (this.imageHeight/windowHeight) / this.scale;
+
+          this.translateX += deltaX;
+          this.translateY += deltaY;
+
+          const minTranslateX = this.imageWidth - 4096;
+          const minTranslateY = this.imageHeight - 2160;
+
+          this.translateX = Math.min(Math.max(this.translateX, -minTranslateX), 0);
+          this.translateY = Math.min(Math.max(this.translateY, -minTranslateY), 0);
+
+          console.log('Move to: ' + this.translateX + ', ' + this.translateY);
+          lastX = event.offsetX;
+          lastY = event.offsetY;
+          this.drawImageData(this.drawImgData);
+        }
+      });
+
+      canvas.addEventListener('mouseup', () => {
+        isDragging = false;
+      });
+
+      canvas.addEventListener('wheel', (event) => {
+        event.preventDefault();
+        const delta = event.deltaY > 0 ? -0.1 : 0.1;
+        this.scale += delta;
+        this.scale = Math.min(Math.max(this.scale, 1), 3);
+        this.translateX = 0;
+        this.translateY = 0;
+        this.drawImageData(this.drawImgData);
+      });
+
+      // 添加触摸事件监听
+      canvas.addEventListener('touchstart', (event) => {
+        event.preventDefault();
+        isDragging = true;
+        lastX = event.touches[0].clientX;
+        lastY = event.touches[0].clientY;
+      });
+
+      canvas.addEventListener('touchmove', throttledTouchMove);
+
+      canvas.addEventListener('touchend', () => {isDragging = false; });
+
+      // 添加缩放功能
+      canvas.addEventListener('gesturechange', throttledGesturechange);
+    },
+
+    // 节流函数
+    throttle(func, delay) {
+      let lastExecuted = 0;
+      return function (...args) {
+        const now = Date.now();
+        if (now - lastExecuted >= delay) {
+          func.apply(this, args);
+          lastExecuted = now;
+        }
+      };
     },
 
     ImageSoftAWB (img16, gainR, gainB, offset) {
@@ -987,49 +1179,49 @@ export default {
       this.histogram_max = max;
     },
 
-    // loadOpenCv() {
-    //   return new Promise((resolve, reject) => {
-    //     if (typeof cv === 'undefined') {
-    //       // 如果 cv 未定义，尝试加载 OpenCV.js
-    //       const script = document.createElement('script');
-    //       script.src = '/opencv.js'; // 使用 public 文件夹中的路径
-    //       script.async = true;
-    //       script.onload = () => {
-    //         resolve();
-    //       };
-    //       script.onerror = (error) => {
-    //         reject(error);
-    //       };
-    //       document.head.appendChild(script);
-    //     } else {
-    //       // 如果 cv 已定义，直接解析
-    //       resolve();
-    //     }
-    //   });
-    // },
-
     loadOpenCv() {
       return new Promise((resolve, reject) => {
         if (typeof cv === 'undefined') {
+          // 如果 cv 未定义，尝试加载 OpenCV.js
           const script = document.createElement('script');
-          script.src = 'https://docs.opencv.org/4.5.5/opencv.js';
+          script.src = '/opencv.js'; // 使用 public 文件夹中的路径
           script.async = true;
           script.onload = () => {
-            if (typeof cv !== 'undefined') {
-              resolve();
-            } else {
-              reject(new Error('Failed to load OpenCV.js'));
-            }
-          }
+            resolve();
+          };
           script.onerror = (error) => {
             reject(error);
-          }
+          };
           document.head.appendChild(script);
         } else {
+          // 如果 cv 已定义，直接解析
           resolve();
         }
       });
     },
+
+    // loadOpenCv() {
+    //   return new Promise((resolve, reject) => {
+    //     if (typeof cv === 'undefined') {
+    //       const script = document.createElement('script');
+    //       script.src = 'https://docs.opencv.org/4.5.5/opencv.js';
+    //       script.async = true;
+    //       script.onload = () => {
+    //         if (typeof cv !== 'undefined') {
+    //           resolve();
+    //         } else {
+    //           reject(new Error('Failed to load OpenCV.js'));
+    //         }
+    //       }
+    //       script.onerror = (error) => {
+    //         reject(error);
+    //       }
+    //       document.head.appendChild(script);
+    //     } else {
+    //       resolve();
+    //     }
+    //   });
+    // },
 
     onCvReady() {
       
@@ -1315,6 +1507,9 @@ export default {
     this.loadImageToCanvasMainCamera();
     this.loadImageToCanvasGuiderCamera();
 
+    this.initCanvas();
+    this.addEventListeners();
+
     for (const i in this.$stellariumWebPlugins()) {
       const plugin = this.$stellariumWebPlugins()[i]
       if (plugin.onAppMounted) {
@@ -1398,6 +1593,7 @@ export default {
 
 
     })
+
   }
 }
 </script>

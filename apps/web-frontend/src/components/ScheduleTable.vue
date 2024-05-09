@@ -48,7 +48,7 @@ export default {
       initialColumnValues: {
         1: 'null ',
         2: '',
-        3: '::',
+        3: 'Now',
         4: '1 s',
         5: 'L',
         6: '1',
@@ -83,10 +83,16 @@ export default {
     this.$bus.$on('getTableData',this.getTableData);
 
     this.$bus.$on('TargetRaDec',this.insertObjRaDec);
+
+    this.$bus.$on('StagingScheduleData',this.RecoveryScheduleData);
+
   },
   mounted() {
+    console.log('initialize ScheduleTable------------------------------');
+    // this.sendMessage('Vue_Command', 'getStagingScheduleData');
     // 初始化表格数据
     this.initializeTable();
+    this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getStagingScheduleData');
   },
   methods: {
     selectCell(row, column) {
@@ -128,6 +134,8 @@ export default {
       {
         this.$bus.$emit('KeyBoardMode','Focus');
       }
+
+      this.getTableData(false);
     },
 
     SelectedScheduleRow(index) {
@@ -220,7 +228,7 @@ export default {
       }
     },
 
-    getTableData() {
+    getTableData(isStart) {
       // this.$bus.$emit('getScheduleItemList');
       // 清空原始表格数据
       this.tableData = [];
@@ -249,7 +257,57 @@ export default {
       }
       // 输出表格数据
       console.log('Table Data:', this.tableData);
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'ScheduleTabelData:'+ this.tableData);
+      if(isStart) {
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'ScheduleTabelData:'+ this.tableData);
+      } else {
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'StagingScheduleData:'+ this.tableData);
+      }
+      
+    },
+
+    RecoveryScheduleData(text) {
+      console.log('RecoveryScheduleData: ', text);
+      const rowData = text.split('[');
+
+      // 循环遍历分割后的数组
+      for (let i = 1; i < rowData.length; i++) {
+        console.log('rowData: ', rowData[i]);
+
+        const colData = rowData[i].split(',');
+        for (let j = 1; j < colData.length; j++){
+          console.log('colData: ', colData[j]);
+          let key;
+          if(j === 1) {
+            key = `${i}-${1}`;
+            this.cellValues[key] = colData[j];
+          } else if (j === 2) {
+            key = `${i}-${2}`;
+            this.cellValues[key] = colData[j];
+          } else if (j === 3) {
+            key = `${i}-${2}`;
+            const currentValue = this.cellValues[key] || '';
+            this.cellValues[key] = currentValue + ',' + colData[j];
+          } else if (j === 4) {
+            key = `${i}-${3}`;
+            this.cellValues[key] = colData[j];
+          } else if (j === 5) {
+            key = `${i}-${4}`;
+            this.cellValues[key] = colData[j];
+          } else if (j === 6) {
+            key = `${i}-${5}`;
+            this.cellValues[key] = colData[j];
+          } else if (j === 7) {
+            key = `${i}-${6}`;
+            this.cellValues[key] = colData[j];
+          } else if (j === 8) {
+            key = `${i}-${7}`;
+            this.cellValues[key] = colData[j];
+          } else if (j === 9) {
+            key = `${i}-${8}`;
+            this.cellValues[key] = colData[j];
+          }
+        }
+      }
     },
 
     EditContent(text) {
@@ -290,19 +348,16 @@ export default {
           
         } else if (this.selectedColumn === 3) {
           const currentValue = this.cellValues[key] || '';
-          const numbers = currentValue.match(/\d+/g) || [];
-          const colons = currentValue.match(/:/g) || [];
           const textIsNumber = !isNaN(text);
 
           if (textIsNumber) {
             const currentLength = currentValue.length;
-            if (currentLength === 2) {
+            if (currentValue === 'Now') {
               if (text < 3) {
-                const insertIndex = currentValue.indexOf(':');
-                const updatedValue = currentValue.slice(0, insertIndex) + text + currentValue.slice(insertIndex);
+                const updatedValue = text + ':';
                 this.cellValues[key] = updatedValue;
               }
-            } else if (currentLength === 3) {
+            } else if (currentLength === 2) {
               const firstChar = currentValue.charAt(0);
               if (firstChar > 1) {
                 if (text < 4) {
@@ -315,42 +370,28 @@ export default {
                 const updatedValue = currentValue.slice(0, insertIndex) + text + currentValue.slice(insertIndex);
                 this.cellValues[key] = updatedValue;
               }
-            } else if (currentLength === 4) {
-              if (text < 6) {
-                const insertIndex = currentValue.indexOf(':', currentValue.indexOf(':') + 1);
-                const updatedValue = currentValue.slice(0, insertIndex) + text + currentValue.slice(insertIndex);
-                this.cellValues[key] = updatedValue;
-              }
-            } else if (currentLength === 5) {
-              const insertIndex = currentValue.indexOf(':', currentValue.indexOf(':') + 1);
-              const updatedValue = currentValue.slice(0, insertIndex) + text + currentValue.slice(insertIndex);
-              this.cellValues[key] = updatedValue;
-            } else if (currentLength === 6) {
+            } else if (currentLength === 3) {
               if (text < 6) {
                 const updatedValue = currentValue + text;
                 this.cellValues[key] = updatedValue;
               }
-            } else if (currentLength === 7) {
+            } else if (currentLength === 4) {
               const updatedValue = currentValue + text;
               this.cellValues[key] = updatedValue;
             }
           } else if (text === 'Delete') {
             const currentLength = currentValue.length;
-            if (currentLength === 7 || currentLength === 8) {
+            if (currentLength === 4 || currentLength === 5) {
               const updatedValue = currentValue.slice(0, -1);
               this.cellValues[key] = updatedValue;
-            } else if (currentLength >= 5 && currentLength <= 6) {
-              const indexToDelete = currentValue.indexOf(':', currentValue.indexOf(':') + 1) - 1;
-              if (indexToDelete >= 0) {
-                const updatedValue = currentValue.slice(0, indexToDelete) + currentValue.slice(indexToDelete + 1);
-                this.cellValues[key] = updatedValue;
-              }
-            } else if (currentLength >= 3 && currentLength <= 4) {
+            } else if (currentLength === 3) {
               const indexToDelete = currentValue.indexOf(':') - 1;
               if (indexToDelete >= 0) {
                 const updatedValue = currentValue.slice(0, indexToDelete) + currentValue.slice(indexToDelete + 1);
                 this.cellValues[key] = updatedValue;
               }
+            } else if (currentLength === 2) {
+              this.cellValues[key] = 'Now';
             }
           }
         } else if (this.selectedColumn === 4) {
