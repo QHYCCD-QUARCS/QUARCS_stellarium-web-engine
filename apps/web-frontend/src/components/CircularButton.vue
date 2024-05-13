@@ -1,5 +1,5 @@
 <template>
-  <div class="circular-button">
+  <div class="circular-button no-select">
     <svg
       @touchstart="handleMouseDown" @touchend="handleMouseUp"
       @mousedown="handleMouseDown" @mouseup="handleMouseUp"

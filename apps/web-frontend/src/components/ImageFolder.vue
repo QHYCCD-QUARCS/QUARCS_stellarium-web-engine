@@ -1,7 +1,8 @@
 <template>
-  <div :class="{ 'ImageFolder': !folderSelect, 'ImageFolder-select': folderSelect}"
+  <div :class="{ 'ImageFolder': !folderSelect, 'ImageFolder-select': folderSelect, 'ImageFolder-Deleted': folderSelect&&DeleteBtnSelect }"
        :style="{ width: width + 'px', height: height + 'px' }"
-       @click="toggleFolder">
+       @click="toggleFolder"
+       v-show="isShow">
 
     <div class="no-select" style="display: flex; justify-content: center; align-items: center;">
       <img src="@/assets/images/svg/ui/folder.svg" height="80px" style="min-height: 80px"></img>
@@ -25,24 +26,39 @@ export default {
     imageName: {
       type: String,
       default: ''
+    },
+    folderSelect: {
+      type: Boolean,
+      default: false
+    },
+    folderIndex: {
+      type: Number,
+      default: 0
+    },
+    DeleteBtnSelect: {
+      type: Boolean,
+      default: false
     }
   },
   data() {
     return {
       width: 100,
       height: 80,
-      folderSelect: false
+      // folderSelect: false,
+      isShow: true
     };
   },
   methods: {
     toggleFolder() {
-      console.log("Clicked");
       this.folderSelect = !this.folderSelect; // Toggle folder state
-
-      // const windowWidth = window.innerWidth;
-      // const windowHeight = window.innerHeight;
-
-      // this.$bus.$emit('AppSendMessage', 'Vue_Command', 'windowSize:' + windowWidth + ',' + windowHeight);
+      this.$bus.$emit('SelectFolderIndex', this.folderIndex);
+    },
+    updateShow(show) {
+      this.isShow = show;
+    },
+    updateData(imageDate, imageName) {
+      this.imageDate = imageDate;
+      this.imageName = imageName;
     }
   }
 }
@@ -56,8 +72,11 @@ export default {
   backdrop-filter: blur(5px);
   border-radius: 5px;
   box-sizing: border-box;
-  /* transition: background-color 0.5s ease; */
+  /* transition: background-color 0.1s ease; */
+  
 }
+
+
 
 .ImageFolder-select {
   pointer-events: auto;
@@ -66,8 +85,21 @@ export default {
   backdrop-filter: blur(5px);
   border-radius: 5px;
   box-sizing: border-box;
-  /* transition: background-color 0.5s ease; */
+  /* transition: background-color 0.1s ease; */
 }
+
+.ImageFolder-Deleted {
+  pointer-events: auto;
+  position: fixed;
+  background-color: rgba(255, 0, 0, 0.5);
+  /* background: linear-gradient(to right, rgba(255, 0, 0, 0.5) 30%, rgba(75, 155, 250, 0.5) 70%); */
+  backdrop-filter: blur(5px);
+  border-radius: 5px;
+  box-sizing: border-box;
+  /* transition: background-color 0.3s ease; */
+}
+
+
 
 .image-data {
   font-size: 13px;

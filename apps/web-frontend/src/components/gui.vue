@@ -215,7 +215,8 @@ export default {
     toggleFloatingBox() {
       this.showFloatingBox = !this.showFloatingBox; // 切换显示状态
       this.ShowImageManagerPanel = !this.showFloatingBox;
-      this.$bus.$emit('StagingScheduleData', 'data.message');
+      // this.$bus.$emit('StagingScheduleData', 'data.message');
+      this.$bus.$emit('calculateTotalPage');
     },
     toggleChartsPanel() {
       this.showChartsPanel = !this.showChartsPanel;
