@@ -135,3 +135,7 @@ Contributing
 
 In order for your contribution to Stellarium Web Engine to be accepted, you have to sign the
 [QUARCS_Stellarium Web Contributor License Agreement (CLA)](doc/cla/sign-cla.md).
+
+
+Welcome to join the QUARUS Discod discussion group for online discussions (https://discord.gg/uHTPfJ5uuV)   
+-

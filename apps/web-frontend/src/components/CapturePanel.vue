@@ -14,8 +14,8 @@
           <span class="CFW-plus-icon"> <v-icon>mdi-menu-down</v-icon> </span>
         </button>
 
-        <span class="text-ExpTime-content" ref="expTimeContent"> 1ms </span>
-        <span class="text-CFW-content" ref="CFWContent"> CFW </span>
+        <span class="text-ExpTime-content" ref="expTimeContent"> {{ExpTimes[currentExpTimeIndex]}} </span>
+        <span class="text-CFW-content" ref="CFWContent"> {{CFWs[currentCFWIndex]}} </span>
     </div>
 
     <div>
@@ -79,12 +79,27 @@ export default {
       currentExpTimeIndex: 0,
       currentCFWIndex: 0,
 
-      ExpTimes: ['1ms', '5ms', '10ms', '30ms', '50ms', '100ms', '1s', '5s', '10s'],
+      ExpTimes: ['1ms', '10ms', '100ms', '1s', '5s', '10s', '30s', '60s', '120s'],
       CFWs: ['Null', 'L', 'R', 'G', 'B', 'Ha', 'OIIII', 'SII'],
     };
   },
   created() {
-    
+    this.$bus.$on('ExpTime [1]', this.ModifyExpTimeList);
+    this.$bus.$on('ExpTime [2]', this.ModifyExpTimeList);
+    this.$bus.$on('ExpTime [3]', this.ModifyExpTimeList);
+    this.$bus.$on('ExpTime [4]', this.ModifyExpTimeList);
+    this.$bus.$on('ExpTime [5]', this.ModifyExpTimeList);
+    this.$bus.$on('ExpTime [6]', this.ModifyExpTimeList);
+    this.$bus.$on('ExpTime [7]', this.ModifyExpTimeList);
+    this.$bus.$on('ExpTime [8]', this.ModifyExpTimeList);
+    this.$bus.$on('ExpTime [9]', this.ModifyExpTimeList);
+
+    this.$bus.$on('initExpTimeList', this.initExpTimeList);
+  },
+  mounted: function () {
+    this.CurrentExpTimeList();
+    this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getExpTimeList');
+
   },
   methods: {
     handleExpTimeButtonClick(direction) {
@@ -102,7 +117,7 @@ export default {
         }
       }
       // console.log('handleExpTimeButtonClick: ',this.ExpTimes[this.currentExpTimeIndex]);
-      this.$refs.expTimeContent.innerText = this.ExpTimes[this.currentExpTimeIndex];
+      // this.$refs.expTimeContent.innerText = this.ExpTimes[this.currentExpTimeIndex];
       this.$bus.$emit('time-selected', this.ExpTimes[this.currentExpTimeIndex]);
     },
 
@@ -121,7 +136,7 @@ export default {
         }
       }
       // console.log('handleMouseDownCFW: ',this.CFWs[this.currentCFWIndex]);
-      this.$refs.CFWContent.innerText = this.CFWs[this.currentCFWIndex];
+      // this.$refs.CFWContent.innerText = this.CFWs[this.currentCFWIndex];
       this.$bus.$emit('cfw-selected', this.CFWs[this.currentCFWIndex]);
     },
 
@@ -134,6 +149,56 @@ export default {
     CaptureImageSave() {
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'CaptureImageSave');
       // this.$bus.$emit('mainCanvasZoom');
+    },
+
+    CurrentExpTimeList() {
+      for(let i = 0; i < this.ExpTimes.length; i++) {
+        this.$bus.$emit('CurrentExpTimeList', i, this.ExpTimes[i]);
+      }
+    },
+
+    parseNumberFromBracket(str) {
+      const regex = /\[(\d+)\]/; // 匹配[]中的数字
+      const match = regex.exec(str);
+      if (match && match.length > 1) {
+        return parseInt(match[1]); // 返回匹配到的数字
+      } else {
+        return null; // 如果没有匹配到，则返回null
+      }
+    },
+
+    ModifyExpTimeList(payload) {
+      const [signal, value] = payload.split(':'); // 拆分信号和值
+
+      // 正则表达式，匹配数字后面跟着'ms'或's'
+      const regex = /^\d+(ms|s)$/;
+
+      if (regex.test(value)) {
+        this.ExpTimes[this.parseNumberFromBracket(signal) - 1] = value;
+
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'ExpTimeList:' + this.ExpTimes);
+      } else {
+        // 如果不符合格式，可以做出相应的处理，比如提示用户输入错误等
+        console.error('Value format is invalid. Please provide a number followed by "ms" or "s".');
+        this.$bus.$emit('showMsgBox', 'Value format is invalid. Please provide a number followed by "ms" or "s".', 'error');
+      }
+    },
+
+    initExpTimeList(list) {
+      console.log('initExpTimeList: ', list);
+      const parts = list.split(',');
+
+      for(let i = 0; i < parts.length; i++)
+      {
+        this.ExpTimes[i] = parts[i];
+      }
+      this.CurrentExpTimeList();
+    },
+
+    CurrentCFWList() {
+      for(let i = 0; i < this.CFWs.length; i++) {
+        this.$bus.$emit('CurrentCFWList', i, this.CFWs[i]);
+      }
     },
     
   },

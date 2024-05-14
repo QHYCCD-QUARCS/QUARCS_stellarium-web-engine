@@ -58,7 +58,7 @@
     </div>
 
     <span v-show="isNoFolders" style="position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); font-size: 20px; color: rgba(255, 255, 255, 0.5); user-select: none;"> 
-      There are no image files.
+      There are no image folders.
     </span>
 
   </div>

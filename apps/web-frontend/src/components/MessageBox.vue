@@ -1,6 +1,6 @@
 <template>
   <div>
-    <transition name="message-slide" mode="out-in">
+    <transition ref="messageBox" name="message-slide" mode="out-in">
       <div
         v-if="showMessage"
         class="message-box"
@@ -85,7 +85,7 @@ export default {
 
 <style scoped>
 .message-slide-enter-active{
-  transition: transform 0.3s ease-in-out;
+  transition: transform 0.3s ease-in;
 }
 
 .message-slide-leave-active {
@@ -120,6 +120,16 @@ export default {
   width: 40%; /* 设置宽度为显示位置的三分之一 */
   max-width: 50%; /* 最大宽度，根据需要调整 */
   margin: 0 auto; /* 水平居中 */
+  animation: showAnimation 0.3s forwards;
+}
+
+@keyframes showAnimation {
+  from {
+    top: -40px;
+  }
+  to {
+    top: 5px;
+  }
 }
 
 .message-box-expanded {

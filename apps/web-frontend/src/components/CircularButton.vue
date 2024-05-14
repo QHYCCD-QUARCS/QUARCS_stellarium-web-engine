@@ -77,7 +77,7 @@ export default {
       // circumference: 339.292,
       radius: 30, // 圆的半径
       strokeWidth: 7, // 圆环的线宽
-      animationDuration: 1000, // 动画时长为1000毫秒（1秒）
+      animationDuration: 1, // 动画时长为1000毫秒（1秒）
       animationStartTime: 0, // 动画开始时间
       isClicked: false,
 

@@ -53,14 +53,22 @@
           { label: 'ImageGainR' , value: '' },
           { label: 'ImageGainB' , value: '' },
           { label: 'Offset' , value: '' },
-          { label: '配置项6' , value: '' },
-          { label: '配置项7' , value: '' },
-          { label: '配置项8' , value: '' },
-          { label: '配置项9' , value: '' },
+          { label: 'ExpTime [1]' , value: '' },
+          { label: 'ExpTime [2]' , value: '' },
+          { label: 'ExpTime [3]' , value: '' },
+          { label: 'ExpTime [4]' , value: '' },
+          { label: 'ExpTime [5]' , value: '' },
+          { label: 'ExpTime [6]' , value: '' },
+          { label: 'ExpTime [7]' , value: '' },
+          { label: 'ExpTime [8]' , value: '' },
+          { label: 'ExpTime [9]' , value: '' },
           // 在这里添加更多的配置项
         ],
 
       }
+    },
+    created() {
+      this.$bus.$on('CurrentExpTimeList', this.CurrentExpTimeList);
     },
     methods: {
       AddDrivers(option) {
@@ -96,6 +104,15 @@
         if (this.activeMenu === 'connection') { this.activeMenu = 'configuration'; }
         else { this.activeMenu = 'connection'; }
       },
+      CurrentExpTimeList(index, value) {
+        const expTimeIndex = this.configurationItems.findIndex(item => item.label === 'ExpTime [' + (index + 1) + ']');
+        if (expTimeIndex !== -1) { // 确保找到了对应的配置项
+          // 更新 ExpTime1 配置项的值
+          this.configurationItems[expTimeIndex].value = value;
+        } else {
+          console.error('ExpTime [' + index + '] configuration item not found.');
+        }
+      }
 
     },
     // 计算属性和其他选项保持不变

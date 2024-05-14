@@ -462,6 +462,13 @@ export default {
             console.log('------------------------------');
           }
 
+          if (data.message.startsWith('ExpTimeList:')) {
+            const parts = data.message.split(':');
+            if (parts.length === 2) {
+              this.$bus.$emit('initExpTimeList', parts[1]);
+            }
+          }
+
           
         }
         else if (data.type === 'QT_Confirm') {
