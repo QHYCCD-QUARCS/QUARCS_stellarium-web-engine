@@ -198,8 +198,8 @@ export default {
     this.$bus.$on('showMsgBox', this.showMessageBox);
     this.$bus.$on('MainCameraSize', this.resizeRedBox);
     this.$bus.$on('RedBoxSizeChange', this.RedBoxSizeChange);
-    this.$bus.$on('time-selected', this.handleExpTimeSelected);
-    this.$bus.$on('cfw-selected', this.handleCFWSelected);
+    // this.$bus.$on('time-selected', this.handleExpTimeSelected);
+    // this.$bus.$on('cfw-selected', this.handleCFWSelected);
     this.$bus.$on('toggleSchedulePanel', this.toggleSchedulePanel);
     this.$bus.$on('MountPanelClose', this.toggleFloatingBox);
     this.$bus.$on('toggleHistogramPanel', this.toggleHistogramPanel);
@@ -346,7 +346,7 @@ export default {
       } else if (device.type === 'Guider') {
         this.$refs.guiderDialog.AddDevices(device);
       } else if (device.type === 'CFW') {
-        this.$refs.cfwDialog.AddDevices(driver);
+        this.$refs.cfwDialog.AddDevices(device);
       }
     },
 
@@ -432,36 +432,36 @@ export default {
     //   }
     // },
 
-    handleExpTimeSelected(time) {
-      console.log('QHYCCD | ExpTimeSelected: ', time);
-      // 根据需要处理选择的时间
-      const match = time.match(/(\d+)([a-zA-Z]+)/);
+    // handleExpTimeSelected(time) {
+    //   console.log('QHYCCD | ExpTimeSelected: ', time);
+    //   // 根据需要处理选择的时间
+    //   const match = time.match(/(\d+)([a-zA-Z]+)/);
 
-      if (match) {
-        const numericPart = parseInt(match[1], 10); // 将匹配到的数字部分转换为整数
-        const unitPart = match[2].toLowerCase(); // 获取单位部分，并将其转换为小写
+    //   if (match) {
+    //     const numericPart = parseInt(match[1], 10); // 将匹配到的数字部分转换为整数
+    //     const unitPart = match[2].toLowerCase(); // 获取单位部分，并将其转换为小写
 
-        let convertedTime = numericPart; // 默认情况下，将数字部分保持不变
+    //     let convertedTime = numericPart; // 默认情况下，将数字部分保持不变
 
-        if (unitPart === 's') {
-          convertedTime *= 1000; // 如果单位是秒(s)，则将数字乘以1000
-        }
+    //     if (unitPart === 's') {
+    //       convertedTime *= 1000; // 如果单位是秒(s)，则将数字乘以1000
+    //     }
 
-        console.log('Numeric part:', numericPart);
-        console.log('Unit part:', unitPart);
-        console.log('Converted time:', convertedTime);
+    //     console.log('Numeric part:', numericPart);
+    //     console.log('Unit part:', unitPart);
+    //     console.log('Converted time:', convertedTime);
 
-        // this.$refs.CaptureBtn.SetDuration(convertedTime);
-        this.$bus.$emit('SetExpTime',convertedTime);
-      } else {
-        console.log('No numeric part found in time:', time);
-      }
-    },
+    //     // this.$refs.CaptureBtn.SetDuration(convertedTime);
+    //     this.$bus.$emit('SetExpTime',convertedTime);
+    //   } else {
+    //     console.log('No numeric part found in time:', time);
+    //   }
+    // },
 
-    handleCFWSelected(cfw) {
-      console.log('QHYCCD | CFWSelected: ', cfw);
-      // 根据需要处理选择的时间
-    },
+    // handleCFWSelected(cfw) {
+    //   console.log('QHYCCD | CFWSelected: ', cfw);
+    //   // 根据需要处理选择的时间
+    // },
 
   },
   computed: {

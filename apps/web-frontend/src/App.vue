@@ -469,6 +469,31 @@ export default {
             }
           }
 
+          if (data.message.startsWith('CameraInExposuring:')) {
+            this.$bus.$emit('CameraInExposuring');
+          }
+
+          if (data.message.startsWith('CFWPositionMax:')) {
+            const parts = data.message.split(':');
+            if (parts.length === 2) {
+              this.$bus.$emit('SetCFWPositionMax', parts[1]);
+            }
+          }
+
+          if (data.message.startsWith('SetCFWPositionSuccess:')) {
+            const parts = data.message.split(':');
+            if (parts.length === 2) {
+              this.$bus.$emit('SetCFWPositionSuccess', parts[1]);
+            }
+          }
+
+          if (data.message.startsWith('getCFWList:')) {
+            const parts = data.message.split(':');
+            if (parts.length === 2) {
+              this.$bus.$emit('initCFWList', parts[1]);
+            }
+          }
+
           
         }
         else if (data.type === 'QT_Confirm') {

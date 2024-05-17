@@ -22,6 +22,16 @@ export default {
       mode: this.initialMode,
 
       isExpanded: false,
+
+      CFWkeys: [
+        { label: '1', value: '1' },
+        { label: '2', value: '2' },
+        { label: '3', value: '3' },
+        { label: '4', value: '4' },
+        { label: '5', value: '5' },
+        { label: '6', value: '6' },
+        { label: '7', value: '7' },
+      ],
     };
   },
   computed: {
@@ -73,17 +83,7 @@ export default {
             { label: 'Delete', value: 'Delete' }
           ];
         case 'CFW':
-          return [
-            { label: 'L', value: 'L' },
-            { label: 'R', value: 'R' },
-            { label: 'G', value: 'G' },
-            { label: 'B', value: 'B' },
-            { label: 'Ha', value: 'Ha' },
-            { label: 'OIII', value: 'OIII' },
-            { label: 'SII', value: 'SII' },
-            { label: 'Null', value: 'Null' },
-            { label: 'Null', value: 'Null' }
-          ];
+          return this.CFWkeys;
         case 'Repeat':
           return [
             { label: '1', value: '1' },
@@ -119,6 +119,7 @@ export default {
     this.$bus.$on('KeyBoardMode',this.changeMode);
     this.$bus.$on('toggleScheduleKeyBoard', this.toggleMore);
     this.$bus.$on('toggleSchedulePanel', this.setWeith);
+    this.$bus.$on('initCFWList', this.initCFWList);
   },
   methods: {
     handleButtonClick(button) {
@@ -140,6 +141,16 @@ export default {
     setWeith() {
       this.isExpanded = false;
       this.BoardLeft = window.innerWidth - 100;
+    },
+    initCFWList(list) {
+      console.log('Replace keys');
+      this.CFWkeys.splice(0, this.CFWkeys.length);
+      const parts = list.split(',');
+      for(let i = 0; i < parts.length; i++)
+      {
+        const newItem = { label: parts[i], value: (i+1) };
+        this.CFWkeys.push(newItem);
+      }
     },
   }
 };

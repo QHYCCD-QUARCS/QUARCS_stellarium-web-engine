@@ -7,10 +7,10 @@
         <button class="ExpTime-plus no-select" @click="handleExpTimeButtonClick('plus')">
           <span class="ExpTime-plus-icon"> <v-icon>mdi-menu-up</v-icon> </span>
         </button>
-        <button class="CFW-minus no-select" @click="handleCFWButtonClick('minus')">
+        <button class="CFW-minus no-select" :disabled="cfwButtonsDisabled" @click="handleCFWButtonClick('minus')">
           <span class="CFW-minus-icon"> <v-icon>mdi-menu-down</v-icon> </span>
         </button>
-        <button class="CFW-plus no-select" @click="handleCFWButtonClick('plus')">
+        <button class="CFW-plus no-select" :disabled="cfwButtonsDisabled" @click="handleCFWButtonClick('plus')">
           <span class="CFW-plus-icon"> <v-icon>mdi-menu-down</v-icon> </span>
         </button>
 
@@ -78,9 +78,11 @@ export default {
 
       currentExpTimeIndex: 0,
       currentCFWIndex: 0,
+      cfwButtonsDisabled: false,
 
       ExpTimes: ['1ms', '10ms', '100ms', '1s', '5s', '10s', '30s', '60s', '120s'],
-      CFWs: ['Null', 'L', 'R', 'G', 'B', 'Ha', 'OIIII', 'SII'],
+      // CFWs: ['Null', 'L', 'R', 'G', 'B', 'Ha', 'OIIII', 'SII'],
+      CFWs: ['Null'],
     };
   },
   created() {
@@ -94,11 +96,18 @@ export default {
     this.$bus.$on('ExpTime [8]', this.ModifyExpTimeList);
     this.$bus.$on('ExpTime [9]', this.ModifyExpTimeList);
 
+    this.$bus.$on('CFWvalue', this.ModifyCFWList);
+
     this.$bus.$on('initExpTimeList', this.initExpTimeList);
+    this.$bus.$on('SetCFWPositionMax', this.SetCFWPositionMax);
+    this.$bus.$on('SetCFWPositionSuccess', this.SetCFWPositionSuccess);
+
+    this.$bus.$on('initCFWList', this.initCFWList);
   },
   mounted: function () {
     this.CurrentExpTimeList();
     this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getExpTimeList');
+    this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getCFWList');
 
   },
   methods: {
@@ -137,7 +146,10 @@ export default {
       }
       // console.log('handleMouseDownCFW: ',this.CFWs[this.currentCFWIndex]);
       // this.$refs.CFWContent.innerText = this.CFWs[this.currentCFWIndex];
-      this.$bus.$emit('cfw-selected', this.CFWs[this.currentCFWIndex]);
+      // this.$bus.$emit('cfw-selected', this.currentCFWIndex);
+      console.log('QHYCCD | CFWSelected: ', (this.currentCFWIndex+1));
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'SetCFWPosition:' + (this.currentCFWIndex+1));
+      this.cfwButtonsDisabled = true;
     },
 
     toggleFocuserPanel() {
@@ -184,6 +196,12 @@ export default {
       }
     },
 
+    ModifyCFWList(payload) {
+      const [signal, value] = payload.split(':'); // 拆分信号和值
+      this.CFWs[this.parseNumberFromBracket(signal) - 1] = value;
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'CFWList:' + this.CFWs);
+    },
+
     initExpTimeList(list) {
       console.log('initExpTimeList: ', list);
       const parts = list.split(',');
@@ -199,6 +217,30 @@ export default {
       for(let i = 0; i < this.CFWs.length; i++) {
         this.$bus.$emit('CurrentCFWList', i, this.CFWs[i]);
       }
+    },
+
+    SetCFWPositionMax(max) {
+      for (let i = 0; i < max; i++) {
+        this.CFWs[i] = i + 1;
+      }
+      console.log('CFWList: ', this.CFWs);
+      // this.CurrentCFWList();
+    },
+
+    SetCFWPositionSuccess(num) {
+      console.log('Set CFW Position Success: ', num);
+      this.cfwButtonsDisabled = false;
+    },
+
+    initCFWList(list) {
+      console.log('initCFWList: ', list);
+      const parts = list.split(',');
+
+      for(let i = 0; i < parts.length; i++)
+      {
+        this.CFWs[i] = parts[i];
+      }
+      this.CurrentCFWList();
     },
     
   },

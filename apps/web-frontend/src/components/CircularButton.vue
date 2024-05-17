@@ -92,6 +92,10 @@ export default {
   created() {
     this.$bus.$on('showCaptureImage', this.overProgress);
     this.$bus.$on('SetExpTime',this.SetDuration);
+    this.$bus.$on('CameraInExposuring',this.setInProgress);
+  },
+  mounted() {
+    this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getCaptureStatus');
   },
   computed: {
     svgSize() {
@@ -173,6 +177,7 @@ export default {
     resetProgress() {
       this.progress = 0;
       this.isClicked = false;
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getCaptureStatus');
     },
 
     SetDuration(time) {
@@ -205,6 +210,11 @@ export default {
     resetlongPressProgress() {
       this.longPressProgress = 0;
       this.isLongPress = false;
+    },
+
+    setInProgress() {
+      this.progress = 0.99;
+      this.isClicked = true;
     },
 
   },
