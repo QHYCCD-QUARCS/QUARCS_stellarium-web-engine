@@ -1,10 +1,26 @@
 <template>
   <div class="mount-control-panel" :style="{ top: top + 'px', right: right + 'px', width: width + 'px', height: height + 'px' }">
     <div class="Direction-Btn">
-      <button class="ra-plus no-select" @touchstart="handleMouseDownRA('plus')" @touchend="stop">RA +</button>
-      <button class="ra-minus no-select" @touchstart="handleMouseDownRA('minus')" @touchend="stop">RA -</button>
-      <button class="dec-plus no-select" @touchstart="handleMouseDownDEC('plus')" @touchend="stop">DEC +</button>
-      <button class="dec-minus no-select" @touchstart="handleMouseDownDEC('minus')" @touchend="stop">DEC -</button>
+      <button class="ra-plus no-select" @touchstart="handleMouseDownRA('plus')" @touchend="stop">
+        <div style="display: flex; justify-content: center; align-items: center;">
+          <img src="@/assets/images/svg/ui/RA+.svg" height="40px" style="min-height: 40px"></img>
+        </div>
+      </button>
+      <button class="ra-minus no-select" @touchstart="handleMouseDownRA('minus')" @touchend="stop">
+        <div style="display: flex; justify-content: center; align-items: center;">
+          <img src="@/assets/images/svg/ui/RA-.svg" height="40px" style="min-height: 40px"></img>
+        </div>
+      </button>
+      <button class="dec-plus no-select" @touchstart="handleMouseDownDEC('plus')" @touchend="stop">
+        <div style="display: flex; justify-content: center; align-items: center;">
+          <img src="@/assets/images/svg/ui/DEC+.svg" height="40px" style="min-height: 40px"></img>
+        </div>
+      </button>
+      <button class="dec-minus no-select" @touchstart="handleMouseDownDEC('minus')" @touchend="stop">
+        <div style="display: flex; justify-content: center; align-items: center;">
+          <img src="@/assets/images/svg/ui/DEC-.svg" height="40px" style="min-height: 40px"></img>
+        </div>
+      </button>
     </div>
 
     <div>
@@ -15,24 +31,49 @@
     </div>
     
     <div v-if="showButtons">
-      <button v-bind:class="{ 'btn-park-on no-select': ParkSwitch, 'btn-park no-select': !ParkSwitch }" @click="MountPark"><v-icon> mdi-parking </v-icon></button>
+      <button v-bind:class="{ 'btn-park-on no-select': ParkSwitch, 'btn-park no-select': !ParkSwitch }" @click="MountPark">
+        <div style="display: flex; justify-content: center; align-items: center;">
+          <img src="@/assets/images/svg/ui/Park.svg" height="25px" style="min-height: 25px"></img>
+        </div>
+      </button>
       <button v-bind:class="{ 'btn-track-on no-select': TrackSwitch, 'btn-track no-select': !TrackSwitch }" @click="MountTrack"><v-icon> mdi-target </v-icon></button>
-      <button class="custom-button btn-home no-select" @click="MountHome"><v-icon> mdi-home </v-icon></button>
-      <button class="custom-button btn-sync no-select" @click="MountSYNC"><v-icon> mdi-sync </v-icon></button>
+      <button class="custom-button btn-home no-select" @click="MountHome">
+        <div style="display: flex; justify-content: center; align-items: center;">
+          <img src="@/assets/images/svg/ui/Home.svg" height="20px" style="min-height: 20px"></img>
+        </div>
+      </button>
+      <button class="custom-button btn-sync no-select" @click="MountSYNC">
+        <div style="display: flex; justify-content: center; align-items: center;">
+          <img src="@/assets/images/svg/ui/Sync.svg" height="20px" style="min-height: 20px"></img>
+        </div>
+      </button>
+
+      <button class="custom-button btn-slove no-select" @click="SolveSYNC">
+        <div style="display: flex; justify-content: center; align-items: center;">
+          <img src="@/assets/images/svg/ui/Solve.svg" height="20px" style="min-height: 20px"></img>
+        </div>
+      </button>
     </div>
 
     <div>
-      <i class="mdi border-icon mdi-image-filter-center-focus"></i>
       <span v-if="isIDLE" class="icon-container">
-        <v-icon class="green-icon">mdi-circle-medium</v-icon>
+        <div style="display: flex; justify-content: center; align-items: center;">
+          <img src="@/assets/images/svg/ui/Status-idle.svg" height="15px" style="min-height: 15px"></img>
+        </div>
       </span>
       <span v-else class="icon-container">
-        <v-icon class="red-icon">mdi-circle-medium</v-icon>
+        <div style="display: flex; justify-content: center; align-items: center;">
+          <img src="@/assets/images/svg/ui/Status-busy.svg" height="15px" style="min-height: 15px"></img>
+        </div>
       </span>
     </div>
 
     <div>
-      <button class="btn-close no-select" @click="PanelClose"><v-icon> mdi-close-circle-outline </v-icon></button>
+      <button class="btn-close no-select" @click="PanelClose">
+        <div style="display: flex; justify-content: center; align-items: center;">
+          <img src="@/assets/images/svg/ui/OFF.svg" height="12px" style="min-height: 12px"></img>
+        </div>
+      </button>
     </div>
 
   </div>
@@ -60,6 +101,12 @@ export default {
       speedNum: 0,
 
       isIDLE: true,
+
+      FocalLength: 510,
+      CameraSizeWidth: 24.9,
+      CameraSizeHeight: 16.6,
+
+      RaDec: 0,
     };
   },
   created() {
@@ -67,6 +114,9 @@ export default {
     this.$bus.$on('MountParkSwitch', this.MountParkSwitch);
     this.$bus.$on('MountTrackSwitch', this.MountTrackSwitch);
     this.$bus.$on('MountTotalSlewRate',this.MountTotalSlewRate);
+    this.$bus.$on('TargetRaDec',this.getTargetRaDec);
+    this.$bus.$on('MountGoto',this.MountGoto);
+    this.$bus.$on('MountStatus',this.MountStatus);
   },
   methods: {
     handleMouseDownRA(direction) {
@@ -109,6 +159,27 @@ export default {
     MountSYNC() {
       console.log('QHYCCD | SYNC');
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'MountSYNC');
+    },
+    SolveSYNC() {
+      console.log('QHYCCD | SolveSYNC');
+
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'SolveSYNC:' + this.FocalLength + ':' + this.CameraSizeWidth + ':' + this.CameraSizeHeight);
+    },
+    getTargetRaDec(value) {
+      console.log('getTargetRaDec:', value);
+      this.RaDec = value;
+    },
+    MountGoto() {
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'MountGoto:' + this.RaDec);
+    },
+
+    MountStatus(status) {
+      if(status === 'Slewing') {
+        this.isIDLE = false;
+      } 
+      else {
+        this.isIDLE = true;
+      }
     },
     
     MountTotalSlewRate(num) {
@@ -378,6 +449,14 @@ export default {
   right: calc(50% - 17.5px);
 }
 
+.btn-slove {
+  position:absolute;
+  width: 35px;
+  height: 35px;
+  bottom: 10px;
+  right: 10px;
+}
+
 .border-icon {
   position: absolute;
   top: 0px;
@@ -387,8 +466,8 @@ export default {
 
 .icon-container {
   position: absolute;
-  top: 1px;
-  left: 1px;
+  top: 5px;
+  left: 5px;
 }
 
 .icon-container .green-icon {

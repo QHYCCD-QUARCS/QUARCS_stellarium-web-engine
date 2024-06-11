@@ -30,7 +30,7 @@
       <button  @click="AutoFocus" @touchend="active" class="get-click btn-Auto"><v-icon>mdi-focus-auto</v-icon></button>
       <button  @click="FocusGoto" @touchend="active" class="get-click btn-Goto">
         <div style="display: flex; justify-content: center; align-items: center;">
-          <img src="@/assets/images/svg/ui/goto.svg" height="25px" style="min-height: 25px"></img>
+          <img src="@/assets/images/svg/ui/Move.svg" height="10px" style="min-height: 10px"></img>
         </div>
       </button>
       <button :disabled="isBtnMoveDisabled" @click="FocusRightMove" @touchend="active" class="get-click btn-Right">
@@ -130,6 +130,12 @@ export default {
   methods: {
     AutoFocus() {
       console.log('QHYCCD | AutoFocus: ');
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'ClearDataPoints');
+      this.$bus.$emit('ClearAllData');
+
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'AutoFocus');
+
+
     },
     
     StepsChange() {
@@ -155,14 +161,12 @@ export default {
       this.isBtnMoveDisabled = true;
       console.log('QHYCCD | FocusLeftMove: ');
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'focusMove:'+ "Left" + ":" + this.MoveSteps);
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'focusCapture');
     },
 
     FocusRightMove() {
       this.isBtnMoveDisabled = true;
       console.log('QHYCCD | FocusRightMove: ');
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'focusMove:'+ "Right" + ":" + this.MoveSteps);
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'focusCapture');
     },
 
     ShowSpeedNum(speed) {
@@ -175,7 +179,7 @@ export default {
     },
 
     setTargetPosition(target) {
-      this.TargetPosition = target;
+      this.TargetPosition = parseInt(target, 10);
     },
 
     FocusGoto() {

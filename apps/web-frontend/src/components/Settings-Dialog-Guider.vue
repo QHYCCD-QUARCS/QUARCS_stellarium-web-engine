@@ -14,13 +14,14 @@
           <v-spacer></v-spacer>
           <v-btn @click="confirmDriver">确定</v-btn>
           <!-- <v-btn @click="connectIndiServer">连接indiServer</v-btn> -->
-          <v-select label="选择设备" :items="devices" v-model="selectedDevice"></v-select>
+          <v-select label="选择设备" :items="devices" item-text="label" item-value="value" v-model="selectedDevice"></v-select>
           <v-spacer></v-spacer>
           <v-btn @click="confirmDevice">确定</v-btn>
         </div>
         <!-- 设备配置的菜单内容 -->
         <div v-if="activeMenu === 'configuration'">
           <!-- 设备配置的内容，您可以根据需要添加表单元素 -->
+          <v-btn @touchend="ClearCalibrationData"> Clear Calibration Data </v-btn>
           <div v-for="(item, index) in configurationItems" :key="index">
            <v-text-field v-model="item.value" :label="item.label"></v-text-field>
            <v-btn @click="confirmConfiguration(item)">确定</v-btn>
@@ -88,6 +89,9 @@
         if (this.activeMenu === 'connection') { this.activeMenu = 'configuration'; }
         else { this.activeMenu = 'connection'; }
       },
+      ClearCalibrationData() {
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'ClearCalibrationData');
+      }
 
     },
     // 计算属性和其他选项保持不变

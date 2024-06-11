@@ -36,12 +36,15 @@
     </div>
 
     <div>
-      <i class="mdi border-icon mdi-image-filter-center-focus"></i>
       <span v-if="isIDLE" class="icon-container">
-        <v-icon class="green-icon">mdi-circle-medium</v-icon>
+        <div style="display: flex; justify-content: center; align-items: center;">
+          <img src="@/assets/images/svg/ui/Status-idle.svg" height="15px" style="min-height: 15px"></img>
+        </div>
       </span>
       <span v-else class="icon-container">
-        <v-icon class="red-icon">mdi-circle-medium</v-icon>
+        <div style="display: flex; justify-content: center; align-items: center;">
+          <img src="@/assets/images/svg/ui/Status-busy.svg" height="15px" style="min-height: 15px"></img>
+        </div>
       </span>
     </div>
 
@@ -426,8 +429,8 @@ export default {
 
 .icon-container {
   position: absolute;
-  top: 1px;
-  left: 1px;
+  top: 5px;
+  left: 5px;
 }
 
 .icon-container .green-icon {

@@ -60,21 +60,25 @@
       </v-card>
     </v-dialog>
     <div v-if="$store.state.showSelectedInfoButtons" style="position: absolute; right: 0px; bottom: -50px;">
-      <v-btn v-if="!showPointToButton" fab small color="transparent" @click.native="showShareLinkDialog = !showShareLinkDialog">
-        <v-icon>mdi-link</v-icon>
-      </v-btn>
       <v-btn v-if="showPointToButton" fab small color="transparent" v-on:click.native="lockToSelection()">
         <img src="@/assets/images/svg/ui/point_to.svg" height="40px" style="min-height: 40px"></img>
       </v-btn>
+      <!-- <v-btn v-if="showPointToButton" fab small color="transparent" v-on:click.native="printName()">
+        <v-icon>mdi-share</v-icon>
+      </v-btn> -->
+
+      <!-- <v-btn v-if="!showPointToButton" fab small color="transparent" @click.native="showShareLinkDialog = !showShareLinkDialog"> -->
+      <v-btn v-if="!showPointToButton" fab small color="transparent" @click.native="MountGoto()">
+        <img src="@/assets/images/svg/ui/goto.svg" height="40px" style="min-height: 40px"></img>
+      </v-btn>
+
       <v-btn v-if="!showPointToButton" fab small color="transparent" @mousedown="zoomOutButtonClicked()">
         <img :class="{bt_disabled: !zoomOutButtonEnabled}" src="@/assets/images/svg/ui/remove_circle_outline.svg" height="40px" style="min-height: 40px"></img>
       </v-btn>
       <v-btn v-if="!showPointToButton" fab small color="transparent" @mousedown="zoomInButtonClicked()">
         <img :class="{bt_disabled: !zoomInButtonEnabled}" src="@/assets/images/svg/ui/add_circle_outline.svg" height="40px" style="min-height: 40px"></img>
       </v-btn>
-      <v-btn v-if="showPointToButton" fab small color="transparent" v-on:click.native="printName()">
-        <v-icon>mdi-share</v-icon>
-      </v-btn>
+
     </div>
     <v-snackbar bottom left :timeout="2000" v-model="copied" color="secondary" >
       Link copied
@@ -340,11 +344,15 @@ export default {
       if (this.$stel.core.selection) {
         this.$stel.pointAndLock(this.$stel.core.selection, 0.5)
       }
+      this.printName();
     },
     printName: function () {
       const Name = this.title;
       console.log('SelectedObject:', Name);
       this.$bus.$emit('insertObjName',Name);
+    },
+    MountGoto: function () {
+      this.$bus.$emit('MountGoto');
     },
     zoomInButtonClicked: function () {
       const currentFov = this.$store.state.stel.fov * 180 / Math.PI

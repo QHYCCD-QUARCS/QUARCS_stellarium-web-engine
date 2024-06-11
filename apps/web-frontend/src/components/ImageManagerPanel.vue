@@ -30,12 +30,12 @@
     <div>
       <button class="custom-button btn-PrevPage no-select" @click="prevPage">
         <div style="display: flex; justify-content: center; align-items: center;">
-          <img src="@/assets/images/svg/ui/arrow-left-circle.svg" height="20px" style="min-height: 20px"></img>
+          <img src="@/assets/images/svg/ui/arrow-left.svg" height="20px" style="min-height: 20px"></img>
         </div>
       </button>
       <button class="custom-button btn-NextPage no-select" @click="nextPage">
         <div style="display: flex; justify-content: center; align-items: center;">
-          <img src="@/assets/images/svg/ui/arrow-right-circle.svg" height="20px" style="min-height: 20px"></img>
+          <img src="@/assets/images/svg/ui/arrow-right.svg" height="20px" style="min-height: 20px"></img>
         </div>
       </button>
 
@@ -46,7 +46,11 @@
     </div>
 
     <div>
-      <button class="btn-close no-select" @click="PanelClose"><v-icon> mdi-close-circle-outline </v-icon></button>
+      <button class="btn-close no-select" @click="PanelClose">
+        <div style="display: flex; justify-content: center; align-items: center;">
+          <img src="@/assets/images/svg/ui/OFF.svg" height="12px" style="min-height: 12px"></img>
+        </div>
+      </button>
     </div>
 
     <span style="position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); color: rgba(255, 255, 255, 0.5); user-select: none;"> 
@@ -178,6 +182,7 @@ export default {
 
     MoveFileToUSB() {
       this.updateImageFolders();
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'MoveFileToUSB');
     },
 
     updateImageFolders() {

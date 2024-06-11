@@ -25,6 +25,7 @@ export default {
       containerMaxWidth: 150,
       chartData1: [],  
       chartData2: [],
+      chartData3: [], 
       xAxis_min: 0,
       xAxis_max: 6000, 
       yAxis_min: 0,
@@ -46,7 +47,9 @@ export default {
     this.$bus.$on('FocusPosition', this.changeRange_x);
     this.$bus.$on('UpdateFWHM',this.UpdateFWHM);
     this.$bus.$on('fitQuadraticCurve', this.fitQuadraticCurve);
+    this.$bus.$on('fitQuadraticCurve_minPoint', this.fitQuadraticCurve_minPoint);
     this.$bus.$on('ClearfitQuadraticCurve', this.clearChartData2);
+    this.$bus.$on('ClearAllData', this.ClearAllData);
   },
   methods: {
     initChart() {
@@ -149,10 +152,19 @@ export default {
             itemStyle: {
               color: 'green'
             },
-            lineStyle: {  // 设置红色曲线的宽度为2
+            lineStyle: {
               width: 1
             },
             symbolSize: 0
+          },
+          {
+            name: 'minPoint',
+            type: 'scatter',
+            data: this.chartData3,
+            itemStyle: {
+              color: 'rgba(75, 155, 250, 0.7)'
+            },
+            symbolSize: 4
           },
           {
             name: 'MiddleLine',
@@ -180,9 +192,9 @@ export default {
       this.renderChart(this.xAxis_min, this.xAxis_max, this.yAxis_min, this.yAxis_max);
     },
     changeRange_x(current, target) {
-      this.xAxis_min = Number(current)-3000;
-      this.xAxis_max = Number(current)+3000;
-      this.currentX = current;
+      this.xAxis_min = Number(target)-3000;
+      this.xAxis_max = Number(target)+3000;
+      this.currentX = target;
       console.log("QHYCCD | changeRange_x:", current, this.xAxis_min, this.xAxis_max);
       this.renderChart(this.xAxis_min, this.xAxis_max, this.yAxis_min, this.yAxis_max);
     },
@@ -192,6 +204,14 @@ export default {
     },
     clearChartData2() {
       this.chartData2 = [];
+      this.renderChart(this.xAxis_min, this.xAxis_max, this.yAxis_min, this.yAxis_max);
+    },
+    ClearAllData() {
+      this.chartData1 = [];
+      this.chartData2 = [];
+      this.chartData3 = [];
+      this.yAxis_max = 30;
+      this.FWHMMax = 15;
       this.renderChart(this.xAxis_min, this.xAxis_max, this.yAxis_min, this.yAxis_max);
     },
 
@@ -223,16 +243,26 @@ export default {
         this.FWHMMax = FWHM;
         this.yAxis_min = 0;
         this.yAxis_max = this.FWHMMax * 2;
+        console.log("QHYCCD | Change Y max");
 
         this.renderChart(this.xAxis_min, this.xAxis_max, this.yAxis_min, this.yAxis_max);
       }
+
+      console.log("QHYCCD | FWHMMax:", this.FWHMMax);
     },
 
     fitQuadraticCurve(x, y) {
-      console.log(x, y);
+      // console.log(x, y);
       const newDataPoint = [x, y];
       this.addData_Line(newDataPoint);
     },
+
+    fitQuadraticCurve_minPoint(x, y) {
+      console.log("QHYCCD | minPoint:", x, ',', y);
+      this.chartData3 = [];
+      const newDataPoint = [x, y];
+      this.chartData3.push(newDataPoint);
+    }
   }
 }
 </script>

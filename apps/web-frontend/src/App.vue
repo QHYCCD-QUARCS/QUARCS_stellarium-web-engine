@@ -138,6 +138,10 @@ import GuiLoader from '@/components/gui-loader.vue'
 import swh from '@/assets/sw_helpers.js'
 import Moment from 'moment'
 
+var glTestCircle;
+var glLayer;
+var glStel;
+
 export default {
   data (context) {
     return {
@@ -199,7 +203,7 @@ export default {
       CanvasWidth: 4096,
       CanvasHeight: 2160,
 
-      scale: 2,
+      scale: 1,
       translateX: 0,
       translateY: 0,
       bufferCanvas: null,
@@ -207,6 +211,11 @@ export default {
       imageWidth: 0,
       imageHeight: 0,
       drawImgData: null,
+
+      mainCameraSizeX: 0,
+      mainCameraSizeY: 0,
+
+      ImageProportion: 0,
     }
   },
   components: { Gui,
@@ -221,6 +230,8 @@ export default {
     this.$bus.$on('HandleHistogramNum', this.applyHistStretch);
     this.$bus.$on('ImageGainR', this.ImageGainSet);
     this.$bus.$on('ImageGainB', this.ImageGainSet);
+    this.$bus.$on('ImageProportion', this.setImageProportion);
+    this.$bus.$on('MountGoto',this.lookatcircle);
   },
   methods: {
     getLocationHostName() {
@@ -245,12 +256,12 @@ export default {
       };
 
       this.websocket.onmessage = (message) => {
-        console.log('QHYCCD | Received message:', message.data);
+        // console.log('QHYCCD | Received message:', message.data);
 
         const data = JSON.parse(message.data);
 
         if (data.type === 'QT_Return') {
-          console.log('QHYCCD | QT_Return');
+          // console.log('QHYCCD | QT_Return');
           if (data.message.startsWith('AddDriver:')) {
             const parts = data.message.split(':');
             if (parts.length === 3) {
@@ -401,6 +412,8 @@ export default {
               const SizeX = parts[1];
               const SizeY = parts[2];
               this.$bus.$emit('MainCameraSize', SizeX, SizeY);
+              this.mainCameraSizeX = SizeX;
+              this.mainCameraSizeY = SizeY;
             }
           }
 
@@ -418,6 +431,15 @@ export default {
             }
           }
 
+          if (data.message.startsWith('fitQuadraticCurve_minPoint:')) {
+            const parts = data.message.split(':');
+
+            const x = parts[1];
+            const y = parts[2];
+      
+            this.$bus.$emit('fitQuadraticCurve_minPoint', x, y);
+          }
+          
           if (data.message.startsWith('TelescopePark:')) {
             const parts = data.message.split(':');
             if (parts.length === 2) {
@@ -493,6 +515,29 @@ export default {
               this.$bus.$emit('initCFWList', parts[1]);
             }
           }
+
+          if (data.message.startsWith('GuiderStatus:')) {
+            const parts = data.message.split(':');
+            if (parts.length === 2) {
+              this.$bus.$emit('GuiderStatus', parts[1]);
+            }
+          }
+
+          if (data.message.startsWith('TelescopeRADEC:')) {
+            const parts = data.message.split(':');
+            if (parts.length === 3) {
+              this.UpdateCirclePos(parts[1], parts[2]);
+            }
+          }
+
+          if (data.message.startsWith('TelescopeStatus:')) {
+            const parts = data.message.split(':');
+            if (parts.length === 2) {
+              // console.log('TelescopeStatus:', parts[1]);
+              this.UpdateTelescopeStatus(parts[1]);
+            }
+          }
+
 
           
         }
@@ -679,6 +724,9 @@ export default {
     },
 
     async readBinFile(fileName) {
+      console.log('CaptureTestTime | Read image data start.');
+      const startTime = new Date();
+
       try {
         const response = await fetch(fileName);
         if (!response.ok) {
@@ -690,6 +738,11 @@ export default {
         const fileReader = new FileReader();
         fileReader.onload = () => {
           const arrayBuffer = fileReader.result;
+
+          const endTime = new Date();
+          const elapsedTime = endTime.getTime() - startTime.getTime();
+          console.log('CaptureTestTime | Read image data end:', elapsedTime, 'milliseconds');
+
           this.processImage(arrayBuffer);
         };
         fileReader.onerror = (error) => {
@@ -701,7 +754,14 @@ export default {
       }
     },
 
+    setImageProportion(value) {
+      this.ImageProportion = value;
+    },
+
     processImage(imgArray) {
+      console.log('CaptureTestTime | Process image data start.');
+      const startTime = new Date();
+
       // 获取 ArrayBuffer 数据视图
       const dataView = new DataView(imgArray);
       // console.log('ArrayBuffer byte length:', dataView.byteLength);
@@ -711,8 +771,10 @@ export default {
       // console.log('转换后的16位数据长度', uint16Array.length);
 
       // 设置画布宽高常量
-      const canvasWidth = 6252;
-      const canvasHeight = 4176;
+      const canvasWidth = parseInt(this.mainCameraSizeX);
+      const canvasHeight = parseInt(this.mainCameraSizeY);
+      // const canvasWidth = 1920;
+      // const canvasHeight = 1080;
 
       // 获取原始画布和修改后的画布以及对应上下文
       const modifiedCanvas = document.getElementById('mainCamera-canvas');
@@ -803,6 +865,10 @@ export default {
       // modifiedCtx.putImageData(colorData, 0, 0);
       this.drawImgData = colorData;
       this.drawImageData(this.drawImgData);
+
+      const endTime = new Date();
+      const elapsedTime = endTime.getTime() - startTime.getTime();
+      console.log('CaptureTestTime | Process image data end:', elapsedTime, 'milliseconds');
       // console.log('修改后的彩图绘制完成！');
 
       this.$bus.$emit('showCaptureImage');
@@ -845,12 +911,15 @@ export default {
       this.bufferCanvas.height = colorData.height;
       this.bufferCtx.putImageData(colorData, 0, 0);
 
+      // 计算调整后的高度
+      const adjustedHeight = colorData.height * this.ImageProportion;
+
       // 绘制图像
-      this.bufferCtx.drawImage(this.bufferCanvas, this.translateX, this.translateY, colorData.width * this.scale, colorData.height * this.scale);
+      this.bufferCtx.drawImage(this.bufferCanvas, this.translateX, this.translateY, colorData.width * this.scale, adjustedHeight * this.scale);
       this.imageWidth = colorData.width * this.scale;
-      this.imageHeight = colorData.height * this.scale;
-      console.log('image size: ' + colorData.width * this.scale + ', ' + colorData.height * this.scale);
-      console.log('image scale: ' + this.scale);
+      this.imageHeight = adjustedHeight * this.scale;
+      // console.log('image size: ' + colorData.width * this.scale + ', ' + adjustedHeight * this.scale);
+      // console.log('image scale: ' + this.scale);
 
       // 恢复 buffer canvas 状态
       this.bufferCtx.restore();
@@ -886,7 +955,14 @@ export default {
           this.translateX = Math.min(Math.max(this.translateX, -minTranslateX), 0);
           this.translateY = Math.min(Math.max(this.translateY, -minTranslateY), 0);
 
-          console.log('Move to: ' + this.translateX + ', ' + this.translateY);
+          // console.log('Move to: ' + Math.floor(-this.translateX/4096*windowWidth) + ', ' + Math.floor(-this.translateY/2160*windowHeight));
+          this.$bus.$emit('RedBoxOffset', Math.floor(-this.translateX/4096*windowWidth), Math.floor(-this.translateY/2160*windowHeight));
+
+          const ScaleImageSize_X = Math.floor(minTranslateX / 4096 * windowWidth + windowWidth);
+          const ScaleImageSize_Y = Math.floor(minTranslateY / 2160 * windowHeight + windowHeight);
+          // console.log('ScaleImageSize: ' + ScaleImageSize_X + ', ' + ScaleImageSize_Y);
+          this.$bus.$emit('ScaleImageSize', ScaleImageSize_X, ScaleImageSize_Y);
+
           lastX = event.touches[0].clientX;
           lastY = event.touches[0].clientY;
           this.drawImageData(this.drawImgData);
@@ -901,6 +977,8 @@ export default {
         this.translateX = 0;
         this.translateY = 0;
         this.drawImageData(this.drawImgData);
+        this.$bus.$emit('RedBoxScale', this.scale);
+        this.$bus.$emit('RedBoxOffset', 0, 0);
       }, 100); // 100 毫秒内最多执行一次
 
       canvas.addEventListener('mousedown', (event) => {
@@ -908,6 +986,7 @@ export default {
         isDragging = true;
         lastX = event.offsetX;
         lastY = event.offsetY;
+        this.$bus.$emit('RedBox_XY', lastX, lastY);
       });
 
       canvas.addEventListener('mousemove', (event) => {
@@ -929,6 +1008,13 @@ export default {
           this.translateY = Math.min(Math.max(this.translateY, -minTranslateY), 0);
 
           console.log('Move to: ' + this.translateX + ', ' + this.translateY);
+          this.$bus.$emit('RedBoxOffset', Math.floor(-this.translateX/4096*windowWidth), Math.floor(-this.translateY/2160*windowHeight));
+
+          const ScaleImageSize_X = Math.floor(minTranslateX / 4096 * windowWidth + windowWidth);
+          const ScaleImageSize_Y = Math.floor(minTranslateY / 2160 * windowHeight + windowHeight);
+          // console.log('ScaleImageSize: ' + ScaleImageSize_X + ', ' + ScaleImageSize_Y);
+          this.$bus.$emit('ScaleImageSize', ScaleImageSize_X, ScaleImageSize_Y);
+
           lastX = event.offsetX;
           lastY = event.offsetY;
           this.drawImageData(this.drawImgData);
@@ -947,6 +1033,8 @@ export default {
         this.translateX = 0;
         this.translateY = 0;
         this.drawImageData(this.drawImgData);
+        this.$bus.$emit('RedBoxScale', this.scale);
+        this.$bus.$emit('RedBoxOffset', 0, 0);
       });
 
       // 添加触摸事件监听
@@ -955,6 +1043,7 @@ export default {
         isDragging = true;
         lastX = event.touches[0].clientX;
         lastY = event.touches[0].clientY;
+        this.$bus.$emit('RedBox_XY', event);
       });
 
       canvas.addEventListener('touchmove', throttledTouchMove);
@@ -1267,65 +1356,6 @@ export default {
       this.cvReady = true;
     },
 
-    // convertToGrayscale() {
-    //   //console.log('QHYCCD | convertToGrayscale()');
-    //   //changeOrder();
-
-
-    //   if (!this.cvReady) {
-    //     console.log('QHYCCD | OpenCV.js is not ready.');
-    //     return;
-    //   }
-      
-      
-    //   console.log('QHYCCD | convertToGrayscale() 1');
-    //   let imgElement = document.getElementById('imageSrc');
-    //   console.log('QHYCCD | convertToGrayscale() 1.5');
-    //   if (!imgElement) {
-    //     console.error('Image element not found');
-    //   return;
-    //   };
-
-    //   console.log('QHYCCD | convertToGrayscale() 1.6');
-    //   if (!imgElement) {
-    //     console.error('Image element not found');
-    //     return;
-    //   } else {
-    //     console.log('QHYCCD | imgElement:', imgElement);
-    //   }
-
-    //   let src; 
-    //   try {
-    //     src = cv.imread(imgElement);
-    //     console.log('QHYCCD | Image read into OpenCV:', src);
-    //   } catch (error) {
-    //     console.log('QHYCCD | Error reading image with OpenCV:', error);
-    //   }
-    //   console.log('QHYCCD | convertToGrayscale() 1.7');
-    //   console.log('QHYCCD | src:', src);
-
-    //   let dst = new cv.Mat();
-
-    //   try {
-    //     console.log('QHYCCD | convertToGrayscale()2');
-    //     cv.cvtColor(src, dst, cv.COLOR_RGBA2GRAY, 0);
-    //     console.log('QHYCCD | convertToGrayscale()3');
-    //   } catch (error) {
-    //     console.log('QHYCCD | Error during grayscale conversion:', error);
-    //   }
-
-
-    //   console.log('QHYCCD | imshow()');
-    //   cv.imshow('guiderCamera-canvas', dst);
-
-    //   // 释放内存
-    //   src.delete();
-    //   dst.delete();
-    //   console.log('QHYCCD | convertToGrayscale() Finished');
-    // },
-
-
-
 
     loadImageToCanvasMainCamera: function () {
       const canvas = document.getElementById('mainCamera-canvas')
@@ -1493,6 +1523,69 @@ export default {
       }
     },
 
+    lookatcircle() {
+      // glStel.core.selection = glTestCircle;
+      glStel.pointAndLock(glTestCircle);
+    },
+
+    setGloabalStel: function (stel){
+      return stel;
+    },
+
+    setGlobalLayer: function (stel) {
+      return stel.createLayer({ id: 'testLayerStars', z: 7, visible: true });
+    },
+
+    vec3_from_sphe: function (ra_degree, dec_degree, out) {
+      const cp = Math.cos(dec_degree * Math.PI / 180);
+      out[0] = Math.cos(ra_degree * Math.PI / 180) * cp;
+      out[1] = Math.sin(ra_degree * Math.PI / 180) * cp;
+      out[2] = Math.sin(dec_degree * Math.PI / 180);
+    },
+
+    testAddCircle: function (stel, layer) {
+      console.log("Add a circle star near polaris");
+
+      var circle = stel.createObj('circle', { id: 'my circle  ', model_data: {} });
+
+      circle.update();
+      layer.add(circle);
+
+      // Select
+      stel.core.selection = circle;
+      stel.pointAndLock(circle);
+
+      // Circle Property
+      var mm = circle.pos;
+      this.vec3_from_sphe(2.52971 , 89.2641, mm);
+      circle.pos = mm;
+      console.log("circle pos:" + mm);
+      circle.label = "";
+      circle.size = [0.05, 0.05];
+      circle.color = [0, 1, 0, 0.25];
+      circle.border_color = [0, 1, 0, 1];
+
+      return circle;
+    },
+
+    UpdateCirclePos(Ra_degree, Dec_degree) {
+      var mm = glTestCircle.pos;
+      this.vec3_from_sphe(Ra_degree, Dec_degree, mm);
+      glTestCircle.pos = mm;
+    },
+
+    UpdateTelescopeStatus(status) {
+      this.$bus.$emit('MountStatus', status);
+      if(status === 'Slewing') {
+        glTestCircle.color = [1, 0, 0, 0.25];
+        glTestCircle.border_color = [1, 0, 0, 1];
+      } 
+      else {
+        glTestCircle.color = [0, 1, 0, 0.25];
+        glTestCircle.border_color = [0, 1, 0, 1];
+      }
+    }
+
    
   },
   computed: {
@@ -1615,6 +1708,11 @@ export default {
             core.planets.addDataSource({ url: process.env.BASE_URL + 'skydata/surveys/sso/moon', key: 'default' })
             core.comets.addDataSource({ url: process.env.BASE_URL + 'skydata/CometEls.txt', key: 'mpc_comets' })
             core.satellites.addDataSource({ url: process.env.BASE_URL + 'skydata/tle_satellite.jsonl.gz', key: 'jsonl/sat' })
+
+            // Mount Pointing
+            glStel  = that.setGloabalStel(that.$stel);
+            glLayer = that.setGlobalLayer(that.$stel);
+            glTestCircle = that.testAddCircle(that.$stel,glLayer);
             
           }
         })

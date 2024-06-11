@@ -61,8 +61,8 @@
         :y="svgSize / 2"
         v-if="!isClicked"
         xlink:href="@/assets/images/svg/ui/media record.svg"
-        width="30px" height="30px"
-        style="transform: translate(-15px, -15px);"
+        width="20px" height="20px"
+        style="transform: translate(-8px, -10px);"
       />
 
     </svg>
@@ -177,7 +177,6 @@ export default {
     resetProgress() {
       this.progress = 0;
       this.isClicked = false;
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getCaptureStatus');
     },
 
     SetDuration(time) {

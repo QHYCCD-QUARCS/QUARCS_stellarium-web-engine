@@ -57,17 +57,17 @@
   <button v-show="isMainSwitchShow" @click="SwitchMainPage" class="get-click btn-MainPageSwitch">
     <span v-if="CurrentMainPage === 'Stel'">
       <div style="display: flex; justify-content: center; align-items: center;">
-        <img src="@/assets/images/svg/ui/sheying.svg" height="35px" style="min-height: 35px"></img>
+        <img src="@/assets/images/svg/ui/sheying.svg" height="33px" style="min-height: 33px"></img>
       </div>
     </span>
     <span v-if="CurrentMainPage === 'MainCamera'">
       <div style="display: flex; justify-content: center; align-items: center;">
-        <img src="@/assets/images/svg/ui/Guiding Curve.svg" height="35px" style="min-height: 35px"></img>
+        <img src="@/assets/images/svg/ui/Guiding Curve.svg" height="33px" style="min-height: 33px"></img>
       </div>
     </span>
     <span v-if="CurrentMainPage === 'GuiderCamera'">
       <div style="display: flex; justify-content: center; align-items: center;">
-        <img src="@/assets/images/svg/ui/skymap.svg" height="35px" style="min-height: 35px"></img>
+        <img src="@/assets/images/svg/ui/skymap.svg" height="33px" style="min-height: 33px"></img>
       </div>
     </span>
   </button>
@@ -77,7 +77,11 @@
   </div> -->
 
   <ChartComponent v-show="showChartsPanel" style="position: absolute; bottom: 10px; left: 170px; " class="get-click"/>
-  <button  v-show="isCaptureMode" @click="toggleChartsPanel" class="get-click btn-ChartsSwitch"><v-icon> mdi-chart-scatter-plot </v-icon></button>
+  <button  v-show="isCaptureMode" @click="toggleChartsPanel" class="get-click btn-ChartsSwitch">
+    <div style="display: flex; justify-content: center; align-items: center;">
+      <img src="@/assets/images/svg/ui/GuidingPanel.svg" height="35px" style="min-height: 35px"></img>
+    </div>
+  </button>
 
   <HistogramPanel v-show="showHistogramPanel" style="position: absolute; bottom: 10px; left: 170px; " class="get-click"/>
 
@@ -181,13 +185,24 @@ export default {
       isInitRedBox: true,
       mouseX: 0, // 鼠标的X坐标
       mouseY: 0, // 鼠标的Y坐标
+      mouseX_: 0, 
+      mouseY_: 0, 
       BoxSideLength: 500,
       RedBoxWidth: 20,
       RedBoxHeight: 20,
+      RedBoxWidth_: 20,
+      RedBoxHeight_: 20,
 
       isStellariumMode: true,
       isCaptureMode: false,
       isGuiderMode: false,
+
+      ImageProportion: 1,
+      RedBoxOffset_X: 0,
+      RedBoxOffset_Y: 0,
+
+      ScaleImageWidth: 0,
+      ScaleImageHeight: 0,
       
 
     }
@@ -198,7 +213,7 @@ export default {
     this.$bus.$on('showMsgBox', this.showMessageBox);
     this.$bus.$on('MainCameraSize', this.resizeRedBox);
     this.$bus.$on('RedBoxSizeChange', this.RedBoxSizeChange);
-    // this.$bus.$on('time-selected', this.handleExpTimeSelected);
+    this.$bus.$on('time-selected', this.handleExpTimeSelected);
     // this.$bus.$on('cfw-selected', this.handleCFWSelected);
     this.$bus.$on('toggleSchedulePanel', this.toggleSchedulePanel);
     this.$bus.$on('MountPanelClose', this.toggleFloatingBox);
@@ -206,7 +221,11 @@ export default {
     this.$bus.$on('toggleFocuserPanel', this.toggleFocuserPanel);
     this.$bus.$on('ImageManagerPanelClose', this.toggleImageManagerPanel);
     
-
+    // this.$bus.$on('RedBoxClick', this.handleTouchOrMouseDown);
+    this.$bus.$on('RedBox_XY', this.RedBox_XY);
+    this.$bus.$on('RedBoxOffset', this.setRedBoxOffset);
+    this.$bus.$on('RedBoxScale', this.SetRedBoxScale);
+    this.$bus.$on('ScaleImageSize', this.setScaleImageSize);
   },
   mounted() {
     this.resizeRedBox(1920, 1080);
@@ -277,6 +296,33 @@ export default {
       this.showHistogramPanel = false;
       this.showChartsPanel = false;
     },
+
+    RedBox_XY(event) {
+      if (this.isRedBoxMode){
+        // this.mouseX = X;
+        // this.mouseY = Y;
+        this.handleTouchOrMouseDown(event);
+      }
+    },
+
+    setRedBoxOffset(X, Y) {
+      this.RedBoxOffset_X = X;
+      this.RedBoxOffset_Y = Y;
+      // console.log('RedBoxOffset:', this.RedBoxOffset_Y);
+      this.mouseX =  this.mouseX_ - this.RedBoxOffset_X;
+      this.mouseY =  this.mouseY_ - this.RedBoxOffset_Y;
+    },
+
+    SetRedBoxScale(value) {
+      this.RedBoxWidth = this.RedBoxWidth_ * value;
+      this.RedBoxHeight = this.RedBoxHeight_ * value;
+    },
+
+    setScaleImageSize(width, height) {
+      this.ScaleImageWidth = width;
+      this.ScaleImageHeight = height;
+      // console.log('ScaleImageSize: ' + this.ScaleImageWidth + ', ' + this.ScaleImageHeight);
+    },
     
     handleTouchOrMouseDown(event) {
       // 获取触摸或鼠标位置
@@ -284,15 +330,17 @@ export default {
       const clientY = event.type.startsWith('touch') ? event.touches[0].clientY : event.clientY;
 
       // 更新位置
-      this.mouseX = clientX;
-      this.mouseY = clientY;
+      this.mouseX = Math.floor(clientX);
+      this.mouseX_ = Math.floor(clientX);
+      this.mouseY = Math.floor(clientY);
+      this.mouseY_ = Math.floor(clientY);
 
       console.log('handleTouchOrMouseDown: ', this.mouseX, ',', this.mouseY);
 
       const windowWidth = window.innerWidth;
       const windowHeight = window.innerHeight;
 
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'RedBox:'+ this.mouseX + ":" + this.mouseY + ":" + windowWidth + ":" + windowHeight);
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'RedBox:'+ Math.floor((this.mouseX + this.RedBoxOffset_X) / this.ScaleImageWidth * windowWidth) + ":" + Math.floor((this.mouseY + this.RedBoxOffset_Y) / this.ScaleImageHeight * windowHeight) + ":" + windowWidth + ":" + windowHeight);
     },
 
     resizeRedBox(CameraWidth, CameraHeight) {
@@ -302,6 +350,15 @@ export default {
       this.RedBoxWidth = this.BoxSideLength * windowWidth / CameraWidth;
       this.RedBoxHeight = this.BoxSideLength * windowHeight / CameraHeight;
 
+      this.ImageProportion = this.RedBoxWidth/this.RedBoxHeight;
+      this.$bus.$emit('ImageProportion', this.ImageProportion);
+      this.RedBoxHeight = this.RedBoxHeight * this.ImageProportion;
+
+      this.RedBoxWidth_ = this.RedBoxWidth;
+      this.RedBoxHeight_ = this.RedBoxHeight;
+
+      console.log('RedBoxSize:', this.RedBoxWidth, ', ' , this.RedBoxHeight);
+
       if(this.isInitRedBox === true)
       {
         // 将小红框置于界面中央
@@ -310,7 +367,7 @@ export default {
         this.isInitRedBox = false;
       }
 
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'RedBox:'+ this.mouseX + ":" + this.mouseY + ":" + windowWidth + ":" + windowHeight);  //TODO: BoxSize
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'RedBox:'+ Math.floor((this.mouseX + this.RedBoxOffset_X) / this.ScaleImageWidth * windowWidth) + ":" + Math.floor((this.mouseY + this.RedBoxOffset_Y) / this.ScaleImageHeight * windowHeight) + ":" + windowWidth + ":" + windowHeight);  //TODO: BoxSize
     },
 
     RedBoxSizeChange(length) {
@@ -432,31 +489,31 @@ export default {
     //   }
     // },
 
-    // handleExpTimeSelected(time) {
-    //   console.log('QHYCCD | ExpTimeSelected: ', time);
-    //   // 根据需要处理选择的时间
-    //   const match = time.match(/(\d+)([a-zA-Z]+)/);
+    handleExpTimeSelected(time) {
+      console.log('QHYCCD | ExpTimeSelected: ', time);
+      // 根据需要处理选择的时间
+      const match = time.match(/(\d+)([a-zA-Z]+)/);
 
-    //   if (match) {
-    //     const numericPart = parseInt(match[1], 10); // 将匹配到的数字部分转换为整数
-    //     const unitPart = match[2].toLowerCase(); // 获取单位部分，并将其转换为小写
+      if (match) {
+        const numericPart = parseInt(match[1], 10); // 将匹配到的数字部分转换为整数
+        const unitPart = match[2].toLowerCase(); // 获取单位部分，并将其转换为小写
 
-    //     let convertedTime = numericPart; // 默认情况下，将数字部分保持不变
+        let convertedTime = numericPart; // 默认情况下，将数字部分保持不变
 
-    //     if (unitPart === 's') {
-    //       convertedTime *= 1000; // 如果单位是秒(s)，则将数字乘以1000
-    //     }
+        if (unitPart === 's') {
+          convertedTime *= 1000; // 如果单位是秒(s)，则将数字乘以1000
+        }
 
-    //     console.log('Numeric part:', numericPart);
-    //     console.log('Unit part:', unitPart);
-    //     console.log('Converted time:', convertedTime);
+        console.log('Numeric part:', numericPart);
+        console.log('Unit part:', unitPart);
+        console.log('Converted time:', convertedTime);
 
-    //     // this.$refs.CaptureBtn.SetDuration(convertedTime);
-    //     this.$bus.$emit('SetExpTime',convertedTime);
-    //   } else {
-    //     console.log('No numeric part found in time:', time);
-    //   }
-    // },
+        // this.$refs.CaptureBtn.SetDuration(convertedTime);
+        this.$bus.$emit('SetExpTime',convertedTime);
+      } else {
+        console.log('No numeric part found in time:', time);
+      }
+    },
 
     // handleCFWSelected(cfw) {
     //   console.log('QHYCCD | CFWSelected: ', cfw);
@@ -547,10 +604,10 @@ export default {
   right: 90px;
   
   user-select: none;
-  backdrop-filter: blur(5px);  
+  backdrop-filter: blur(5px);
   background-color: rgba(0, 0, 0, 0.1);
-  border-radius: 10px;  
-  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 50%; 
+  /* border: 1px solid rgba(255, 255, 255, 0.8); */
 }
 
 .btn-HistogramSwitch {
@@ -578,7 +635,7 @@ export default {
   backdrop-filter: blur(5px);
   background-color: rgba(0, 0, 0, 0.1);
   border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.8);
+  /* border: 1px solid rgba(255, 255, 255, 0.8); */
 }
 
 .btn-MainPageSwitch {
@@ -593,12 +650,13 @@ export default {
   background-color: rgba(0, 0, 0, 0.1);
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.8);
+  box-sizing: border-box;
 }
 
 .red-box {
   position: absolute;
   background-color: transparent;
-  border: 1px solid rgba(255, 0, 0, 0.8);
+  border: 1px solid rgba(255, 212, 9, 0.6);
 }
 
 .btn-ShowUISwitch {
@@ -612,7 +670,7 @@ export default {
   backdrop-filter: blur(5px);  
   background-color: rgba(0, 0, 0, 0.1);
   border-radius: 50%;  
-  border: 1px solid rgba(255, 255, 255, 0.8);
+  /* border: 1px solid rgba(255, 255, 255, 0.8); */
 }
 
 
