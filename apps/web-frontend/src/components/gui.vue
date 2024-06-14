@@ -20,6 +20,13 @@
   </template>
   <selected-object-info style="position: absolute; top: 48px; left: 0px; width: 350px; max-width: calc(100vw - 12px); margin: 6px" class="get-click"></selected-object-info>
 
+  <button v-show="!showFloatingBox" @click="toggleImageManagerPanel" class="get-click btn-ImageManagerPanelSwitch">
+      <!-- <div style="display: flex; justify-content: center; align-items: center;">
+        <img src="@/assets/images/svg/ui/FolderSwitch.svg" height="30px" style="min-height: 30px"></img>
+      </div> -->
+    <v-icon color="rgba(255, 255, 255)"> mdi-folder-image </v-icon>
+  </button>
+
   <div v-show="showMountSwitch">
     <button v-show="!showFloatingBox" @click="toggleFloatingBox" class="get-click btn-MountPanelSwitch">
       <div style="display: flex; justify-content: center; align-items: center;">
@@ -101,13 +108,9 @@
     </div>
   </button>
 
-  <div>
-    <CapturePanel v-show="isCaptureMode" />
-  </div>
+  <CapturePanel v-show="isCaptureMode" />
 
-  <div>
-    <ImageManagerPanel v-show="ShowImageManagerPanel" />
-  </div>
+  <ImageManagerPanel v-show="ShowImageManagerPanel" />
 
   <SchedulePanel v-show="ShowSchedulePanel" class="get-click" style="position: absolute;"/>
   <ScheduleKeyBoard v-show="ShowSchedulePanel" />
@@ -233,9 +236,6 @@ export default {
   methods: {
     toggleFloatingBox() {
       this.showFloatingBox = !this.showFloatingBox; // 切换显示状态
-      this.ShowImageManagerPanel = !this.showFloatingBox;
-      // this.$bus.$emit('StagingScheduleData', 'data.message');
-      this.$bus.$emit('calculateTotalPage');
     },
     toggleChartsPanel() {
       this.showChartsPanel = !this.showChartsPanel;
@@ -270,6 +270,11 @@ export default {
 
     toggleImageManagerPanel() {
       this.ShowImageManagerPanel = !this.ShowImageManagerPanel;
+      if(this.ShowImageManagerPanel){
+        this.$bus.$emit('calculateTotalPage');
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'ShowAllImageFolder');
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'USBCheck');
+      }
     },
 
     showCaptureUI() {
@@ -596,6 +601,20 @@ export default {
   border: 1px solid rgba(255, 255, 255, 0.8);
 }
 
+.btn-ImageManagerPanelSwitch {
+  position:absolute;
+  width: 35px;
+  height: 35px;
+  top: 100px;
+  right: 20px;
+  
+  user-select: none;
+  backdrop-filter: blur(5px);
+  background-color: rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+}
+
 .btn-ChartsSwitch {
   position:absolute;
   width: 35px;
@@ -608,20 +627,6 @@ export default {
   background-color: rgba(0, 0, 0, 0.1);
   border-radius: 50%; 
   /* border: 1px solid rgba(255, 255, 255, 0.8); */
-}
-
-.btn-HistogramSwitch {
-  position:absolute;
-  width: 50px;
-  height: 50px;
-  bottom: 140px;
-  left: 10px;
-  
-  user-select: none;
-  backdrop-filter: blur(5px);  
-  background-color: rgba(0, 0, 0, 0.1);
-  border-radius: 50%;  
-  border: 1px solid rgba(255, 255, 255, 0.8);
 }
 
 .btn-UISwitch {
@@ -673,5 +678,15 @@ export default {
   /* border: 1px solid rgba(255, 255, 255, 0.8); */
 }
 
+
+.btn-ImageManagerPanelSwitch:active,
+.btn-MountPanelSwitch:active,
+.btn-ChartsSwitch:active,
+.btn-UISwitch:active,
+.btn-MainPageSwitch:active,
+.btn-ShowUISwitch:active {
+  transform: scale(0.95); /* 点击时缩小按钮 */
+  background-color: rgba(255, 255, 255, 0.7);
+}
 
 </style>

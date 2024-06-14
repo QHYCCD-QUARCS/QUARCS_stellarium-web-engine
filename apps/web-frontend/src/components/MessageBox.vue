@@ -1,20 +1,12 @@
 <template>
-  <div>
-    <transition ref="messageBox" name="message-slide" mode="out-in">
-      <div
-        v-if="showMessage"
-        class="message-box"
-        :class="{ 'message-box-expanded': isExpanded }"
-        :style="messageStyle" 
-        @click="expandMessage"
-        key="message-box"
-      >
-        <div class="message-content">
-          {{ message }}
-        </div>
+  <transition ref="messageBox" name="message-slide">
+    <div v-if="showMessage" class="message-box" :class="{ 'message-box-expanded': isExpanded }" :style="messageStyle"
+      @click="expandMessage" key="message-box">
+      <div class="message-content">
+        {{ message }}
       </div>
-    </transition>
-  </div>
+    </div>
+  </transition>
 </template>
 
 <script>
@@ -84,22 +76,30 @@ export default {
 </script>
 
 <style scoped>
-.message-slide-enter-active{
-  transition: transform 0.3s ease-in;
+@keyframes showPanelAnimation {
+  from {
+    top: -40px;
+  }
+  to {
+    top: 5px;
+  }
+}
+
+@keyframes hidePanelAnimation {
+  from {
+    top: 5px;
+  }
+  to {
+    top: -40px;
+  }
+}
+
+.message-slide-enter-active {
+  animation: showPanelAnimation 0.3s forwards;
 }
 
 .message-slide-leave-active {
-  transition: transform 0.3s ease-in-out;
-}
-
-.message-slide-leave-to,
-.message-slide-enter-from {
-  transform: translateY(-100%);
-}
-
-.message-slide-enter-to,
-.message-slide-leave-from {
-  transform: translateY(0);
+  animation: hidePanelAnimation 0.3s forwards;
 }
 
 .message-box {
@@ -109,27 +109,16 @@ export default {
   top: 5px;
   left: 0;
   right: 0;
-  backdrop-filter: blur(5px); /* 添加毛玻璃效果 */
+  backdrop-filter: blur(5px);
   color: #000;
   text-align: center;
   padding: 10px;
   cursor: pointer;
   transition: transform 0.3s ease-in-out;
-  border-radius: 10px; /* 添加圆角效果，根据需要调整圆角半径 */
-  /* height: 80px; */
-  width: 40%; /* 设置宽度为显示位置的三分之一 */
-  max-width: 50%; /* 最大宽度，根据需要调整 */
-  margin: 0 auto; /* 水平居中 */
-  animation: showAnimation 0.3s forwards;
-}
-
-@keyframes showAnimation {
-  from {
-    top: -40px;
-  }
-  to {
-    top: 5px;
-  }
+  border-radius: 10px;
+  width: 40%;
+  max-width: 50%;
+  margin: 0 auto;
 }
 
 .message-box-expanded {

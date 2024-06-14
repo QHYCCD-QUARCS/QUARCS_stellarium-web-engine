@@ -1,0 +1,12 @@
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M20 18H4V8H20M20 7H10L9 6H4C2.89 6 3 6.89 3 8V17C3 18.5 3 18 3 18.5C3 19 3.5 19 5 19H19C19.5304 19 20.1249 18.8751 20.5 18.5C20.8751 18.1249 21 17.5304 21 17V9C21 7.89 21.1 7 20 7Z" fill="white"/>
+<path d="M18 16H6L9.95455 11.165L11.0455 12.5L13.0909 10L18 16ZM11.7273 13.335L13.0909 15H15.8182L13.0909 11.665L11.7273 13.335ZM8.18182 15H11.7273L9.95455 12.835L8.18182 15Z" fill="white"/>
+<line x1="20.5" y1="16.5" x2="20.5" y2="18.5" stroke="white" stroke-linecap="round"/>
+<line x1="3.5" y1="16.5" x2="3.5" y2="18.5" stroke="white" stroke-linecap="round"/>
+<line x1="3.5" y1="18.5" x2="5.5" y2="18.5" stroke="white" stroke-linecap="round"/>
+<line x1="3.5" y1="6.5" x2="3.5" y2="8.5" stroke="white" stroke-linecap="round"/>
+<line x1="3.5" y1="6.5" x2="5.5" y2="6.5" stroke="white" stroke-linecap="round"/>
+<line x1="20.5" y1="7.5" x2="20.5" y2="9.5" stroke="white" stroke-linecap="round"/>
+<line x1="18.5" y1="18.5" x2="20.5" y2="18.5" stroke="white" stroke-linecap="round"/>
+<line x1="18.5" y1="7.5" x2="20.5" y2="7.5" stroke="white" stroke-linecap="round"/>
+</svg>

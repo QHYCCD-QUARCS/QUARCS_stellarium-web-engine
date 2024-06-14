@@ -1,4 +1,5 @@
 <template>
+  <transition name="panel">
   <div class="mount-control-panel" :style="{ top: top + 'px', right: right + 'px', width: width + 'px', height: height + 'px' }">
     <div class="Direction-Btn">
       <button class="ra-plus no-select" @touchstart="handleMouseDownRA('plus')" @touchend="stop">
@@ -77,6 +78,7 @@
     </div>
 
   </div>
+  </transition>
 </template>
 
 <script>
@@ -85,7 +87,7 @@ export default {
   data() {
     return {
       top: 50,
-      right: 50,
+      right: 10,
       startX: 0,
       startY: 0,
       width: 150,
@@ -236,7 +238,33 @@ export default {
   border-radius: 10px;
   border: 4px solid rgba(128, 128, 128, 0.5);
   box-sizing: border-box;
-  transition: height 0.2s ease;
+  overflow: hidden;
+}
+
+@keyframes showPanelAnimation {
+  from {
+    right: -150px;
+  }
+  to {
+    right: 10px;
+  }
+}
+
+@keyframes hidePanelAnimation {
+  from {
+    right: 10px;
+  }
+  to {
+    right: -150px;
+  }
+}
+
+.panel-enter-active {
+  animation: showPanelAnimation 0.15s forwards;
+}
+
+.panel-leave-active {
+  animation: hidePanelAnimation 0.15s forwards;
 }
 
 .custom-button {

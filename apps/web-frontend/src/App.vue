@@ -538,6 +538,35 @@ export default {
             }
           }
 
+          if (data.message.startsWith('ShowAllImageFolder:')) {
+            const parts = data.message.split(':');
+            if (parts.length === 3) {
+              this.$bus.$emit('ShowAllImageFolder', parts[1],parts[2]);
+            }
+          }
+
+          if (data.message.startsWith('USBCheck:')) {
+            const parts = data.message.split(':');
+            if (parts.length === 2) {
+              const USBdata = parts[1].split(',');
+              console.log('USB name: ', USBdata[0]);
+              console.log('USB space: ', USBdata[1]);
+
+              this.$bus.$emit('USB_Name_Sapce', USBdata[0], USBdata[1]);
+            }
+          }
+          
+          if (data.message.startsWith('ImageSaveErroe:')) {
+            const parts = data.message.split(':');
+            if (parts.length === 2) {
+              const Erroe = parts[1];
+              if (Erroe === 'USB-Null') {
+                this.callShowMessageBox('No USB Drive Detected.','error');
+              } else if (Erroe === 'USB-Multiple') {
+                this.callShowMessageBox('Multiple USB drives detected, please remove excess USB drives','error');
+              }
+            }
+          }
 
           
         }
