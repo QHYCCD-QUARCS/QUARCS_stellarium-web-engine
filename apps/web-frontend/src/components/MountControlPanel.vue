@@ -238,7 +238,7 @@ export default {
   border-radius: 10px;
   border: 4px solid rgba(128, 128, 128, 0.5);
   box-sizing: border-box;
-  overflow: hidden;
+  /* overflow: hidden; */
 }
 
 @keyframes showPanelAnimation {

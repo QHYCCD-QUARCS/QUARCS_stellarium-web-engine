@@ -211,11 +211,16 @@ export default {
       imageWidth: 0,
       imageHeight: 0,
       drawImgData: null,
+      OriginalImage: null,
+      detectStarsImg: null,
 
       mainCameraSizeX: 0,
       mainCameraSizeY: 0,
 
       ImageProportion: 0,
+
+      DetectedStarsList: [],
+      DetectedStarsFinish: false,
     }
   },
   components: { Gui,
@@ -232,6 +237,7 @@ export default {
     this.$bus.$on('ImageGainB', this.ImageGainSet);
     this.$bus.$on('ImageProportion', this.setImageProportion);
     this.$bus.$on('MountGoto',this.lookatcircle);
+    this.$bus.$on('SwitchImageToShow', this.SwitchImageToShow);
   },
   methods: {
     getLocationHostName() {
@@ -334,6 +340,7 @@ export default {
               // this.readBinFile(process.env.VUE_APP_IMAGE_FILE + fileName);  
               // this.readBinFile(this.ImageFileUrl + fileName); //this.ImageFileUrl + fileName
               this.readBinFile('img/' + fileName);
+              this.DetectedStarsFinish = false;
             }
           }
 
@@ -495,6 +502,10 @@ export default {
             this.$bus.$emit('CameraInExposuring');
           }
 
+          if (data.message.startsWith('AutoFocusOver:')) {
+            this.$bus.$emit('AutoFocusOver');
+          }
+
           if (data.message.startsWith('CFWPositionMax:')) {
             const parts = data.message.split(':');
             if (parts.length === 2) {
@@ -568,6 +579,24 @@ export default {
             }
           }
 
+          if (data.message.startsWith('DetectedStars:')) {
+            // this.$bus.$emit('ClearfitQuadraticCurve');
+            const parts = data.message.split(':');
+            console.log('Detected', parts.length, 'stars.');
+            this.DetectedStarsList = [];
+            for (let i = 0; i < parts.length; i++) {
+              const a = parts[i];
+              const b = a.split('|');
+              if (b.length === 3) {
+                const x = b[0];
+                const y = b[1];
+                const hfr = b[2];
+                // console.log('Stars at(', x, ',', y, ') with HFR:', hfr);
+                this.DetectedStarsList.push({x: x, y: y, hfr: hfr});
+              }
+            }
+            this.DetectedStarsFinish = true;
+          }
           
         }
         else if (data.type === 'QT_Confirm') {
@@ -819,11 +848,12 @@ export default {
       let gainB = 1.0;
       let offset = 0;
       let mode = 1;
+      let CFA = 'BG';
 
       // 参数
       let B = 0;
       let W = 65535;
-      let CFA = 'RGGB';
+      // let CFA = 'RGGB';
       let cvmode = 0;
 
       let mat = new cv.Mat(canvasHeight, canvasWidth, cv.CV_16UC1);
@@ -892,7 +922,8 @@ export default {
       const colorData = new ImageData(new Uint8ClampedArray(img8.data), img8.cols, img8.rows);
 
       // modifiedCtx.putImageData(colorData, 0, 0);
-      this.drawImgData = colorData;
+      this.OriginalImage = colorData;
+      this.drawImgData = this.OriginalImage;
       this.drawImageData(this.drawImgData);
 
       const endTime = new Date();
@@ -906,17 +937,43 @@ export default {
       this.MakeHistogram(colorData);
       this.histogramImage = colorData;
 
+      // 星点检测
+      // this.detectStarsImg = this.DrawDetectStars(img8, this.DetectedStarsList);
+      // 检查 DetectedStarsFinish 变量
+      const checkDetectedStarsFinish = () => {
+        console.log('Wait for Detect Stars finish...');
+        if (this.DetectedStarsFinish) {
+          // 如果 DetectedStarsFinish 为 true，执行星点检测并清除定时器
+          this.detectStarsImg = this.DrawDetectStars(img8, this.DetectedStarsList);
+          img8.delete();
+          clearInterval(intervalId);
+        }
+      };
+
+      // 设置一个定时器，每隔 100 毫秒检查一次 DetectedStarsFinish 变量
+      const intervalId = setInterval(checkDetectedStarsFinish, 1000);
+
       // 内存释放
       // dst.delete();
       // mat.delete();
       targetImg16.delete();
-      img8.delete();
       resizeImg.delete();
     },
 
     initCanvas() {
       this.bufferCanvas = document.createElement('canvas');
       this.bufferCtx = this.bufferCanvas.getContext('2d');
+    },
+
+    SwitchImageToShow(isOriginal) {
+      console.log('Show Original Image: ', isOriginal);
+      if(isOriginal) {
+        this.drawImgData = this.OriginalImage;
+      } else {
+        this.drawImgData = this.detectStarsImg;
+      }
+      
+      this.drawImageData(this.drawImgData);
     },
 
     drawImageData(colorData) {
@@ -1137,6 +1194,52 @@ export default {
       // console.log('转换完成！');
       // console.timeEnd('Bit16To8处理时间');
       return img8;
+    },
+
+    DrawDetectStars(image, Stars) {
+      console.log('Draw circle on the Capture Image(', image.cols, ',', image.rows, ').');
+      if (!(image instanceof cv.Mat)) {
+        throw new Error('Invalid image data');
+      }
+      Stars.forEach(star => {
+        // 将坐标和半径转换为整数
+        let centerX = Math.round(star.x / (this.mainCameraSizeX / image.cols));
+        let centerY = Math.round(star.y / (this.mainCameraSizeY / image.rows));
+        let radius = Math.round(star.hfr);
+
+        console.log('Draw circle at(', centerX, ',', centerY, ') with radius:', radius);
+        
+        let center = new cv.Point(centerX, centerY);
+        let color = new cv.Scalar(255, 0, 0, 255);
+        let thickness = 2; // 圆圈厚度
+
+        cv.circle(image, center, radius, color, thickness);
+
+        // 添加 hfr 值到圆的上方
+        // 确保 star.hfr 是一个数字
+        let hfrValue = parseFloat(star.hfr);
+        if (isNaN(hfrValue)) {
+          hfrValue = 0; // 如果 star.hfr 不能转换为数字，则默认值设为0
+        }
+
+        // 保留到小数点后2位
+        let text = hfrValue.toFixed(2);
+        let fontFace = cv.FONT_HERSHEY_SIMPLEX;
+        let fontScale = 1;
+        let textColor = new cv.Scalar(255, 0, 0, 255);
+        let textThickness = 2;
+
+        // 手动设置文本的位置，假设字体高度大约为10像素
+        let textX = centerX - (text.length * 10); // 估算每个字符宽度为5像素
+        let textY = centerY - radius - 3; // 圆的上方 3 像素
+
+        // 在图像上绘制文本
+        cv.putText(image, text, new cv.Point(textX, textY), fontFace, fontScale, textColor, textThickness);
+      });
+
+      const imageData = new ImageData(new Uint8ClampedArray(image.data), image.cols, image.rows);
+
+      return imageData;
     },
 
     GetAutoStretch(imgData, mode) {

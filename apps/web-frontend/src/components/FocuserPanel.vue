@@ -1,4 +1,5 @@
 <template>
+  <transition name="panel">
   <div class="chart-panel" :style="{ bottom: bottom + 'px', left: left + 'px', right: right + 'px', height: height + 'px' }">
     <ImageChart ref="imagechart" class="image-chart"/>
     <FocusChart ref="focuschart" class="focus-chart"/>
@@ -27,7 +28,20 @@
           <img src="@/assets/images/svg/ui/arrow-left-circle.svg" height="20px" style="min-height: 20px"></img>
         </div>
       </button>
-      <button  @click="AutoFocus" @touchend="active" class="get-click btn-Auto"><v-icon>mdi-focus-auto</v-icon></button>
+      <!-- <button  @click="AutoFocus" @touchend="active" class="get-click btn-Auto"><v-icon>mdi-focus-auto</v-icon></button> -->
+      <button  @click="AutoFocus" @touchend="active" class="get-click btn-Auto">
+        <span v-if="inAutoFocus">
+          <div style="display: flex; justify-content: center; align-items: center;">
+            <img src="@/assets/images/svg/ui/StopAutoFocus.svg" height="20px" style="min-height: 20px"></img>
+          </div>
+        </span>
+        <span v-else>
+          <div style="display: flex; justify-content: center; align-items: center;">
+            <img src="@/assets/images/svg/ui/AutoFocus.svg" height="20px" style="min-height: 20px"></img>
+          </div>
+        </span>
+      </button>
+
       <button  @click="FocusGoto" @touchend="active" class="get-click btn-Goto">
         <div style="display: flex; justify-content: center; align-items: center;">
           <img src="@/assets/images/svg/ui/Move.svg" height="10px" style="min-height: 10px"></img>
@@ -86,6 +100,7 @@
      </div>
 
   </div>
+</transition>
 </template>
 
 <script>
@@ -112,6 +127,8 @@ export default {
 
       isBtnMoveDisabled: false,
 
+      inAutoFocus: false,
+
     };
   },
   components: {
@@ -126,16 +143,31 @@ export default {
     this.$bus.$on('UpdateFWHM',this.UpdateFWHM);
     this.$bus.$on('showRoiImage',this.loadAndDisplayImage);
     this.$bus.$on('setTargetPosition', this.setTargetPosition);
+    this.$bus.$on('AutoFocusOver', this.AutoFocusOver);
   },
   methods: {
     AutoFocus() {
-      console.log('QHYCCD | AutoFocus: ');
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'ClearDataPoints');
-      this.$bus.$emit('ClearAllData');
+      if(this.inAutoFocus)
+      {
+        this.inAutoFocus = false;
+        console.log('QHYCCD | StopAutoFocus');
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'StopAutoFocus');
+      }
+      else
+      {
+        console.log('QHYCCD | StartAutoFocus');
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'ClearDataPoints');
+        this.$bus.$emit('ClearAllData');
 
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'AutoFocus');
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'AutoFocus');
 
+        this.inAutoFocus = true;
+      }
+    },
 
+    AutoFocusOver() {
+      console.log('QHYCCD | AutoFocusOver');
+      this.inAutoFocus = false;
     },
     
     StepsChange() {
@@ -235,6 +267,32 @@ export default {
   border: 4px solid rgba(128, 128, 128, 0.5);
   box-sizing: border-box;
   transition: width 0.2s ease;
+}
+
+@keyframes showPanelAnimation {
+  from {
+    bottom: -150px;
+  }
+  to {
+    bottom: 10px;
+  }
+}
+
+@keyframes hidePanelAnimation {
+  from {
+    bottom: 10px;
+  }
+  to {
+    bottom: -150px;
+  }
+}
+
+.panel-enter-active {
+  animation: showPanelAnimation 0.15s forwards;
+}
+
+.panel-leave-active {
+  animation: hidePanelAnimation 0.15s forwards;
 }
 
 .focus-chart {

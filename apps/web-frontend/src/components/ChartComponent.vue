@@ -1,4 +1,5 @@
 <template>
+<transition name="panel">
   <div class="chart-panel" :style="{ bottom: bottom + 'px', left: left + 'px', right: right + 'px', height: height + 'px' }">
     <LineChart ref="linechart" class="line-chart"/>
     
@@ -45,6 +46,7 @@
     </div>
     
   </div>
+</transition>
 </template>
 
 <script>
@@ -117,6 +119,32 @@ export default {
   border: 4px solid rgba(128, 128, 128, 0.5);
   box-sizing: border-box;
   transition: width 0.2s ease;
+}
+
+@keyframes showPanelAnimation {
+  from {
+    bottom: -150px;
+  }
+  to {
+    bottom: 10px;
+  }
+}
+
+@keyframes hidePanelAnimation {
+  from {
+    bottom: 10px;
+  }
+  to {
+    bottom: -150px;
+  }
+}
+
+.panel-enter-active {
+  animation: showPanelAnimation 0.15s forwards;
+}
+
+.panel-leave-active {
+  animation: hidePanelAnimation 0.15s forwards;
 }
 
 .line-chart {

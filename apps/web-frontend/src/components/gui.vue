@@ -10,7 +10,11 @@
 <div class="click-through" style="position:absolute; z-index: 1; width: 100%; height: 100%; display:flex; align-items: flex-end;">
   <div v-show="showRedBox" class="red-box" :style="{ top: mouseY + 'px', left: mouseX + 'px', width: RedBoxWidth + 'px', height: RedBoxHeight + 'px' }"></div>
   <message-box v-if="isMessageBoxShow" ref="messageBox"></message-box>
-  <toolbar v-show="showToolbar" v-if="$store.state.showMainToolBar" class="get-click"></toolbar>
+  <div>
+    <transition name="ToolBar">
+      <toolbar v-show="showToolbar" v-if="$store.state.showMainToolBar" class="get-click"></toolbar>
+    </transition>
+  </div>
   <observing-panel></observing-panel>
   <template v-for="(item, i) in pluginsGuiComponents">
     <component :is="item" :key="i"></component>
@@ -20,19 +24,23 @@
   </template>
   <selected-object-info style="position: absolute; top: 48px; left: 0px; width: 350px; max-width: calc(100vw - 12px); margin: 6px" class="get-click"></selected-object-info>
 
-  <button v-show="!showFloatingBox" @click="toggleImageManagerPanel" class="get-click btn-ImageManagerPanelSwitch">
+  <transition name="RightBtn">
+    <button v-show="showMountSwitch" @click="toggleImageManagerPanel" class="get-click btn-ImageManagerPanelSwitch">
       <!-- <div style="display: flex; justify-content: center; align-items: center;">
         <img src="@/assets/images/svg/ui/FolderSwitch.svg" height="30px" style="min-height: 30px"></img>
       </div> -->
-    <v-icon color="rgba(255, 255, 255)"> mdi-folder-image </v-icon>
-  </button>
+      <v-icon color="rgba(255, 255, 255)"> mdi-folder-image </v-icon>
+    </button>
+  </transition>
 
-  <div v-show="showMountSwitch">
-    <button v-show="!showFloatingBox" @click="toggleFloatingBox" class="get-click btn-MountPanelSwitch">
+  <div>
+    <transition name="RightBtn">
+    <button v-show="showMountSwitch" @click="toggleFloatingBox" class="get-click btn-MountPanelSwitch">
       <div style="display: flex; justify-content: center; align-items: center;">
         <img src="@/assets/images/svg/ui/mount.svg" height="33px" style="min-height: 33px"></img>
       </div>
     </button>
+    </transition>
     <mount-control-panel v-show="showFloatingBox" style="position: absolute; top: 50px; right: 10px; " class="get-click"></mount-control-panel>
   </div>
   
@@ -47,8 +55,10 @@
 
   <progress-bars style="position: absolute; bottom: 54px; right: 12px;"></progress-bars>
 
-  <div v-show="isBottomBarShow">
-    <bottom-bar style="position:absolute; width: 100%; justify-content: center; bottom: 0; display:flex; margin-bottom: 0px" class="get-click"></bottom-bar>
+  <div>
+    <transition name="BottomBar">
+      <bottom-bar v-show="isBottomBarShow" style="position:absolute; width: 100%; justify-content: center; bottom: 0; display:flex; margin-bottom: 0px" class="get-click"></bottom-bar>
+    </transition>
   </div>
 
   <!-- <div v-show="isExpTimeBarShow" class="exp-time-btn-bar-container">
@@ -61,6 +71,7 @@
 
   <button v-if="isCaptureMode" @click="Switch_ExpTime_CFW" class="get-click btn-ExpTime-CFW-Switch">Switch ExpTime CFW</button> -->
 
+  <transition name="BottomBtn">
   <button v-show="isMainSwitchShow" @click="SwitchMainPage" class="get-click btn-MainPageSwitch">
     <span v-if="CurrentMainPage === 'Stel'">
       <div style="display: flex; justify-content: center; align-items: center;">
@@ -78,17 +89,20 @@
       </div>
     </span>
   </button>
+  </transition>
 
   <!-- <div v-show="isCaptureMode">
     <CircularProgressButton ref="CaptureBtn" class="get-click btn-Capture" />
   </div> -->
 
   <ChartComponent v-show="showChartsPanel" style="position: absolute; bottom: 10px; left: 170px; " class="get-click"/>
+  <transition name="BottomBtn">
   <button  v-show="isCaptureMode" @click="toggleChartsPanel" class="get-click btn-ChartsSwitch">
     <div style="display: flex; justify-content: center; align-items: center;">
       <img src="@/assets/images/svg/ui/GuidingPanel.svg" height="35px" style="min-height: 35px"></img>
     </div>
   </button>
+  </transition>
 
   <HistogramPanel v-show="showHistogramPanel" style="position: absolute; bottom: 10px; left: 170px; " class="get-click"/>
 
@@ -263,6 +277,7 @@ export default {
       else if(this.showChartsPanel) {
         this.showChartsPanel = !this.showChartsPanel;
       }
+      this.$bus.$emit('SwitchImageToShow', !this.showFocuserPanel);
     },
     toggleSchedulePanel() {
       this.ShowSchedulePanel = !this.ShowSchedulePanel;
@@ -687,6 +702,110 @@ export default {
 .btn-ShowUISwitch:active {
   transform: scale(0.95); /* 点击时缩小按钮 */
   background-color: rgba(255, 255, 255, 0.7);
+}
+
+@keyframes showBottomBarAnimation {
+  from {
+    bottom: -50px;
+  }
+  to {
+    bottom: 0;
+  }
+}
+
+@keyframes hideBottomBarAnimation {
+  from {
+    bottom: 0;
+  }
+  to {
+    bottom: -50px;
+  }
+}
+
+.BottomBar-enter-active {
+  animation: showBottomBarAnimation 0.15s forwards;
+}
+
+.BottomBar-leave-active {
+  animation: hideBottomBarAnimation 0.15s forwards;
+}
+
+@keyframes showToolBarAnimation {
+  from {
+    top: -40px;
+  }
+  to {
+    top: 0;
+  }
+}
+
+@keyframes hideToolBarAnimation {
+  from {
+    top: 0;
+  }
+  to {
+    top: -40px;
+  }
+}
+
+.ToolBar-enter-active {
+  animation: showToolBarAnimation 0.15s forwards;
+}
+
+.ToolBar-leave-active {
+  animation: hideToolBarAnimation 0.15s forwards;
+}
+
+@keyframes showBottomBtnAnimation {
+  from {
+    bottom: -50px;
+  }
+  to {
+    bottom: 20px;
+  }
+}
+
+@keyframes hideBottomBtnAnimation {
+  from {
+    bottom: 20px;
+  }
+  to {
+    bottom: -50px;
+  }
+}
+
+.BottomBtn-enter-active {
+  animation: showBottomBtnAnimation 0.15s forwards;
+}
+
+.BottomBtn-leave-active {
+  animation: hideBottomBtnAnimation 0.15s forwards;
+}
+
+@keyframes showRightBtnAnimation {
+  from {
+    right: -50px;
+  }
+  to {
+    right: 20px;
+  }
+}
+
+@keyframes hideRightBtnAnimation {
+  from {
+    right: 20px;
+  }
+  to {
+    right: -50px;
+  }
+}
+
+.RightBtn-enter-active {
+  animation: showRightBtnAnimation 0.15s forwards;
+}
+
+.RightBtn-leave-active {
+  animation: hideRightBtnAnimation 0.15s forwards;
 }
 
 </style>

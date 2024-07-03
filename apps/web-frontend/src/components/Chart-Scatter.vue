@@ -151,7 +151,7 @@ export default {
 <style scoped>
 .scatterchart-panel {
   background-color: rgba(0, 0, 0, 0.0);
-  backdrop-filter: blur(5px);
+  /* backdrop-filter: blur(5px); */
   border-radius: 5px;
   box-sizing: border-box;
 }

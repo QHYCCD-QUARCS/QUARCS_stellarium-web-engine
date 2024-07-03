@@ -1,4 +1,5 @@
 <template>
+  <transition name="panel">
   <div class="capture-panel" :style="{ bottom: bottom + 'px', left: left + 'px', width: width + 'px', height: height + 'px' }">
     <div class="Direction-Btn">
         <button class="ExpTime-minus no-select" @click="handleExpTimeButtonClick('minus')">
@@ -57,6 +58,7 @@
     </div>
 
   </div>
+</transition>
 </template>
 
 <script>
@@ -268,6 +270,32 @@ export default {
   border: 4px solid rgba(128, 128, 128, 0.5);
   box-sizing: border-box;
   transition: height 0.2s ease;
+}
+
+@keyframes showPanelAnimation {
+  from {
+    left: -150px;
+  }
+  to {
+    left: 10px;
+  }
+}
+
+@keyframes hidePanelAnimation {
+  from {
+    left: 10px;
+  }
+  to {
+    left: -150px;
+  }
+}
+
+.panel-enter-active {
+  animation: showPanelAnimation 0.15s forwards;
+}
+
+.panel-leave-active {
+  animation: hidePanelAnimation 0.15s forwards;
 }
 
 .custom-button {

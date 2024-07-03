@@ -1,4 +1,5 @@
 <template>
+  <transition name="panel">
   <div class="chart-panel" :style="{ bottom: bottom + 'px', left: left + 'px', right: right + 'px', height: height + 'px' }">
      <HistogramChart ref="histogramchart" class="histogram-chart"/>
      <DialKnob class="dial-knob"/>
@@ -9,6 +10,7 @@
         </div>
      </button>
   </div>
+</transition>
 </template>
 
 <script>
@@ -57,6 +59,32 @@ export default {
   backdrop-filter: blur(5px);
   border-radius: 10px; 
   transition: width 0.2s ease;
+}
+
+@keyframes showPanelAnimation {
+  from {
+    bottom: -150px;
+  }
+  to {
+    bottom: 10px;
+  }
+}
+
+@keyframes hidePanelAnimation {
+  from {
+    bottom: 10px;
+  }
+  to {
+    bottom: -150px;
+  }
+}
+
+.panel-enter-active {
+  animation: showPanelAnimation 0.15s forwards;
+}
+
+.panel-leave-active {
+  animation: hidePanelAnimation 0.15s forwards;
 }
 
 .histogram-chart {
