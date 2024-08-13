@@ -82,10 +82,6 @@
         console.log("QHYCCD | confirmDriver: ", this.selectedDriver);
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'ConfirmIndiDriver:'+this.selectedDriver);
       },
-      connectIndiServer() {
-        // 连接indiServer的逻辑
-
-      },
       confirmDevice() {
         // 确定设备的逻辑
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'ConfirmIndiDevice:'+this.selectedDevice);

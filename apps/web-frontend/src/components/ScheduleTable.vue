@@ -455,7 +455,7 @@ export default {
     },
     handleScrollB() {
       this.$bus.$emit('scrollEventB', this.$refs.listB.scrollTop);
-      console.log(`handleScrollB: `, this.$refs.listB.scrollTop);
+      // console.log(`handleScrollB: `, this.$refs.listB.scrollTop);
     },
     AddScheduleRow() {
       this.numberOfRows += 1;

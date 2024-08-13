@@ -402,7 +402,7 @@ export default {
   display: inline-block;
   font-family: monospace;
   padding-right: 2px;
-  font-size: 13px;
+  font-size: 11px;
   font-weight: bold;
 }
 

@@ -24,12 +24,33 @@
   </template>
   <selected-object-info style="position: absolute; top: 48px; left: 0px; width: 350px; max-width: calc(100vw - 12px); margin: 6px" class="get-click"></selected-object-info>
 
-  <transition name="RightBtn">
+  <!-- <transition name="RightBtn">
     <button v-show="showMountSwitch" @click="toggleImageManagerPanel" class="get-click btn-ImageManagerPanelSwitch">
-      <!-- <div style="display: flex; justify-content: center; align-items: center;">
-        <img src="@/assets/images/svg/ui/FolderSwitch.svg" height="30px" style="min-height: 30px"></img>
-      </div> -->
       <v-icon color="rgba(255, 255, 255)"> mdi-folder-image </v-icon>
+    </button>
+  </transition> -->
+
+  <transition name="RightBtn">
+    <button v-show="isPolarAxisMode" @click="RecalibratePolarAxis" class="get-click btn-Recalibrate">
+      <div style="display: flex; justify-content: center; align-items: center;">
+        <img src="@/assets/images/svg/ui/Reset.svg" height="20px" style="min-height: 20px"></img>
+      </div>
+    </button>
+  </transition>
+
+  <transition name="RightBtn">
+    <button v-show="isPolarAxisMode && showSingleSolveBtn" @click="SingleSolveImage" class="get-click btn-SolveImage" style=" background-color: rgba(0, 0, 0, 0.1); ">
+      <div style="display: flex; justify-content: center; align-items: center;">
+        <img src="@/assets/images/svg/ui/Solve.svg" height="25px" style="min-height: 25px"></img>
+      </div>
+    </button>
+  </transition>
+
+  <transition name="RightBtn">
+    <button v-show="isPolarAxisMode && !showSingleSolveBtn" @click="LoopSolveImage" class="get-click btn-SolveImage" :style="{ 'background-color': PlateSolveInProgress ? 'rgba(46, 160, 67, 0.3)' : 'rgba(0, 0, 0, 0.1)' }">
+      <div style="display: flex; justify-content: center; align-items: center;">
+        <img src="@/assets/images/svg/ui/LoopSolve.svg" height="25px" style="min-height: 25px"></img>
+      </div>
     </button>
   </transition>
 
@@ -57,7 +78,7 @@
 
   <div>
     <transition name="BottomBar">
-      <bottom-bar v-show="isBottomBarShow" style="position:absolute; width: 100%; justify-content: center; bottom: 0; display:flex; margin-bottom: 0px" class="get-click"></bottom-bar>
+      <bottom-bar v-show="isBottomBarShow" :style="{ width: isPolarAxisMode ? '75%' : '100%' }" style="position:absolute; justify-content: center; bottom: 0; display:flex; margin-bottom: 0px" class="get-click"></bottom-bar>
     </transition>
   </div>
 
@@ -118,9 +139,38 @@
   <!-- <button v-show="isRedBoxMode" @click="showCaptureUI" class="get-click btn-ShowUISwitch"> <v-icon> mdi-flip-to-front </v-icon> </button> -->
   <button v-show="isRedBoxMode" @click="showCaptureUI" class="get-click btn-ShowUISwitch">
     <div style="display: flex; justify-content: center; align-items: center;">
-        <img src="@/assets/images/svg/ui/UI_Show.svg" height="20px" style="min-height: 20px">
+      <img src="@/assets/images/svg/ui/UI_Show.svg" height="20px" style="min-height: 20px">
     </div>
   </button>
+
+  <button v-show="isPolarAxisMode" @click="QuitPolarAxisMode" class="get-click btn-ShowUISwitch">
+    <!-- <div style="display: flex; justify-content: center; align-items: center;">
+      <img src="@/assets/images/svg/ui/UI_Show.svg" height="20px" style="min-height: 20px">
+    </div> -->
+    <v-icon color="rgba(255, 255, 255)"> mdi-close-outline </v-icon>
+  </button>
+
+  <transition name="BottomCanvas">
+    <div v-show="isPolarAxisMode" class="Canvas-SolveImage">
+      <canvas ref="SolveImageCanvas" id="SolveImage-Canvas"></canvas>
+    </div>
+  </transition>
+
+  <transition name="BottomCanvas">
+    <div v-show="isPolarAxisMode" class="Text-SolveImage">
+      <span style="position: absolute; top: 0px; left: 5%; height: 30%; width: 90%; font-size: 10px; color: rgba(255, 255, 255, 0.3); user-select: none;"> 
+        Difference: {{ DifferenceText }}
+      </span>
+      <span style="position: absolute; top: 35%; left: 5%; height: 30%; width: 90%; font-size: 10px; color: rgba(255, 255, 255, 0.3); user-select: none;"> 
+        Target: {{ TargetText }}
+      </span>
+      <span style="position: absolute; top: 70%; left: 5%; height: 30%; width: 90%; font-size: 10px; color: rgba(255, 255, 255, 0.3); user-select: none;"> 
+        Current: {{ CurrentText }}
+      </span>
+    </div>
+  </transition>
+
+  
 
   <CapturePanel v-show="isCaptureMode" />
 
@@ -220,6 +270,20 @@ export default {
 
       ScaleImageWidth: 0,
       ScaleImageHeight: 0,
+
+      FocalLength: 130,         // QHY462C: 130  5.568 3.132
+      CameraSizeWidth: 5.568,   // QHY163M: 510  17.7  13.4
+      CameraSizeHeight: 3.132, 
+
+      PlateSolveInProgress: false,
+
+      isPolarAxisMode: false,
+
+      showSingleSolveBtn: true,
+
+      DifferenceText: '',
+      TargetText: '',
+      CurrentText: '',
       
 
     }
@@ -229,7 +293,7 @@ export default {
     this.$bus.$on('add-device', this.handleAddDevice);
     this.$bus.$on('showMsgBox', this.showMessageBox);
     this.$bus.$on('MainCameraSize', this.resizeRedBox);
-    this.$bus.$on('RedBoxSizeChange', this.RedBoxSizeChange);
+    this.$bus.$on('RedBox Side Length (px)', this.RedBoxSizeChange);
     this.$bus.$on('time-selected', this.handleExpTimeSelected);
     // this.$bus.$on('cfw-selected', this.handleCFWSelected);
     this.$bus.$on('toggleSchedulePanel', this.toggleSchedulePanel);
@@ -237,12 +301,18 @@ export default {
     this.$bus.$on('toggleHistogramPanel', this.toggleHistogramPanel);
     this.$bus.$on('toggleFocuserPanel', this.toggleFocuserPanel);
     this.$bus.$on('ImageManagerPanelClose', this.toggleImageManagerPanel);
+    this.$bus.$on('ImageManagerPanelOpen', this.toggleImageManagerPanel);
     
     // this.$bus.$on('RedBoxClick', this.handleTouchOrMouseDown);
     this.$bus.$on('RedBox_XY', this.RedBox_XY);
     this.$bus.$on('RedBoxOffset', this.setRedBoxOffset);
     this.$bus.$on('RedBoxScale', this.SetRedBoxScale);
     this.$bus.$on('ScaleImageSize', this.setScaleImageSize);
+    this.$bus.$on('CalibratePolarAxisMode', this.CalibratePolarAxisMode);
+    this.$bus.$on('showSolveImage', this.showSolveImage);
+    this.$bus.$on('HideSingleSolveBtn', this.HideSingleSolveBtn);
+    this.$bus.$on('ShowAzAltText', this.ShowAzAltText);
+    this.$bus.$on('ShowCurrentAzAltText', this.ShowCurrentAzAltText);
   },
   mounted() {
     this.resizeRedBox(1920, 1080);
@@ -300,6 +370,7 @@ export default {
       this.isExpTimeBarShow = true;
       this.isMainSwitchShow = true;
       this.showMountSwitch = true;
+      this.isPolarAxisMode = false;
     },
     hideCaptureUI() {
       document.addEventListener('click', this.handleTouchOrMouseDown);
@@ -390,8 +461,9 @@ export default {
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'RedBox:'+ Math.floor((this.mouseX + this.RedBoxOffset_X) / this.ScaleImageWidth * windowWidth) + ":" + Math.floor((this.mouseY + this.RedBoxOffset_Y) / this.ScaleImageHeight * windowHeight) + ":" + windowWidth + ":" + windowHeight);  //TODO: BoxSize
     },
 
-    RedBoxSizeChange(length) {
-      this.BoxSideLength = length;
+    RedBoxSizeChange(payload) {
+      const [signal, value] = payload.split(':');
+      this.BoxSideLength = value;
       console.log('RedBoxSizeChange: ', this.BoxSideLength);
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'RedBoxSizeChange:'+ this.BoxSideLength);
     },
@@ -535,6 +607,82 @@ export default {
       }
     },
 
+    SingleSolveImage() {
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'SolveImage:' + this.FocalLength + ':' + this.CameraSizeWidth + ':' + this.CameraSizeHeight);
+    },
+
+    LoopSolveImage() {
+      if (this.PlateSolveInProgress) {
+        this.PlateSolveInProgress = false;
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'stopLoopSolveImage');
+      } else {
+        this.PlateSolveInProgress = true;
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'startLoopSolveImage:' + this.FocalLength + ':' + this.CameraSizeWidth + ':' + this.CameraSizeHeight);
+      }
+    },
+
+    CalibratePolarAxisMode() {
+      this.$bus.$emit('showStelCanvas');
+      this.CurrentMainPage = 'Stel';
+      this.isBottomBarShow = true;
+      this.hideCaptureUI();
+      this.isPolarAxisMode = true;
+      this.isRedBoxMode = false;
+      document.removeEventListener('click', this.handleTouchOrMouseDown);
+
+
+    },
+
+    QuitPolarAxisMode() {
+      this.showCaptureUI();
+      this.isCaptureMode = false;
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'StopLoopCapture');
+    },
+
+    showSolveImage(img) {
+      const canvas = document.getElementById('SolveImage-Canvas');
+
+      if (canvas.getContext) {
+        const ctx = canvas.getContext('2d');
+        const canvasWidth = window.innerWidth / 4;
+        const canvasHeight = window.innerHeight /4;
+
+        // 清除画布
+        ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+
+        // 调整图像尺寸以适应画布尺寸
+        ctx.drawImage(img, 0, 0, canvasWidth, canvasHeight);
+      }
+    },
+
+    HideSingleSolveBtn() {
+      this.showSingleSolveBtn = false;
+    },
+
+    RecalibratePolarAxis() {
+      console.log('Re calibrate the polar axis');
+      this.showSingleSolveBtn = true;
+      this.$bus.$emit('RecalibratePolarAxis');
+
+      if (this.PlateSolveInProgress) {
+        this.PlateSolveInProgress = false;
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'stopLoopSolveImage');
+      }
+
+      this.DifferenceText = '';
+      this.TargetText = '';
+      this.CurrentText = '';
+    },
+
+    ShowAzAltText(Az1, Alt1, Az2, Alt2) {
+      this.DifferenceText = Az1.toFixed(3) + ', ' + Alt1.toFixed(3);
+      this.TargetText = Az2.toFixed(3) + ', ' + Alt2.toFixed(3);
+    },
+
+    ShowCurrentAzAltText(Az, Alt) {
+      this.CurrentText = Az.toFixed(3) + ', ' + Alt.toFixed(3);
+    },
+
     // handleCFWSelected(cfw) {
     //   console.log('QHYCCD | CFWSelected: ', cfw);
     //   // 根据需要处理选择的时间
@@ -628,6 +776,65 @@ export default {
   background-color: rgba(0, 0, 0, 0.1);
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.8);
+}
+
+.btn-SolveImage {
+  position:absolute;
+  width: 35px;
+  height: 35px;
+  top: calc(50% - 35px);
+  right: 20px;
+  
+  user-select: none;
+  backdrop-filter: blur(5px);
+  /* background-color: rgba(0, 0, 0, 0.1); */
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+}
+
+.btn-Recalibrate {
+  position:absolute;
+  width: 35px;
+  height: 35px;
+  top: calc(75% - 70px);
+  right: 20px;
+  
+  user-select: none;
+  backdrop-filter: blur(5px);
+  background-color: rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+}
+
+.Canvas-SolveImage {
+  position:absolute;
+  bottom: 20px;
+  right: 20px;
+
+  width: 25%;
+  height: 25%;
+  
+  user-select: none;
+  background-color: rgba(0, 0, 0, 0.0);
+  backdrop-filter: blur(5px);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 10px; 
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.Text-SolveImage {
+  position:absolute;
+  width: calc(25% - 50px);
+  height: 25%;
+  top: calc(50% - 35px);
+  right: 70px;
+  
+  user-select: none;
+  /* backdrop-filter: blur(1px);
+  background-color: rgba(0, 0, 0, 0.1); */
+  border-radius: 10px;
+  /* border: 1px solid rgba(255, 255, 255, 0.8); */
 }
 
 .btn-ChartsSwitch {
@@ -806,6 +1013,32 @@ export default {
 
 .RightBtn-leave-active {
   animation: hideRightBtnAnimation 0.15s forwards;
+}
+
+@keyframes showBottomCanvasAnimation {
+  from {
+    bottom: -25%;
+  }
+  to {
+    bottom: 20px;
+  }
+}
+
+@keyframes hideBottomCanvasAnimation {
+  from {
+    bottom: 20px;
+  }
+  to {
+    bottom: -25%;
+  }
+}
+
+.BottomCanvas-enter-active {
+  animation: showBottomCanvasAnimation 0.15s forwards;
+}
+
+.BottomCanvas-leave-active {
+  animation: hideBottomCanvasAnimation 0.15s forwards;
 }
 
 </style>

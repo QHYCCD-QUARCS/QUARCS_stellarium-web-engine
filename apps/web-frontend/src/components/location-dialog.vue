@@ -46,6 +46,7 @@ export default {
     },
     saveManualCoordinates: function () {
       const [lat, lng] = this.manualCoordinates.split(',').map(coord => parseFloat(coord.trim()))
+      this.$bus.$emit('PolarPointAltitude', lat)
       const loc = {
         short_name: 'Unknown',
         country: 'Unknown',

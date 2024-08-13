@@ -9,7 +9,58 @@
 <template>
 
 <v-app>
-  <v-navigation-drawer v-model="nav" app stateless width="150">
+  <v-navigation-drawer v-model="drawer_2" ref="Drawer_2" app absolute temporary width="200" style="left: 170px; backdrop-filter: blur(5px); background-color: rgba(0, 0, 0, 0.1);">
+    
+    <span style="position: absolute; top: 0px; left: 50%; transform: translateX(-50%); font-size: 30px; color: rgba(255, 255, 255, 0.5); user-select: none;">
+      {{ CurrentDriverType }}
+      <v-divider></v-divider>
+    </span>
+
+    <div style="position: absolute; top: 50px; left: 50%; width: 200px; transform: translateX(-50%); max-height: calc(100% - 95px); overflow-y: auto;">
+
+      <div v-show="!DeviceIsConnected" style="text-align: center;">
+        <span style="display: inline-block; font-size: 15px; color: rgba(255, 255, 255, 0.5); user-select: none;">
+          {{ 'Device Connect' }}
+        </span>
+        <v-select label="Select Driver" :items="drivers" item-text="label" item-value="value" v-model="selectedDriver" style="width: 150px; display: inline-block;"></v-select>
+        <button :disabled="loadingSelectDriver" @click="confirmDriver" class="get-click btn-confirm" style="display: inline-block;">
+          <template v-if="!loadingSelectDriver">
+            <v-icon color="rgba(255, 255, 255)">mdi-check-bold</v-icon>
+          </template>
+          <template v-else>
+            <div class="progress-spinner">
+              <v-progress-circular indeterminate color="white" size="20"></v-progress-circular>
+            </div>
+          </template>
+        </button>
+      </div>
+
+      <div v-show="!DeviceIsConnected" style="text-align: center;">
+        <v-select label="Select Device" :items="ToBeConnectDevice" item-text="label" item-value="value" v-model="selectedDevice" style="width: 150px; display: inline-block;"></v-select>
+        <button @click="confirmDevice" class="get-click btn-confirm" style="display: inline-block;">
+          <v-icon color="rgba(255, 255, 255)"> mdi-check-bold </v-icon>
+        </button>
+      </div>
+
+      <!-- <v-divider style="margin-top: 20px;"></v-divider> -->
+
+      <div v-show="DeviceIsConnected" v-for="(item, index) in CurrentConfigItems()" :key="index" style="text-align: center;">
+        <span v-if="index === 0" style="display: inline-block; font-size: 15px; color: rgba(255, 255, 255, 0.5); user-select: none;">
+          {{ 'Device Config Items' }}
+        </span>
+        <v-text-field v-model="item.value" :label="item.label" style="width: 150px; display: inline-block;"></v-text-field>
+
+      </div>
+
+    </div>
+
+    <button v-show="DeviceIsConnected" @click="confirmConfiguration(CurrentConfigItems())" class="get-click btn-confirm" style="position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); display: inline-block; user-select: none;">
+      <v-icon color="rgba(255, 255, 255)"> mdi-check-bold </v-icon>
+    </button>
+
+  </v-navigation-drawer>
+
+  <v-navigation-drawer v-model="nav" app :stateless = "drawer_2" temporary width="170" style="backdrop-filter: blur(5px); background-color: rgba(0, 0, 0, 0.1);">  <!-- stateless temporary  -->
     <v-layout column fill-height>
       <v-list dense>
         <template v-for="(item,i) in menuItems">
@@ -37,49 +88,99 @@
           </template>
         </template>
 
-        <v-list-item @click.stop="connectAllDevice()" :style="{ height: '36px' }">
+        <v-list-item :disabled="loadingConnectAllDevice" @click.stop="connectAllDevice()" :style="{ height: '36px' }">
+          <v-list-item-icon style="margin-right: 10px;">
+            <div style="display: flex; justify-content: center; align-items: center;">
+              <img src="@/assets/images/svg/ui/Connect.svg" height="30px" style="min-height: 30px"></img>
+            </div>
+          </v-list-item-icon>
           <v-list-item-content>
             <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ '连接所选设备' }}</v-list-item-title>
+            <v-progress-linear
+              v-if="loadingConnectAllDevice"
+              indeterminate
+              color="white"
+              height="5"
+            ></v-progress-linear>
           </v-list-item-content>
         </v-list-item>
 
+        <v-list-item @click.stop="CalibratePolarAxis()" :style="{ height: '36px' }">
+          <v-list-item-icon style="margin-right: 10px;">
+            <div style="display: flex; justify-content: center; align-items: center;">
+              <img src="@/assets/images/svg/ui/PoleAxis.svg" height="30px" style="min-height: 30px"></img>
+            </div>
+          </v-list-item-icon>
+          <v-list-item-content>
+            <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ '校准极轴' }}</v-list-item-title>
+          </v-list-item-content>
+        </v-list-item>
+
+        <v-list-item @click.stop="OpenIamgeFolder()" :style="{ height: '36px' }">
+          <v-list-item-icon style="margin-right: 10px;">
+            <div style="display: flex; justify-content: center; align-items: center;">
+              <img src="@/assets/images/svg/ui/FolderSwitch.svg" height="30px" style="min-height: 30px"></img>
+            </div>
+          </v-list-item-icon>
+          <v-list-item-content>
+            <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ '图像文件' }}</v-list-item-title>
+          </v-list-item-content>
+        </v-list-item>
+
+        <v-divider></v-divider>
 
         <v-list-item v-for="(device, index) in devices" :key="index" @click.stop="selectDevice(device)" :style="{ height: '36px' }">
+          <v-list-item-icon style="margin-right: 10px;">
+            <div style="display: flex; justify-content: center; align-items: center;">
+              <img :src="require(`@/assets/images/svg/ui/${device.driverType}.svg`)" height="30px" style="min-height: 30px"></img>
+            </div>
+          </v-list-item-icon>
           <v-list-item-content>
             <v-list-item-title>
               <!-- {{ device.name }} <span>{{ device.device }}</span> -->
               <span>
-                <div :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ device.name }}</div>
+                <div :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ device.driverType }}</div>
                 <div :style="{ fontSize: '7px' }" :class="{ 'connected-device': device.isConnected }">{{ device.device }}</div>
               </span>
             </v-list-item-title>
           </v-list-item-content>
         </v-list-item>
+
+        <v-divider></v-divider>
+
       </v-list>
 
-      <template v-for="(item,i) in menuComponents">
+
+      <!-- <template v-for="(item,i) in menuComponents">
         <component :is="item" :key="i"></component>
       </template>
-      <v-spacer></v-spacer>
+      <v-spacer></v-spacer> -->
+
+
       <v-list dense>
 
-        <v-divider class="divider_menu"/>
+        <!-- <v-divider class="divider_menu"/> -->
 
         <v-list-item @click.stop="locationClicked()" :style="{ height: '36px' }">
+          <v-list-item-icon style="margin-right: 10px;">
+            <div style="display: flex; justify-content: center; align-items: center;">
+              <img :src="require(`@/assets/images/svg/ui/Location.svg`)" height="30px" style="min-height: 30px"></img>
+            </div>
+          </v-list-item-icon>
           <v-list-item-content>
             <v-list-item-title>
               <span>
-                <div :style="{ fontSize: '10px' }">{{ 'Location: '+$store.state.currentLocation.short_name }}</div>
+                <div :style="{ fontSize: '10px' }">{{ $store.state.currentLocation.short_name }}</div>
               </span>
             </v-list-item-title>
           </v-list-item-content>
         </v-list-item>
 
-        <v-list-item @click.stop="applyHistStretch(histogram_min, histogram_max)" :style="{ height: '36px' }">
+        <v-list-item @click.stop="drawer_2 = !drawer_2;" :style="{ height: '36px' }">
           <v-list-item-content>
             <v-list-item-title>
               <span>
-                <div :style="{ fontSize: '10px' }">{{ 'showIMG' }}</div>
+                <div :style="{ fontSize: '10px' }">{{ 'Test' }}</div>
               </span>
             </v-list-item-title>
           </v-list-item-content>
@@ -176,19 +277,82 @@ export default {
 
       // isMessageBoxShow: false,
 
-      driverType: '',
-      deviceType: '',
+      CurrentDriverType: '',
+      DeviceIsConnected: null,
+      confirmDriverType: '',
 
       devices: [
-        // { name: '一键连接', device: '' },
-        { name: '导星镜', driverType: 'Guider', type: 'CCDs', ListNum: "1", isget: false, device: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_Guider' },
-        { name: '主相机', driverType: 'MainCamera', type: 'CCDs', ListNum: "20", isget: false, device: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_MainCamera' },
-        { name: '赤道仪', driverType: 'Mount', type: 'Telescopes', ListNum: "0", isget: false, device: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_Mount' },
-        { name: '望远镜', dialogStateVar: 'showDeviceSettingsDialog_Telescopes', device: '' },
-        { name: '电动调焦器', driverType: 'Focuser', type: 'Focusers', ListNum: "22", isget: false, device: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_Focuser' },
-        { name: '电子极轴镜', driverType: 'PoleCamera', type: 'CCDs', ListNum: "2", isget: false, device: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_PoleCamera' },
-        { name: '滤镜轮', driverType: 'CFW', type: 'Filter Wheels', ListNum: "21", isget: false, device: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_CFW' },
+        { name: '导星镜', driverType: 'Guider', type: 'CCDs', ListNum: "1", isget: false, device: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_Guider'},
+        { name: '主相机', driverType: 'MainCamera', type: 'CCDs', ListNum: "20", isget: false, device: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_MainCamera'},
+        { name: '赤道仪', driverType: 'Mount', type: 'Telescopes', ListNum: "0", isget: false, device: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_Mount'},
+        { name: '望远镜', driverType: 'Telescopes', device: '', isConnected: true},
+        { name: '电动调焦器', driverType: 'Focuser', type: 'Focusers', ListNum: "22", isget: false, device: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_Focuser'},
+        { name: '电子极轴镜', driverType: 'PoleCamera', type: 'CCDs', ListNum: "2", isget: false, device: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_PoleCamera'},
+        { name: '滤镜轮', driverType: 'CFW', type: 'Filter Wheels', ListNum: "21", isget: false, device: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_CFW'},
       ],
+
+      // Changing the label name also requires changing the emit signal name
+      GuiderConfigItems: [
+        { driverType: 'Guider', num: 1, label: 'Chip Width (mm)' , value: '' },
+        { driverType: 'Guider', num: 2, label: 'Chip Height (mm)' , value: '' },
+        { driverType: 'Guider', num: 3, label: 'Focal Length (mm)' , value: '' },
+        { driverType: 'Guider', num: 4, label: '配置项4' , value: '' },
+      ],
+
+      MainCameraConfigItems: [
+        { driverType: 'MainCamera', num: 1, label: 'Chip Width (mm)', value: '' },
+        { driverType: 'MainCamera', num: 2, label: 'Chip Height (mm)', value: '' },
+        { driverType: 'MainCamera', num: 3, label: 'Focal Length (mm)', value: '' },
+        { driverType: 'MainCamera', num: 4, label: 'ImageGainR', value: '' },
+        { driverType: 'MainCamera', num: 5, label: 'ImageGainB', value: '' },
+        { driverType: 'MainCamera', num: 6, label: 'Offset', value: '' },
+        { driverType: 'MainCamera', num: 7, label: 'ImageCFA', value: '', inputType: 'select'},
+        { driverType: 'MainCamera', num: 1, label: 'RedBox Side Length (px)', value: '' },
+        { driverType: 'MainCamera', num: 7, label: 'ExpTime [1]', value: '' },
+        { driverType: 'MainCamera', num: 8, label: 'ExpTime [2]', value: '' },
+        { driverType: 'MainCamera', num: 9, label: 'ExpTime [3]', value: '' },
+        { driverType: 'MainCamera', num: 10, label: 'ExpTime [4]', value: '' },
+        { driverType: 'MainCamera', num: 11, label: 'ExpTime [5]', value: '' },
+        { driverType: 'MainCamera', num: 12, label: 'ExpTime [6]', value: '' },
+        { driverType: 'MainCamera', num: 13, label: 'ExpTime [7]', value: '' },
+        { driverType: 'MainCamera', num: 14, label: 'ExpTime [8]', value: '' },
+        { driverType: 'MainCamera', num: 15, label: 'ExpTime [9]', value: '' },
+        // 在这里添加更多的配置项
+      ],
+
+      MountConfigItems: [
+
+      ],
+
+      TelescopesConfigItems: [
+        { driverType: 'Telescopes', num: 1, label: 'Focal Length (mm)', value: '' },
+      ],
+
+      FocuserConfigItems: [
+        { driverType: 'Focuser', num: 1, label: 'RedBox Side Length (px)', value: '' },
+        { driverType: 'Focuser', num: 2, label: 'Min Step', value: '' },
+        
+      ],
+
+      PoleCameraConfigItems: [
+
+      ],
+
+      CFWConfigItems: [
+        { driverType: 'CFW', num: 1, label: 'CFW [1]', value: '' },
+        { driverType: 'CFW', num: 2, label: 'CFW [2]', value: '' },
+        { driverType: 'CFW', num: 3, label: 'CFW [3]', value: '' },
+        { driverType: 'CFW', num: 4, label: 'CFW [4]', value: '' },
+        { driverType: 'CFW', num: 5, label: 'CFW [5]', value: '' },
+        { driverType: 'CFW', num: 6, label: 'CFW [6]', value: '' },
+        { driverType: 'CFW', num: 7, label: 'CFW [7]', value: '' },
+        { driverType: 'CFW', num: 8, label: 'CFW [8]', value: '' },
+        { driverType: 'CFW', num: 9, label: 'CFW [9]', value: '' },
+      ],
+
+      BeforeChangeConfigItems: [],
+
+      
 
       imageData: null,
       histogramData: null,
@@ -199,6 +363,10 @@ export default {
 
       ImageGainR: 1,
       ImageGainB: 1,
+
+      ImageOffset: 0,
+
+      ImageCFA: 'BG',
 
       CanvasWidth: 4096,
       CanvasHeight: 2160,
@@ -221,6 +389,33 @@ export default {
 
       DetectedStarsList: [],
       DetectedStarsFinish: false,
+
+      CartesianList: [],
+
+      PolarPoint_Altitude: 0,
+
+      LastPoint_AzAlt: null,
+
+      MarkCircleNum: 0,
+
+      LastCircle_RaDec: null,
+      LastCircle_AzAlt: null,
+
+      Circles: [],
+
+      drawer_2: null,
+
+      drivers: [], // 驱动选项数组
+      selectedDriver: null, // 选中的驱动
+
+      devicesList: [], // 设备选项数组
+      selectedDevice: null, // 选中的设备
+      ToBeConnectDevice: [],
+
+      loadingSelectDriver: false,
+      loadingConnectAllDevice: false,
+
+
     }
   },
   components: { Gui,
@@ -235,9 +430,15 @@ export default {
     this.$bus.$on('HandleHistogramNum', this.applyHistStretch);
     this.$bus.$on('ImageGainR', this.ImageGainSet);
     this.$bus.$on('ImageGainB', this.ImageGainSet);
+    this.$bus.$on('Offset', this.ImageOffsetSet);
+    this.$bus.$on('ImageCFA', this.ImageCFASet);
     this.$bus.$on('ImageProportion', this.setImageProportion);
     this.$bus.$on('MountGoto',this.lookatcircle);
     this.$bus.$on('SwitchImageToShow', this.SwitchImageToShow);
+    this.$bus.$on('PolarPointAltitude', this.setPolarPointAltitude);
+    this.$bus.$on('showStelCanvas', this.showStelCanvas);
+    this.$bus.$on('RecalibratePolarAxis', this.RecalibratePolarAxis);
+    this.$bus.$on('CurrentExpTimeList', this.CurrentExpTimeList);
   },
   methods: {
     getLocationHostName() {
@@ -273,10 +474,11 @@ export default {
             if (parts.length === 3) {
               const label = parts[1];
               const value = parts[2];
-              const type = this.driverType;
+              const type = this.CurrentDriverType;
               // 创建一个驱动对象
               const driver = { type, label, value };
               this.$bus.$emit('add-driver', driver);
+              this.drivers.push(driver);
             }
           }
 
@@ -286,11 +488,21 @@ export default {
               const label = parts[1];
               console.log('QHYCCD | AddDevice: ',label);
               // const value = parts[2];
-              const type = this.driverType;
+              const type = this.confirmDriverType;
               // 创建一个驱动对象
               const device = { type, label, label };
               console.log('QHYCCD | AddDevice: ',device);
               this.$bus.$emit('add-device', device);
+              this.devicesList.push(device);
+
+              this.ToBeConnectDevice = [];
+              this.devicesList.forEach(devicesList => {
+                if (devicesList.type === this.CurrentDriverType) {
+                  this.ToBeConnectDevice.push(devicesList);
+                }
+              });
+
+              this.loadingSelectDriver = false;
             }
           }
 
@@ -309,6 +521,24 @@ export default {
               const type = parts[1];
               const device = parts[2];
               this.updateDevicesConnect(type,device);
+            }
+          }
+
+          if (data.message.startsWith('ConnectFailed:')) {
+            const parts = data.message.split(':');
+            if (parts.length === 2) {
+              const reason = parts[1];
+              this.callShowMessageBox(reason,'error');
+              this.loadingConnectAllDevice = false;
+            }
+          }
+
+          if (data.message.startsWith('ScanFailed:')) {
+            const parts = data.message.split(':');
+            if (parts.length === 2) {
+              const reason = parts[1];
+              this.callShowMessageBox(reason,'error');
+              this.loadingSelectDriver = false;
             }
           }
 
@@ -597,6 +827,48 @@ export default {
             }
             this.DetectedStarsFinish = true;
           }
+
+          if (data.message.startsWith('SolveImageResult:')) {
+            const parts = data.message.split(':');
+            if (parts.length === 5) {
+              // this.UpdateCirclePos(parts[1], parts[2]);
+              console.log('Solve Image Result(RA_Degree, DEC_Degree, Azimuth, Altitude):', parts[1], ',', parts[2], ',', parts[3], ',', parts[4]);
+              this.SolveResultMark(parts[1], parts[2], parts[3], parts[4]);
+            }
+          }
+
+          if (data.message.startsWith('SolveFovResult:')) {
+            const parts = data.message.split(':');
+            if (parts.length === 9) {
+              // this.UpdateCirclePos(parts[1], parts[2]);
+              // console.log('Solve Image Result(RA_Degree, DEC_Degree, Azimuth, Altitude):', parts[1], ',', parts[2], ',', parts[3], ',', parts[4]);
+              const RaDec = [
+                {Ra: parts[1], Dec: parts[2]},
+                {Ra: parts[3], Dec: parts[4]},
+                {Ra: parts[5], Dec: parts[6]},
+                {Ra: parts[7], Dec: parts[8]},
+              ];
+              this.SolveFovMark(RaDec);
+            }
+          }
+
+          if (data.message.startsWith('RealTimeSolveImageResult:')) {
+            const parts = data.message.split(':');
+            if (parts.length === 5) {
+              // this.UpdateCirclePos(parts[1], parts[2]);
+              // glLayer.remove(this.LastCircle_RaDec);
+              // glLayer.remove(this.LastCircle_AzAlt);
+              console.log('Solve Image Result(RA_Degree, DEC_Degree, Azimuth, Altitude):', parts[1], ',', parts[2], ',', parts[3], ',', parts[4]);
+              const result = this.SolveResultMark_RealTime(parts[1], parts[2], parts[3], parts[4]);
+              // this.LastCircle_RaDec = result.Circle_RaDec;
+              // this.LastCircle_AzAlt = result.Circle_AltAz;
+            }
+          }
+
+          if (data.message.startsWith('SolveImageFaild')) {
+            this.callShowMessageBox('Solve image faild...','error');
+          }
+
           
         }
         else if (data.type === 'QT_Confirm') {
@@ -694,21 +966,69 @@ export default {
       this.sendMessage('Vue_Command', 'getConnectedDevices');
       this.sendMessage('Vue_Command', 'getStagingImage');
       this.sendMessage('Vue_Command', 'getStagingScheduleData');
+      this.sendMessage('Vue_Command', 'getStagingSolveResult');
     },
 
     selectDevice(device) {
       if (device.isget === false) {
         // console.log('QHYCCD | Selected device:', device.type);
         // 将 isget 设置为 true
-        device.isget = true;
+        // device.isget = true;
         this.sendMessage('Vue_Command', 'SelectIndiDriver:' + device.type + ":" + device.ListNum);
+        this.drivers = [];
       }
 
-      this.driverType = device.driverType;
+      this.CurrentDriverType = device.driverType;
+      this.DeviceIsConnected = device.isConnected;
 
-      this.toggleStoreValue(device.dialogStateVar);
-      // console.log('QHYCCD | dialogStateVar:', device.dialogStateVar);
-      // console.log('QHYCCD | dialogState:', this.$store.state[device.dialogStateVar]);
+      // this.toggleStoreValue(device.dialogStateVar);
+
+      this.drawer_2 = true;
+
+      this.ToBeConnectDevice = [];
+      this.devicesList.forEach(devicesList => {
+        if (devicesList.type === this.CurrentDriverType) {
+          this.ToBeConnectDevice.push(devicesList);
+        }
+      });
+
+      // this.BeforeChangeConfigItems = this.CurrentConfigItems();
+    },
+
+    CurrentConfigItems() {
+      console.log('CurrentConfigItems: ',this.CurrentDriverType + 'ConfigItems');
+      switch (this.CurrentDriverType) {
+        case 'Guider':
+          return this.GuiderConfigItems;
+        case 'MainCamera':
+          return this.MainCameraConfigItems;
+        case 'Mount':
+          return this.MountConfigItems;
+        case 'Telescopes':
+          return this.TelescopesConfigItems;
+        case 'Focuser':
+          return this.FocuserConfigItems;
+        case 'PoleCamera':
+          return this.PoleCameraConfigItems;
+        case 'CFW':
+          return this.CFWConfigItems;
+        default:
+          return [];
+      }
+    },
+
+    confirmDriver() {
+      // 确定驱动的逻辑
+      console.log("QHYCCD | confirmDriver: ", this.selectedDriver);
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'ConfirmIndiDriver:' + this.selectedDriver);
+      this.confirmDriverType = this.CurrentDriverType;
+      this.loadingSelectDriver = true;
+    },
+    confirmDevice() {
+      // 确定设备的逻辑
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'ConfirmIndiDevice:' + this.selectedDevice);
+      // this.$bus.$emit('AppUpdateDevices', this.CurrentDriverType, this.selectedDevice);
+      this.updateDevices(this.CurrentDriverType, this.selectedDevice);
     },
 
     updateDevices(driverType, newDevice) {    // 手动选择
@@ -725,6 +1045,7 @@ export default {
           device.device = ' [ '+newDevice+' ] ';
         }
       });
+      this.loadingConnectAllDevice = false;
     },
 
     updateDevicesConnect(type, newDevice) {    // 连接成功
@@ -735,12 +1056,64 @@ export default {
         }
       });
       this.callShowMessageBox( newDevice + ' success connected','success');
+      this.loadingConnectAllDevice = false;
     },
 
     connectAllDevice()
     {
       console.log("QHYCCD | connectAllDevice.");
       this.sendMessage('Vue_Command', 'connectAllDevice');
+      this.loadingConnectAllDevice = true;
+    },
+
+    OpenIamgeFolder() {
+      this.$bus.$emit('ImageManagerPanelOpen');
+      this.nav = false;
+    },
+
+    CurrentExpTimeList(index, value) {
+      const expTimeIndex = this.MainCameraConfigItems.findIndex(item => item.label === 'ExpTime [' + (index + 1) + ']');
+      if (expTimeIndex !== -1) { // 确保找到了对应的配置项
+        // 更新 ExpTime1 配置项的值
+        this.MainCameraConfigItems[expTimeIndex].value = value;
+      } else {
+        console.error('ExpTime [' + index + '] configuration item not found.');
+      }
+    },
+
+    // confirmConfiguration(item) {
+    //   console.log(`QHYCCD | confirmConfiguration: ${item.value}`);
+    //   switch (item.driverType) {
+    //     case 'Guider':
+          
+    //     case 'MainCamera':
+    //       this.$bus.$emit(item.label, item.label + ':' + item.value);
+    //     case 'Mount':
+
+    //     case 'Telescope':
+
+    //     case 'Focuser':
+    //         this.$bus.$emit(item.label, item.value);  //RedBox Side Length (px)
+          
+    //     case 'PoleCamera':
+          
+    //     case 'CFW':
+    //       if (item.label.startsWith('CFW [')) {
+    //         this.$bus.$emit('CFWvalue', item.label+':'+item.value);
+    //       }
+    //       else {
+    //         this.$bus.$emit(item.label, item.label+':'+item.value);
+    //       }
+    //   }
+    // },
+
+    confirmConfiguration(List) {
+      List.forEach(item => {
+        if (item.value !== '') {
+          console.log(item.label, item.value);
+          this.$bus.$emit(item.label, item.label + ':' + item.value);
+        }
+      });
     },
 
     loadAndDisplayImage(imagePath) {
@@ -755,6 +1128,7 @@ export default {
           canvas.height = img.height;
           ctx.clearRect(0, 0, canvas.width, canvas.height);
           ctx.drawImage(img, 0, 0);
+          this.$bus.$emit('showSolveImage', img);
         };
 
         // 添加错误处理
@@ -778,6 +1152,26 @@ export default {
         // 处理 ImageGainB 信号
         this.ImageGainB = doubleValue;
         console.log('ImageGainB is set to:', doubleValue);
+      }
+    },
+
+    ImageOffsetSet(payload) {
+      const [signal, value] = payload.split(':'); // 拆分信号和值
+      const doubleValue = parseFloat(value); // 将值转换为 double 类型
+
+      this.ImageOffset = doubleValue;
+      console.log('ImageOffset is set to:', doubleValue);
+    },
+
+    ImageCFASet(payload) {
+      const [signal, value] = payload.split(':'); // 拆分信号和值
+
+      if (['GR', 'GB', 'BG', 'RGGB'].includes(value)) {
+        this.ImageCFA = value;
+        console.log('ImageCFA is set to:', value);
+      } else {
+        console.log(`Invalid value for ImageCFA: '${value}'. Please set it to one of 'GR', 'GB', 'BG', 'RGGB'.`);
+        this.callShowMessageBox(`Invalid value for ImageCFA: '${value}'. Please set it to one of 'GR', 'GB', 'BG', 'RGGB'.`,'error');
       }
     },
 
@@ -822,17 +1216,13 @@ export default {
 
       // 获取 ArrayBuffer 数据视图
       const dataView = new DataView(imgArray);
-      // console.log('ArrayBuffer byte length:', dataView.byteLength);
 
       // 将 ArrayBuffer 转换为 Uint16Array
       const uint16Array = new Uint16Array(dataView.buffer);
-      // console.log('转换后的16位数据长度', uint16Array.length);
 
       // 设置画布宽高常量
       const canvasWidth = parseInt(this.mainCameraSizeX);
       const canvasHeight = parseInt(this.mainCameraSizeY);
-      // const canvasWidth = 1920;
-      // const canvasHeight = 1080;
 
       // 获取原始画布和修改后的画布以及对应上下文
       const modifiedCanvas = document.getElementById('mainCamera-canvas');
@@ -844,20 +1234,26 @@ export default {
       modifiedCanvas.height = canvasHeight;
 
       // 用户自定义参数
-      let gainR = 1.0;
-      let gainB = 1.0;
-      let offset = 0;
+      // let gainR = 1.0;
+      let gainR = this.ImageGainR;
+      // let gainB = 1.0;
+      let gainB = this.ImageGainB;
+      // let offset = 0;
+      let offset = this.ImageOffset;
+      // let CFA = 'BG';
+      let CFA = this.ImageCFA;
       let mode = 1;
-      let CFA = 'BG';
-
+      
       // 参数
       let B = 0;
       let W = 65535;
-      // let CFA = 'RGGB';
       let cvmode = 0;
 
       let mat = new cv.Mat(canvasHeight, canvasWidth, cv.CV_16UC1);
       mat.data16U.set(uint16Array);
+
+      let colorData;
+      let img8 = new cv.Mat();
 
       if (CFA === 'GR') {
         cvmode = cv.COLOR_BayerGR2RGBA;
@@ -872,12 +1268,8 @@ export default {
       let dst = new cv.Mat();
       try {
         cv.cvtColor(mat, dst, cvmode);
-        // console.log('dst目标图像大小:', dst.cols, 'x', dst.rows);
-        // console.log('dst目标图像通道数:', dst.channels());
       } catch (error) {
         console.error('cvtColor 出错:', error);
-        // console.log('mat目标图像大小:', mat.cols, 'x', mat.rows);
-        // console.log('mat目标图像通道数:', mat.channels());
         return
       }
 
@@ -886,7 +1278,6 @@ export default {
       let resizeImg = new cv.Mat();
 
       // Resize the image
-      // console.log('Resize the image');
       cv.resize(dst, resizeImg, new cv.Size(4096, 2160), 0, 0, cv.INTER_LINEAR);
 
       dst.delete();
@@ -901,27 +1292,24 @@ export default {
         return;
       }
 
-      // 输出目标图像信息
-      // console.log('图像处理正常！', 'targetImg16目标图像大小:', targetImg16.cols, 'x', targetImg16.rows, 'targetImg16目标图像通道数:', targetImg16.channels());
+      resizeImg.delete();
 
       const { blackLevel, whiteLevel } = this.GetAutoStretch(uint16Array, mode);
       B = blackLevel;
       W = whiteLevel;
       // console.log('Stretch to:', B, ',', W);
       // 对目标图像进行位深度转换
-      let img8 = this.Bit16To8_Stretch(targetImg16, B, W);
+      img8 = this.Bit16To8_Stretch(targetImg16, B, W);
       if (img8.empty() || img8.rows === 0 || img8.cols === 0) {
         console.error('img8 为空或大小为0');
         return;
       }
-      // 输出转换后的图像信息
-      // console.log('img8图像大小:', img8.rows, 'x', img8.cols);
-      // console.log('img8通道数:', img8.channels());
+
+      targetImg16.delete();
 
       // 创建用于绘制的 ImageData 对象，并在修改后的画布上绘制图像
-      const colorData = new ImageData(new Uint8ClampedArray(img8.data), img8.cols, img8.rows);
+      colorData = new ImageData(new Uint8ClampedArray(img8.data), img8.cols, img8.rows);
 
-      // modifiedCtx.putImageData(colorData, 0, 0);
       this.OriginalImage = colorData;
       this.drawImgData = this.OriginalImage;
       this.drawImageData(this.drawImgData);
@@ -929,16 +1317,12 @@ export default {
       const endTime = new Date();
       const elapsedTime = endTime.getTime() - startTime.getTime();
       console.log('CaptureTestTime | Process image data end:', elapsedTime, 'milliseconds');
-      // console.log('修改后的彩图绘制完成！');
 
       this.$bus.$emit('showCaptureImage');
 
-      // console.log('QHYCCD | imageData:', colorData);
       this.MakeHistogram(colorData);
       this.histogramImage = colorData;
 
-      // 星点检测
-      // this.detectStarsImg = this.DrawDetectStars(img8, this.DetectedStarsList);
       // 检查 DetectedStarsFinish 变量
       const checkDetectedStarsFinish = () => {
         console.log('Wait for Detect Stars finish...');
@@ -952,12 +1336,6 @@ export default {
 
       // 设置一个定时器，每隔 100 毫秒检查一次 DetectedStarsFinish 变量
       const intervalId = setInterval(checkDetectedStarsFinish, 1000);
-
-      // 内存释放
-      // dst.delete();
-      // mat.delete();
-      targetImg16.delete();
-      resizeImg.delete();
     },
 
     initCanvas() {
@@ -1004,8 +1382,6 @@ export default {
       this.bufferCtx.drawImage(this.bufferCanvas, this.translateX, this.translateY, colorData.width * this.scale, adjustedHeight * this.scale);
       this.imageWidth = colorData.width * this.scale;
       this.imageHeight = adjustedHeight * this.scale;
-      // console.log('image size: ' + colorData.width * this.scale + ', ' + adjustedHeight * this.scale);
-      // console.log('image scale: ' + this.scale);
 
       // 恢复 buffer canvas 状态
       this.bufferCtx.restore();
@@ -1693,6 +2069,7 @@ export default {
       circle.pos = mm;
       console.log("circle pos:" + mm);
       circle.label = "";
+      circle.frame = 1;
       circle.size = [0.05, 0.05];
       circle.color = [0, 1, 0, 0.25];
       circle.border_color = [0, 1, 0, 1];
@@ -1716,17 +2093,417 @@ export default {
         glTestCircle.color = [0, 1, 0, 0.25];
         glTestCircle.border_color = [0, 1, 0, 1];
       }
-    }
+    },
+
+    setPolarPointAltitude(Altitude) {
+      this.PolarPoint_Altitude = Altitude;
+      console.log('Polar Point Altitude:', this.PolarPoint_Altitude);
+    },
+
+    AddMarkCircle: function (stel, layer, frame, label) {
+      var circle = stel.createObj('circle', { id: 'my circle  ', model_data: {} });
+
+      circle.update();
+      layer.add(circle);
+
+      // Select
+      stel.core.selection = circle;
+      stel.pointAndLock(circle);
+
+      // Circle Property
+      var mm = circle.pos;
+      this.vec3_from_sphe(2.52971 , 89.2641, mm);
+      circle.pos = mm;
+      circle.label = label;
+      circle.frame = frame;
+      circle.size = [0.04, 0.04];
+      circle.color = [1, 1, 1, 0.25];
+      circle.border_color = [1, 1, 1, 0.5];
+
+      return circle;
+    },
+
+    AddMarkRectangle: function (stel, layer, RaDec) {
+      var line = stel.createObj('geojson', {
+        data: {
+          "type": "FeatureCollection",
+          "features": [
+            {
+              "type": "Feature",
+              "properties": {
+                "stroke": "#FFFFFF",
+                "stroke-opacity": 1,
+                "fill": "#1E90FF",
+                "fill-opacity": 0.25
+              },
+              "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                  [
+                    // [139.76, 35.52], [139.32, 33.41], [140.92, 33.08], [141.35, 35.19], [139.76, 35.52]
+                    [parseFloat(RaDec[0].Ra), parseFloat(RaDec[0].Dec)], [parseFloat(RaDec[1].Ra), parseFloat(RaDec[1].Dec)],
+                    [parseFloat(RaDec[2].Ra), parseFloat(RaDec[2].Dec)], [parseFloat(RaDec[3].Ra), parseFloat(RaDec[3].Dec)],
+                    [parseFloat(RaDec[0].Ra), parseFloat(RaDec[0].Dec)]
+                  ]
+                ]
+              }
+            },
+          ]
+        }
+      });
+
+      line.update();
+      layer.add(line);
+
+      return line;
+    },
+
+    getCiecleAzAlt(Circle) {
+      var obs = this.$stel.core.observer;
+      var cirs = this.$stel.convertFrame(obs, 'ICRF', 'CIRS', Circle.getInfo('radec'));
+      var observed = this.$stel.convertFrame(obs, 'CIRS', 'OBSERVED', cirs);
+      // const azalt = this.$stel.c2s(this.$stel.convertFrame(this.$stel.core.observer, 'ICRF', 'OBSERVED', obj.getInfo('radec')))
+      var azalt = this.$stel.c2s(observed);
+      var az = this.$stel.anp(azalt[0]);
+      var alt = this.$stel.anp(azalt[1]);
+
+      const az_raf = this.$stel.a2af(az, 1);
+      const Az_degree = (az_raf.degrees < 0 ? az_raf.degrees + 180 : az_raf.degrees) + az_raf.arcminutes / 60 + az_raf.arcseconds / 3600;
+
+      const alt_raf = this.$stel.a2af(alt, 1);
+      const Alt_degree = alt_raf.degrees + alt_raf.arcminutes / 60 + alt_raf.arcseconds / 3600;
+
+      console.log('AzAlt:', Az_degree, Alt_degree);
+
+      return { Az_degree, Alt_degree };
+    },
+
+    SolveResultMark(RaDegree, DecDegree, Azimuth, Altitude) {
+      var MarkCircle_RaDec = this.AddMarkCircle(this.$stel, glLayer, 1, "RaDec");
+      var mm = MarkCircle_RaDec.pos;
+      this.vec3_from_sphe(RaDegree, DecDegree, mm);
+      MarkCircle_RaDec.pos = mm;
+      console.log("RaDec circle coordinates:" + mm);
+
+      const AzAlt = this.getCiecleAzAlt(MarkCircle_RaDec);
+
+      this.MarkCircleNum ++;
+      let Label = "AzAlt_Vue_" + this.MarkCircleNum;
+
+      var MarkCircle_AltAz = this.AddMarkCircle(this.$stel, glLayer, 4, Label);
+      var mm = MarkCircle_AltAz.pos;
+      this.vec3_from_sphe(AzAlt.Az_degree, AzAlt.Alt_degree, mm);
+      MarkCircle_AltAz.pos = mm;
+      console.log("AzAlt_Vue circle coordinates:" + mm);
+
+      console.log("AzAlt_Vue circle x:" + mm[0]);
+      console.log("AzAlt_Vue circle y:" + mm[1]);
+      console.log("AzAlt_Vue circle z:" + mm[2]);
+
+      this.LastPoint_AzAlt = this.getCiecleAzAlt(MarkCircle_AltAz);
+
+      this.CalculationPolarPoint(mm);
+
+      // 将创建的圆存储到数组中
+      this.Circles.push(MarkCircle_RaDec);
+      this.Circles.push(MarkCircle_AltAz);
+
+      // var MarkCircle_AltAz_Qt = this.AddMarkCircle(this.$stel, glLayer, 4, "AzAlt_Qt");
+      // var mm = MarkCircle_AltAz_Qt.pos;
+      // this.vec3_from_sphe(Azimuth, Altitude, mm);
+      // MarkCircle_AltAz_Qt.pos = mm;
+      // console.log("AzAlt_Qt circle coordinates:" + mm)
+
+      // return {
+      //   Circle_RaDec: MarkCircle_RaDec,
+      //   Circle_AltAz: MarkCircle_AltAz
+      // };
+    }, 
+
+    RemoveAllCircles() {
+      this.Circles.forEach(circle => {
+        glLayer.remove(circle);
+      });
+      this.Circles = [];
+    },
+
+    SolveResultMark_RealTime(RaDegree, DecDegree, Azimuth, Altitude) {
+      this.LastCircle_RaDec = this.AddMarkCircle(this.$stel, glLayer, 1, "RaDec");
+      var mm = this.LastCircle_RaDec.pos;
+      this.vec3_from_sphe(RaDegree, DecDegree, mm);
+      this.LastCircle_RaDec.pos = mm;
+      console.log("RaDec circle coordinates:" + mm);
+
+      const AzAlt = this.getCiecleAzAlt(this.LastCircle_RaDec);
+      glLayer.remove(this.LastCircle_RaDec);
+      
+      if (this.LastCircle_AzAlt !== null && this.LastCircle_AzAlt !== undefined) {
+        glLayer.remove(this.LastCircle_AzAlt);
+      }
+      this.LastCircle_AzAlt = this.AddMarkCircle(this.$stel, glLayer, 4, 'Current');
+      var mm = this.LastCircle_AzAlt.pos;
+      this.vec3_from_sphe(AzAlt.Az_degree, AzAlt.Alt_degree, mm);
+      this.LastCircle_AzAlt.pos = mm;
+      console.log("AzAlt_Vue circle coordinates:" + mm);
+
+      console.log("AzAlt_Vue circle x:" + mm[0]);
+      console.log("AzAlt_Vue circle y:" + mm[1]);
+      console.log("AzAlt_Vue circle z:" + mm[2]);
+
+      this.Current_AzAlt = this.getCiecleAzAlt(this.LastCircle_AzAlt);
+      console.log("Current AzAlt:", this.Current_AzAlt.Az_degree, this.Current_AzAlt.Alt_degree);
+      this.$bus.$emit('ShowCurrentAzAltText', this.Current_AzAlt.Az_degree, this.Current_AzAlt.Alt_degree);
+    }, 
+
+
+    CalculationPolarPoint(coordinate) {
+      this.CartesianList.push(coordinate);
+
+      if(this.CartesianList.length < 3) {
+        return;
+      }
+
+      this.$bus.$emit('HideSingleSolveBtn');
+
+      // 获取三个点的坐标
+      const p1 = this.CartesianList[0];
+      const p2 = this.CartesianList[1];
+      const p3 = this.CartesianList[2];
+
+      // 计算两个向量
+      const v1 = [
+        p2[0] - p1[0],
+        p2[1] - p1[1],
+        p2[2] - p1[2]
+      ];
+
+      const v2 = [
+        p3[0] - p1[0],
+        p3[1] - p1[1],
+        p3[2] - p1[2]
+      ];
+
+      // 计算法向量
+      const normal = [
+        v1[1] * v2[2] - v1[2] * v2[1],
+        v1[2] * v2[0] - v1[0] * v2[2],
+        v1[0] * v2[1] - v1[1] * v2[0]
+      ];
+
+      // 计算法向量的长度
+      const normalLength = Math.sqrt(normal[0] ** 2 + normal[1] ** 2 + normal[2] ** 2);
+
+      // 归一化法向量
+      const unitNormal = [
+        normal[0] / normalLength,
+        normal[1] / normalLength,
+        normal[2] / normalLength
+      ];
+
+      // 假设球的半径为r，圆心为(0, 0, 0)
+      const r = 1; // 根据你的实际情况调整
+
+      // 计算与球面的交点
+      const intersection1 = [
+        unitNormal[0] * r,
+        unitNormal[1] * r,
+        unitNormal[2] * r
+      ];
+
+      const intersection2 = [
+        -unitNormal[0] * r,
+        -unitNormal[1] * r,
+        -unitNormal[2] * r
+      ];
+
+      console.log('Intersection Points:', intersection1, intersection2);
+
+      // 选择离(0,0,1)更近的交点
+      const closerIntersection = intersection1[2] > 0 ? intersection1 : intersection2;
+
+      var MarkCircle_FakePolarPoint = this.AddMarkCircle(this.$stel, glLayer, 4, "FakePolarPoint");
+      var mm = MarkCircle_FakePolarPoint.pos;
+      mm[0] = closerIntersection[0];
+      mm[1] = closerIntersection[1];
+      mm[2] = closerIntersection[2];
+      MarkCircle_FakePolarPoint.pos = mm;
+      console.log("FakePolarPoint circle coordinates:" + mm);
+
+      const AzAlt_FakePolarPoint = this.getCiecleAzAlt(MarkCircle_FakePolarPoint);
+
+      console.log("Fake Polar Point AzAlt:", AzAlt_FakePolarPoint.Az_degree, ',', AzAlt_FakePolarPoint.Alt_degree);
+
+      this.Circles.push(MarkCircle_FakePolarPoint);
+
+      let AzAlt_PolarPoint = {
+        Az_degree: 0,
+        Alt_degree: this.PolarPoint_Altitude
+      };
+
+      console.log("Real Polar Point AzAlt:", AzAlt_PolarPoint.Az_degree, ',', AzAlt_PolarPoint.Alt_degree);
+
+      console.log("Last Point AzAlt:", this.LastPoint_AzAlt.Az_degree, this.LastPoint_AzAlt.Alt_degree);
+
+      ////////////////////////////////////////////////
+
+      // // 将球坐标转换为笛卡尔坐标
+      // let fakePolarPoint = this.sphericalToCartesian(AzAlt_FakePolarPoint.Az_degree, AzAlt_FakePolarPoint.Alt_degree);
+      // let polarPoint = this.sphericalToCartesian(AzAlt_PolarPoint.Az_degree, AzAlt_PolarPoint.Alt_degree);
+      // let lastPoint = this.sphericalToCartesian(this.LastPoint_AzAlt.Az_degree, this.LastPoint_AzAlt.Alt_degree);
+
+      // // 计算旋转四元数
+      // let quaternion = this.computeQuaternion(fakePolarPoint, polarPoint);
+
+      // // 应用旋转
+      // let fourthPoint = this.applyQuaternion(lastPoint, quaternion);
+
+      // // 将结果转换回球坐标
+      // let fourthPointAzAlt = this.cartesianToSpherical(fourthPoint);
+      // console.log("Fourth Point AzAlt:", fourthPointAzAlt.Az_degree, ',', fourthPointAzAlt.Alt_degree);
+
+      ////////////////////////////////////////////////
+
+      // 计算角度差值，考虑角度的循环性质
+      function calculateAngleDifference(angle1, angle2) {
+        let difference = angle2 - angle1;
+        while (difference > 180) difference -= 360;
+        while (difference < -180) difference += 360;
+        return difference;
+      }
+
+      let azimuthDifference = calculateAngleDifference(AzAlt_FakePolarPoint.Az_degree, AzAlt_PolarPoint.Az_degree);
+      let altitudeDifference = AzAlt_PolarPoint.Alt_degree - AzAlt_FakePolarPoint.Alt_degree;
+
+      // 应用差值到LastPoint
+      let fourthPointAzAlt = {
+        Az_degree: this.LastPoint_AzAlt.Az_degree + azimuthDifference,
+        Alt_degree: this.LastPoint_AzAlt.Alt_degree + altitudeDifference
+      };
+
+      // 确保方位角在0到360度之间
+      fourthPointAzAlt.Az_degree = (fourthPointAzAlt.Az_degree + 360) % 360;
+
+      // 确保高度角在-90到90度之间
+      fourthPointAzAlt.Alt_degree = Math.max(Math.min(fourthPointAzAlt.Alt_degree, 90), -90);
+
+      console.log("Fourth Point AzAlt:", fourthPointAzAlt.Az_degree, ',', fourthPointAzAlt.Alt_degree);
+
+      this.$bus.$emit('ShowAzAltText', azimuthDifference, altitudeDifference, fourthPointAzAlt.Az_degree, fourthPointAzAlt.Alt_degree);
+
+      ////////////////////////////////////////////////
+
+      // 将角度转换为弧度
+      function degreesToRadians(degrees) {
+        return degrees * Math.PI / 180;
+      }
+
+      // 将球坐标转换为笛卡尔坐标
+      function sphericalToCartesian(azimuth, altitude) {
+        let az = degreesToRadians(azimuth);
+        let alt = degreesToRadians(altitude);
+        let x = Math.cos(alt) * Math.cos(az);
+        let y = Math.cos(alt) * Math.sin(az);
+        let z = Math.sin(alt);
+        return { x: x, y: y, z: z };
+      }
+
+      // 将第四个点转换为笛卡尔坐标
+      let fourthPointCartesian = sphericalToCartesian(fourthPointAzAlt.Az_degree, fourthPointAzAlt.Alt_degree);
+      console.log("Fourth Point Cartesian:", fourthPointCartesian.x, ',', fourthPointCartesian.y, ',', fourthPointCartesian.z);
+
+      var MarkCircle_fourthPoint = this.AddMarkCircle(this.$stel, glLayer, 4, "fourthPoint");
+      var mm = MarkCircle_fourthPoint.pos;
+      mm[0] = fourthPointCartesian.x;
+      mm[1] = fourthPointCartesian.y;
+      mm[2] = fourthPointCartesian.z;
+      MarkCircle_fourthPoint.pos = mm;
+
+      this.Circles.push(MarkCircle_fourthPoint);
+      
+      // 清空列表，准备下次计算
+      this.CartesianList = [];
+      this.MarkCircleNum = 0;
+    },
+
+    // 将角度转换为弧度
+    degreesToRadians(degrees) {
+      return degrees * Math.PI / 180;
+    },
+
+    // 将球坐标转换为笛卡尔坐标
+    sphericalToCartesian(azimuth, altitude) {
+      let az = this.degreesToRadians(azimuth);
+      let alt = this.degreesToRadians(altitude);
+      let x = Math.cos(alt) * Math.cos(az);
+      let y = Math.cos(alt) * Math.sin(az);
+      let z = Math.sin(alt);
+      return { x: x, y: y, z: z };
+    },
+
+    // 计算旋转四元数
+    computeQuaternion(from, to) {
+      let w = from.x * to.x + from.y * to.y + from.z * to.z + 1;
+      let x = from.y * to.z - from.z * to.y;
+      let y = from.z * to.x - from.x * to.z;
+      let z = from.x * to.y - from.y * to.x;
+
+      let norm = Math.sqrt(w * w + x * x + y * y + z * z);
+      return { w: w / norm, x: x / norm, y: y / norm, z: z / norm };
+    },
+
+    // 应用四元数旋转
+    applyQuaternion(point, quat) {
+      let x = quat.w * quat.w * point.x + 2 * quat.y * quat.w * point.z - 2 * quat.z * quat.w * point.y + quat.x * quat.x * point.x + 2 * quat.y * quat.x * point.y + 2 * quat.z * quat.x * point.z - quat.z * quat.z * point.x - quat.y * quat.y * point.x;
+      let y = 2 * quat.x * quat.y * point.x + quat.y * quat.y * point.y + 2 * quat.z * quat.y * point.z + 2 * quat.w * quat.z * point.x - quat.z * quat.z * point.y + quat.w * quat.w * point.y - 2 * quat.x * quat.w * point.z - quat.x * quat.x * point.y;
+      let z = 2 * quat.x * quat.z * point.x + 2 * quat.y * quat.z * point.y + quat.z * quat.z * point.z - 2 * quat.w * quat.y * point.x - quat.y * quat.y * point.z + 2 * quat.w * quat.x * point.y - quat.x * quat.x * point.z + quat.w * quat.w * point.z;
+      return { x: x, y: y, z: z };
+    },
+
+    // 将笛卡尔坐标转换回球坐标
+    cartesianToSpherical(cartesian) {
+      let r = Math.sqrt(cartesian.x ** 2 + cartesian.y ** 2 + cartesian.z ** 2);
+      let azimuth = Math.atan2(cartesian.y, cartesian.x);
+      let altitude = Math.asin(cartesian.z / r);
+      return {
+        Az_degree: azimuth * 180 / Math.PI,
+        Alt_degree: altitude * 180 / Math.PI
+      };
+    },
+
+    SolveFovMark(RaDec) {
+      console.log('RaDec[4]:', RaDec);
+
+      var rectangle = this.AddMarkRectangle(this.$stel, glLayer, RaDec);
+
+      this.Circles.push(rectangle);
+
+    },
+
+    CalibratePolarAxis() {
+      this.$bus.$emit('CalibratePolarAxisMode');
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'StartLoopCapture');
+      this.nav = false;
+    },
+
+    RecalibratePolarAxis() {
+      // 清空列表，准备下次计算
+      this.CartesianList = [];
+      this.MarkCircleNum = 0;
+      this.RemoveAllCircles();
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'ClearSloveResultList');
+    },
 
    
   },
   computed: {
     nav: {
       get: function () {
+        console.log('nav:', this.$store.state.showNavigationDrawer);
         return this.$store.state.showNavigationDrawer
       },
       set: function (v) {
         if (this.$store.state.showNavigationDrawer !== v) {
+          console.log('nav:', this.$store.state.showNavigationDrawer);
           this.$store.commit('toggleBool', 'showNavigationDrawer')
         }
       }
@@ -1949,6 +2726,18 @@ html, body, #app {
 
 .connected-device {
   color: #4dc251;
+}
+
+.btn-confirm {
+  width: 60px; 
+  height: 30px;
+  background-color: rgba(255, 255, 255, 0.1); 
+  border-radius: 10px;
+}
+
+.btn-confirm:active {
+  /* transform: scale(0.95); 点击时缩小按钮 */
+  background-color: rgba(255, 255, 255, 0.5);
 }
 
 

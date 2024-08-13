@@ -1,0 +1,7 @@
+{
+    "files.associations": {
+        "forward_list": "c",
+        "ostream": "c",
+        "swe.h": "c"
+    }
+}

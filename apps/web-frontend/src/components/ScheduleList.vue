@@ -185,6 +185,7 @@ export default {
     },
     handleScrollA() {
       this.$bus.$emit('scrollEventA', this.$refs.listA.scrollTop);
+      // console.log('ScrollTop: ', this.$refs.listA.scrollTop);
     },
   },
 };

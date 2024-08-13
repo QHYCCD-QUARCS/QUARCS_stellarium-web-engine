@@ -108,12 +108,15 @@ export default {
   methods: {
     toggleNavigationDrawer: function () {
       this.$store.commit('toggleBool', 'showNavigationDrawer')
-      this.isDrawerShow = !this.isDrawerShow
-      if(this.isDrawerShow) {
-        this.isTargetSearchShow = false;
-      } else {
-        this.isTargetSearchShow = true;
-      }
+      // this.isDrawerShow = !this.isDrawerShow
+
+      // if(this.isDrawerShow) {
+      //   this.isTargetSearchShow = false;
+      // } else {
+      //   this.isTargetSearchShow = true;
+      // }
+
+      // this.$bus.$emit('ShowNavigationDrawer');
     },
 
     getLocalTime: function () {

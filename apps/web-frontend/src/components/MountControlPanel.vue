@@ -51,7 +51,7 @@
 
       <button class="custom-button btn-slove no-select" @click="SolveSYNC">
         <div style="display: flex; justify-content: center; align-items: center;">
-          <img src="@/assets/images/svg/ui/Solve.svg" height="20px" style="min-height: 20px"></img>
+          <img src="@/assets/images/svg/ui/Solve.svg" height="25px" style="min-height: 25px"></img>
         </div>
       </button>
     </div>
