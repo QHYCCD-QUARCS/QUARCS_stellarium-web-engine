@@ -25,6 +25,7 @@ export default {
   },
   mounted() {
     this.initChart();
+    this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getStagingGuiderData');
   },
   created() {
     this.$bus.$on('AddLineChartData', this.addData);

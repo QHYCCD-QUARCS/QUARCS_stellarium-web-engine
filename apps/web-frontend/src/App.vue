@@ -9,14 +9,14 @@
 <template>
 
 <v-app>
-  <v-navigation-drawer v-model="drawer_2" ref="Drawer_2" app absolute temporary width="200" style="left: 170px; backdrop-filter: blur(5px); background-color: rgba(0, 0, 0, 0.1);">
+  <v-navigation-drawer v-model="drawer_2" ref="Drawer_2" app absolute temporary :width="DeviceIsConnected ? 200 : 200" style="left: 170px; backdrop-filter: blur(5px); background-color: rgba(0, 0, 0, 0.1);">
     
     <span style="position: absolute; top: 0px; left: 50%; transform: translateX(-50%); font-size: 30px; color: rgba(255, 255, 255, 0.5); user-select: none;">
       {{ CurrentDriverType }}
       <v-divider></v-divider>
     </span>
 
-    <div style="position: absolute; top: 50px; left: 50%; width: 200px; transform: translateX(-50%); max-height: calc(100% - 95px); overflow-y: auto;">
+    <div :style="{ width: DeviceIsConnected ? '200px' : '200px' }" style="position: absolute; top: 50px; max-height: calc(100% - 95px); overflow-y: auto;">
 
       <div v-show="!DeviceIsConnected" style="text-align: center;">
         <span style="display: inline-block; font-size: 15px; color: rgba(255, 255, 255, 0.5); user-select: none;">
@@ -44,12 +44,32 @@
 
       <!-- <v-divider style="margin-top: 20px;"></v-divider> -->
 
-      <div v-show="DeviceIsConnected" v-for="(item, index) in CurrentConfigItems()" :key="index" style="text-align: center;">
+      <div v-show="DeviceIsConnected" v-for="(item, index) in CurrentConfigItems()" :key="index" style="text-align: center; width: 200px;">
         <span v-if="index === 0" style="display: inline-block; font-size: 15px; color: rgba(255, 255, 255, 0.5); user-select: none;">
           {{ 'Device Config Items' }}
         </span>
-        <v-text-field v-model="item.value" :label="item.label" style="width: 150px; display: inline-block;"></v-text-field>
+        <v-card-text>
+          <v-text-field v-if="item.inputType === 'text'" v-model="item.value" :label="item.label" style="width: 150px; display: inline-block;"></v-text-field>
 
+          <div v-if="item.inputType === 'slider'" style="text-align: left; height: 30px; width: 150px; display: inline-block; margin-bottom: 20px;">
+            <span style="display: inline-block; font-size: 15px; color: rgba(255, 255, 255, 0.5); user-select: none;">{{ item.label }}: {{ item.value }}</span>
+            <div>
+              <button @click="decrement(item)" class="get-click btn-slider" style="position: absolute; left: 25px; transform: translateY(5px); user-select: none; font-size: 5px;">
+                <div style="display: flex; justify-content: center; align-items: center;">
+                  <img src="@/assets/images/svg/ui/Minus.svg" height="10px" style="min-height: 10px"></img>
+                </div>
+              </button>
+              <v-slider v-model="item.value" :step="item.inputStep" :max="item.inputMax" :min="item.inputMin" color="white" class="align-center" style="position: absolute; left: 45px; width: calc(100% - 90px);"></v-slider>
+              <button @click="increment(item)" class="get-click btn-slider" style="position: absolute; right: 25px; transform: translateY(5px); user-select: none; font-size: 5px;">
+                <div style="display: flex; justify-content: center; align-items: center;">
+                  <img src="@/assets/images/svg/ui/Plus.svg" height="10px" style="min-height: 10px"></img>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          <v-select v-if="item.inputType === 'select'" v-model="item.value" :label="item.label" :items="item.selectValue" style="width: 150px; display: inline-block;"></v-select>
+        </v-card-text>
       </div>
 
     </div>
@@ -102,6 +122,17 @@
               color="white"
               height="5"
             ></v-progress-linear>
+          </v-list-item-content>
+        </v-list-item>
+
+        <v-list-item @click.stop="disconnectAllDevice(false)" :style="{ height: '36px' }">
+          <v-list-item-icon style="margin-right: 10px;">
+            <div style="display: flex; justify-content: center; align-items: center;">
+              <img src="@/assets/images/svg/ui/DisConnect.svg" height="30px" style="min-height: 30px"></img>
+            </div>
+          </v-list-item-icon>
+          <v-list-item-content>
+            <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ '断开所有设备' }}</v-list-item-title>
           </v-list-item-content>
         </v-list-item>
 
@@ -176,11 +207,16 @@
           </v-list-item-content>
         </v-list-item>
 
-        <v-list-item @click.stop="drawer_2 = !drawer_2;" :style="{ height: '36px' }">
+        <v-list-item @click.stop="ShowConfirmDialog('Confirm', 'Are you sure you need to refresh?', 'Refresh')" :style="{ height: '36px' }">
+          <v-list-item-icon style="margin-right: 10px;">
+            <div style="display: flex; justify-content: center; align-items: center;">
+              <img :src="require(`@/assets/images/svg/ui/Refresh.svg`)" height="30px" style="min-height: 30px"></img>
+            </div>
+          </v-list-item-icon>
           <v-list-item-content>
             <v-list-item-title>
               <span>
-                <div :style="{ fontSize: '10px' }">{{ 'Test' }}</div>
+                <div :style="{ fontSize: '10px' }">{{ 'Refresh Page' }}</div>
               </span>
             </v-list-item-title>
           </v-list-item-content>
@@ -281,42 +317,48 @@ export default {
       DeviceIsConnected: null,
       confirmDriverType: '',
 
+      MainCameraOffsetMin: 0,
+      MainCameraOffsetMax: 0,
+
+      MainCameraGainMin: 0,
+      MainCameraGainMax: 0,
+
       devices: [
-        { name: '导星镜', driverType: 'Guider', type: 'CCDs', ListNum: "1", isget: false, device: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_Guider'},
-        { name: '主相机', driverType: 'MainCamera', type: 'CCDs', ListNum: "20", isget: false, device: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_MainCamera'},
-        { name: '赤道仪', driverType: 'Mount', type: 'Telescopes', ListNum: "0", isget: false, device: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_Mount'},
+        { name: '导星镜', driverType: 'Guider', type: 'CCDs', ListNum: "1", isget: false, device: '', driverName: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_Guider'},
+        { name: '主相机', driverType: 'MainCamera', type: 'CCDs', ListNum: "20", isget: false, device: '', driverName: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_MainCamera'},
+        { name: '赤道仪', driverType: 'Mount', type: 'Telescopes', ListNum: "0", isget: false, device: '', driverName: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_Mount'},
         { name: '望远镜', driverType: 'Telescopes', device: '', isConnected: true},
-        { name: '电动调焦器', driverType: 'Focuser', type: 'Focusers', ListNum: "22", isget: false, device: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_Focuser'},
-        { name: '电子极轴镜', driverType: 'PoleCamera', type: 'CCDs', ListNum: "2", isget: false, device: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_PoleCamera'},
-        { name: '滤镜轮', driverType: 'CFW', type: 'Filter Wheels', ListNum: "21", isget: false, device: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_CFW'},
+        { name: '电动调焦器', driverType: 'Focuser', type: 'Focusers', ListNum: "22", isget: false, device: '', driverName: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_Focuser'},
+        { name: '电子极轴镜', driverType: 'PoleCamera', type: 'CCDs', ListNum: "2", isget: false, device: '', driverName: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_PoleCamera'},
+        { name: '滤镜轮', driverType: 'CFW', type: 'Filter Wheels', ListNum: "21", isget: false, device: '', driverName: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_CFW'},
       ],
 
       // Changing the label name also requires changing the emit signal name
       GuiderConfigItems: [
-        { driverType: 'Guider', num: 1, label: 'Chip Width (mm)' , value: '' },
-        { driverType: 'Guider', num: 2, label: 'Chip Height (mm)' , value: '' },
-        { driverType: 'Guider', num: 3, label: 'Focal Length (mm)' , value: '' },
-        { driverType: 'Guider', num: 4, label: '配置项4' , value: '' },
+
       ],
 
       MainCameraConfigItems: [
-        { driverType: 'MainCamera', num: 1, label: 'Chip Width (mm)', value: '' },
-        { driverType: 'MainCamera', num: 2, label: 'Chip Height (mm)', value: '' },
-        { driverType: 'MainCamera', num: 3, label: 'Focal Length (mm)', value: '' },
-        { driverType: 'MainCamera', num: 4, label: 'ImageGainR', value: '' },
-        { driverType: 'MainCamera', num: 5, label: 'ImageGainB', value: '' },
-        { driverType: 'MainCamera', num: 6, label: 'Offset', value: '' },
-        { driverType: 'MainCamera', num: 7, label: 'ImageCFA', value: '', inputType: 'select'},
-        { driverType: 'MainCamera', num: 1, label: 'RedBox Side Length (px)', value: '' },
-        { driverType: 'MainCamera', num: 7, label: 'ExpTime [1]', value: '' },
-        { driverType: 'MainCamera', num: 8, label: 'ExpTime [2]', value: '' },
-        { driverType: 'MainCamera', num: 9, label: 'ExpTime [3]', value: '' },
-        { driverType: 'MainCamera', num: 10, label: 'ExpTime [4]', value: '' },
-        { driverType: 'MainCamera', num: 11, label: 'ExpTime [5]', value: '' },
-        { driverType: 'MainCamera', num: 12, label: 'ExpTime [6]', value: '' },
-        { driverType: 'MainCamera', num: 13, label: 'ExpTime [7]', value: '' },
-        { driverType: 'MainCamera', num: 14, label: 'ExpTime [8]', value: '' },
-        { driverType: 'MainCamera', num: 15, label: 'ExpTime [9]', value: '' },
+        // { driverType: 'MainCamera', num: 1, label: 'Chip Width (mm)', value: '' },
+        // { driverType: 'MainCamera', num: 2, label: 'Chip Height (mm)', value: '' },
+        // { driverType: 'MainCamera', num: 3, label: 'Focal Length (mm)', value: '' },
+        { driverType: 'MainCamera', label: 'ImageGainR', value: '', inputType: 'slider', inputMin: 0, inputMax: 255, inputStep: 0.1},
+        { driverType: 'MainCamera', label: 'ImageGainB', value: '', inputType: 'slider', inputMin: 0, inputMax: 255, inputStep: 0.1},
+        { driverType: 'MainCamera', label: 'ImageCFA', value: '', inputType: 'select', selectValue: ['GR', 'GB', 'BG', 'RGGB']},
+        { driverType: 'MainCamera', label: 'ImageOffset', value: '', inputType: 'slider', inputMin: 0, inputMax: 255, inputStep: 0.1},
+
+        { driverType: 'MainCamera', label: 'Gain', value: '', inputType: 'slider', inputMin: 0, inputMax: 0, inputStep: 1},
+        { driverType: 'MainCamera', label: 'Offset', value: '', inputType: 'slider', inputMin: 0, inputMax: 0, inputStep: 1},
+        { driverType: 'MainCamera', label: 'RedBox Side Length (px)', value: '', inputType: 'text'},
+        { driverType: 'MainCamera', label: 'ExpTime [1]', value: '', inputType: 'text' },
+        { driverType: 'MainCamera', label: 'ExpTime [2]', value: '', inputType: 'text' },
+        { driverType: 'MainCamera', label: 'ExpTime [3]', value: '', inputType: 'text' },
+        { driverType: 'MainCamera', label: 'ExpTime [4]', value: '', inputType: 'text' },
+        { driverType: 'MainCamera', label: 'ExpTime [5]', value: '', inputType: 'text' },
+        { driverType: 'MainCamera', label: 'ExpTime [6]', value: '', inputType: 'text' },
+        { driverType: 'MainCamera', label: 'ExpTime [7]', value: '', inputType: 'text' },
+        { driverType: 'MainCamera', label: 'ExpTime [8]', value: '', inputType: 'text' },
+        { driverType: 'MainCamera', label: 'ExpTime [9]', value: '', inputType: 'text' },
         // 在这里添加更多的配置项
       ],
 
@@ -325,12 +367,12 @@ export default {
       ],
 
       TelescopesConfigItems: [
-        { driverType: 'Telescopes', num: 1, label: 'Focal Length (mm)', value: '' },
+        { driverType: 'Telescopes', num: 1, label: 'Focal Length (mm)', value: '', inputType: 'text'},
       ],
 
       FocuserConfigItems: [
-        { driverType: 'Focuser', num: 1, label: 'RedBox Side Length (px)', value: '' },
-        { driverType: 'Focuser', num: 2, label: 'Min Step', value: '' },
+        { driverType: 'Focuser', num: 1, label: 'RedBox Side Length (px)', value: '', inputType: 'text'},
+        { driverType: 'Focuser', num: 2, label: 'Min Step', value: '', inputType: 'text' },
         
       ],
 
@@ -339,15 +381,7 @@ export default {
       ],
 
       CFWConfigItems: [
-        { driverType: 'CFW', num: 1, label: 'CFW [1]', value: '' },
-        { driverType: 'CFW', num: 2, label: 'CFW [2]', value: '' },
-        { driverType: 'CFW', num: 3, label: 'CFW [3]', value: '' },
-        { driverType: 'CFW', num: 4, label: 'CFW [4]', value: '' },
-        { driverType: 'CFW', num: 5, label: 'CFW [5]', value: '' },
-        { driverType: 'CFW', num: 6, label: 'CFW [6]', value: '' },
-        { driverType: 'CFW', num: 7, label: 'CFW [7]', value: '' },
-        { driverType: 'CFW', num: 8, label: 'CFW [8]', value: '' },
-        { driverType: 'CFW', num: 9, label: 'CFW [9]', value: '' },
+
       ],
 
       BeforeChangeConfigItems: [],
@@ -355,7 +389,6 @@ export default {
       
 
       imageData: null,
-      histogramData: null,
 
       histogramImage: null,
       histogram_min: 0,
@@ -415,6 +448,12 @@ export default {
       loadingSelectDriver: false,
       loadingConnectAllDevice: false,
 
+      CurrentLocationLng: 0,
+      CurrentLocationLat: 0,
+
+      histogramData: [],
+
+      ImageArrayBuffer: null,
 
     }
   },
@@ -430,7 +469,8 @@ export default {
     this.$bus.$on('HandleHistogramNum', this.applyHistStretch);
     this.$bus.$on('ImageGainR', this.ImageGainSet);
     this.$bus.$on('ImageGainB', this.ImageGainSet);
-    this.$bus.$on('Offset', this.ImageOffsetSet);
+    this.$bus.$on('Offset', this.CameraOffsetSet);
+    this.$bus.$on('ImageOffset', this.ImageOffsetSet);
     this.$bus.$on('ImageCFA', this.ImageCFASet);
     this.$bus.$on('ImageProportion', this.setImageProportion);
     this.$bus.$on('MountGoto',this.lookatcircle);
@@ -439,6 +479,10 @@ export default {
     this.$bus.$on('showStelCanvas', this.showStelCanvas);
     this.$bus.$on('RecalibratePolarAxis', this.RecalibratePolarAxis);
     this.$bus.$on('CurrentExpTimeList', this.CurrentExpTimeList);
+    this.$bus.$on('disconnectAllDevice', this.disconnectAllDevice);
+    this.$bus.$on('GetConnectedDevices', this.ReturnConnectedDevices);
+    this.$bus.$on('CurrentCFWList', this.CurrentCFWList);
+    this.$bus.$on('calcWhiteBalanceGains', this.calcWhiteBalanceGains);
   },
   methods: {
     getLocationHostName() {
@@ -603,7 +647,7 @@ export default {
               const Data_Dec = parts[3];
               const newDataPoint_Ra = [Data_x, Data_Ra];
               const newDataPoint_Dec = [Data_x, Data_Dec];
-              console.log('QHYCCD | Add line chart Data:', newDataPoint_Ra, ',', newDataPoint_Dec);
+              // console.log('QHYCCD | Add line chart Data:', newDataPoint_Ra, ',', newDataPoint_Dec);
               this.$bus.$emit('AddLineChartData', newDataPoint_Ra, newDataPoint_Dec);
             }
           }
@@ -614,6 +658,14 @@ export default {
               const min = parts[1];
               const max = parts[2];
               this.$bus.$emit('SetLineChartRange', min, max);
+            }
+          }
+
+          if (data.message.startsWith('GuiderStatus:')) {
+            const parts = data.message.split(':');
+            if (parts.length === 2) {
+              const status = parts[1];
+              this.$bus.$emit('GuiderStatus', status);
             }
           }
 
@@ -740,6 +792,12 @@ export default {
             const parts = data.message.split(':');
             if (parts.length === 2) {
               this.$bus.$emit('SetCFWPositionMax', parts[1]);
+
+              for(let i = 1; i <= parts[1]; i++) {
+                this.CFWConfigItems.push({ driverType: 'CFW', label: `CFW [${i}]`, value: '', inputType: 'text' });
+              }
+
+              this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getCFWList');
             }
           }
 
@@ -757,10 +815,10 @@ export default {
             }
           }
 
-          if (data.message.startsWith('GuiderStatus:')) {
+          if (data.message.startsWith('GuiderSwitchStatus:')) {
             const parts = data.message.split(':');
             if (parts.length === 2) {
-              this.$bus.$emit('GuiderStatus', parts[1]);
+              this.$bus.$emit('GuiderSwitchStatus', parts[1]);
             }
           }
 
@@ -774,8 +832,14 @@ export default {
           if (data.message.startsWith('TelescopeStatus:')) {
             const parts = data.message.split(':');
             if (parts.length === 2) {
-              // console.log('TelescopeStatus:', parts[1]);
               this.UpdateTelescopeStatus(parts[1]);
+            }
+          }
+
+          if (data.message.startsWith('MainCameraStatus:')) {
+            const parts = data.message.split(':');
+            if (parts.length === 2) {
+              this.UpdateMainCameraStatus(parts[1]);
             }
           }
 
@@ -867,6 +931,47 @@ export default {
 
           if (data.message.startsWith('SolveImageFaild')) {
             this.callShowMessageBox('Solve image faild...','error');
+          }
+
+          if (data.message.startsWith('SetCurrentLocation')) {
+            const parts = data.message.split(':');
+            if (parts.length === 3) {
+              this.$bus.$emit('SetCurrentLocation',parts[1], parts[2]);
+              this.CurrentLocationLat = parts[1];
+              this.CurrentLocationLng = parts[2];
+            }
+          }
+
+          if (data.message.startsWith('MainCameraOffsetRange:')) {
+            const parts = data.message.split(':');
+            if (parts.length === 3) {
+              console.log('MainCameraOffsetRange:', parts[1], ',', parts[2]);
+              this.MainCameraOffsetMin = parts[1];
+              this.MainCameraOffsetMax = parts[2];
+
+              const OffsetItem = this.MainCameraConfigItems.find(item => item.label === 'Offset');
+              if (OffsetItem) {
+                console.log('MainCameraOffsetRange:', parseInt(this.MainCameraOffsetMin, 10), ',', parseInt(this.MainCameraOffsetMax, 10));
+                OffsetItem.inputMin = parseInt(this.MainCameraOffsetMin, 10);
+                OffsetItem.inputMax = parseInt(this.MainCameraOffsetMax, 10);
+              }
+            }
+          }
+
+          if (data.message.startsWith('MainCameraGainRange:')) {
+            const parts = data.message.split(':');
+            if (parts.length === 3) {
+              console.log('MainCameraGainRange:', parts[1], ',', parts[2]);
+              this.MainCameraGainMin = parts[1];
+              this.MainCameraGainMax = parts[2];
+
+              const gainItem = this.MainCameraConfigItems.find(item => item.label === 'Gain');
+              if (gainItem) {
+                console.log('MainCameraGainRange:', parseInt(this.MainCameraGainMin, 10), ',', parseInt(this.MainCameraGainMax, 10));
+                gainItem.inputMin = parseInt(this.MainCameraGainMin, 10);
+                gainItem.inputMax = parseInt(this.MainCameraGainMax, 10);
+              }
+            }
           }
 
           
@@ -1023,10 +1128,16 @@ export default {
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'ConfirmIndiDriver:' + this.selectedDriver);
       this.confirmDriverType = this.CurrentDriverType;
       this.loadingSelectDriver = true;
+
+      this.devices.forEach(device => {
+        if (device.driverType === this.CurrentDriverType) {
+          device.driverName = this.selectedDriver;
+        }
+      });
     },
     confirmDevice() {
       // 确定设备的逻辑
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'ConfirmIndiDevice:' + this.selectedDevice);
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'ConfirmIndiDevice:' + this.selectedDevice + ':' + this.selectedDriver);
       // this.$bus.$emit('AppUpdateDevices', this.CurrentDriverType, this.selectedDevice);
       this.updateDevices(this.CurrentDriverType, this.selectedDevice);
     },
@@ -1057,6 +1168,14 @@ export default {
       });
       this.callShowMessageBox( newDevice + ' success connected','success');
       this.loadingConnectAllDevice = false;
+
+      if (type === 'MainCamera') {
+        this.$bus.$emit('MainCameraConnected', 1);
+        console.log('MainCamera is Connected.');
+      } else if (type === 'Mount') {
+        this.$bus.$emit('MountConnected', 1);
+        console.log('Mount is Connected.');
+      }
     },
 
     connectAllDevice()
@@ -1064,6 +1183,45 @@ export default {
       console.log("QHYCCD | connectAllDevice.");
       this.sendMessage('Vue_Command', 'connectAllDevice');
       this.loadingConnectAllDevice = true;
+    },
+
+    disconnectAllDevice(confirm) {
+      // 检查是否有设备的 isConnected 属性为 true
+      const hasConnectedDevices = this.devices.some(device => device.isConnected);
+
+      if (hasConnectedDevices) { 
+        if(confirm === false) {
+          this.ShowConfirmDialog('Confirm', 'Are you sure you want to disconnect all devices?', 'disconnectAllDevice');
+        } else {
+          this.sendMessage('Vue_Command', 'disconnectAllDevice');
+          this.devices.forEach(device => {
+            device.isConnected = false;
+            // device.device = '';
+          });
+
+          this.$bus.$emit('MainCameraConnected', 0);
+          this.$bus.$emit('MountConnected', 0);
+        }
+      } else {
+        console.log("没有设备连接");
+        this.callShowMessageBox('No devices have been connected.', 'error');
+      }
+    },
+
+    ReturnConnectedDevices() {
+      this.devices.forEach(device => {
+        if (device.driverType === 'MainCamera') {
+          if(device.isConnected === true){
+            this.$bus.$emit('MainCameraConnected', 1);
+            console.log('MainCamera is Connected.');
+          }
+        } else if (device.driverType === 'Mount') {
+          if(device.isConnected === true){
+            this.$bus.$emit('MountConnected', 1);
+            console.log('Mount is Connected.');
+          }
+        }
+      });
     },
 
     OpenIamgeFolder() {
@@ -1078,6 +1236,16 @@ export default {
         this.MainCameraConfigItems[expTimeIndex].value = value;
       } else {
         console.error('ExpTime [' + index + '] configuration item not found.');
+      }
+    },
+
+    CurrentCFWList(index, value) {
+      const expTimeIndex = this.CFWConfigItems.findIndex(item => item.label === 'CFW [' + (index + 1) + ']');
+      if (expTimeIndex !== -1) { // 确保找到了对应的配置项
+        // 更新 ExpTime1 配置项的值
+        this.CFWConfigItems[expTimeIndex].value = value;
+      } else {
+        console.error('CFW [' + index + '] configuration item not found.');
       }
     },
 
@@ -1155,12 +1323,19 @@ export default {
       }
     },
 
+    CameraOffsetSet(payload) {
+      const [signal, value] = payload.split(':'); // 拆分信号和值
+      const doubleValue = parseFloat(value); // 将值转换为 double 类型
+
+      console.log('CameraOffset is set to:', doubleValue);
+    },
+
     ImageOffsetSet(payload) {
       const [signal, value] = payload.split(':'); // 拆分信号和值
       const doubleValue = parseFloat(value); // 将值转换为 double 类型
 
       this.ImageOffset = doubleValue;
-      console.log('ImageOffset is set to:', doubleValue);
+      console.log('Image Offset is set to:', doubleValue);
     },
 
     ImageCFASet(payload) {
@@ -1175,35 +1350,117 @@ export default {
       }
     },
 
+    // async readBinFile(fileName) {
+    //   console.log('CaptureTestTime | Read image data start.');
+    //   const startTime = new Date();
+
+    //   try {
+    //     const response = await fetch(fileName);
+    //     if (!response.ok) {
+    //       throw new Error('Network response was not ok');
+    //     }
+
+    //     const blob = await response.blob();
+
+    //     const fileReader = new FileReader();
+    //     fileReader.onload = () => {
+    //       const arrayBuffer = fileReader.result;
+
+    //       const endTime = new Date();
+    //       const elapsedTime = endTime.getTime() - startTime.getTime();
+    //       console.log('CaptureTestTime | Read image data end:', elapsedTime, 'milliseconds');
+    //       this.callShowMessageBox(`Read image data end: '${elapsedTime}' milliseconds.`,'msg');
+
+    //       this.processImage(arrayBuffer);
+    //     };
+    //     fileReader.onerror = (error) => {
+    //       console.error('FileReader error:', error);
+    //     };
+    //     fileReader.readAsArrayBuffer(blob);
+    //   } catch (error) {
+    //     console.error('There was a problem with the fetch operation:', error);
+    //   }
+    // },
+
     async readBinFile(fileName) {
       console.log('CaptureTestTime | Read image data start.');
       const startTime = new Date();
 
       try {
+        // Fetch with progress tracking
         const response = await fetch(fileName);
         if (!response.ok) {
           throw new Error('Network response was not ok');
         }
 
-        const blob = await response.blob();
+        const contentLength = response.headers.get('content-length');
+        if (!contentLength) {
+          throw new Error('Content-Length header is missing');
+        }
 
+        const total = parseInt(contentLength, 10);
+        let loaded = 0;
+
+        const reader = response.body.getReader();
+        const stream = new ReadableStream({
+          start: (controller) => {
+            const push = () => {
+              reader.read().then(({ done, value }) => {
+                if (done) {
+                  controller.close();
+                  return;
+                }
+                loaded += value.byteLength;
+                const percent = (loaded / total) * 100;
+                console.log(`Progress: ${Math.round(percent)}%`); 
+                this.updateCaptureImageProgress(Math.round(percent));
+                controller.enqueue(value);
+                push();
+              }).catch(error => {
+                console.error('Stream reading error:', error);
+                controller.error(error);
+              });
+            };
+            push();
+          }
+        });
+
+        const newResponse = new Response(stream);
+        const blob = await newResponse.blob();
+
+        // FileReader with progress tracking
         const fileReader = new FileReader();
         fileReader.onload = () => {
-          const arrayBuffer = fileReader.result;
+          this.ImageArrayBuffer = fileReader.result;
 
           const endTime = new Date();
           const elapsedTime = endTime.getTime() - startTime.getTime();
           console.log('CaptureTestTime | Read image data end:', elapsedTime, 'milliseconds');
+          this.callShowMessageBox(`Read image data end: '${elapsedTime}' milliseconds.`, 'msg');
 
-          this.processImage(arrayBuffer);
+          this.processImage(this.ImageArrayBuffer);
         };
+
         fileReader.onerror = (error) => {
           console.error('FileReader error:', error);
         };
+
+        fileReader.onprogress = (event) => {
+          if (event.lengthComputable) {
+            const percentLoaded = (event.loaded / event.total) * 100;
+            console.log(`FileReader Progress: ${Math.round(percentLoaded)}%`); // Update this with your progress UI update logic
+            this.updateCaptureImageProgress(Math.round(percentLoaded));
+          }
+        };
+
         fileReader.readAsArrayBuffer(blob);
       } catch (error) {
         console.error('There was a problem with the fetch operation:', error);
       }
+    },
+
+    updateCaptureImageProgress(num) {
+      this.$bus.$emit('ShowCaptureImageProgress', num);
     },
 
     setImageProportion(value) {
@@ -1278,7 +1535,7 @@ export default {
       let resizeImg = new cv.Mat();
 
       // Resize the image
-      cv.resize(dst, resizeImg, new cv.Size(4096, 2160), 0, 0, cv.INTER_LINEAR);
+      cv.resize(dst, resizeImg, new cv.Size(4096, 2160), 0, 0, cv.INTER_LINEAR);  // 2048, 1080   4096, 2160
 
       dst.delete();
 
@@ -1529,10 +1786,7 @@ export default {
     },
 
     ImageSoftAWB (img16, gainR, gainB, offset) {
-      // console.time('SoftAWB处理完成,处理时间');
-
       // 分离通道
-      // console.log('正在分离通道...');
       let channels = new cv.MatVector();
       cv.split(img16, channels);
 
@@ -1541,24 +1795,20 @@ export default {
         let channel = channels.get(i);
         channel.convertTo(channel, -1, 1, offset); // 减去偏移量
         if (i === 0) {
-          channel.convertTo(channel, -1, gainB, 0); // 乘以增益
-        } else if (i === 2) {
           channel.convertTo(channel, -1, gainR, 0); // 乘以增益
+        } else if (i === 2) {
+          channel.convertTo(channel, -1, gainB, 0); // 乘以增益
         }
         channel.delete(); // 手动释放内存
       }
 
       // 合并通道
-      // console.log('正在合并通道...');
       let mergedImg = new cv.Mat();
       cv.merge(channels, mergedImg);
 
       // 释放资源
-      // console.log('正在释放资源...');
       channels.delete();
 
-      // console.log('图像处理完成。');
-      // console.timeEnd('SoftAWB处理完成,处理时间');
       return mergedImg;
     },
 
@@ -1714,9 +1964,9 @@ export default {
       console.log('MakeHistogram');
 
       // 计算三个通道的直方图
-      const histogramData = this.calculateHistogram(imageData);
+      this.histogramData = this.calculateHistogram(imageData);
 
-      this.$bus.$emit('showHistogram', histogramData);
+      this.$bus.$emit('showHistogram', this.histogramData);
     },
 
     calculateHistogram(imageData) {
@@ -1726,6 +1976,9 @@ export default {
         Array(256).fill(0), // 存储绿色通道直方图
         Array(256).fill(0)  // 存储红色通道直方图
       ];
+
+      // let totalBrightness = 0;
+      // let count = 0;
 
       // 分别计算三个通道的直方图
       for (let i = 0; i < imageData.data.length; i += 4) {
@@ -1737,7 +1990,19 @@ export default {
         histogram[0][b]++;
         histogram[1][g]++;
         histogram[2][r]++;
+
+        // 计算像素的灰度值（亮度），减去offset并防止出现负值
+        // const brightness = Math.max((r + g + b) / 3, 0);
+
+        // // 累加亮度
+        // totalBrightness += brightness;
+        // count++;
       }
+
+      // 计算平均亮度
+      // const averageBrightness = totalBrightness / count;
+
+      // console.log(`Average Brightness: ${averageBrightness}`);
 
       return histogram;
     },
@@ -1806,6 +2071,72 @@ export default {
     setAutoHistogramNum(min, max) {
       this.histogram_min = min;
       this.histogram_max = max;
+    },
+
+    calcWhiteBalanceGains() {
+      const Gains = this.calculateWhiteBalanceGains(this.histogramData, this.ImageOffset);
+
+      this.ImageGainR = Gains.GainR;
+      this.ImageGainB = Gains.GainB;
+
+      const GainRIndex = this.MainCameraConfigItems.findIndex(item => item.label === 'ImageGainR');
+      if (GainRIndex !== -1) { // 确保找到了对应的配置项
+        // 更新 ExpTime1 配置项的值
+        this.MainCameraConfigItems[GainRIndex].value = this.ImageGainR;
+      } else {
+        console.error('ImageGainR configuration item not found.');
+      }
+
+      const GainBIndex = this.MainCameraConfigItems.findIndex(item => item.label === 'ImageGainB');
+      if (GainBIndex !== -1) { // 确保找到了对应的配置项
+        // 更新 ExpTime1 配置项的值
+        this.MainCameraConfigItems[GainBIndex].value = this.ImageGainB;
+      } else {
+        console.error('ImageGainB configuration item not found.');
+      }
+
+      this.processImage(this.ImageArrayBuffer);
+    },
+
+    calculateWhiteBalanceGains(histogram, offset) {
+      let sumR = 0, sumG = 0, sumB = 0;
+      let countR = 0, countG = 0, countB = 0;
+
+      // for (let i = 0; i < 256; i++) {
+      //   sumR += histogram[2][i] * i;
+      //   sumG += histogram[1][i] * i;
+      //   sumB += histogram[0][i] * i;
+
+      //   countR += histogram[2][i];
+      //   countG += histogram[1][i];
+      //   countB += histogram[0][i];
+      // }
+
+      for (let i = 0; i < 256; i++) {
+        // Subtract offset from pixel value
+        const adjustedR = Math.max(i - offset, 0);
+        const adjustedG = Math.max(i - offset, 0);
+        const adjustedB = Math.max(i - offset, 0);
+
+        sumR += histogram[2][i] * adjustedR;
+        sumG += histogram[1][i] * adjustedG;
+        sumB += histogram[0][i] * adjustedB;
+
+        countR += histogram[2][i];
+        countG += histogram[1][i];
+        countB += histogram[0][i];
+      }
+
+      const meanR = sumR / countR;
+      const meanG = sumG / countG;
+      const meanB = sumB / countB;
+
+      // Calculate gains
+      const GainR = meanG / meanR;
+      const GainB = meanG / meanB;
+
+      console.log(`GainR: ${GainR}, GainB: ${GainB}`);
+      return { GainR, GainB };
     },
 
     loadOpenCv() {
@@ -2092,6 +2423,16 @@ export default {
       else {
         glTestCircle.color = [0, 1, 0, 0.25];
         glTestCircle.border_color = [0, 1, 0, 1];
+      }
+    },
+
+    UpdateMainCameraStatus(status) {
+      this.$bus.$emit('MainCameraStatus', status);
+      if(status === 'Exposuring') {
+
+      } 
+      else {
+
       }
     },
 
@@ -2493,6 +2834,30 @@ export default {
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'ClearSloveResultList');
     },
 
+    ShowConfirmDialog(Title, Text, ToDo) {
+      // window.location.reload();
+      this.nav = false;
+      this.$bus.$emit('ShowConfirmDialog', Title, Text, ToDo);
+    },
+
+    GetCurrentLocation() {
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getCurrentLocation');
+    },
+
+    decrement(item) {
+      console.log('decrement:', item.value);
+      if (item.value > item.inputMin) {
+        item.value -= item.inputStep;
+      }
+    },
+
+    increment (item) {
+      console.log('increment:', item.value);
+      if (item.value < item.inputMax) {
+        item.value += item.inputStep;
+      }
+    },
+
    
   },
   computed: {
@@ -2735,7 +3100,15 @@ html, body, #app {
   border-radius: 10px;
 }
 
-.btn-confirm:active {
+.btn-slider {
+  width: 20px; 
+  height: 20px;
+  background-color: rgba(255, 255, 255, 0.1); 
+  border-radius: 10px;
+}
+
+.btn-confirm:active
+.btn-slider:active {
   /* transform: scale(0.95); 点击时缩小按钮 */
   background-color: rgba(255, 255, 255, 0.5);
 }

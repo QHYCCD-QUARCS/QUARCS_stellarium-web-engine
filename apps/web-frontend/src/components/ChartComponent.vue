@@ -7,7 +7,7 @@
 
     <div class="buttons-container">
 
-      <button :class="{ 'btn-Guider-true': isGuiding, 'btn-Guider-false': !isGuiding }" :style="{ animationDuration: ExpTime + 'ms' }" @touchend="GuiderSwitch">
+      <button :class="GuiderSwitchBtnClass" :style="{ animationDuration: ExpTime + 'ms' }" @touchend="GuiderSwitch">
         <div style="display: flex; justify-content: center; align-items: center;">
           <img src="@/assets/images/svg/ui/Guider.svg" height="20px" style="min-height: 20px"></img>
         </div>
@@ -63,6 +63,7 @@ export default {
       height: 90,
       ExpTime: 1000,
       isGuiding: false,
+      CurrentGuiderStatus: 'null',
     };
   },
   components: {
@@ -70,10 +71,27 @@ export default {
     ScatterChart,
   },
   created() {
+    this.$bus.$on('GuiderSwitchStatus', this.GuiderSwitchStatus);
     this.$bus.$on('GuiderStatus', this.GuiderStatus);
   },
   mounted() {
-    this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getGuiderStatus');
+    this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getGuiderSwitchStatus');
+  },
+  computed: {
+    GuiderSwitchBtnClass() {
+        return [
+          {
+            'btn-Guider-true': this.isGuiding, 
+            'btn-Guider-false': !this.isGuiding, 
+          },
+          {
+            'btn-InGuiding': this.CurrentGuiderStatus === 'InGuiding',
+            'btn-InCalibration': this.CurrentGuiderStatus === 'InCalibration',
+            'btn-StarLostAlert': this.CurrentGuiderStatus === 'StarLostAlert',
+            'btn-null': this.CurrentGuiderStatus === 'null',
+          }
+        ];
+    }
   },
   methods: {
     GuiderSwitch() {
@@ -91,13 +109,27 @@ export default {
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'GuiderExpTimeSwitch:' + this.ExpTime);
     },
 
-    GuiderStatus(value) {
+    GuiderSwitchStatus(value) {
       if(value === 'true') {
         this.isGuiding = true;
       } else {
         this.isGuiding = false;
+        this.CurrentGuiderStatus = 'null';
+        this.$bus.$emit('GuiderStop');
       }
-      console.log('GuiderStatus:', this.isGuiding);
+      console.log('GuiderSwitchStatus:', this.isGuiding);
+    },
+
+    GuiderStatus(status) {
+      if(status === 'InGuiding') {
+        this.CurrentGuiderStatus = 'InGuiding';
+      } else if(status === 'InCalibration') {
+        this.CurrentGuiderStatus = 'InCalibration';
+      } else if(status === 'StarLostAlert') {
+        this.CurrentGuiderStatus = 'StarLostAlert';
+        this.$bus.$emit('showMsgBox', 'Lost guiding star target.', 'error');
+      }
+      console.log('GuiderStatus:', this.CurrentGuiderStatus);
     },
     
     DataClear() {
@@ -199,7 +231,7 @@ export default {
   user-select: none;
   background-color: rgba(64, 64, 64, 0.5);
   backdrop-filter: blur(5px);
-  border: none;
+  /* border: none; */
   border-radius: 50%; 
   box-sizing: border-box;
 
@@ -215,6 +247,21 @@ export default {
   }
 }
 
+.btn-InGuiding {
+  border: 1px solid rgba(51, 218, 121, 1);
+}
+
+.btn-InCalibration {
+  border: 1px solid rgba(255, 165, 0, 1);
+}
+
+.btn-StarLostAlert {
+  border: 1px solid rgba(255, 0, 0, 1);
+}
+
+.btn-null {
+  border: none;
+}
 
 .btn-Guider:active,
 .btn-Style:active {

@@ -174,12 +174,58 @@
 
   <CapturePanel v-show="isCaptureMode" />
 
+  <button v-show="isCaptureMode" @click="getOriginalImage" class="get-click btn-OriginalImage">
+    <div style="display: flex; justify-content: center; align-items: center;">
+      <img src="@/assets/images/svg/ui/OriginalImage.svg" height="20px" style="min-height: 20px"></img>
+    </div>
+  </button>
+
+  <!-- <button v-show="isCaptureMode" @click="calcWhiteBalanceGains" class="get-click btn-WhiteBalance">
+    <div style="display: flex; justify-content: center; align-items: center;">
+      <img src="@/assets/images/svg/ui/WhiteBalance.svg" height="20px" style="min-height: 20px"></img>
+    </div>
+  </button> -->
+
   <ImageManagerPanel v-show="ShowImageManagerPanel" />
 
   <SchedulePanel v-show="ShowSchedulePanel" class="get-click" style="position: absolute;"/>
   <ScheduleKeyBoard v-show="ShowSchedulePanel" />
   <ScheduleList v-show="ShowSchedulePanel" class="get-click" style="position: absolute;"/>
 
+  <v-dialog v-model="ConfirmDialog" width="220" persistent>
+    <v-expand-x-transition>
+    <v-card style="backdrop-filter: blur(5px); background-color: rgba(64, 64, 64, 0.5);">
+      <v-card-title style="font-size: 20px;">
+        {{ ConfirmDialogTitle }}
+      </v-card-title>
+      <v-card-text style="font-size: 15px; margin-bottom: -20px; line-height: 1.5;">
+        {{ ConfirmDialogText }}
+      </v-card-text>
+      <v-card-actions style="margin-top: -20px; padding-top: -20px;">
+        <v-spacer></v-spacer>
+        <v-btn @click="ConfirmDialog = false" style="background-color: rgba(255, 255, 255, 0.1);">
+          <v-icon color="rgba(255, 0, 0)"> mdi-close </v-icon>
+        </v-btn>
+        <v-btn @click="ConfirmDialogToDo()" style="background-color: rgba(255, 255, 255, 0.1);"> 
+          <v-icon color="rgba(51, 218, 121)"> mdi-check </v-icon>
+        </v-btn>
+        <v-spacer></v-spacer>
+      </v-card-actions>
+    </v-card>
+    </v-expand-x-transition>
+  </v-dialog>
+
+
+  <div v-if="CaptureImageProgressCard&&isCaptureMode" class="CaptureImageProgress-card">
+    <div class="text-center">
+      <v-progress-circular :value="Number(CaptureImageProgressNum_)" :rotate="360" :size="70" :width="7" style="top: 7px; color: rgba(255, 255, 255, 0.7);">
+        <template v-slot:default> {{ CaptureImageProgressNum }} % </template>
+      </v-progress-circular>
+    </div>
+    <span style="position: absolute; bottom: 5px; left: 50%; transform: translateX(-50%); font-size: 10px; color: rgba(255, 255, 255, 0.3); user-select: none; text-align: center; width: 100%;"> 
+      Image loading in progress...
+    </span>
+  </div>
   
 
 </div>
@@ -271,9 +317,9 @@ export default {
       ScaleImageWidth: 0,
       ScaleImageHeight: 0,
 
-      FocalLength: 130,         // QHY462C: 130  5.568 3.132
-      CameraSizeWidth: 5.568,   // QHY163M: 510  17.7  13.4
-      CameraSizeHeight: 3.132, 
+      FocalLength: 510,         // QHY462C: 130  5.568 3.132
+      // CameraSizeWidth: 5.568,   // QHY163M: 510  17.7  13.4
+      // CameraSizeHeight: 3.132, 
 
       PlateSolveInProgress: false,
 
@@ -284,6 +330,16 @@ export default {
       DifferenceText: '',
       TargetText: '',
       CurrentText: '',
+
+      ConfirmDialog: false,
+      ConfirmDialogTitle: 'Title',
+      ConfirmDialogText: 'Text',
+
+      ConfirmToDo: '',
+
+      CaptureImageProgressCard: false,
+      CaptureImageProgressNum: 0,
+      CaptureImageProgressNum_: 0,
       
 
     }
@@ -313,6 +369,9 @@ export default {
     this.$bus.$on('HideSingleSolveBtn', this.HideSingleSolveBtn);
     this.$bus.$on('ShowAzAltText', this.ShowAzAltText);
     this.$bus.$on('ShowCurrentAzAltText', this.ShowCurrentAzAltText);
+    this.$bus.$on('ShowConfirmDialog', this.ShowConfirmDialog);
+    this.$bus.$on('CameraInExposuring',this.SwitchMainPage);
+    this.$bus.$on('ShowCaptureImageProgress', this.ShowCaptureImageProgress);
   },
   mounted() {
     this.resizeRedBox(1920, 1080);
@@ -608,7 +667,7 @@ export default {
     },
 
     SingleSolveImage() {
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'SolveImage:' + this.FocalLength + ':' + this.CameraSizeWidth + ':' + this.CameraSizeHeight);
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'SolveImage:' + this.FocalLength);
     },
 
     LoopSolveImage() {
@@ -617,7 +676,7 @@ export default {
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'stopLoopSolveImage');
       } else {
         this.PlateSolveInProgress = true;
-        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'startLoopSolveImage:' + this.FocalLength + ':' + this.CameraSizeWidth + ':' + this.CameraSizeHeight);
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'startLoopSolveImage:' + this.FocalLength);
       }
     },
 
@@ -682,6 +741,46 @@ export default {
     ShowCurrentAzAltText(Az, Alt) {
       this.CurrentText = Az.toFixed(3) + ', ' + Alt.toFixed(3);
     },
+
+    ShowConfirmDialog(title, text, ToDo) {
+      this.ConfirmDialog = true;
+      this.ConfirmDialogTitle = title;
+      this.ConfirmDialogText = text;
+      this.ConfirmToDo = ToDo;
+    },
+
+    ConfirmDialogToDo() {
+      this.ConfirmDialog = false;
+      if(this.ConfirmToDo === 'Refresh') {
+        window.location.reload();
+      } else if(this.ConfirmToDo === 'disconnectAllDevice') {
+        this.$bus.$emit('disconnectAllDevice', true);
+      }
+    },
+
+    getOriginalImage() {
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getOriginalImage');
+    },
+
+    ShowCaptureImageProgress(num) {
+      this.CaptureImageProgressCard = true;
+      this.CaptureImageProgressNum = num;
+
+      if(num % 5 === 0) {
+        this.CaptureImageProgressNum_ = num;
+      }
+
+      if(num === 100) {
+        this.CaptureImageProgressCard = false;
+        this.CaptureImageProgressNum = 0;
+        this.CaptureImageProgressNum_ = 0;
+      }
+    },
+
+    // calcWhiteBalanceGains() {
+    //   this.$bus.$emit('calcWhiteBalanceGains');
+    // },
+    
 
     // handleCFWSelected(cfw) {
     //   console.log('QHYCCD | CFWSelected: ', cfw);
@@ -750,6 +849,10 @@ export default {
 </script>
 
 <style>
+/* .v-overlay__scrim {
+  display: none !important;
+} */
+
 .btn-MountPanelSwitch {
   position:absolute;
   width: 35px;
@@ -865,6 +968,32 @@ export default {
   /* border: 1px solid rgba(255, 255, 255, 0.8); */
 }
 
+.btn-OriginalImage {
+  position:absolute;
+  width: 35px;
+  height: 35px;
+  top: 95px;
+  left: 20px;
+  
+  user-select: none;
+  backdrop-filter: blur(5px);
+  background-color: rgba(0, 0, 0, 0.1);
+  border-radius: 50%;
+}
+
+.btn-WhiteBalance {
+  position:absolute;
+  width: 35px;
+  height: 35px;
+  top: 140px;
+  left: 20px;
+  
+  user-select: none;
+  backdrop-filter: blur(5px);
+  background-color: rgba(0, 0, 0, 0.1);
+  border-radius: 50%;
+}
+
 .btn-MainPageSwitch {
   position:absolute;
   width: 35px;
@@ -906,7 +1035,9 @@ export default {
 .btn-ChartsSwitch:active,
 .btn-UISwitch:active,
 .btn-MainPageSwitch:active,
-.btn-ShowUISwitch:active {
+.btn-ShowUISwitch:active,
+.btn-OriginalImage:active,
+.btn-WhiteBalance:active {
   transform: scale(0.95); /* 点击时缩小按钮 */
   background-color: rgba(255, 255, 255, 0.7);
 }
@@ -1039,6 +1170,22 @@ export default {
 
 .BottomCanvas-leave-active {
   animation: hideBottomCanvasAnimation 0.15s forwards;
+}
+
+.CaptureImageProgress-card {
+  position:absolute;
+  width: 150px;
+  height: 100px;
+  bottom: calc(50%-50px);
+  right: calc(50%-50px);
+  
+  user-select: none;
+  border-radius: 10px;
+  /* border: 1px solid rgba(255, 255, 255, 0.8); */
+  box-sizing: border-box;
+
+  backdrop-filter: blur(5px); 
+  background-color: rgba(64, 64, 64, 0.5);
 }
 
 </style>

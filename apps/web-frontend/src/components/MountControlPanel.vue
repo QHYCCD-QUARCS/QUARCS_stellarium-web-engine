@@ -105,8 +105,8 @@ export default {
       isIDLE: true,
 
       FocalLength: 510,
-      CameraSizeWidth: 24.9,
-      CameraSizeHeight: 16.6,
+      // CameraSizeWidth: 24.9,
+      // CameraSizeHeight: 16.6,
 
       RaDec: 0,
     };
@@ -165,7 +165,7 @@ export default {
     SolveSYNC() {
       console.log('QHYCCD | SolveSYNC');
 
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'SolveSYNC:' + this.FocalLength + ':' + this.CameraSizeWidth + ':' + this.CameraSizeHeight);
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'SolveSYNC:' + this.FocalLength);
     },
     getTargetRaDec(value) {
       console.log('getTargetRaDec:', value);

@@ -38,11 +38,15 @@ export default {
     }
   },
   mounted: function () {
+    // this.GetCurrentLocation();
+  },
+  created() {
+    this.$bus.$on('SetCurrentLocation',this.SetCurrentLocation);
   },
   methods: {
     setLocation: function (loc) {
       this.$store.commit('setCurrentLocation', loc)
-      this.$store.commit('toggleBool', 'showLocationDialog')
+      // this.$store.commit('toggleBool', 'showLocationDialog')
     },
     saveManualCoordinates: function () {
       const [lat, lng] = this.manualCoordinates.split(',').map(coord => parseFloat(coord.trim()))
@@ -57,7 +61,26 @@ export default {
         street_address: ''
       }
       this.setLocation(loc)
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'saveCurrentLocation:'+lat+':'+lng);
+    },
+    GetCurrentLocation() {
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getCurrentLocation');
+    },
+    SetCurrentLocation(lat, lng) {
+      console.log('SetCurrentLocation:', lat, ',', lng);
+      this.$bus.$emit('PolarPointAltitude', lat);
+      const loc = {
+        short_name: 'Unknown',
+        country: 'Unknown',
+        lng: lng,
+        lat: lat,
+        alt: 0, 
+        accuracy: 0, 
+        street_address: ''
+      }
+      this.setLocation(loc);
     }
+
   },
   components: { LocationMgr }
 }

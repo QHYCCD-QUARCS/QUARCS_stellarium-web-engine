@@ -45,6 +45,91 @@
         </div>
       </span>
 
+      <card class="Card-Status" :style="{ width: openStatusCard ? '105px' : '30px' }" @click="toggleStatusCard">
+
+        <div style="position: absolute;" 
+          :style="{ top: openStatusCard ? '5px' : '0px', left: openStatusCard ? '5px' : '0px', width: openStatusCard ? '20px' : '15px', height: openStatusCard ? '20px' : '15px'}">
+          <span v-if="MainCameraInProgress&&MainCameraConnect">
+            <div style="display: flex; justify-content: center; align-items: center;">
+              <img src="@/assets/images/svg/ui/MainCamera-red.svg" :style="{height: openStatusCard ? '20px' : '15px'}"></img>
+            </div>
+          </span>
+          <span v-if="!MainCameraInProgress&&MainCameraConnect">
+            <div style="display: flex; justify-content: center; align-items: center;">
+              <img src="@/assets/images/svg/ui/MainCamera-green.svg" :style="{height: openStatusCard ? '20px' : '15px'}"></img>
+            </div>
+          </span>
+          <span v-if="!MainCameraConnect">
+            <div style="display: flex; justify-content: center; align-items: center;">
+              <img src="@/assets/images/svg/ui/MainCamera-white.svg" :style="{height: openStatusCard ? '20px' : '15px'}"></img>
+            </div>
+          </span>
+        </div>
+
+        <div style="position: absolute;" 
+          :style="{ top: openStatusCard ? '5px' : '0px', left: openStatusCard ? '30px' : '15px', width: openStatusCard ? '20px' : '15px', height: openStatusCard ? '20px' : '15px'}">
+          <span v-if="MountInProgress&&MountConnect">
+            <div style="display: flex; justify-content: center; align-items: center;">
+              <img src="@/assets/images/svg/ui/Mount-red.svg" :style="{height: openStatusCard ? '20px' : '15px'}"></img>
+            </div>
+          </span>
+          <span v-if="!MountInProgress&&MountConnect">
+            <div style="display: flex; justify-content: center; align-items: center;">
+              <img src="@/assets/images/svg/ui/Mount-green.svg" :style="{height: openStatusCard ? '20px' : '15px'}"></img>
+            </div>
+          </span>
+          <span v-if="!MountConnect">
+            <div style="display: flex; justify-content: center; align-items: center;">
+              <img src="@/assets/images/svg/ui/Mount-white.svg" :style="{height: openStatusCard ? '20px' : '15px'}"></img>
+            </div>
+          </span>
+        </div>
+
+        <div style="position: absolute;" 
+          :style="{ top: openStatusCard ? '5px' : '15px', left: openStatusCard ? '55px' : '0px', width: openStatusCard ? '20px' : '15px', height: openStatusCard ? '20px' : '15px'}">
+          <span v-if="CurrentGuiderStatus === 0">
+            <div style="display: flex; justify-content: center; align-items: center;">
+              <img src="@/assets/images/svg/ui/Guider-white.svg" :style="{height: openStatusCard ? '20px' : '15px'}"></img>
+            </div>
+          </span>
+          <span v-if="CurrentGuiderStatus === 1">
+            <div style="display: flex; justify-content: center; align-items: center;">
+              <img src="@/assets/images/svg/ui/Guider-yellow.svg" :style="{height: openStatusCard ? '20px' : '15px'}"></img>
+            </div>
+          </span>
+          <span v-if="CurrentGuiderStatus === 2">
+            <div style="display: flex; justify-content: center; align-items: center;">
+              <img src="@/assets/images/svg/ui/Guider-green.svg" :style="{height: openStatusCard ? '20px' : '15px'}"></img>
+            </div>
+          </span>
+          <span v-if="CurrentGuiderStatus === 3">
+            <div style="display: flex; justify-content: center; align-items: center;">
+              <img src="@/assets/images/svg/ui/Guider-red.svg" :style="{height: openStatusCard ? '20px' : '15px'}"></img>
+            </div>
+          </span>
+        </div>
+
+        <div style="position: absolute;" 
+          :style="{ top: openStatusCard ? '5px' : '15px', left: openStatusCard ? '80px' : '15px', width: openStatusCard ? '20px' : '15px', height: openStatusCard ? '20px' : '15px'}">
+          <span v-if="FocusStatus === 0">
+            <div style="display: flex; justify-content: center; align-items: center;">
+              <img src="@/assets/images/svg/ui/Focuser-white.svg" :style="{height: openStatusCard ? '20px' : '15px'}"></img>
+            </div>
+          </span>
+          <span v-if="FocusStatus === 1">
+            <div style="display: flex; justify-content: center; align-items: center;">
+              <img src="@/assets/images/svg/ui/Focuser-green.svg" :style="{height: openStatusCard ? '20px' : '15px'}"></img>
+            </div>
+          </span>
+          <span v-if="FocusStatus === 2">
+            <div style="display: flex; justify-content: center; align-items: center;">
+              <img src="@/assets/images/svg/ui/Focuser-red.svg" :style="{height: openStatusCard ? '20px' : '15px'}"></img>
+            </div>
+          </span>
+        </div>
+
+      </card>
+
       <button class="ScheduleBtn" @click="toggleSchedulePanel" >
         <div style="display: flex; justify-content: center; align-items: center;">
           <img src="@/assets/images/svg/ui/schedule_table.svg" height="25px" style="min-height: 25px"></img>
@@ -67,12 +152,28 @@ export default {
       isDrawerShow: false,
       isTargetSearchShow: true,
       isConnect: true,
+      openStatusCard: false,
+      MainCameraInProgress: false,
+      MountInProgress: true,
+      CurrentGuiderStatus: 1,
+      FocusStatus: 0,
+
+      MainCameraConnect: false,
+
+      MountConnect: false,
     }
   },
   created() {
     this.$bus.$on('ShowTargetSearch', this.ShowTargetSearch);
     this.$bus.$on('HideTargetSearch', this.HideTargetSearch);
     this.$bus.$on('ShowNetStatus', this.ShowNetStatus);
+
+    this.$bus.$on('MainCameraStatus',this.MainCameraStatus);
+    this.$bus.$on('MountStatus',this.MountStatus);
+    this.$bus.$on('GuiderStatus', this.GuiderStatus);
+    this.$bus.$on('GuiderStop', this.GuiderStatusStop);
+    this.$bus.$on('MainCameraConnected', this.MainCameraConnected);
+    this.$bus.$on('MountConnected', this.MountConnected);
   },
   computed: {
     fov: function () {
@@ -104,6 +205,10 @@ export default {
         this.$stel.core.observer.utc = m.toDate().getMJD()
       }
     }
+  },
+  mounted: function () {
+    this.GetConnectedDevices();
+
   },
   methods: {
     toggleNavigationDrawer: function () {
@@ -155,6 +260,64 @@ export default {
       this.$bus.$emit('toggleSchedulePanel');
     },
 
+    toggleStatusCard() {
+      this.openStatusCard = !this.openStatusCard;
+    },
+
+    MainCameraStatus(status) {
+      if(status === 'Exposuring') {
+        this.MainCameraInProgress = true;
+      } 
+      else {
+        this.MainCameraInProgress = false;
+      }
+    },
+
+    MountStatus(status) {
+      if(status === 'Slewing') {
+        this.MountInProgress = true;
+      } 
+      else {
+        this.MountInProgress = false;
+      }
+    },
+
+    GuiderStatus(status) {
+      if(status === 'InGuiding') {
+        this.CurrentGuiderStatus = 2;
+      } else if(status === 'InCalibration') {
+        this.CurrentGuiderStatus = 1;
+      } else if(status === 'StarLostAlert') {
+        this.CurrentGuiderStatus = 3;
+      }
+    },
+
+    GuiderStatusStop() {
+      this.CurrentGuiderStatus = 0;
+    },
+
+    MainCameraConnected(num) {
+      if(num === 0){
+        this.MainCameraConnect = false;
+      } else {
+        this.MainCameraConnect = true;
+      }
+      console.log('MainCamera is Connected: ', num);
+    },
+
+    MountConnected(num) {
+      if(num === 0){
+        this.MountConnect = false;
+      } else {
+        this.MountConnect = true;
+      }
+      console.log('Mount is Connected: ', num);
+    },
+
+    GetConnectedDevices() {
+      this.$bus.$emit('GetConnectedDevices');
+    },
+
   },
   components: { TargetSearch, DateTimePicker }
 }
@@ -171,13 +334,13 @@ export default {
   top: 0px;
   left: 0px;
   width: 100%;
-  backdrop-filter: blur(5px); /* 添加毛玻璃效果 */
+  backdrop-filter: blur(5px);
   background-color: rgba(0, 0, 0, 0.1);
 }
 
 #stellarium-web-toolbar-logo {
   margin-right: 10px;
-  margin-left: 30px;
+  margin-left: 20px;
 }
 
 @media all and (max-width: 600px) {
@@ -208,7 +371,6 @@ export default {
 }
 
 .ScheduleBtn {
-    margin: 10px;
     color: white;
     cursor: pointer;
 
@@ -220,11 +382,19 @@ export default {
     height: 35px;
     
     user-select: none;
-    backdrop-filter: blur(5px);
+    /* backdrop-filter: blur(5px); */
     background-color: rgba(0, 0, 0, 0.0);
     border-radius: 10px;
 
     /* border: 1px solid rgba(255, 255, 255, 0.8); */
+}
+
+.Card-Status {
+  position: relative;
+  margin: 5px; 
+  border-radius: 5px; 
+  height: 30px;
+  background-color: rgba(0, 0, 0, 0.1);
 }
 
 .icon-container .green-icon {

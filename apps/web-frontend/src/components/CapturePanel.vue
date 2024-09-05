@@ -101,18 +101,35 @@ export default {
     this.$bus.$on('ExpTime [8]', this.ModifyExpTimeList);
     this.$bus.$on('ExpTime [9]', this.ModifyExpTimeList);
 
-    this.$bus.$on('CFWvalue', this.ModifyCFWList);
+    // this.$bus.$on('CFW [1]', this.ModifyCFWList);
+    // this.$bus.$on('CFW [2]', this.ModifyCFWList);
+    // this.$bus.$on('CFW [3]', this.ModifyCFWList);
+    // this.$bus.$on('CFW [4]', this.ModifyCFWList);
+    // this.$bus.$on('CFW [5]', this.ModifyCFWList);
+    // this.$bus.$on('CFW [6]', this.ModifyCFWList);
+    // this.$bus.$on('CFW [7]', this.ModifyCFWList);
+    // this.$bus.$on('CFW [8]', this.ModifyCFWList);
+    // this.$bus.$on('CFW [9]', this.ModifyCFWList);
+    this.$bus.$on('SetCFWPositionMax', (max) => {
+      this.SetCFWPositionMax(max);
+      
+      // 动态注册新的 CFW 事件监听器
+      for (let i = 1; i <= max; i++) {
+        this.$bus.$on(`CFW [${i}]`, this.ModifyCFWList);
+      }
+    });
 
     this.$bus.$on('initExpTimeList', this.initExpTimeList);
-    this.$bus.$on('SetCFWPositionMax', this.SetCFWPositionMax);
+    // this.$bus.$on('SetCFWPositionMax', this.SetCFWPositionMax);
     this.$bus.$on('SetCFWPositionSuccess', this.SetCFWPositionSuccess);
 
     this.$bus.$on('initCFWList', this.initCFWList);
+
+    this.$bus.$on('MainCameraStatus',this.MainCameraStatus);
   },
   mounted: function () {
     this.CurrentExpTimeList();
     this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getExpTimeList');
-    this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getCFWList');
 
   },
   methods: {
@@ -246,6 +263,15 @@ export default {
         this.CFWs[i] = parts[i];
       }
       this.CurrentCFWList();
+    },
+
+    MainCameraStatus(status) {
+      if(status === 'Exposuring') {
+        this.isIDLE = false;
+      } 
+      else {
+        this.isIDLE = true;
+      }
     },
     
   },
