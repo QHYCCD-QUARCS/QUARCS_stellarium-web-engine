@@ -7,14 +7,15 @@
 // repository.
 
 <template>
-<v-dialog max-width='600' v-model="$store.state.showViewSettingsDialog">
-<v-card v-if="$store.state.showViewSettingsDialog" class="secondary white--text">
+<v-dialog max-width='300' v-model="$store.state.showViewSettingsDialog">
+<v-card v-if="$store.state.showViewSettingsDialog" style="backdrop-filter: blur(5px); background-color: rgba(64, 64, 64, 0.5);">
   <v-card-title><div class="text-h5">{{ $t('View settings') }}</div></v-card-title>
   <v-card-text>
     <v-checkbox hide-details :label="$t('Milky Way')" v-model="milkyWayOn"></v-checkbox>
     <v-checkbox hide-details :label="$t('DSS')" v-model="dssOn"></v-checkbox>
     <v-checkbox hide-details :label="$t('Meridian Line')" v-model="meridianOn"></v-checkbox>
     <v-checkbox hide-details :label="$t('Ecliptic Line')" v-model="eclipticOn"></v-checkbox>
+    <v-checkbox hide-details :label="$t('High FPS')" v-model="highfpsOn"></v-checkbox>
   </v-card-text>
   <v-card-actions>
     <v-spacer></v-spacer><v-btn class="blue--text darken-1" text @click.native="$store.state.showViewSettingsDialog = false">Close</v-btn>
@@ -28,6 +29,7 @@
 export default {
   data: function () {
     return {
+      HighFPSMode: true,
     }
   },
   computed: {
@@ -61,6 +63,15 @@ export default {
       },
       set: function (newValue) {
         this.$stel.core.lines.ecliptic.visible = newValue
+      }
+    },
+    highfpsOn: {
+      get: function () {
+        return this.HighFPSMode
+      },
+      set: function (newValue) {
+        window.setHighFrameRate(newValue)
+        this.HighFPSMode = newValue
       }
     }
   }

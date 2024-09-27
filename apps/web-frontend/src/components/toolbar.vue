@@ -10,7 +10,7 @@
   <div id="toolbar-image">
     <v-toolbar height="40px" elevation="0" class="transparent" dense>
       <v-app-bar-nav-icon @click="toggleNavigationDrawer"></v-app-bar-nav-icon>
-      <img class="tbtitle hidden-xs-only" id="stellarium-web-toolbar-logo" src="@/assets/images/logo.svg" width="33" height="33" alt="Stellarium Web Logo"/>
+      <img class="tbtitle hidden-xs-only" id="stellarium-web-toolbar-logo" src="@/assets/images/logo.svg" width="33" height="33"  style="pointer-events: none;" alt="Stellarium Web Logo"/>
       <span class="tbtitle hidden-xs-only">Q U A R C S</span>
       <v-spacer></v-spacer>
       <target-search v-show="isTargetSearchShow"></target-search>
@@ -36,12 +36,12 @@
 
       <span v-if="isConnect">
         <div style="display: flex; justify-content: center; align-items: center;">
-          <img src="@/assets/images/svg/ui/wifi.svg" height="30px" style="min-height: 30px"></img>
+          <img src="@/assets/images/svg/ui/wifi.svg" height="30px" style="min-height: 30px; pointer-events: none;"></img>
         </div>
       </span>
       <span v-else>
         <div style="display: flex; justify-content: center; align-items: center;">
-          <img src="@/assets/images/svg/ui/wifi_off.svg" height="30px" style="min-height: 30px"></img>
+          <img src="@/assets/images/svg/ui/wifi_off.svg" height="30px" style="min-height: 30px; pointer-events: none;"></img>
         </div>
       </span>
 
@@ -51,17 +51,17 @@
           :style="{ top: openStatusCard ? '5px' : '0px', left: openStatusCard ? '5px' : '0px', width: openStatusCard ? '20px' : '15px', height: openStatusCard ? '20px' : '15px'}">
           <span v-if="MainCameraInProgress&&MainCameraConnect">
             <div style="display: flex; justify-content: center; align-items: center;">
-              <img src="@/assets/images/svg/ui/MainCamera-red.svg" :style="{height: openStatusCard ? '20px' : '15px'}"></img>
+              <img src="@/assets/images/svg/ui/MainCamera-red.svg" :style="{height: openStatusCard ? '20px' : '15px'}" style="pointer-events: none;"></img>
             </div>
           </span>
           <span v-if="!MainCameraInProgress&&MainCameraConnect">
             <div style="display: flex; justify-content: center; align-items: center;">
-              <img src="@/assets/images/svg/ui/MainCamera-green.svg" :style="{height: openStatusCard ? '20px' : '15px'}"></img>
+              <img src="@/assets/images/svg/ui/MainCamera-green.svg" :style="{height: openStatusCard ? '20px' : '15px'}" style="pointer-events: none;"></img>
             </div>
           </span>
           <span v-if="!MainCameraConnect">
             <div style="display: flex; justify-content: center; align-items: center;">
-              <img src="@/assets/images/svg/ui/MainCamera-white.svg" :style="{height: openStatusCard ? '20px' : '15px'}"></img>
+              <img src="@/assets/images/svg/ui/MainCamera-white.svg" :style="{height: openStatusCard ? '20px' : '15px'}" style="pointer-events: none;"></img>
             </div>
           </span>
         </div>
@@ -70,17 +70,17 @@
           :style="{ top: openStatusCard ? '5px' : '0px', left: openStatusCard ? '30px' : '15px', width: openStatusCard ? '20px' : '15px', height: openStatusCard ? '20px' : '15px'}">
           <span v-if="MountInProgress&&MountConnect">
             <div style="display: flex; justify-content: center; align-items: center;">
-              <img src="@/assets/images/svg/ui/Mount-red.svg" :style="{height: openStatusCard ? '20px' : '15px'}"></img>
+              <img src="@/assets/images/svg/ui/Mount-red.svg" :style="{height: openStatusCard ? '20px' : '15px'}" style="pointer-events: none;"></img>
             </div>
           </span>
           <span v-if="!MountInProgress&&MountConnect">
             <div style="display: flex; justify-content: center; align-items: center;">
-              <img src="@/assets/images/svg/ui/Mount-green.svg" :style="{height: openStatusCard ? '20px' : '15px'}"></img>
+              <img src="@/assets/images/svg/ui/Mount-green.svg" :style="{height: openStatusCard ? '20px' : '15px'}" style="pointer-events: none;"></img>
             </div>
           </span>
           <span v-if="!MountConnect">
             <div style="display: flex; justify-content: center; align-items: center;">
-              <img src="@/assets/images/svg/ui/Mount-white.svg" :style="{height: openStatusCard ? '20px' : '15px'}"></img>
+              <img src="@/assets/images/svg/ui/Mount-white.svg" :style="{height: openStatusCard ? '20px' : '15px'}" style="pointer-events: none;"></img>
             </div>
           </span>
         </div>
@@ -89,22 +89,22 @@
           :style="{ top: openStatusCard ? '5px' : '15px', left: openStatusCard ? '55px' : '0px', width: openStatusCard ? '20px' : '15px', height: openStatusCard ? '20px' : '15px'}">
           <span v-if="CurrentGuiderStatus === 0">
             <div style="display: flex; justify-content: center; align-items: center;">
-              <img src="@/assets/images/svg/ui/Guider-white.svg" :style="{height: openStatusCard ? '20px' : '15px'}"></img>
+              <img src="@/assets/images/svg/ui/Guider-white.svg" :style="{height: openStatusCard ? '20px' : '15px'}" style="pointer-events: none;"></img>
             </div>
           </span>
           <span v-if="CurrentGuiderStatus === 1">
             <div style="display: flex; justify-content: center; align-items: center;">
-              <img src="@/assets/images/svg/ui/Guider-yellow.svg" :style="{height: openStatusCard ? '20px' : '15px'}"></img>
+              <img src="@/assets/images/svg/ui/Guider-yellow.svg" :style="{height: openStatusCard ? '20px' : '15px'}" style="pointer-events: none;"></img>
             </div>
           </span>
           <span v-if="CurrentGuiderStatus === 2">
             <div style="display: flex; justify-content: center; align-items: center;">
-              <img src="@/assets/images/svg/ui/Guider-green.svg" :style="{height: openStatusCard ? '20px' : '15px'}"></img>
+              <img src="@/assets/images/svg/ui/Guider-green.svg" :style="{height: openStatusCard ? '20px' : '15px'}" style="pointer-events: none;"></img>
             </div>
           </span>
           <span v-if="CurrentGuiderStatus === 3">
             <div style="display: flex; justify-content: center; align-items: center;">
-              <img src="@/assets/images/svg/ui/Guider-red.svg" :style="{height: openStatusCard ? '20px' : '15px'}"></img>
+              <img src="@/assets/images/svg/ui/Guider-red.svg" :style="{height: openStatusCard ? '20px' : '15px'}" style="pointer-events: none;"></img>
             </div>
           </span>
         </div>
@@ -113,17 +113,17 @@
           :style="{ top: openStatusCard ? '5px' : '15px', left: openStatusCard ? '80px' : '15px', width: openStatusCard ? '20px' : '15px', height: openStatusCard ? '20px' : '15px'}">
           <span v-if="FocusStatus === 0">
             <div style="display: flex; justify-content: center; align-items: center;">
-              <img src="@/assets/images/svg/ui/Focuser-white.svg" :style="{height: openStatusCard ? '20px' : '15px'}"></img>
+              <img src="@/assets/images/svg/ui/Focuser-white.svg" :style="{height: openStatusCard ? '20px' : '15px'}" style="pointer-events: none;"></img>
             </div>
           </span>
           <span v-if="FocusStatus === 1">
             <div style="display: flex; justify-content: center; align-items: center;">
-              <img src="@/assets/images/svg/ui/Focuser-green.svg" :style="{height: openStatusCard ? '20px' : '15px'}"></img>
+              <img src="@/assets/images/svg/ui/Focuser-green.svg" :style="{height: openStatusCard ? '20px' : '15px'}" style="pointer-events: none;"></img>
             </div>
           </span>
           <span v-if="FocusStatus === 2">
             <div style="display: flex; justify-content: center; align-items: center;">
-              <img src="@/assets/images/svg/ui/Focuser-red.svg" :style="{height: openStatusCard ? '20px' : '15px'}"></img>
+              <img src="@/assets/images/svg/ui/Focuser-red.svg" :style="{height: openStatusCard ? '20px' : '15px'}" style="pointer-events: none;"></img>
             </div>
           </span>
         </div>
@@ -132,7 +132,7 @@
 
       <button class="ScheduleBtn" @click="toggleSchedulePanel" >
         <div style="display: flex; justify-content: center; align-items: center;">
-          <img src="@/assets/images/svg/ui/schedule_table.svg" height="25px" style="min-height: 25px"></img>
+          <img src="@/assets/images/svg/ui/schedule_table.svg" height="25px" style="min-height: 25px; pointer-events: none;"></img>
         </div>
       </button>
       

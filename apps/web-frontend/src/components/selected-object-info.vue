@@ -61,7 +61,7 @@
     </v-dialog>
     <div v-if="$store.state.showSelectedInfoButtons" style="position: absolute; right: 0px; bottom: -50px;">
       <v-btn v-if="showPointToButton" fab small color="transparent" v-on:click.native="lockToSelection()">
-        <img src="@/assets/images/svg/ui/point_to.svg" height="40px" style="min-height: 40px"></img>
+        <img src="@/assets/images/svg/ui/point_to.svg" height="40px" style="min-height: 40px; pointer-events: none;"></img>
       </v-btn>
       <!-- <v-btn v-if="showPointToButton" fab small color="transparent" v-on:click.native="printName()">
         <v-icon>mdi-share</v-icon>
@@ -69,7 +69,7 @@
 
       <!-- <v-btn v-if="!showPointToButton" fab small color="transparent" @click.native="showShareLinkDialog = !showShareLinkDialog"> -->
       <v-btn v-if="!showPointToButton" fab small color="transparent" @click.native="MountGoto()">
-        <img src="@/assets/images/svg/ui/goto.svg" height="40px" style="min-height: 40px"></img>
+        <img src="@/assets/images/svg/ui/goto.svg" height="40px" style="min-height: 40px; pointer-events: none;"></img>
       </v-btn>
 
       <v-btn v-if="!showPointToButton" fab small color="transparent" @mousedown="zoomOutButtonClicked()">
@@ -99,7 +99,9 @@ export default {
       shareLink: undefined,
       showShareLinkDialog: false,
       copied: false,
-      items: []
+      items: [],
+      TargetRa: 0,
+      TargetDec: 0,
     }
   },
   computed: {
@@ -275,7 +277,9 @@ export default {
       const radecCIRS = this.$stel.c2s(posCIRS)
       const raCIRS = this.$stel.anp(radecCIRS[0])
       const decCIRS = this.$stel.anpm(radecCIRS[1])
-      // console.log('ra_JNOW:', raCIRS, ' dec_JNOW:', decCIRS)
+      console.log('ra_JNOW:', raCIRS, ' dec_JNOW:', decCIRS)
+      this.TargetRa = raCIRS;
+      this.TargetDec = decCIRS;
       ret.push({
         key: that.$t('Ra/Dec'),
         value: formatRA(raCIRS) + '&nbsp;&nbsp;&nbsp;' + formatDec(decCIRS)
@@ -350,6 +354,11 @@ export default {
       const Name = this.title;
       console.log('SelectedObject:', Name);
       this.$bus.$emit('insertObjName',Name);
+
+      // Math.floor(this.TargetRa * 100) / 100;
+      // Math.floor(this.TargetDec * 100) / 100;
+
+      this.$bus.$emit('TargetRaDec','Ra:' + Math.floor(this.TargetRa * 1000000) / 1000000 + ',' + 'Dec:' + Math.floor(this.TargetDec * 1000000) / 1000000);
     },
     MountGoto: function () {
       this.$bus.$emit('MountGoto');

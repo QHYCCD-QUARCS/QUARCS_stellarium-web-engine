@@ -7,6 +7,8 @@
  * repository.
  */
 
+var highframeRate = true; // 默认低帧率
+
 Module.afterInit(function() {
   if (!Module.canvas) return;
 
@@ -45,12 +47,14 @@ Module.afterInit(function() {
     Module._core_update();
     Module._core_render(displayWidth, displayHeight, dpr);
 
-    // window.requestAnimationFrame(render)
-
-    // Adjust the frame rate to 15 frames per second
-    setTimeout(function () {
+    if(highframeRate) {
       window.requestAnimationFrame(render);
-    }, 1000 / 15); // 15 FPS
+    } else {
+      // Adjust the frame rate to 15 frames per second
+      setTimeout(function () {
+        window.requestAnimationFrame(render);
+      }, 1000 / 18); // 15 FPS
+    }
   }
 
   var fixPageXY = function(e) {
@@ -167,4 +171,13 @@ Module.afterInit(function() {
 
   // Kickoff rendering at max FPS, normally 60 FPS on a browser.
   window.requestAnimationFrame(render)
-})
+});
+
+// 通过 window 对象暴露 setFrameRate 函数，使其成为全局变量
+window.setHighFrameRate = function(newFrameRate) {
+  highframeRate = newFrameRate;
+};
+
+window.getHighFrameRate = function() {
+  return highframeRate;
+}

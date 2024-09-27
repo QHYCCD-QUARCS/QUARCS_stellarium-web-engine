@@ -26,12 +26,12 @@
     <div>
       <button class="custom-button btn-focus no-select" @click="toggleFocuserPanel"> 
         <div style="display: flex; justify-content: center; align-items: center;">
-          <img src="@/assets/images/svg/ui/focuser.svg" height="45px" style="min-height: 45px"></img>
+          <img src="@/assets/images/svg/ui/focuser.svg" height="45px" style="min-height: 45px; pointer-events: none;"></img>
         </div>
       </button>
       <button class="custom-button btn-hist no-select" @click="toggleHistogramPanel"> 
         <div style="display: flex; justify-content: center; align-items: center;">
-          <img src="@/assets/images/svg/ui/histo.svg" height="45px" style="min-height: 45px"></img>
+          <img src="@/assets/images/svg/ui/histo.svg" height="45px" style="min-height: 45px; pointer-events: none;"></img>
         </div> 
       </button>
     </div>
@@ -39,12 +39,12 @@
     <div>
       <span v-if="isIDLE" class="icon-container">
         <div style="display: flex; justify-content: center; align-items: center;">
-          <img src="@/assets/images/svg/ui/Status-idle.svg" height="15px" style="min-height: 15px"></img>
+          <img src="@/assets/images/svg/ui/Status-idle.svg" height="15px" style="min-height: 15px; pointer-events: none;"></img>
         </div>
       </span>
       <span v-else class="icon-container">
         <div style="display: flex; justify-content: center; align-items: center;">
-          <img src="@/assets/images/svg/ui/Status-busy.svg" height="15px" style="min-height: 15px"></img>
+          <img src="@/assets/images/svg/ui/Status-busy.svg" height="15px" style="min-height: 15px; pointer-events: none;"></img>
         </div>
       </span>
     </div>
@@ -52,7 +52,7 @@
     <div>
       <button class="btn-save no-select" @click="CaptureImageSave"> 
         <div style="display: flex; justify-content: center; align-items: center;">
-          <img src="@/assets/images/svg/ui/download.svg" height="25px" style="min-height: 25px"></img>
+          <img src="@/assets/images/svg/ui/download.svg" height="25px" style="min-height: 25px; pointer-events: none;"></img>
         </div>
       </button>
     </div>

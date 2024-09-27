@@ -28,7 +28,7 @@ static int circle_init(obj_t *obj, json_value *args)
     vec4_set(circle->pos, 0, 0, 1, 0);
     vec2_set(circle->size, 5 * DD2R, 5 * DD2R);
     // circle->frame = FRAME_ICRF;
-    vec_set(circle->frame, 1);
+    // vec_set(circle->frame, 1);
     vec4_set(circle->color, 1, 1, 1, 0.25);
     vec4_set(circle->border_color, 1, 1, 1, 1);
     return 0;

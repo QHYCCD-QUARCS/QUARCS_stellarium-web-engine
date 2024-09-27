@@ -7,7 +7,7 @@
 // repository.
 
 <template>
-  <v-card width="400">
+  <v-card width="400" style="backdrop-filter: blur(5px); background-color: rgba(64, 64, 64, 0.5);">
     <v-container>
       <v-row justify="space-between" no-gutters class="ma-3">
         <div>

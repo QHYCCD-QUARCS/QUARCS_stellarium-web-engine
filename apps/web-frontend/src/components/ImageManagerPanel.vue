@@ -4,7 +4,7 @@
     <div>
       <button class="custom-button btn-MoveUSB no-select" @click="MoveFileToUSB"> 
         <div style="display: flex; justify-content: center; align-items: center;">
-          <img src="@/assets/images/svg/ui/USB Flash Drive.svg" height="20px" style="min-height: 20px"></img>
+          <img src="@/assets/images/svg/ui/USB Flash Drive.svg" height="20px" style="min-height: 20px; pointer-events: none;"></img>
         </div>
       </button>
 
@@ -18,7 +18,7 @@
       <button class="custom-button btn-Delete no-select" @click="DeleteBtnClick"> 
         <span v-if="DeleteBtnSelect === false">
           <div style="display: flex; justify-content: center; align-items: center;">
-            <img src="@/assets/images/svg/ui/delete.svg" height="20px" style="min-height: 20px"></img>
+            <img src="@/assets/images/svg/ui/delete.svg" height="20px" style="min-height: 20px; pointer-events: none;"></img>
           </div> 
         </span>
         <span v-if="DeleteBtnSelect === true">
@@ -40,12 +40,12 @@
     <div>
       <button class="custom-button btn-PrevPage no-select" @click="prevPage">
         <div style="display: flex; justify-content: center; align-items: center;">
-          <img src="@/assets/images/svg/ui/arrow-left.svg" height="20px" style="min-height: 20px"></img>
+          <img src="@/assets/images/svg/ui/arrow-left.svg" height="20px" style="min-height: 20px; pointer-events: none;"></img>
         </div>
       </button>
       <button class="custom-button btn-NextPage no-select" @click="nextPage">
         <div style="display: flex; justify-content: center; align-items: center;">
-          <img src="@/assets/images/svg/ui/arrow-right.svg" height="20px" style="min-height: 20px"></img>
+          <img src="@/assets/images/svg/ui/arrow-right.svg" height="20px" style="min-height: 20px; pointer-events: none;"></img>
         </div>
       </button>
 
@@ -58,7 +58,7 @@
     <div>
       <button class="btn-close no-select" @click="PanelClose">
         <div style="display: flex; justify-content: center; align-items: center;">
-          <img src="@/assets/images/svg/ui/OFF.svg" height="12px" style="min-height: 12px"></img>
+          <img src="@/assets/images/svg/ui/OFF.svg" height="12px" style="min-height: 12px; pointer-events: none;"></img>
         </div>
       </button>
     </div>

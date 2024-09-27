@@ -60,7 +60,7 @@ export default {
   created() {
     this.$bus.$on('SearchName',this.SelectedObjectByName);
 
-    this.$bus.$on('insertObjName',this.SelectedObjectByName);
+    // this.$bus.$on('insertObjName',this.SelectedObjectByName);
   },
   methods: {
     SelectedObjectByName(text) {

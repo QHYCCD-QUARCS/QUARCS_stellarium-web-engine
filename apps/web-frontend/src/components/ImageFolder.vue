@@ -5,7 +5,7 @@
        v-show="isShow">
 
     <div class="no-select" style="display: flex; justify-content: center; align-items: center;">
-      <img src="@/assets/images/svg/ui/folder.svg" height="80px" style="min-height: 80px"></img>
+      <img src="@/assets/images/svg/ui/folder.svg" height="80px" style="min-height: 80px; pointer-events: none;"></img>
     </div> 
 
     <span class="image-data" style="position: absolute; top: 10px; left: 8px; color: rgba(255, 255, 255, 0.7); user-select: none;"> {{ imageDate }}</span>

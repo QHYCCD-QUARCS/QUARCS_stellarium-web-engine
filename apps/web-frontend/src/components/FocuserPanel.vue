@@ -9,73 +9,73 @@
       <button  @click="SpeedChange" @touchend="active" class="get-click btn-Speed">
         <span v-if="MoveSpeed === 1">
           <div style="display: flex; justify-content: center; align-items: center;">
-            <img src="@/assets/images/svg/ui/Speed-1.svg" height="25px" style="min-height: 25px"></img>
+            <img src="@/assets/images/svg/ui/Speed-1.svg" height="25px" style="min-height: 25px; pointer-events: none;"></img>
           </div>
         </span>
         <span v-if="MoveSpeed === 3">
           <div style="display: flex; justify-content: center; align-items: center;">
-            <img src="@/assets/images/svg/ui/Speed-2.svg" height="25px" style="min-height: 25px"></img>
+            <img src="@/assets/images/svg/ui/Speed-2.svg" height="25px" style="min-height: 25px; pointer-events: none;"></img>
           </div>
         </span>
         <span v-if="MoveSpeed === 5">
           <div style="display: flex; justify-content: center; align-items: center;">
-            <img src="@/assets/images/svg/ui/Speed-3.svg" height="25px" style="min-height: 25px"></img>
+            <img src="@/assets/images/svg/ui/Speed-3.svg" height="25px" style="min-height: 25px; pointer-events: none;"></img>
           </div>
         </span>
       </button>
       <button :disabled="isBtnMoveDisabled" @click="FocusLeftMove" @touchend="active" class="get-click btn-Left">
         <div style="display: flex; justify-content: center; align-items: center;">
-          <img src="@/assets/images/svg/ui/arrow-left-circle.svg" height="20px" style="min-height: 20px"></img>
+          <img src="@/assets/images/svg/ui/arrow-left-circle.svg" height="20px" style="min-height: 20px; pointer-events: none;"></img>
         </div>
       </button>
       <!-- <button  @click="AutoFocus" @touchend="active" class="get-click btn-Auto"><v-icon>mdi-focus-auto</v-icon></button> -->
       <button  @click="AutoFocus" @touchend="active" class="get-click btn-Auto">
         <span v-if="inAutoFocus">
           <div style="display: flex; justify-content: center; align-items: center;">
-            <img src="@/assets/images/svg/ui/StopAutoFocus.svg" height="20px" style="min-height: 20px"></img>
+            <img src="@/assets/images/svg/ui/StopAutoFocus.svg" height="20px" style="min-height: 20px; pointer-events: none;"></img>
           </div>
         </span>
         <span v-else>
           <div style="display: flex; justify-content: center; align-items: center;">
-            <img src="@/assets/images/svg/ui/AutoFocus.svg" height="20px" style="min-height: 20px"></img>
+            <img src="@/assets/images/svg/ui/AutoFocus.svg" height="20px" style="min-height: 20px; pointer-events: none;"></img>
           </div>
         </span>
       </button>
 
       <button  @click="FocusGoto" @touchend="active" class="get-click btn-Goto">
         <div style="display: flex; justify-content: center; align-items: center;">
-          <img src="@/assets/images/svg/ui/Move.svg" height="10px" style="min-height: 10px"></img>
+          <img src="@/assets/images/svg/ui/Move.svg" height="10px" style="min-height: 10px; pointer-events: none;"></img>
         </div>
       </button>
       <button :disabled="isBtnMoveDisabled" @click="FocusRightMove" @touchend="active" class="get-click btn-Right">
         <div style="display: flex; justify-content: center; align-items: center;">
-          <img src="@/assets/images/svg/ui/arrow-right-circle.svg" height="20px" style="min-height: 20px"></img>
+          <img src="@/assets/images/svg/ui/arrow-right-circle.svg" height="20px" style="min-height: 20px; pointer-events: none;"></img>
         </div>
       </button>
       <button  @click="StepsChange" @touchend="active" class="get-click btn-Steps">
         <span v-if="MoveSteps === 100">
           <div style="display: flex; justify-content: center; align-items: center;">
-            <img src="@/assets/images/svg/ui/step_100.svg" height="25px" style="min-height: 25px"></img>
+            <img src="@/assets/images/svg/ui/step_100.svg" height="25px" style="min-height: 25px; pointer-events: none;"></img>
           </div>
         </span>
         <span v-if="MoveSteps === 500">
           <div style="display: flex; justify-content: center; align-items: center;">
-            <img src="@/assets/images/svg/ui/step_500.svg" height="25px" style="min-height: 25px"></img>
+            <img src="@/assets/images/svg/ui/step_500.svg" height="25px" style="min-height: 25px; pointer-events: none;"></img>
           </div>
         </span>
         <span v-if="MoveSteps === 1000">
           <div style="display: flex; justify-content: center; align-items: center;">
-            <img src="@/assets/images/svg/ui/step_1000.svg" height="25px" style="min-height: 25px"></img>
+            <img src="@/assets/images/svg/ui/step_1000.svg" height="25px" style="min-height: 25px; pointer-events: none;"></img>
           </div>
         </span>
         <span v-if="MoveSteps === 5000">
           <div style="display: flex; justify-content: center; align-items: center;">
-            <img src="@/assets/images/svg/ui/step_5000.svg" height="25px" style="min-height: 25px"></img>
+            <img src="@/assets/images/svg/ui/step_5000.svg" height="25px" style="min-height: 25px; pointer-events: none;"></img>
           </div>
         </span>
         <span v-if="MoveSteps === 10000">
           <div style="display: flex; justify-content: center; align-items: center;">
-            <img src="@/assets/images/svg/ui/step_10000.svg" height="25px" style="min-height: 25px"></img>
+            <img src="@/assets/images/svg/ui/step_10000.svg" height="25px" style="min-height: 25px; pointer-events: none;"></img>
           </div>
         </span>
       </button>

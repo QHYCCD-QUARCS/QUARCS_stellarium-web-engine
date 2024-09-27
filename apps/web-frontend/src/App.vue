@@ -11,72 +11,147 @@
 <v-app>
   <v-navigation-drawer v-model="drawer_2" ref="Drawer_2" app absolute temporary :width="DeviceIsConnected ? 200 : 200" style="left: 170px; backdrop-filter: blur(5px); background-color: rgba(0, 0, 0, 0.1);">
     
-    <span style="position: absolute; top: 0px; left: 50%; transform: translateX(-50%); font-size: 30px; color: rgba(255, 255, 255, 0.5); user-select: none;">
-      {{ CurrentDriverType }}
-      <v-divider></v-divider>
-    </span>
+    <div v-show="isOpenDevicePage">
+      <span style="position: absolute; top: 0px; left: 50%; transform: translateX(-50%); font-size: 30px; color: rgba(255, 255, 255, 0.5); user-select: none;">
+        {{ CurrentDriverType }}
+        <v-divider></v-divider>
+      </span>
 
-    <div :style="{ width: DeviceIsConnected ? '200px' : '200px' }" style="position: absolute; top: 50px; max-height: calc(100% - 95px); overflow-y: auto;">
+      <div :style="{ width: DeviceIsConnected ? '200px' : '200px' }" style="position: absolute; top: 50px; max-height: calc(100% - 95px); overflow-y: auto;">
 
-      <div v-show="!DeviceIsConnected" style="text-align: center;">
-        <span style="display: inline-block; font-size: 15px; color: rgba(255, 255, 255, 0.5); user-select: none;">
-          {{ 'Device Connect' }}
-        </span>
-        <v-select label="Select Driver" :items="drivers" item-text="label" item-value="value" v-model="selectedDriver" style="width: 150px; display: inline-block;"></v-select>
-        <button :disabled="loadingSelectDriver" @click="confirmDriver" class="get-click btn-confirm" style="display: inline-block;">
-          <template v-if="!loadingSelectDriver">
-            <v-icon color="rgba(255, 255, 255)">mdi-check-bold</v-icon>
-          </template>
-          <template v-else>
-            <div class="progress-spinner">
-              <v-progress-circular indeterminate color="white" size="20"></v-progress-circular>
+        <div v-show="!DeviceIsConnected" style="text-align: center;">
+          <span style="display: inline-block; font-size: 15px; color: rgba(255, 255, 255, 0.5); user-select: none;">
+            {{ 'Device Connect' }}
+          </span>
+          <v-select label="Select Driver" :items="drivers" item-text="label" item-value="value" v-model="selectedDriver" style="width: 150px; display: inline-block;"></v-select>
+          <button :disabled="loadingSelectDriver" @click="confirmDriver" class="get-click btn-confirm" style="display: inline-block;">
+            <template v-if="!loadingSelectDriver">
+              <v-icon color="rgba(255, 255, 255)">mdi-check-bold</v-icon>
+            </template>
+            <template v-else>
+              <div class="progress-spinner">
+                <v-progress-circular indeterminate color="white" size="20"></v-progress-circular>
+              </div>
+            </template>
+          </button>
+        </div>
+
+        <div v-show="!DeviceIsConnected" style="text-align: center;">
+          <v-select label="Select Device" :items="ToBeConnectDevice" item-text="label" item-value="value" v-model="selectedDevice" style="width: 150px; display: inline-block;"></v-select>
+          <button @click="confirmDevice" class="get-click btn-confirm" style="display: inline-block;">
+            <v-icon color="rgba(255, 255, 255)"> mdi-check-bold </v-icon>
+          </button>
+        </div>
+
+        <!-- <v-divider style="margin-top: 20px;"></v-divider> -->
+
+        <div v-show="DeviceIsConnected" v-for="(item, index) in CurrentConfigItems()" :key="index" style="text-align: center; width: 200px;">
+          <span v-if="index === 0" style="display: inline-block; font-size: 15px; color: rgba(255, 255, 255, 0.5); user-select: none;">
+            {{ 'Device Config Items' }}
+          </span>
+          <v-card-text>
+            <v-text-field v-if="item.inputType === 'text'" v-model="item.value" :label="item.label" style="width: 150px; display: inline-block;"></v-text-field>
+
+            <div v-if="item.inputType === 'slider'" style="text-align: left; height: 30px; width: 150px; display: inline-block; margin-bottom: 20px;">
+              <span style="display: inline-block; font-size: 15px; color: rgba(255, 255, 255, 0.5); user-select: none;">{{ item.label }}: {{ item.value }}</span>
+              <div>
+                <button @click="decrement(item)" class="get-click btn-slider" style="position: absolute; left: 25px; transform: translateY(5px); user-select: none; font-size: 5px;">
+                  <div style="display: flex; justify-content: center; align-items: center;">
+                    <img src="@/assets/images/svg/ui/Minus.svg" height="10px" style="min-height: 10px; pointer-events: none;"></img>
+                  </div>
+                </button>
+                <v-slider v-model="item.value" :step="item.inputStep" :max="item.inputMax" :min="item.inputMin" color="white" class="align-center" style="position: absolute; left: 45px; width: calc(100% - 90px);"></v-slider>
+                <button @click="increment(item)" class="get-click btn-slider" style="position: absolute; right: 25px; transform: translateY(5px); user-select: none; font-size: 5px;">
+                  <div style="display: flex; justify-content: center; align-items: center;">
+                    <img src="@/assets/images/svg/ui/Plus.svg" height="10px" style="min-height: 10px; pointer-events: none;"></img>
+                  </div>
+                </button>
+              </div>
             </div>
-          </template>
-        </button>
+
+            <v-select v-if="item.inputType === 'select'" v-model="item.value" :label="item.label" :items="item.selectValue" style="width: 150px; display: inline-block;"></v-select>
+          </v-card-text>
+        </div>
+
       </div>
 
-      <div v-show="!DeviceIsConnected" style="text-align: center;">
-        <v-select label="Select Device" :items="ToBeConnectDevice" item-text="label" item-value="value" v-model="selectedDevice" style="width: 150px; display: inline-block;"></v-select>
-        <button @click="confirmDevice" class="get-click btn-confirm" style="display: inline-block;">
-          <v-icon color="rgba(255, 255, 255)"> mdi-check-bold </v-icon>
-        </button>
-      </div>
-
-      <!-- <v-divider style="margin-top: 20px;"></v-divider> -->
-
-      <div v-show="DeviceIsConnected" v-for="(item, index) in CurrentConfigItems()" :key="index" style="text-align: center; width: 200px;">
-        <span v-if="index === 0" style="display: inline-block; font-size: 15px; color: rgba(255, 255, 255, 0.5); user-select: none;">
-          {{ 'Device Config Items' }}
-        </span>
-        <v-card-text>
-          <v-text-field v-if="item.inputType === 'text'" v-model="item.value" :label="item.label" style="width: 150px; display: inline-block;"></v-text-field>
-
-          <div v-if="item.inputType === 'slider'" style="text-align: left; height: 30px; width: 150px; display: inline-block; margin-bottom: 20px;">
-            <span style="display: inline-block; font-size: 15px; color: rgba(255, 255, 255, 0.5); user-select: none;">{{ item.label }}: {{ item.value }}</span>
-            <div>
-              <button @click="decrement(item)" class="get-click btn-slider" style="position: absolute; left: 25px; transform: translateY(5px); user-select: none; font-size: 5px;">
-                <div style="display: flex; justify-content: center; align-items: center;">
-                  <img src="@/assets/images/svg/ui/Minus.svg" height="10px" style="min-height: 10px"></img>
-                </div>
-              </button>
-              <v-slider v-model="item.value" :step="item.inputStep" :max="item.inputMax" :min="item.inputMin" color="white" class="align-center" style="position: absolute; left: 45px; width: calc(100% - 90px);"></v-slider>
-              <button @click="increment(item)" class="get-click btn-slider" style="position: absolute; right: 25px; transform: translateY(5px); user-select: none; font-size: 5px;">
-                <div style="display: flex; justify-content: center; align-items: center;">
-                  <img src="@/assets/images/svg/ui/Plus.svg" height="10px" style="min-height: 10px"></img>
-                </div>
-              </button>
-            </div>
-          </div>
-
-          <v-select v-if="item.inputType === 'select'" v-model="item.value" :label="item.label" :items="item.selectValue" style="width: 150px; display: inline-block;"></v-select>
-        </v-card-text>
-      </div>
+      <button v-show="DeviceIsConnected" @click="confirmConfiguration(CurrentConfigItems())" class="get-click btn-confirm" style="position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); display: inline-block; user-select: none;">
+        <v-icon color="rgba(255, 255, 255)"> mdi-check-bold </v-icon>
+      </button>
 
     </div>
 
-    <button v-show="DeviceIsConnected" @click="confirmConfiguration(CurrentConfigItems())" class="get-click btn-confirm" style="position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); display: inline-block; user-select: none;">
-      <v-icon color="rgba(255, 255, 255)"> mdi-check-bold </v-icon>
-    </button>
+    <div v-show="isOpenPowerPage">
+      <span style="position: absolute; top: 0px; left: 50%; transform: translateX(-50%); font-size: 26px; color: rgba(255, 255, 255, 0.5); user-select: none; white-space: nowrap; ">
+        Power Manager
+        <v-divider></v-divider>
+      </span>
+
+      <div style="position: absolute; top: 50px; max-height: calc(100% - 50px); width: 200px; overflow-y: auto;">
+        <v-list dense>
+
+          <v-list-item @click.stop="SwitchOutPutPower(1, OutPutPower_1_ON)" :style="{ height: '36px', marginBottom: '10px' }">
+            <v-list-item-icon style="margin-right: 10px;">
+              <div style="display: flex; justify-content: center; align-items: center;">
+                <img src="@/assets/images/svg/ui/OutPutPower.svg" height="30px" style="min-height: 30px; pointer-events: none;"></img>
+              </div>
+            </v-list-item-icon>
+            <v-list-item-content>
+              <v-list-item-title>
+                <span>
+                  <div :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ 'OutPut Power 1' }}</div>
+                  <div :style="{ fontSize: '7px' }" :class="{ 'connected-device': OutPutPower_1_ON }">{{ OutPutPower_1_ON ? '[ON]' : '[OFF]' }}</div>
+                </span>
+              </v-list-item-title>
+
+            </v-list-item-content>
+          </v-list-item>
+
+          <v-list-item @click.stop="SwitchOutPutPower(2, OutPutPower_2_ON)" :style="{ height: '36px', marginBottom: '10px' }">
+            <v-list-item-icon style="margin-right: 10px;">
+              <div style="display: flex; justify-content: center; align-items: center;">
+                <img src="@/assets/images/svg/ui/OutPutPower.svg" height="30px" style="min-height: 30px; pointer-events: none;"></img>
+              </div>
+            </v-list-item-icon>
+            <v-list-item-content>
+              <v-list-item-title>
+                <span>
+                  <div :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ 'OutPut Power 2' }}</div>
+                  <div :style="{ fontSize: '7px' }" :class="{ 'connected-device': OutPutPower_2_ON }">{{ OutPutPower_2_ON ? '[ON]' : '[OFF]' }}</div>
+                </span>
+              </v-list-item-title>
+
+            </v-list-item-content>
+          </v-list-item>
+
+          <v-divider :style="{ marginBottom: '10px' }"></v-divider>
+
+          <v-list-item @click.stop="openPowerManagerPage()" :style="{ height: '36px', marginBottom: '10px' }">
+            <v-list-item-icon style="margin-right: 10px;">
+              <div style="display: flex; justify-content: center; align-items: center;">
+                <img src="@/assets/images/svg/ui/Reboot.svg" height="30px" style="min-height: 30px; pointer-events: none;"></img>
+              </div>
+            </v-list-item-icon>
+            <v-list-item-content>
+              <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ 'Reboot' }}</v-list-item-title>
+            </v-list-item-content>
+          </v-list-item>
+
+          <v-list-item @click.stop="openPowerManagerPage()" :style="{ height: '36px', marginBottom: '10px' }">
+            <v-list-item-icon style="margin-right: 10px;">
+              <div style="display: flex; justify-content: center; align-items: center;">
+                <img src="@/assets/images/svg/ui/PowerOFF.svg" height="30px" style="min-height: 30px; pointer-events: none;"></img>
+              </div>
+            </v-list-item-icon>
+            <v-list-item-content>
+              <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ 'Main Power OFF' }}</v-list-item-title>
+            </v-list-item-content>
+          </v-list-item>
+
+        </v-list>
+      </div>
+
+    </div>
 
   </v-navigation-drawer>
 
@@ -108,10 +183,21 @@
           </template>
         </template>
 
+        <v-list-item @click.stop="openPowerManagerPage()" :style="{ height: '36px' }">
+          <v-list-item-icon style="margin-right: 10px;">
+            <div style="display: flex; justify-content: center; align-items: center;">
+              <img src="@/assets/images/svg/ui/Power.svg" height="30px" style="min-height: 30px; pointer-events: none;"></img>
+            </div>
+          </v-list-item-icon>
+          <v-list-item-content>
+            <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ '电源管理' }}</v-list-item-title>
+          </v-list-item-content>
+        </v-list-item>
+
         <v-list-item :disabled="loadingConnectAllDevice" @click.stop="connectAllDevice()" :style="{ height: '36px' }">
           <v-list-item-icon style="margin-right: 10px;">
             <div style="display: flex; justify-content: center; align-items: center;">
-              <img src="@/assets/images/svg/ui/Connect.svg" height="30px" style="min-height: 30px"></img>
+              <img src="@/assets/images/svg/ui/Connect.svg" height="30px" style="min-height: 30px; pointer-events: none;"></img>
             </div>
           </v-list-item-icon>
           <v-list-item-content>
@@ -128,7 +214,7 @@
         <v-list-item @click.stop="disconnectAllDevice(false)" :style="{ height: '36px' }">
           <v-list-item-icon style="margin-right: 10px;">
             <div style="display: flex; justify-content: center; align-items: center;">
-              <img src="@/assets/images/svg/ui/DisConnect.svg" height="30px" style="min-height: 30px"></img>
+              <img src="@/assets/images/svg/ui/DisConnect.svg" height="30px" style="min-height: 30px; pointer-events: none;"></img>
             </div>
           </v-list-item-icon>
           <v-list-item-content>
@@ -139,7 +225,7 @@
         <v-list-item @click.stop="CalibratePolarAxis()" :style="{ height: '36px' }">
           <v-list-item-icon style="margin-right: 10px;">
             <div style="display: flex; justify-content: center; align-items: center;">
-              <img src="@/assets/images/svg/ui/PoleAxis.svg" height="30px" style="min-height: 30px"></img>
+              <img src="@/assets/images/svg/ui/PoleAxis.svg" height="30px" style="min-height: 30px; pointer-events: none;"></img>
             </div>
           </v-list-item-icon>
           <v-list-item-content>
@@ -150,7 +236,7 @@
         <v-list-item @click.stop="OpenIamgeFolder()" :style="{ height: '36px' }">
           <v-list-item-icon style="margin-right: 10px;">
             <div style="display: flex; justify-content: center; align-items: center;">
-              <img src="@/assets/images/svg/ui/FolderSwitch.svg" height="30px" style="min-height: 30px"></img>
+              <img src="@/assets/images/svg/ui/FolderSwitch.svg" height="30px" style="min-height: 30px; pointer-events: none;"></img>
             </div>
           </v-list-item-icon>
           <v-list-item-content>
@@ -168,7 +254,6 @@
           </v-list-item-icon>
           <v-list-item-content>
             <v-list-item-title>
-              <!-- {{ device.name }} <span>{{ device.device }}</span> -->
               <span>
                 <div :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ device.driverType }}</div>
                 <div :style="{ fontSize: '7px' }" :class="{ 'connected-device': device.isConnected }">{{ device.device }}</div>
@@ -254,7 +339,7 @@
           <component v-bind:is="guiComponent"></component>
           <canvas id="stel-canvas" ref='stelCanvas' :style="{ zIndex: canvasZIndexStel }"></canvas>
           <canvas ref="mainCanvas" id="mainCamera-canvas"   :style="{ zIndex: canvasZIndexMainCamera }"></canvas>
-          <canvas ref="guiderCanvas" id="guiderCamera-canvas" :style="{ zIndex: canvasZIndexGuiderCamera }"></canvas>
+          <canvas ref="guiderCanvas" id="guiderCamera-canvas" :style="{ zIndex: canvasZIndexGuiderCamera }" @click="handleGuiderCanvasClick"></canvas>
           <!-- <img id="imageSrc" alt="Source" :src="imageSrc" crossOrigin = "" /> -->
 
         </div>
@@ -342,10 +427,11 @@ export default {
         // { driverType: 'MainCamera', num: 1, label: 'Chip Width (mm)', value: '' },
         // { driverType: 'MainCamera', num: 2, label: 'Chip Height (mm)', value: '' },
         // { driverType: 'MainCamera', num: 3, label: 'Focal Length (mm)', value: '' },
-        { driverType: 'MainCamera', label: 'ImageGainR', value: '', inputType: 'slider', inputMin: 0, inputMax: 255, inputStep: 0.1},
-        { driverType: 'MainCamera', label: 'ImageGainB', value: '', inputType: 'slider', inputMin: 0, inputMax: 255, inputStep: 0.1},
+        { driverType: 'MainCamera', label: 'ImageGainR', value: '', inputType: 'slider', inputMin: 0, inputMax: 3, inputStep: 0.01},
+        { driverType: 'MainCamera', label: 'ImageGainB', value: '', inputType: 'slider', inputMin: 0, inputMax: 3, inputStep: 0.01},
         { driverType: 'MainCamera', label: 'ImageCFA', value: '', inputType: 'select', selectValue: ['GR', 'GB', 'BG', 'RGGB']},
         { driverType: 'MainCamera', label: 'ImageOffset', value: '', inputType: 'slider', inputMin: 0, inputMax: 255, inputStep: 0.1},
+        { driverType: 'MainCamera', label: 'Binning', value: '', inputType: 'slider', inputMin: 1, inputMax: 4, inputStep: 1},
 
         { driverType: 'MainCamera', label: 'Gain', value: '', inputType: 'slider', inputMin: 0, inputMax: 0, inputStep: 1},
         { driverType: 'MainCamera', label: 'Offset', value: '', inputType: 'slider', inputMin: 0, inputMax: 0, inputStep: 1},
@@ -455,6 +541,14 @@ export default {
 
       ImageArrayBuffer: null,
 
+      isOpenDevicePage: false,
+      isOpenPowerPage: false,
+
+      OutPutPower_1_ON: true,
+      OutPutPower_2_ON: false,
+
+      isPolarAxisMode: false,
+
     }
   },
   components: { Gui,
@@ -471,6 +565,7 @@ export default {
     this.$bus.$on('ImageGainB', this.ImageGainSet);
     this.$bus.$on('Offset', this.CameraOffsetSet);
     this.$bus.$on('ImageOffset', this.ImageOffsetSet);
+    this.$bus.$on('Binning', this.BinningSet);
     this.$bus.$on('ImageCFA', this.ImageCFASet);
     this.$bus.$on('ImageProportion', this.setImageProportion);
     this.$bus.$on('MountGoto',this.lookatcircle);
@@ -483,6 +578,8 @@ export default {
     this.$bus.$on('GetConnectedDevices', this.ReturnConnectedDevices);
     this.$bus.$on('CurrentCFWList', this.CurrentCFWList);
     this.$bus.$on('calcWhiteBalanceGains', this.calcWhiteBalanceGains);
+    this.$bus.$on('SwitchOutPutPower', this.SwitchOutPutPower);
+    this.$bus.$on('PolarAxisMode', this.PolarAxisMode);
   },
   methods: {
     getLocationHostName() {
@@ -745,11 +842,27 @@ export default {
             }
           }
           
-          if (data.message.startsWith('TelescopeTotalSlewRate:')) {
+          // if (data.message.startsWith('TelescopeTotalSlewRate:')) {
+          //   const parts = data.message.split(':');
+          //   if (parts.length === 2) {
+          //     const num = parts[1];
+          //     this.$bus.$emit('MountTotalSlewRate',num);
+          //   }
+          // }
+
+          if (data.message.startsWith('MountSetSpeedSuccess:')) {
             const parts = data.message.split(':');
             if (parts.length === 2) {
               const num = parts[1];
-              this.$bus.$emit('MountTotalSlewRate',num);
+              this.$bus.$emit('newMountSlewRate',num);
+            }
+          }
+
+          if (data.message.startsWith('TelescopePierSide:')) {
+            const parts = data.message.split(':');
+            if (parts.length === 2) {
+              const Side = parts[1];
+              this.$bus.$emit('updateMountPierSide',Side);
             }
           }
 
@@ -974,6 +1087,58 @@ export default {
             }
           }
 
+          if (data.message.startsWith('OutPutPowerStatus:')) {
+            const parts = data.message.split(':');
+            if (parts.length === 3) {
+              const index = parseInt(parts[1], 10);
+              const value = parseInt(parts[2], 10);
+
+              if (index === 1) {
+                this.OutPutPower_1_ON = value === 1;
+              } else if (index === 2) {
+                this.OutPutPower_2_ON = value === 1;
+              }
+            }
+          }
+
+          if (data.message.startsWith('PHD2StarBoxView:')) {
+            const parts = data.message.split(':');
+            if (parts.length === 2) {
+              const view = parts[1];
+              this.$bus.$emit('PHD2StarBoxView',view);
+            }
+          }
+
+          if (data.message.startsWith('PHD2StarCrossView:')) {
+            const parts = data.message.split(':');
+            if (parts.length === 2) {
+              const view = parts[1];
+              this.$bus.$emit('PHD2StarCrossView',view);
+            }
+          }
+
+          if (data.message.startsWith('PHD2StarBoxPosition:')) {
+            const parts = data.message.split(':');
+            if (parts.length === 5) {
+              const PHD2ImageSize_X = parseInt(parts[1], 10);
+              const PHD2ImageSize_Y = parseInt(parts[2], 10);
+              const Box_X = parseInt(parts[3], 10);
+              const Box_Y = parseInt(parts[4], 10);
+              this.DrawPHD2Box(PHD2ImageSize_X, PHD2ImageSize_Y, Box_X, Box_Y);
+            }
+          }
+
+          if (data.message.startsWith('PHD2StarCrossPosition:')) {
+            const parts = data.message.split(':');
+            if (parts.length === 5) {
+              const PHD2ImageSize_X = parseInt(parts[1], 10);
+              const PHD2ImageSize_Y = parseInt(parts[2], 10);
+              const Cross_X = parseInt(parts[3], 10);
+              const Cross_Y = parseInt(parts[4], 10);
+              this.DrawPHD2Cross(PHD2ImageSize_X, PHD2ImageSize_Y, Cross_X, Cross_Y);
+            }
+          }
+
           
         }
         else if (data.type === 'QT_Confirm') {
@@ -1072,12 +1237,23 @@ export default {
       this.sendMessage('Vue_Command', 'getStagingImage');
       this.sendMessage('Vue_Command', 'getStagingScheduleData');
       this.sendMessage('Vue_Command', 'getStagingSolveResult');
+      this.sendMessage('Vue_Command', 'getGPIOsStatus');
+    },
+
+    openPowerManagerPage() {
+      this.isOpenDevicePage = false;
+      this.isOpenPowerPage = true;
+
+      // window.setHighFrameRate(true); // 使用全局函数更新帧率
+
+      this.drawer_2 = true;
     },
 
     selectDevice(device) {
+      this.isOpenDevicePage = true;
+      this.isOpenPowerPage = false;
+
       if (device.isget === false) {
-        // console.log('QHYCCD | Selected device:', device.type);
-        // 将 isget 设置为 true
         // device.isget = true;
         this.sendMessage('Vue_Command', 'SelectIndiDriver:' + device.type + ":" + device.ListNum);
         this.drivers = [];
@@ -1199,12 +1375,34 @@ export default {
             // device.device = '';
           });
 
-          this.$bus.$emit('MainCameraConnected', 0);
-          this.$bus.$emit('MountConnected', 0);
+          // this.$bus.$emit('MainCameraConnected', 0);
+          // this.$bus.$emit('MountConnected', 0);
+          this.claerDeviceList();
         }
       } else {
         console.log("没有设备连接");
         this.callShowMessageBox('No devices have been connected.', 'error');
+      }
+    },
+
+    claerDeviceList() {
+      this.devices.forEach(device => {
+        device.isConnected = false;
+        device.isget = false;
+        device.device = ''; 
+        device.driverName = '';
+      });
+      this.ToBeConnectDevice = [];
+      this.devicesList = [];
+      this.drivers = [];
+    },
+
+    SwitchOutPutPower(index, isPowerON) {
+      if (isPowerON) { 
+        this.drawer_2 = false;
+        this.ShowConfirmDialog('Output Power:' + index, 'Are you sure you want to turn off this output power?', 'SwitchOutPutPower');
+      } else {
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'SwitchOutPutPower:' + index);
       }
     },
 
@@ -1296,7 +1494,7 @@ export default {
           canvas.height = img.height;
           ctx.clearRect(0, 0, canvas.width, canvas.height);
           ctx.drawImage(img, 0, 0);
-          this.$bus.$emit('showSolveImage', img);
+          // this.$bus.$emit('showSolveImage', img);
         };
 
         // 添加错误处理
@@ -1336,6 +1534,14 @@ export default {
 
       this.ImageOffset = doubleValue;
       console.log('Image Offset is set to:', doubleValue);
+    },
+
+    BinningSet(payload) {
+      const [signal, value] = payload.split(':'); // 拆分信号和值
+      const IntValue = parseInt(value); // 将值转换为 double 类型
+
+      console.log('Image Binning is set to:', IntValue);
+      this.sendMessage('Vue_Command', 'SetBinning:' + IntValue);
     },
 
     ImageCFASet(payload) {
@@ -1436,7 +1642,9 @@ export default {
           const endTime = new Date();
           const elapsedTime = endTime.getTime() - startTime.getTime();
           console.log('CaptureTestTime | Read image data end:', elapsedTime, 'milliseconds');
-          this.callShowMessageBox(`Read image data end: '${elapsedTime}' milliseconds.`, 'msg');
+          if (!this.isPolarAxisMode) {
+            this.callShowMessageBox(`Read image data end: '${elapsedTime}' milliseconds.`, 'msg');
+          }
 
           this.processImage(this.ImageArrayBuffer);
         };
@@ -1564,35 +1772,40 @@ export default {
 
       targetImg16.delete();
 
-      // 创建用于绘制的 ImageData 对象，并在修改后的画布上绘制图像
-      colorData = new ImageData(new Uint8ClampedArray(img8.data), img8.cols, img8.rows);
+      if (this.isPolarAxisMode) {
+        this.$bus.$emit('showSolveImage', img8);
+      } 
+      else {
+        // 创建用于绘制的 ImageData 对象，并在修改后的画布上绘制图像
+        colorData = new ImageData(new Uint8ClampedArray(img8.data), img8.cols, img8.rows);
 
-      this.OriginalImage = colorData;
-      this.drawImgData = this.OriginalImage;
-      this.drawImageData(this.drawImgData);
+        this.OriginalImage = colorData;
+        this.drawImgData = this.OriginalImage;
+        this.drawImageData(this.drawImgData);
 
-      const endTime = new Date();
-      const elapsedTime = endTime.getTime() - startTime.getTime();
-      console.log('CaptureTestTime | Process image data end:', elapsedTime, 'milliseconds');
+        const endTime = new Date();
+        const elapsedTime = endTime.getTime() - startTime.getTime();
+        console.log('CaptureTestTime | Process image data end:', elapsedTime, 'milliseconds');
 
-      this.$bus.$emit('showCaptureImage');
+        this.$bus.$emit('showCaptureImage');
 
-      this.MakeHistogram(colorData);
-      this.histogramImage = colorData;
+        this.MakeHistogram(colorData);
+        this.histogramImage = colorData;
 
-      // 检查 DetectedStarsFinish 变量
-      const checkDetectedStarsFinish = () => {
-        console.log('Wait for Detect Stars finish...');
-        if (this.DetectedStarsFinish) {
-          // 如果 DetectedStarsFinish 为 true，执行星点检测并清除定时器
-          this.detectStarsImg = this.DrawDetectStars(img8, this.DetectedStarsList);
-          img8.delete();
-          clearInterval(intervalId);
-        }
-      };
+        // 检查 DetectedStarsFinish 变量
+        const checkDetectedStarsFinish = () => {
+          console.log('Wait for Detect Stars finish...');
+          if (this.DetectedStarsFinish) {
+            // 如果 DetectedStarsFinish 为 true，执行星点检测并清除定时器
+            this.detectStarsImg = this.DrawDetectStars(img8, this.DetectedStarsList);
+            img8.delete();
+            clearInterval(intervalId);
+          }
+        };
 
-      // 设置一个定时器，每隔 100 毫秒检查一次 DetectedStarsFinish 变量
-      const intervalId = setInterval(checkDetectedStarsFinish, 1000);
+        // 设置一个定时器，每隔 100 毫秒检查一次 DetectedStarsFinish 变量
+        const intervalId = setInterval(checkDetectedStarsFinish, 1000);
+      }
     },
 
     initCanvas() {
@@ -1868,6 +2081,29 @@ export default {
       return imageData;
     },
 
+    DrawPHD2Box(PHD2ImageSize_X, PHD2ImageSize_Y, Box_X, Box_Y) {
+      const ratioZoomX = PHD2ImageSize_X / window.innerWidth;
+      const ratioZoomY = PHD2ImageSize_Y / window.innerHeight;
+
+      const BoxWidth = 20 / ratioZoomX;
+      const BoxHeight = 20 / ratioZoomY;
+
+      const BoxStartX = Box_X / ratioZoomX - BoxWidth / 2;
+      const BoxStartY = Box_Y / ratioZoomY - BoxHeight / 2;
+
+      this.$bus.$emit('PHD2BoxPosition', BoxStartX, BoxStartY, BoxWidth, BoxHeight);
+    },
+
+    DrawPHD2Cross(PHD2ImageSize_X, PHD2ImageSize_Y, Cross_X, Cross_Y) {
+      const ratioZoomX = PHD2ImageSize_X / window.innerWidth;
+      const ratioZoomY = PHD2ImageSize_Y / window.innerHeight;
+
+      const CrossStartX = Cross_X / ratioZoomX;
+      const CrossStartY = Cross_Y / ratioZoomY;
+
+      this.$bus.$emit('PHD2CrossPosition', CrossStartX, CrossStartY);
+    },
+
     GetAutoStretch(imgData, mode) {
       const mean = imgData.reduce((sum, value) => sum + value, 0) / imgData.length;
       const std = Math.sqrt(imgData.reduce((sum, value) => sum + Math.pow(value - mean, 2), 0) / imgData.length);
@@ -1977,9 +2213,6 @@ export default {
         Array(256).fill(0)  // 存储红色通道直方图
       ];
 
-      // let totalBrightness = 0;
-      // let count = 0;
-
       // 分别计算三个通道的直方图
       for (let i = 0; i < imageData.data.length; i += 4) {
         const r = imageData.data[i];
@@ -1990,28 +2223,13 @@ export default {
         histogram[0][b]++;
         histogram[1][g]++;
         histogram[2][r]++;
-
-        // 计算像素的灰度值（亮度），减去offset并防止出现负值
-        // const brightness = Math.max((r + g + b) / 3, 0);
-
-        // // 累加亮度
-        // totalBrightness += brightness;
-        // count++;
       }
-
-      // 计算平均亮度
-      // const averageBrightness = totalBrightness / count;
-
-      // console.log(`Average Brightness: ${averageBrightness}`);
 
       return histogram;
     },
 
     applyHistStretch(Min, Max) {
       if (cv && this.histogramImage) {
-        // Convert the image to a cv.Mat
-        // const src = cv.imread(this.histogramImage);    //Image()
-
         // Create cv.Mat object from image data
         const src = cv.matFromImageData(this.histogramImage);
 
@@ -2058,9 +2276,10 @@ export default {
         canvas.width = stretchImage.cols;
         canvas.height = stretchImage.rows;
 
+        this.drawImgData = new ImageData(new Uint8ClampedArray(stretchImage.data), stretchImage.cols, stretchImage.rows);
+
         // Draw the image on canvas
-        cv.imshow(canvas, stretchImage);
-        console.log('QHYCCD | canvas size:', canvas.width, canvas.height);
+        this.drawImageData(this.drawImgData);
 
         // Clean up
         src.delete();
@@ -2303,6 +2522,7 @@ export default {
       return res
     },
     toggleStoreValue: function (storeVarName) {
+      this.nav = false;
       this.$store.commit('toggleBool', storeVarName)
     },
     getStoreValue: function (storeVarName) {
@@ -2857,6 +3077,21 @@ export default {
         item.value += item.inputStep;
       }
     },
+
+    PolarAxisMode(bool) {
+      this.isPolarAxisMode = bool;
+    },
+
+    handleGuiderCanvasClick(event) {
+      const canvas = this.$refs.guiderCanvas;
+      const rect = canvas.getBoundingClientRect();
+      const x = event.clientX - rect.left; // 点击坐标X
+      const y = event.clientY - rect.top;  // 点击坐标Y
+      console.log(`Clicked at: (${x}, ${y})`);
+      const CanvasWidth = window.innerWidth;
+      const CanvasHeight = window.innerHeight;
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'GuiderCanvasClick:' + CanvasWidth + ':' + CanvasHeight + ':' + x + ':' + y);
+    }
 
    
   },

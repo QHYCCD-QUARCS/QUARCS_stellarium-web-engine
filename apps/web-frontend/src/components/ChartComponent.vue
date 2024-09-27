@@ -7,39 +7,47 @@
 
     <div class="buttons-container">
 
-      <button :class="GuiderSwitchBtnClass" :style="{ animationDuration: ExpTime + 'ms' }" @touchend="GuiderSwitch">
+      <!-- <button :class="GuiderSwitchBtnClass" :style="{ animationDuration: ExpTime + 'ms' }" @touchend="GuiderSwitch">
         <div style="display: flex; justify-content: center; align-items: center;">
-          <img src="@/assets/images/svg/ui/Guider.svg" height="20px" style="min-height: 20px"></img>
+          <img src="@/assets/images/svg/ui/Guider.svg" height="20px" style="min-height: 20px; pointer-events: none;"></img>
+        </div>
+      </button> -->
+
+      <button :class="GuiderSwitchBtnClass" :style="{ animationDuration: ExpTime + 'ms' }" 
+        @mousedown="startPress" @mouseup="endPress"
+        @touchstart="startPress" @touchend="endPress">
+        <div style="display: flex; justify-content: center; align-items: center;">
+          <img src="@/assets/images/svg/ui/Guider.svg" height="20px" style="min-height: 20px; pointer-events: none;"></img>
         </div>
       </button>
 
       <button class="btn-Style" @touchend="ExpTimeSwitch">
         <span v-if="ExpTime === 1000">
           <div style="display: flex; justify-content: center; align-items: center;">
-            <img src="@/assets/images/svg/ui/Exp-1000.svg" height="25px" style="min-height: 25px"></img>
+            <img src="@/assets/images/svg/ui/Exp-1000.svg" height="25px" style="min-height: 25px; pointer-events: none;"></img>
           </div>
         </span>
         <span v-if="ExpTime === 2000">
           <div style="display: flex; justify-content: center; align-items: center;">
-            <img src="@/assets/images/svg/ui/Exp-2000.svg" height="25px" style="min-height: 25px"></img>
+            <img src="@/assets/images/svg/ui/Exp-2000.svg" height="25px" style="min-height: 25px; pointer-events: none;"></img>
           </div>
         </span>
         <span v-if="ExpTime === 500">
           <div style="display: flex; justify-content: center; align-items: center;">
-            <img src="@/assets/images/svg/ui/Exp-500.svg" height="25px" style="min-height: 25px"></img>
+            <img src="@/assets/images/svg/ui/Exp-500.svg" height="25px" style="min-height: 25px; pointer-events: none;"></img>
           </div>
         </span>
       </button>
 
       <button class="btn-Style" @touchend="DataClear">
         <div style="display: flex; justify-content: center; align-items: center;">
-          <img src="@/assets/images/svg/ui/delete.svg" height="20px" style="min-height: 20px"></img>
+          <img src="@/assets/images/svg/ui/delete.svg" height="20px" style="min-height: 20px; pointer-events: none;"></img>
         </div>
       </button>
 
       <button class="btn-Style" @touchend="RangeSwitch">
         <div style="display: flex; justify-content: center; align-items: center;">
-          <img src="@/assets/images/svg/ui/suofang.svg" height="20px" style="min-height: 20px"></img>
+          <img src="@/assets/images/svg/ui/suofang.svg" height="20px" style="min-height: 20px; pointer-events: none;"></img>
         </div>
       </button>
 
@@ -64,6 +72,12 @@ export default {
       ExpTime: 1000,
       isGuiding: false,
       CurrentGuiderStatus: 'null',
+
+      pressTimer: null,
+      longPressThreshold: 1000,
+      isLongPress: false, // 标记是否为长按
+      canClick: true,
+
     };
   },
   components: {
@@ -94,6 +108,40 @@ export default {
     }
   },
   methods: {
+    startPress() {
+      this.isLongPress = false; // 重置长按标记
+      this.pressTimer = setTimeout(() => {
+        this.isLongPress = true; // 标记为长按
+        this.handleLongPress();
+      }, this.longPressThreshold);
+    },
+    endPress() {
+      clearTimeout(this.pressTimer); // 清除定时器
+      if (!this.isLongPress) {
+        this.handleClick(); // 如果不是长按，则触发点击事件
+      }
+      this.pressTimer = null; // 重置定时器
+    },
+    handleClick() {
+      if (!this.canClick) return; // 如果不可点击，直接返回
+      this.canClick = false; // 设置为不可点击
+      // console.log("Button clicked");
+
+      this.GuiderSwitch();
+
+      // 恢复点击权限
+      setTimeout(() => {
+        this.canClick = true;
+      }, 1000); // 1秒后恢复
+    },
+    handleLongPress() {
+      if(this.isGuiding) return;
+      // 长按事件的处理
+      console.log("Button long pressed");
+
+      this.$bus.$emit('ShowConfirmDialog', 'Recalibrate', "Are you sure you need to clear the calibration data and recalibrate?", 'Recalibrate');
+    },
+
     GuiderSwitch() {
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'GuiderSwitch');
     },

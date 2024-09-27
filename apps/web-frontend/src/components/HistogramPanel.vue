@@ -6,7 +6,7 @@
     <div class="buttons-container">
       <button  @touchend="calcWhiteBalanceGains" class="get-click btn-Reset">
         <div style="display: flex; justify-content: center; align-items: center;">
-          <img src="@/assets/images/svg/ui/WhiteBalance.svg" height="20px" style="min-height: 20px"></img>
+          <img src="@/assets/images/svg/ui/WhiteBalance.svg" height="20px" style="min-height: 20px; pointer-events: none;"></img>
         </div>
       </button>
 
@@ -14,7 +14,7 @@
 
       <button  @touchend="ResetHistogram" class="get-click btn-Reset">
         <div style="display: flex; justify-content: center; align-items: center;">
-          <img src="@/assets/images/svg/ui/reset.svg" height="25px" style="min-height: 25px"></img>
+          <img src="@/assets/images/svg/ui/reset.svg" height="25px" style="min-height: 25px; pointer-events: none;"></img>
         </div>
       </button>
 
