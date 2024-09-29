@@ -56,7 +56,7 @@ sudo apt-get install scons
 
 ```shell
 # Download the QUARCS_stellarium-web-engine into the folder, eg: ~/workspace/QUARCS_stellarium-web-engine
-git clone https://github.com/AstroAir/QUARCS_stellarium-web-engine.git
+git clone https://github.com/QHYCCD-QUARCS/QUARCS_stellarium-web-engine.git
 cd QUARCS_stellarium-web-engine
 source $PATCH_TO_EMSDK/emsdk_env.sh # If you have not switched terminals until now, then this step is not necessary
 make js # build stellarium-web-engine.js and stellarium-web-engine.wasm
