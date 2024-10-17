@@ -22,25 +22,16 @@ export default {
     };
   },
   mounted() {
-    this.initChart();
+
   },
   created() {
     // this.$bus.$on('InitChart', this.setMaxWidth);
     this.$bus.$on('showHistogram', this.addDataToChart);
+    this.$bus.$on('updateHistogramWidth', this.initChart);
   },
   methods: {
-    // setMaxWidth() {
-    //   const Width = window.innerWidth;
-    //   this.containerMaxWidth = Width - 350;
-    //   const chartDom = this.$refs.barchart;
-    //   chartDom.style.width = this.containerMaxWidth + 'px';
-    //   this.myChart = echarts.init(chartDom);
-    //   this.renderChart(this.xAxis_min, this.xAxis_max);
-    // },
-
-    initChart() {
-      const Width = window.innerWidth;
-      this.containerMaxWidth = Width - 350;
+    initChart(Width) {
+      this.containerMaxWidth = Width - 10;
       const chartDom = this.$refs.barchart;
       chartDom.style.width = this.containerMaxWidth + 'px';
       this.myChart = echarts.init(chartDom);

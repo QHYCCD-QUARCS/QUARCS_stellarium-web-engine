@@ -13,7 +13,7 @@
     
     <div v-show="isOpenDevicePage">
       <span style="position: absolute; top: 0px; left: 50%; transform: translateX(-50%); font-size: 30px; color: rgba(255, 255, 255, 0.5); user-select: none;">
-        {{ CurrentDriverType }}
+        {{ $t(CurrentDriverType) }}
         <v-divider></v-divider>
       </span>
 
@@ -21,9 +21,9 @@
 
         <div v-show="!DeviceIsConnected" style="text-align: center;">
           <span style="display: inline-block; font-size: 15px; color: rgba(255, 255, 255, 0.5); user-select: none;">
-            {{ 'Device Connect' }}
+            {{ $t('Device Connection') }}
           </span>
-          <v-select label="Select Driver" :items="drivers" item-text="label" item-value="value" v-model="selectedDriver" style="width: 150px; display: inline-block;"></v-select>
+          <v-select :label="$t('Select Driver')" :items="drivers" item-text="label" item-value="value" v-model="selectedDriver" style="width: 150px; display: inline-block;"></v-select>
           <button :disabled="loadingSelectDriver" @click="confirmDriver" class="get-click btn-confirm" style="display: inline-block;">
             <template v-if="!loadingSelectDriver">
               <v-icon color="rgba(255, 255, 255)">mdi-check-bold</v-icon>
@@ -37,7 +37,7 @@
         </div>
 
         <div v-show="!DeviceIsConnected" style="text-align: center;">
-          <v-select label="Select Device" :items="ToBeConnectDevice" item-text="label" item-value="value" v-model="selectedDevice" style="width: 150px; display: inline-block;"></v-select>
+          <v-select :label="$t('Select Device')" :items="ToBeConnectDevice" item-text="label" item-value="value" v-model="selectedDevice" style="width: 150px; display: inline-block;"></v-select>
           <button @click="confirmDevice" class="get-click btn-confirm" style="display: inline-block;">
             <v-icon color="rgba(255, 255, 255)"> mdi-check-bold </v-icon>
           </button>
@@ -47,7 +47,7 @@
 
         <div v-show="DeviceIsConnected" v-for="(item, index) in CurrentConfigItems()" :key="index" style="text-align: center; width: 200px;">
           <span v-if="index === 0" style="display: inline-block; font-size: 15px; color: rgba(255, 255, 255, 0.5); user-select: none;">
-            {{ 'Device Config Items' }}
+            {{ $t('Device Config Items') }}
           </span>
           <v-card-text>
             <v-text-field v-if="item.inputType === 'text'" v-model="item.value" :label="item.label" style="width: 150px; display: inline-block;"></v-text-field>
@@ -83,7 +83,7 @@
 
     <div v-show="isOpenPowerPage">
       <span style="position: absolute; top: 0px; left: 50%; transform: translateX(-50%); font-size: 26px; color: rgba(255, 255, 255, 0.5); user-select: none; white-space: nowrap; ">
-        Power Manager
+        {{ $t('Power Management') }}
         <v-divider></v-divider>
       </span>
 
@@ -99,7 +99,7 @@
             <v-list-item-content>
               <v-list-item-title>
                 <span>
-                  <div :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ 'OutPut Power 1' }}</div>
+                  <div :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('OutPut Power 1') }}</div>
                   <div :style="{ fontSize: '7px' }" :class="{ 'connected-device': OutPutPower_1_ON }">{{ OutPutPower_1_ON ? '[ON]' : '[OFF]' }}</div>
                 </span>
               </v-list-item-title>
@@ -116,7 +116,7 @@
             <v-list-item-content>
               <v-list-item-title>
                 <span>
-                  <div :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ 'OutPut Power 2' }}</div>
+                  <div :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('OutPut Power 2') }}</div>
                   <div :style="{ fontSize: '7px' }" :class="{ 'connected-device': OutPutPower_2_ON }">{{ OutPutPower_2_ON ? '[ON]' : '[OFF]' }}</div>
                 </span>
               </v-list-item-title>
@@ -133,7 +133,7 @@
               </div>
             </v-list-item-icon>
             <v-list-item-content>
-              <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ 'Reboot' }}</v-list-item-title>
+              <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Reboot') }}</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
 
@@ -144,7 +144,7 @@
               </div>
             </v-list-item-icon>
             <v-list-item-content>
-              <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ 'Main Power OFF' }}</v-list-item-title>
+              <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Shut Down') }}</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
 
@@ -158,6 +158,20 @@
   <v-navigation-drawer v-model="nav" app :stateless = "drawer_2" temporary width="170" style="backdrop-filter: blur(5px); background-color: rgba(0, 0, 0, 0.1);">  <!-- stateless temporary  -->
     <v-layout column fill-height>
       <v-list dense>
+        <template>
+          <div>
+            <span style="font-size: 10px; color: rgba(255, 255, 255, 0.5); user-select: none; white-space: nowrap; ">
+              Client Version: {{ VueClientVersion }}
+            </span>
+          </div>
+          <div>
+            <span style="font-size: 10px; color: rgba(255, 255, 255, 0.5); user-select: none; white-space: nowrap; ">
+              Server Version: {{ QTClientVersion }}
+            </span>
+          </div>
+          <v-divider></v-divider>
+        </template>
+
         <template v-for="(item,i) in menuItems">
           <template v-if="$store.state[item.store_show_menu_item] === false"></template>
           <v-subheader v-else-if="item.header" v-text="item.header" class="grey--text text--darken-1" :key="i"/>
@@ -173,12 +187,14 @@
           <template v-else>
             <v-list-item v-if='item.link' target="_blank" rel="noopener" :href='item.link' :key="i">
               <v-list-item-icon><v-icon>{{ item.icon }}</v-icon></v-list-item-icon>
-              <v-list-item-title v-text="item.title"/>
+              <!-- <v-list-item-title v-text="item.title"/> -->
+              <v-list-item-title>{{ $t(item.title) }}</v-list-item-title>
               <v-icon disabled>mdi-open-in-new</v-icon>
             </v-list-item>
             <v-list-item v-else-if='item.footer===undefined' @click.stop="toggleStoreValue(item.store_var_name)" :key="i">
               <v-list-item-icon><v-icon>{{ item.icon }}</v-icon></v-list-item-icon>
-              <v-list-item-title v-text="item.title"/>
+              <!-- <v-list-item-title v-text="item.title"/> -->
+              <v-list-item-title>{{ $t(item.title) }}</v-list-item-title>
             </v-list-item>
           </template>
         </template>
@@ -190,7 +206,7 @@
             </div>
           </v-list-item-icon>
           <v-list-item-content>
-            <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ '电源管理' }}</v-list-item-title>
+            <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Power Management') }}</v-list-item-title>
           </v-list-item-content>
         </v-list-item>
 
@@ -201,7 +217,7 @@
             </div>
           </v-list-item-icon>
           <v-list-item-content>
-            <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ '连接所选设备' }}</v-list-item-title>
+            <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Connect All') }}</v-list-item-title>
             <v-progress-linear
               v-if="loadingConnectAllDevice"
               indeterminate
@@ -218,7 +234,7 @@
             </div>
           </v-list-item-icon>
           <v-list-item-content>
-            <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ '断开所有设备' }}</v-list-item-title>
+            <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Disconnect All') }}</v-list-item-title>
           </v-list-item-content>
         </v-list-item>
 
@@ -229,7 +245,7 @@
             </div>
           </v-list-item-icon>
           <v-list-item-content>
-            <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ '校准极轴' }}</v-list-item-title>
+            <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Calibrate Polar Axis') }}</v-list-item-title>
           </v-list-item-content>
         </v-list-item>
 
@@ -240,7 +256,7 @@
             </div>
           </v-list-item-icon>
           <v-list-item-content>
-            <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ '图像文件' }}</v-list-item-title>
+            <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Image Files') }}</v-list-item-title>
           </v-list-item-content>
         </v-list-item>
 
@@ -255,7 +271,7 @@
           <v-list-item-content>
             <v-list-item-title>
               <span>
-                <div :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ device.driverType }}</div>
+                <div :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t(device.driverType) }}</div>
                 <div :style="{ fontSize: '7px' }" :class="{ 'connected-device': device.isConnected }">{{ device.device }}</div>
               </span>
             </v-list-item-title>
@@ -301,7 +317,7 @@
           <v-list-item-content>
             <v-list-item-title>
               <span>
-                <div :style="{ fontSize: '10px' }">{{ 'Refresh Page' }}</div>
+                <div :style="{ fontSize: '10px' }">{{ $t('Refresh Page') }}</div>
               </span>
             </v-list-item-title>
           </v-list-item-content>
@@ -310,7 +326,8 @@
         <template v-for="(item,i) in menuItems">
           <v-list-item v-if='item.footer' @click.stop="toggleStoreValue(item.store_var_name)" :key="i">
             <v-list-item-icon><v-icon>{{ item.icon }}</v-icon></v-list-item-icon>
-            <v-list-item-title v-text="item.title"/>
+            <!-- <v-list-item-title v-text="item.title"/> -->
+            <v-list-item-title>{{ $t(item.title) }}</v-list-item-title>
           </v-list-item>
         </template>
 
@@ -395,6 +412,9 @@ export default {
       messageCounter: 0, // 用于生成唯一的消息ID
       websocketState: '未连接', // 添加WebSocket连接状态
       networkDisconnected: false, // 添加网络连接状态
+
+      QTClientVersion: 'Not connected',
+      VueClientVersion: '20241017',
 
       // isMessageBoxShow: false,
 
@@ -586,6 +606,9 @@ export default {
       const hostname = window.location.hostname;
       console.log('location hostname:', hostname);
       this.WebSocketUrl = `ws://${hostname}:8600`;
+    },
+    getQTClientVersion() {
+      this.sendMessage('Vue_Command', 'getQTClientVersion');
     },
     connect() {
       // 替换为你的 WebSocket 服务器地址
@@ -935,6 +958,13 @@ export default {
             }
           }
 
+          if (data.message.startsWith('GuiderLoopExpStatus:')) {
+            const parts = data.message.split(':');
+            if (parts.length === 2) {
+              this.$bus.$emit('GuiderLoopExpStatus', parts[1]);
+            }
+          }
+
           if (data.message.startsWith('TelescopeRADEC:')) {
             const parts = data.message.split(':');
             if (parts.length === 3) {
@@ -1139,6 +1169,13 @@ export default {
             }
           }
 
+          if (data.message.startsWith('QTClientVersion:')) {
+            const parts = data.message.split(':');
+            if (parts.length === 2) {
+              this.QTClientVersion = parts[1];
+            }
+          }
+
           
         }
         else if (data.type === 'QT_Confirm') {
@@ -1233,6 +1270,7 @@ export default {
     },
 
     StatusRecovery() {
+      this.getQTClientVersion();
       this.sendMessage('Vue_Command', 'getConnectedDevices');
       this.sendMessage('Vue_Command', 'getStagingImage');
       this.sendMessage('Vue_Command', 'getStagingScheduleData');

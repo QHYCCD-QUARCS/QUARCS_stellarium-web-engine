@@ -155,7 +155,7 @@ export default {
       openStatusCard: false,
       MainCameraInProgress: false,
       MountInProgress: true,
-      CurrentGuiderStatus: 1,
+      CurrentGuiderStatus: 0,
       FocusStatus: 0,
 
       MainCameraConnect: false,

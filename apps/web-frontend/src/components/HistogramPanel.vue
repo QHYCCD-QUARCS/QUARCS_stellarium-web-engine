@@ -1,6 +1,6 @@
 <template>
   <transition name="panel">
-  <div class="chart-panel" :style="{ bottom: bottom + 'px', left: left + 'px', right: right + 'px', height: height + 'px' }">
+    <div class="chart-panel" :style="{ bottom: bottom + 'px', left: ComponentPadding + 'px', right: ComponentPadding + 'px', height: height + 'px' }">
     <HistogramChart ref="histogramchart" class="histogram-chart"/>
     <DialKnob class="dial-knob"/>
     <div class="buttons-container">
@@ -33,8 +33,7 @@ export default {
   data() {
     return {
       bottom: 10,
-      left: 170,
-      right: 170,
+      ComponentPadding: 0,
       height: 90,
 
       histogram_min: 0,
@@ -48,7 +47,24 @@ export default {
   created() {
     this.$bus.$on('AutoHistogramNum', this.setAutoHistogramNum);
   },
+  mounted() {
+    this.updatePosition(); // 初始化位置
+    window.addEventListener('resize', this.updatePosition);
+  },
+  beforeDestroy() {
+    window.removeEventListener('resize', this.updatePosition);
+  },
   methods: {
+    updatePosition() {
+      const screenWidth = window.innerWidth;
+      const halfWidth = screenWidth / 2 - 250;
+      this.ComponentPadding = Math.max(halfWidth, 170);
+
+      // 计算宽度
+      const newWidth = screenWidth - (this.ComponentPadding * 2);
+      // console.log('Update new width:', newWidth);
+      this.$bus.$emit('updateHistogramWidth', newWidth);
+    },
     AutoHistogram() {
       this.$bus.$emit('HandleHistogramNum', this.histogram_min, this.histogram_max);
     },

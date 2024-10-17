@@ -1,6 +1,6 @@
 <template>
   <transition name="panel">
-  <div class="chart-panel" :style="{ bottom: bottom + 'px', left: left + 'px', right: right + 'px', height: height + 'px' }">
+    <div class="chart-panel" :style="{ bottom: bottom + 'px', left: ComponentPadding + 'px', right: ComponentPadding + 'px', height: height + 'px' }">
     <ImageChart ref="imagechart" class="image-chart"/>
     <FocusChart ref="focuschart" class="focus-chart"/>
 
@@ -113,8 +113,7 @@ export default {
     return {
       // width: 330, // 初始宽度
       bottom: 10,
-      left: 170,
-      right: 170,
+      ComponentPadding: 0,
       height: 90,
 
       MoveSteps: 100,
@@ -135,6 +134,13 @@ export default {
     FocusChart,
     ImageChart
   },
+  mounted() {
+    this.updatePosition(); // 初始化位置
+    window.addEventListener('resize', this.updatePosition);
+  },
+  beforeDestroy() {
+    window.removeEventListener('resize', this.updatePosition);
+  },
   created() {
     // this.$bus.$on('AutoHistogramNum', this.setAutoHistogramNum);
     this.$bus.$on('FocusChangeSpeedSuccess', this.ShowSpeedNum);
@@ -146,6 +152,17 @@ export default {
     this.$bus.$on('AutoFocusOver', this.AutoFocusOver);
   },
   methods: {
+    updatePosition() {
+      const screenWidth = window.innerWidth;
+      const halfWidth = screenWidth / 2 - 250;
+      this.ComponentPadding = Math.max(halfWidth, 170);
+      // console.log('Updated Padding:', this.ComponentPadding);
+
+      // 计算宽度
+      const newWidth = screenWidth - (this.ComponentPadding * 2);
+      // console.log('Update Focus Chart width:', newWidth);
+      this.$bus.$emit('updateFocusChartWidth', newWidth);
+    },
     AutoFocus() {
       if(this.inAutoFocus)
       {

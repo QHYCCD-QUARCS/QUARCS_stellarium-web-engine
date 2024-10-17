@@ -119,7 +119,7 @@
     <CircularProgressButton ref="CaptureBtn" class="get-click btn-Capture" />
   </div> -->
 
-  <ChartComponent v-show="showChartsPanel" style="position: absolute; bottom: 10px; left: 170px; " class="get-click"/>
+  <ChartComponent v-show="showChartsPanel" class="get-click"/>
   <transition name="BottomBtn">
   <button  v-show="isCaptureMode" @click="toggleChartsPanel" class="get-click btn-ChartsSwitch">
     <div style="display: flex; justify-content: center; align-items: center;">
@@ -128,9 +128,9 @@
   </button>
   </transition>
 
-  <HistogramPanel v-show="showHistogramPanel" style="position: absolute; bottom: 10px; left: 170px; " class="get-click"/>
+  <HistogramPanel v-show="showHistogramPanel" class="get-click"/>
 
-  <FocuserPanel v-show="showFocuserPanel" style="position: absolute; bottom: 10px; left: 170px; " class="get-click"/>
+  <FocuserPanel v-show="showFocuserPanel" class="get-click"/>
   
   <!-- <button v-show="isCaptureMode" @click="hideCaptureUI" class="get-click btn-UISwitch"> <v-icon> mdi-flip-to-back </v-icon> </button> -->
   <button v-show="isCaptureMode" @click="hideCaptureUI" class="get-click btn-UISwitch">

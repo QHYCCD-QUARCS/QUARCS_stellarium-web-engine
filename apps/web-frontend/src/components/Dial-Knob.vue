@@ -30,10 +30,16 @@ export default {
     this.$bus.$on('toggleHistogramPanel', this.setMaxWidth);
     this.$bus.$on('ChangeDialPosition', this.ChangeDialPosition);
   },
+  mounted() {
+    window.addEventListener('resize', this.setMaxWidth);
+  },
+  beforeDestroy() {
+    window.removeEventListener('resize', this.setMaxWidth);
+  },
   methods: {
     setMaxWidth() {
       const Width = window.innerWidth;
-      this.width = Width - 350;
+      this.width = Math.min(Width - 350, 490);
       this.secondPositionX = this.width;
     },
     startDrag(event) {

@@ -4,14 +4,14 @@
       <thead>
         <tr>
           <!-- <th>序号</th> -->
-          <th>拍摄目标</th>
-          <th>赤经赤纬</th>
-          <th>拍摄时间</th>
-          <th>曝光时间</th>
-          <th>滤镜轮号</th>
-          <th>重复张数</th>
-          <th>拍摄类型</th>
-          <th>重新调焦</th>
+          <th>{{ $t('Target') }}</th>
+          <th>{{ $t('Ra/Dec') }}</th>
+          <th>{{ $t('Shoot Time') }}</th>
+          <th>{{ $t('Exp Time') }}</th>
+          <th>{{ $t('Filter No.') }}</th>
+          <th>{{ $t('Reps') }}</th>
+          <th>{{ $t('Type') }}</th>
+          <th>{{ $t('Refocus') }}</th>
           <!-- <th>进度</th> -->
         </tr>
       </thead>

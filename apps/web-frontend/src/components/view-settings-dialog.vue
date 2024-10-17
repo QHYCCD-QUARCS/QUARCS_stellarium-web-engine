@@ -16,6 +16,8 @@
     <v-checkbox hide-details :label="$t('Meridian Line')" v-model="meridianOn"></v-checkbox>
     <v-checkbox hide-details :label="$t('Ecliptic Line')" v-model="eclipticOn"></v-checkbox>
     <v-checkbox hide-details :label="$t('High FPS')" v-model="highfpsOn"></v-checkbox>
+    <v-select v-model="selectedLanguage" :items="languages" :label="$t('Select Language')" @change="switchLanguage"></v-select>
+
   </v-card-text>
   <v-card-actions>
     <v-spacer></v-spacer><v-btn class="blue--text darken-1" text @click.native="$store.state.showViewSettingsDialog = false">Close</v-btn>
@@ -30,6 +32,17 @@ export default {
   data: function () {
     return {
       HighFPSMode: true,
+      selectedLanguage: this.$i18n.locale,
+      languages: [
+        { text: 'English', value: 'en' },
+        { text: 'Simplified Chinese', value: 'cn' }
+      ]
+    }
+  },
+  methods: {
+    // 切换语言的方法
+    switchLanguage(lang) {
+      this.$i18n.locale = lang;
     }
   },
   computed: {

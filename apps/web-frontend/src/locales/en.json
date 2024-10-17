@@ -54,5 +54,11 @@
   "Moonlight": "Moonlight",
   "Dawn": "Dawn",
   "Twilight": "Twilight",
-  "Daylight": "Daylight"
+  "Daylight": "Daylight",
+  
+  "High FPS": "High FPS",
+  "Mount": "Mount",
+  "Refresh Page": "Refresh Page", 
+  "Select Driver": "Select Driver",
+  "Select Device": "Select Device"
 }

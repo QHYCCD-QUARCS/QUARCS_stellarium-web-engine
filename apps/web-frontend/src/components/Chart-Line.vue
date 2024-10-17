@@ -1,7 +1,6 @@
 <template>
   <div>
     <div ref="linechart" :style="{ width: containerMaxWidth + 'px', height: 80 + 'px' }" class="linechart-panel"></div>
-    <!-- <button @click="clearChartData" class="clear-btn">Clear</button> -->
   </div>
 </template>
 
@@ -24,7 +23,6 @@ export default {
     };
   },
   mounted() {
-    this.initChart();
     this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getStagingGuiderData');
   },
   created() {
@@ -32,11 +30,11 @@ export default {
     this.$bus.$on('SetLineChartRange', this.changeRange);
     this.$bus.$on('clearChartData', this.clearChartData);
     this.$bus.$on('ChartRangeSwitch', this.RangeSwitch);
+    this.$bus.$on('updateLineChartWidth', this.initChart);
   },
   methods: {
-    initChart() {
-      const Width = window.innerWidth;
-      this.containerMaxWidth = Width - 435;
+    initChart(Width) {
+      this.containerMaxWidth = Width - 95;
       const chartDom = this.$refs.linechart;
       chartDom.style.width = this.containerMaxWidth + 'px';
       this.myChart = echarts.init(chartDom);

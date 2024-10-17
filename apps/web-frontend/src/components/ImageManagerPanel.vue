@@ -26,7 +26,7 @@
         </span>
       </button>
 
-      <span class="custom-button ImageFileTip no-select" @click="ImageFileSwitch"> {{ ImageFile }} </span>
+      <span class="custom-button ImageFileTip no-select" @click="ImageFileSwitch"> {{ $t(ImageFile) }} </span>
 
       <button class="custom-button btn-ImageFileSwitch no-select" :class="{ 'btn-ImageFileSwitch-1': isCaptureFile, 'btn-ImageFileSwitch-2': !isCaptureFile }" @click="ImageFileSwitch"> 
         <!-- <div style="display: flex; justify-content: center; align-items: center;">
@@ -65,7 +65,7 @@
 
     <span :class="{ 'span-USB-Info-Normal': !isUSBWarning, 'span-USB-Info-Warning': isUSBWarning }"> 
       <!-- USB Flash Drive: {{ USB_Name }}, Free Space: {{ USB_Space }} -->
-      {{ USB_Info }}
+      {{ $t(USB_Info) }}
     </span>
 
     <div v-for="(item, index) in displayedItems" :key="index">
@@ -73,7 +73,7 @@
     </div>
 
     <span v-show="isNoFolders" style="position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); font-size: 20px; color: rgba(255, 255, 255, 0.5); user-select: none;"> 
-      There are no image folders.
+      {{ $t('There are no image folders') }}
     </span>
 
   </div>
@@ -323,12 +323,12 @@ export default {
       if(Name === 'Null')
       {
         this.isUSBWarning = true;
-        this.USB_Info = 'No USB Drive Detected.';
+        this.USB_Info = 'No USB Drive Detected';
       }
       else if (Name === 'Multiple')
       {
         this.isUSBWarning = true;
-        this.USB_Info = 'Multiple USB drives detected, please remove excess USB drives.';
+        this.USB_Info = 'Multiple USB drives detected, please remove excess USB drives';
       }
       else {
         const USB_Name = Name;
