@@ -1,6 +1,10 @@
 <template>
   <transition name="panel">
   <div class="capture-panel" :style="{ bottom: bottom + 'px', left: left + 'px', width: width + 'px', height: height + 'px' }">
+    <span style="position: absolute; top: 4%; left: 50%; transform: translate(-50%, -50%); font-size: 10px; color: rgba(255, 255, 255, 0.5); user-select: none;"> 
+      {{ CameraTemperature }}
+    </span>
+
     <div class="Direction-Btn">
         <button class="ExpTime-minus no-select" @click="handleExpTimeButtonClick('minus')">
           <span class="ExpTime-minus-icon"> <v-icon>mdi-menu-up</v-icon> </span>
@@ -88,6 +92,10 @@ export default {
       ExpTimes: ['1ms', '10ms', '100ms', '1s', '5s', '10s', '30s', '60s', '120s'],
       // CFWs: ['Null', 'L', 'R', 'G', 'B', 'Ha', 'OIIII', 'SII'],
       CFWs: ['Null'],
+
+      CFWConnect: false,
+
+      CameraTemperature: '',
     };
   },
   created() {
@@ -126,6 +134,10 @@ export default {
     this.$bus.$on('initCFWList', this.initCFWList);
 
     this.$bus.$on('MainCameraStatus',this.MainCameraStatus);
+
+    this.$bus.$on('CFWConnected', this.CFWConnected);
+
+    this.$bus.$on('MainCameraTemperature', this.MainCameraTemperature);
   },
   mounted: function () {
     this.CurrentExpTimeList();
@@ -153,25 +165,29 @@ export default {
     },
 
     handleCFWButtonClick(direction) {
-      if (direction === 'plus') {
-        if (this.currentCFWIndex < this.CFWs.length - 1) {
-          this.currentCFWIndex++;
+      if(this.CFWConnect) {
+        if (direction === 'plus') {
+          if (this.currentCFWIndex < this.CFWs.length - 1) {
+            this.currentCFWIndex++;
+          } else {
+            this.currentCFWIndex = 0;
+          }
         } else {
-          this.currentCFWIndex = 0;
+          if (this.currentCFWIndex > 0) {
+            this.currentCFWIndex--;
+          } else {
+            this.currentCFWIndex = this.CFWs.length - 1;
+          }
         }
+        // console.log('handleMouseDownCFW: ',this.CFWs[this.currentCFWIndex]);
+        // this.$refs.CFWContent.innerText = this.CFWs[this.currentCFWIndex];
+        // this.$bus.$emit('cfw-selected', this.currentCFWIndex);
+        console.log('QHYCCD | CFWSelected: ', (this.currentCFWIndex+1));
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'SetCFWPosition:' + (this.currentCFWIndex+1));
+        this.cfwButtonsDisabled = true;
       } else {
-        if (this.currentCFWIndex > 0) {
-          this.currentCFWIndex--;
-        } else {
-          this.currentCFWIndex = this.CFWs.length - 1;
-        }
+        this.$bus.$emit('showMsgBox', 'Please connect the Filter Wheels first.', 'error');
       }
-      // console.log('handleMouseDownCFW: ',this.CFWs[this.currentCFWIndex]);
-      // this.$refs.CFWContent.innerText = this.CFWs[this.currentCFWIndex];
-      // this.$bus.$emit('cfw-selected', this.currentCFWIndex);
-      console.log('QHYCCD | CFWSelected: ', (this.currentCFWIndex+1));
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'SetCFWPosition:' + (this.currentCFWIndex+1));
-      this.cfwButtonsDisabled = true;
     },
 
     toggleFocuserPanel() {
@@ -273,6 +289,19 @@ export default {
         this.isIDLE = true;
       }
     },
+
+    MainCameraTemperature(value) {
+      this.CameraTemperature = value + '°';
+    },
+
+    CFWConnected(num) {
+      if(num === 0){
+        this.CFWConnect = false;
+      } else {
+        this.CFWConnect = true;
+      }
+      console.log('CFW is Connected: ', num);
+    }
     
   },
   computed: {

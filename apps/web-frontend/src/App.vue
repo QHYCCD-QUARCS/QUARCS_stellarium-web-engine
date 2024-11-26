@@ -24,26 +24,13 @@
             {{ $t('Device Connection') }}
           </span>
           <v-select :label="$t('Select Driver')" :items="drivers" item-text="label" item-value="value" v-model="selectedDriver" style="width: 150px; display: inline-block;"></v-select>
-          <button :disabled="loadingSelectDriver" @click="confirmDriver" class="get-click btn-confirm" style="display: inline-block;">
-            <template v-if="!loadingSelectDriver">
+          <button @click="confirmDriver" class="btn-confirm" style="display: inline-block;">
+            <!-- <template v-if="!loadingSelectDriver"> -->
+            <template>
               <v-icon color="rgba(255, 255, 255)">mdi-check-bold</v-icon>
             </template>
-            <template v-else>
-              <div class="progress-spinner">
-                <v-progress-circular indeterminate color="white" size="20"></v-progress-circular>
-              </div>
-            </template>
           </button>
         </div>
-
-        <div v-show="!DeviceIsConnected" style="text-align: center;">
-          <v-select :label="$t('Select Device')" :items="ToBeConnectDevice" item-text="label" item-value="value" v-model="selectedDevice" style="width: 150px; display: inline-block;"></v-select>
-          <button @click="confirmDevice" class="get-click btn-confirm" style="display: inline-block;">
-            <v-icon color="rgba(255, 255, 255)"> mdi-check-bold </v-icon>
-          </button>
-        </div>
-
-        <!-- <v-divider style="margin-top: 20px;"></v-divider> -->
 
         <div v-show="DeviceIsConnected" v-for="(item, index) in CurrentConfigItems()" :key="index" style="text-align: center; width: 200px;">
           <span v-if="index === 0" style="display: inline-block; font-size: 15px; color: rgba(255, 255, 255, 0.5); user-select: none;">
@@ -75,7 +62,7 @@
 
       </div>
 
-      <button v-show="DeviceIsConnected" @click="confirmConfiguration(CurrentConfigItems())" class="get-click btn-confirm" style="position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); display: inline-block; user-select: none;">
+      <button v-show="DeviceIsConnected" @click="confirmConfiguration(CurrentConfigItems())" class="btn-confirm" style="position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); display: inline-block; user-select: none;">
         <v-icon color="rgba(255, 255, 255)"> mdi-check-bold </v-icon>
       </button>
 
@@ -126,7 +113,7 @@
 
           <v-divider :style="{ marginBottom: '10px' }"></v-divider>
 
-          <v-list-item @click.stop="openPowerManagerPage()" :style="{ height: '36px', marginBottom: '10px' }">
+          <v-list-item @click.stop="Reboot()" :style="{ height: '36px', marginBottom: '10px' }">
             <v-list-item-icon style="margin-right: 10px;">
               <div style="display: flex; justify-content: center; align-items: center;">
                 <img src="@/assets/images/svg/ui/Reboot.svg" height="30px" style="min-height: 30px; pointer-events: none;"></img>
@@ -137,7 +124,7 @@
             </v-list-item-content>
           </v-list-item>
 
-          <v-list-item @click.stop="openPowerManagerPage()" :style="{ height: '36px', marginBottom: '10px' }">
+          <v-list-item @click.stop="PowerOFF()" :style="{ height: '36px', marginBottom: '10px' }">
             <v-list-item-icon style="margin-right: 10px;">
               <div style="display: flex; justify-content: center; align-items: center;">
                 <img src="@/assets/images/svg/ui/PowerOFF.svg" height="30px" style="min-height: 30px; pointer-events: none;"></img>
@@ -172,7 +159,7 @@
           <v-divider></v-divider>
         </template>
 
-        <template v-for="(item,i) in menuItems">
+        <!-- <template v-for="(item,i) in menuItems">
           <template v-if="$store.state[item.store_show_menu_item] === false"></template>
           <v-subheader v-else-if="item.header" v-text="item.header" class="grey--text text--darken-1" :key="i"/>
           <v-divider class="divider_menu" v-else-if="item.divider" :key="i"/>
@@ -187,16 +174,38 @@
           <template v-else>
             <v-list-item v-if='item.link' target="_blank" rel="noopener" :href='item.link' :key="i">
               <v-list-item-icon><v-icon>{{ item.icon }}</v-icon></v-list-item-icon>
-              <!-- <v-list-item-title v-text="item.title"/> -->
               <v-list-item-title>{{ $t(item.title) }}</v-list-item-title>
               <v-icon disabled>mdi-open-in-new</v-icon>
             </v-list-item>
             <v-list-item v-else-if='item.footer===undefined' @click.stop="toggleStoreValue(item.store_var_name)" :key="i">
               <v-list-item-icon><v-icon>{{ item.icon }}</v-icon></v-list-item-icon>
-              <!-- <v-list-item-title v-text="item.title"/> -->
               <v-list-item-title>{{ $t(item.title) }}</v-list-item-title>
             </v-list-item>
           </template>
+        </template> -->
+        <template>
+          <v-list-item @click.stop="QuitToMainApp()" :style="{ height: '36px' }">
+            <v-list-item-icon style="margin-right: 10px;">
+              <div style="display: flex; justify-content: center; align-items: center;">
+                <img src="@/assets/images/svg/ui/Quit.svg" height="30px" style="min-height: 30px; pointer-events: none;"></img>
+              </div>
+            </v-list-item-icon>
+            <v-list-item-content>
+              <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Quit') }}</v-list-item-title>
+            </v-list-item-content>
+          </v-list-item>
+
+          <v-list-item @click.stop="toggleStoreValue('showViewSettingsDialog')" :style="{ height: '36px' }">
+            <v-list-item-icon style="margin-right: 10px;">
+              <div style="display: flex; justify-content: center; align-items: center;">
+                <img src="@/assets/images/svg/ui/Setting.svg" height="30px" style="min-height: 30px; pointer-events: none;"></img>
+              </div>
+            </v-list-item-icon>
+            <v-list-item-content>
+              <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('View Settings') }}</v-list-item-title>
+            </v-list-item-content>
+          </v-list-item>
+          <v-divider></v-divider>
         </template>
 
         <v-list-item @click.stop="openPowerManagerPage()" :style="{ height: '36px' }">
@@ -210,7 +219,8 @@
           </v-list-item-content>
         </v-list-item>
 
-        <v-list-item :disabled="loadingConnectAllDevice" @click.stop="connectAllDevice()" :style="{ height: '36px' }">
+        <v-list-item :disabled="loadingConnectAllDevice" @mousedown="startConnectBtnPress" @mouseup="endConnectBtnPress"
+        @touchstart="startConnectBtnPress" @touchend="endConnectBtnPress" :style="{ height: '36px' }">
           <v-list-item-icon style="margin-right: 10px;">
             <div style="display: flex; justify-content: center; align-items: center;">
               <img src="@/assets/images/svg/ui/Connect.svg" height="30px" style="min-height: 30px; pointer-events: none;"></img>
@@ -238,6 +248,17 @@
           </v-list-item-content>
         </v-list-item>
 
+        <v-list-item @click.stop="DeviceAllocation()" :style="{ height: '36px' }">
+          <v-list-item-icon style="margin-right: 10px;">
+            <div style="display: flex; justify-content: center; align-items: center;">
+              <img src="@/assets/images/svg/ui/Allocation.svg" height="30px" style="min-height: 30px; pointer-events: none;"></img>
+            </div>
+          </v-list-item-icon>
+          <v-list-item-content>
+            <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Device Allocation') }}</v-list-item-title>
+          </v-list-item-content>
+        </v-list-item>
+
         <v-list-item @click.stop="CalibratePolarAxis()" :style="{ height: '36px' }">
           <v-list-item-icon style="margin-right: 10px;">
             <div style="display: flex; justify-content: center; align-items: center;">
@@ -260,6 +281,17 @@
           </v-list-item-content>
         </v-list-item>
 
+        <v-list-item @click.stop="OpenDebugLog()" :style="{ height: '36px' }">
+          <v-list-item-icon style="margin-right: 10px;">
+            <div style="display: flex; justify-content: center; align-items: center;">
+              <img src="@/assets/images/svg/ui/DebugLog.svg" height="30px" style="min-height: 30px; pointer-events: none;"></img>
+            </div>
+          </v-list-item-icon>
+          <v-list-item-content>
+            <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Logs') }}</v-list-item-title>
+          </v-list-item-content>
+        </v-list-item>
+
         <v-divider></v-divider>
 
         <v-list-item v-for="(device, index) in devices" :key="index" @click.stop="selectDevice(device)" :style="{ height: '36px' }">
@@ -279,19 +311,6 @@
         </v-list-item>
 
         <v-divider></v-divider>
-
-      </v-list>
-
-
-      <!-- <template v-for="(item,i) in menuComponents">
-        <component :is="item" :key="i"></component>
-      </template>
-      <v-spacer></v-spacer> -->
-
-
-      <v-list dense>
-
-        <!-- <v-divider class="divider_menu"/> -->
 
         <v-list-item @click.stop="locationClicked()" :style="{ height: '36px' }">
           <v-list-item-icon style="margin-right: 10px;">
@@ -322,28 +341,21 @@
             </v-list-item-title>
           </v-list-item-content>
         </v-list-item>
-        
-        <template v-for="(item,i) in menuItems">
-          <v-list-item v-if='item.footer' @click.stop="toggleStoreValue(item.store_var_name)" :key="i">
-            <v-list-item-icon><v-icon>{{ item.icon }}</v-icon></v-list-item-icon>
-            <!-- <v-list-item-title v-text="item.title"/> -->
-            <v-list-item-title>{{ $t(item.title) }}</v-list-item-title>
-          </v-list-item>
-        </template>
 
-      </v-list>
+        <v-list-item @click.stop="toggleStoreValue('showDataCreditsDialog')" :style="{ height: '36px' }">
+          <v-list-item-icon style="margin-right: 10px;">
+            <div style="display: flex; justify-content: center; align-items: center;">
+              <img src="@/assets/images/svg/ui/DataCredits.svg" height="30px" style="min-height: 30px; pointer-events: none;"></img>
+            </div>
+          </v-list-item-icon>
+          <v-list-item-content>
+            <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Data Credits') }}</v-list-item-title>
+          </v-list-item-content>
+        </v-list-item>
+
+      </v-list> 
     </v-layout>
   </v-navigation-drawer>
-
-
-  <!-- 添加一个新的按钮 This button is to test the opencv.js. Need to set the #guiderCamera-canvas z-index = 0 -->
-
-  <!-- <v-btn class="my-custom-button" @click="handleButtonTestClick">Switch Pages</v-btn> -->
-  <!-- 消息框 -->
-  <!-- <div>
-      <button @click="callShowMessageBox('this is a MessageBox','msg')">显示消息</button>
-      <message-box v-if="isMessageBoxShow" ref="messageBox"></message-box>
-  </div> -->
 
 
   <v-main>
@@ -376,6 +388,7 @@ import Gui from '@/components/gui.vue'
 import GuiLoader from '@/components/gui-loader.vue'
 import swh from '@/assets/sw_helpers.js'
 import Moment from 'moment'
+import BackgroundImage from '@/assets/images/svg/ui/Background.svg';
 
 var glTestCircle;
 var glLayer;
@@ -414,7 +427,7 @@ export default {
       networkDisconnected: false, // 添加网络连接状态
 
       QTClientVersion: 'Not connected',
-      VueClientVersion: '20241017',
+      VueClientVersion: '20241125',
 
       // isMessageBoxShow: false,
 
@@ -432,7 +445,7 @@ export default {
         { name: '导星镜', driverType: 'Guider', type: 'CCDs', ListNum: "1", isget: false, device: '', driverName: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_Guider'},
         { name: '主相机', driverType: 'MainCamera', type: 'CCDs', ListNum: "20", isget: false, device: '', driverName: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_MainCamera'},
         { name: '赤道仪', driverType: 'Mount', type: 'Telescopes', ListNum: "0", isget: false, device: '', driverName: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_Mount'},
-        { name: '望远镜', driverType: 'Telescopes', device: '', isConnected: true},
+        { name: '望远镜', driverType: 'Telescopes', device: '', isConnected: false},
         { name: '电动调焦器', driverType: 'Focuser', type: 'Focusers', ListNum: "22", isget: false, device: '', driverName: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_Focuser'},
         { name: '电子极轴镜', driverType: 'PoleCamera', type: 'CCDs', ListNum: "2", isget: false, device: '', driverName: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_PoleCamera'},
         { name: '滤镜轮', driverType: 'CFW', type: 'Filter Wheels', ListNum: "21", isget: false, device: '', driverName: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_CFW'},
@@ -447,8 +460,8 @@ export default {
         // { driverType: 'MainCamera', num: 1, label: 'Chip Width (mm)', value: '' },
         // { driverType: 'MainCamera', num: 2, label: 'Chip Height (mm)', value: '' },
         // { driverType: 'MainCamera', num: 3, label: 'Focal Length (mm)', value: '' },
-        { driverType: 'MainCamera', label: 'ImageGainR', value: '', inputType: 'slider', inputMin: 0, inputMax: 3, inputStep: 0.01},
-        { driverType: 'MainCamera', label: 'ImageGainB', value: '', inputType: 'slider', inputMin: 0, inputMax: 3, inputStep: 0.01},
+        { driverType: 'MainCamera', label: 'ImageGainR', value: '1', inputType: 'slider', inputMin: 0, inputMax: 3, inputStep: 0.01},
+        { driverType: 'MainCamera', label: 'ImageGainB', value: '1', inputType: 'slider', inputMin: 0, inputMax: 3, inputStep: 0.01},
         { driverType: 'MainCamera', label: 'ImageCFA', value: '', inputType: 'select', selectValue: ['GR', 'GB', 'BG', 'RGGB']},
         { driverType: 'MainCamera', label: 'ImageOffset', value: '', inputType: 'slider', inputMin: 0, inputMax: 255, inputStep: 0.1},
         { driverType: 'MainCamera', label: 'Binning', value: '', inputType: 'slider', inputMin: 1, inputMax: 4, inputStep: 1},
@@ -568,6 +581,13 @@ export default {
       OutPutPower_2_ON: false,
 
       isPolarAxisMode: false,
+
+      ConnectBtnPressTimer: null,
+      ConnectBtnlongPressThreshold: 1000,
+      isConnectBtnLongPress: false, // 标记是否为长按
+      ConnectBtnCanClick: true,
+
+      haveDeviceConnect: false,
 
     }
   },
@@ -706,6 +726,29 @@ export default {
             }
           }
 
+          if (data.message.startsWith('AddDeviceType:')) {
+            const parts = data.message.split(':');
+            if (parts.length === 2) {
+              const DeviceType = parts[1];
+              this.$bus.$emit('AddDeviceType',DeviceType);
+            }
+          }
+
+          if (data.message.startsWith('DeviceToBeAllocated:')) {
+            const parts = data.message.split(':');
+            if (parts.length === 4) {
+              const DeviceType = parts[1];
+              const DeviceIndex = parts[2];
+              const DeviceName = parts[3];
+              this.$bus.$emit('DeviceToBeAllocated',DeviceIndex,DeviceName);
+            }
+          }
+
+          if (data.message.startsWith('ShowDeviceAllocationWindow')) {
+            this.$bus.$emit('toggleDeviceAllocationPanel');
+            this.nav = false;
+          }
+
           if (data.message.startsWith('SaveJpgSuccess:')) {
             const parts = data.message.split(':');
             if (parts.length === 2) {
@@ -823,6 +866,14 @@ export default {
               this.$bus.$emit('MainCameraSize', SizeX, SizeY);
               this.mainCameraSizeX = SizeX;
               this.mainCameraSizeY = SizeY;
+            }
+          }
+
+          if (data.message.startsWith('MainCameraBinning:')) {
+            const parts = data.message.split(':');
+            if (parts.length === 2) {
+              const bin = parseInt(parts[1]);
+              this.$bus.$emit('MainCameraBinning', bin);
             }
           }
 
@@ -986,10 +1037,24 @@ export default {
             }
           }
 
+          if (data.message.startsWith('MainCameraTemperature:')) {
+            const parts = data.message.split(':');
+            if (parts.length === 2) {
+              this.UpdateMainCameraTemperature(parts[1]);
+            }
+          }
+
           if (data.message.startsWith('ShowAllImageFolder:')) {
             const parts = data.message.split(':');
             if (parts.length === 3) {
               this.$bus.$emit('ShowAllImageFolder', parts[1],parts[2]);
+            }
+          }
+
+          if (data.message.startsWith('ImageFilesName|')) {
+            const parts = data.message.split('|');
+            if (parts.length === 2) {
+              this.$bus.$emit('ImageFilesName', parts[1]);
             }
           }
 
@@ -1041,6 +1106,7 @@ export default {
               // this.UpdateCirclePos(parts[1], parts[2]);
               console.log('Solve Image Result(RA_Degree, DEC_Degree, Azimuth, Altitude):', parts[1], ',', parts[2], ',', parts[3], ',', parts[4]);
               this.SolveResultMark(parts[1], parts[2], parts[3], parts[4]);
+              this.$bus.$emit("ImageSolveFinished", true);
             }
           }
 
@@ -1074,6 +1140,7 @@ export default {
 
           if (data.message.startsWith('SolveImageFaild')) {
             this.callShowMessageBox('Solve image faild...','error');
+            this.$bus.$emit("ImageSolveFinished", false);
           }
 
           if (data.message.startsWith('SetCurrentLocation')) {
@@ -1176,6 +1243,28 @@ export default {
             }
           }
 
+          if (data.message.startsWith('CaptureImageSaveStatus:')) {
+            const parts = data.message.split(':');
+            if (parts.length === 2) {
+              const status = parts[1];
+              if(status === 'Repeat') {
+                this.callShowMessageBox(this.$t('There is no need to save it again'),'error');
+              } else if(status === 'Success') {
+                this.callShowMessageBox(this.$t('Image saved successfully'),'success');
+              } else if(status === 'Null') {
+                this.callShowMessageBox(this.$t('No images to save'),'error');
+              }
+            }
+          }
+
+          if (data.message.startsWith('INDIServerDebug|')) {
+            const parts = data.message.split('|');
+            if (parts.length === 2) {
+              const message = parts[1];
+              this.$bus.$emit('INDIServerDebug', message);
+            }
+          }
+
           
         }
         else if (data.type === 'QT_Confirm') {
@@ -1266,7 +1355,7 @@ export default {
     // 消息框
 
     locationClicked: function () {
-      this.$store.commit('toggleBool', 'showLocationDialog')
+      this.$store.commit('toggleBool', 'showLocationDialog');
     },
 
     StatusRecovery() {
@@ -1287,6 +1376,18 @@ export default {
       this.drawer_2 = true;
     },
 
+    Reboot() {
+      
+    },
+
+    PowerOFF() {
+      
+    },
+
+    QuitToMainApp() {
+      this.sendMessage('Broadcast_Msg', 'CloseWebView');
+    },
+
     selectDevice(device) {
       this.isOpenDevicePage = true;
       this.isOpenPowerPage = false;
@@ -1298,7 +1399,10 @@ export default {
       }
 
       this.CurrentDriverType = device.driverType;
-      this.DeviceIsConnected = device.isConnected;
+      this.DeviceIsConnected = device.isConnected; 
+      if(device.driverType === 'Telescopes') {
+        this.DeviceIsConnected = true;
+      }
 
       // this.toggleStoreValue(device.dialogStateVar);
 
@@ -1345,7 +1449,7 @@ export default {
 
       this.devices.forEach(device => {
         if (device.driverType === this.CurrentDriverType) {
-          device.driverName = this.selectedDriver;
+          device.device = ' [ '+this.selectedDriver+' ] ';
         }
       });
     },
@@ -1381,6 +1485,7 @@ export default {
         }
       });
       this.callShowMessageBox( newDevice + ' success connected','success');
+      this.haveDeviceConnect = true;
       this.loadingConnectAllDevice = false;
 
       if (type === 'MainCamera') {
@@ -1389,7 +1494,12 @@ export default {
       } else if (type === 'Mount') {
         this.$bus.$emit('MountConnected', 1);
         console.log('Mount is Connected.');
+      } else if (type === 'CFW') {
+        this.$bus.$emit('CFWConnected', 1);
+        console.log('Mount is Connected.');
       }
+
+      this.$bus.$emit('DeviceConnectSuccess', type, newDevice);
     },
 
     connectAllDevice()
@@ -1399,22 +1509,72 @@ export default {
       this.loadingConnectAllDevice = true;
     },
 
+    autoConnectAllDevice()
+    {
+      console.log("QHYCCD | autoConnectAllDevice.");
+      this.sendMessage('Vue_Command', 'autoConnectAllDevice');
+      this.loadingConnectAllDevice = true;
+    },
+
+    startConnectBtnPress() {
+      this.isConnectBtnLongPress = false; // 重置长按标记
+      this.ConnectBtnPressTimer = setTimeout(() => {
+        this.isConnectBtnLongPress = true; // 标记为长按
+        this.handleConnectBtnLongPress();
+      }, this.ConnectBtnlongPressThreshold);
+    },
+    endConnectBtnPress() {
+      clearTimeout(this.ConnectBtnPressTimer); // 清除定时器
+      if (!this.isConnectBtnLongPress) {
+        this.handleConnectBtnClick(); // 如果不是长按，则触发点击事件
+      }
+      this.ConnectBtnPressTimer = null; // 重置定时器
+    },
+    handleConnectBtnClick() {
+      if (this.haveDeviceConnect) {
+        this.callShowMessageBox('Please disconnect all devices first.', 'error');
+        return;
+      }
+      if (!this.ConnectBtnCanClick) return; // 如果不可点击，直接返回
+      this.ConnectBtnCanClick = false; // 设置为不可点击
+      console.log("Connect Button clicked");
+
+      this.connectAllDevice();
+
+      // 恢复点击权限
+      setTimeout(() => {
+        this.ConnectBtnCanClick = true;
+      }, 1000); // 1秒后恢复
+    },
+    handleConnectBtnLongPress() {
+      if (this.haveDeviceConnect) {
+        this.callShowMessageBox('Please disconnect all devices first.', 'error');
+        return;
+      }
+      // 长按事件的处理
+      console.log("Connect Button long pressed");
+
+      this.autoConnectAllDevice();
+    },
+
     disconnectAllDevice(confirm) {
       // 检查是否有设备的 isConnected 属性为 true
-      const hasConnectedDevices = this.devices.some(device => device.isConnected);
+      // const hasConnectedDevices = this.devices.some(device => device.isConnected);
 
-      if (hasConnectedDevices) { 
+      if (this.haveDeviceConnect) { 
         if(confirm === false) {
           this.ShowConfirmDialog('Confirm', 'Are you sure you want to disconnect all devices?', 'disconnectAllDevice');
         } else {
           this.sendMessage('Vue_Command', 'disconnectAllDevice');
+          this.haveDeviceConnect = false;
           this.devices.forEach(device => {
             device.isConnected = false;
             // device.device = '';
           });
 
-          // this.$bus.$emit('MainCameraConnected', 0);
-          // this.$bus.$emit('MountConnected', 0);
+          this.$bus.$emit('MainCameraConnected', 0);
+          this.$bus.$emit('MountConnected', 0);
+          this.$bus.$emit('CFWConnected', 0);
           this.claerDeviceList();
         }
       } else {
@@ -1433,6 +1593,7 @@ export default {
       this.ToBeConnectDevice = [];
       this.devicesList = [];
       this.drivers = [];
+      this.$bus.$emit('claerDeviceAllocationList');
     },
 
     SwitchOutPutPower(index, isPowerON) {
@@ -1462,6 +1623,16 @@ export default {
 
     OpenIamgeFolder() {
       this.$bus.$emit('ImageManagerPanelOpen');
+      this.nav = false;
+    },
+
+    OpenDebugLog() {
+      this.$bus.$emit('toggleINDIDebugDialog');
+      this.nav = false;
+    },
+
+    DeviceAllocation() {
+      this.$bus.$emit('toggleDeviceAllocationPanel');
       this.nav = false;
     },
 
@@ -1518,6 +1689,7 @@ export default {
           this.$bus.$emit(item.label, item.label + ':' + item.value);
         }
       });
+      this.callShowMessageBox('Configuration has been modified!','success');
     },
 
     loadAndDisplayImage(imagePath) {
@@ -1580,6 +1752,7 @@ export default {
 
       console.log('Image Binning is set to:', IntValue);
       this.sendMessage('Vue_Command', 'SetBinning:' + IntValue);
+      this.$bus.$emit('SetBinningNum', IntValue);
     },
 
     ImageCFASet(payload) {
@@ -2454,47 +2627,40 @@ export default {
 
 
     loadImageToCanvasMainCamera: function () {
-      const canvas = document.getElementById('mainCamera-canvas')
-      const ctx = canvas.getContext('2d')
-      const image = new Image()
+      const canvas = document.getElementById('mainCamera-canvas');
+      const ctx = canvas.getContext('2d');
+      const image = new Image();
       image.onload = () => {
-        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-        // const imageAspectRatio = image.width / image.height
-        // if (canvas.width / canvas.height > imageAspectRatio) {
-        //   ctx.drawImage(image, 0, 0, canvas.height * imageAspectRatio, canvas.height)
-        // } else {
-        //   ctx.drawImage(image, 0, 0, canvas.width, canvas.width / imageAspectRatio)
-        // }
-      }
-      image.src = 'https://www.qhyccd.cn/wp-content/uploads/2023112312-scaled.jpg'
+        // 获取设备像素比
+        const devicePixelRatio = window.devicePixelRatio || 1;
+
+        // 调整画布尺寸以适应高清显示
+        canvas.width = image.width * devicePixelRatio;
+        canvas.height = image.height * devicePixelRatio;
+        ctx.scale(devicePixelRatio, devicePixelRatio); // 缩放ctx以适应高清画布
+
+        // 绘制图像
+        ctx.drawImage(image, 0, 0);
+      };
+      image.src = BackgroundImage;
     },
     loadImageToCanvasGuiderCamera: function () {
-      const canvas = document.getElementById('guiderCamera-canvas')
-      const ctx = canvas.getContext('2d')
-      const image = new Image()
+      const canvas = document.getElementById('guiderCamera-canvas');
+      const ctx = canvas.getContext('2d');
+      const image = new Image();
       image.onload = () => {
-        ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-        // const imageAspectRatio = image.width / image.height
-        // if (canvas.width / canvas.height > imageAspectRatio) {
-        //   ctx.drawImage(image, 0, 0, canvas.height * imageAspectRatio, canvas.height)
-        // } else {
-        //   ctx.drawImage(image, 0, 0, canvas.width, canvas.width / imageAspectRatio)
-        // }
-        console.log(image.width, image.height, canvas.width, canvas.height)
-      }
-      image.src = 'https://www.qhyccd.cn/wp-content/uploads/2023112312-scaled.jpg'
-            /*
-      const canvas = document.getElementById('guiderCamera-canvas')
-      const ctx = canvas.getContext('2d')
-      const buffer = new ArrayBuffer(1280 * 720 * 4)
-      const view = new Uint8Array(buffer)
-      for (let i = 0; i < view.length; i++) {
-        view[i] = i % 256
-      }
-      const blob = new Blob([buffer], { type: 'image/png' })
-      const imageBitmap = createImageBitmap(blob)
-      ctx.drawImage(imageBitmap, 0, 0)
-      */
+        // 获取设备像素比
+        const devicePixelRatio = window.devicePixelRatio || 1;
+
+        // 调整画布尺寸以适应高清显示
+        canvas.width = image.width * devicePixelRatio;
+        canvas.height = image.height * devicePixelRatio;
+        ctx.scale(devicePixelRatio, devicePixelRatio); // 缩放ctx以适应高清画布
+
+        // 绘制图像
+        ctx.drawImage(image, 0, 0);
+      };
+      image.src = BackgroundImage;
     },
 
 
@@ -2694,6 +2860,11 @@ export default {
       }
     },
 
+    UpdateMainCameraTemperature(value) {
+      // console.log('Main Camera Temperature:', value + '°');
+      this.$bus.$emit('MainCameraTemperature', value);
+    },
+
     setPolarPointAltitude(Altitude) {
       this.PolarPoint_Altitude = Altitude;
       console.log('Polar Point Altitude:', this.PolarPoint_Altitude);
@@ -2785,6 +2956,7 @@ export default {
       console.log("RaDec circle coordinates:" + mm);
 
       const AzAlt = this.getCiecleAzAlt(MarkCircle_RaDec);
+      glLayer.remove(MarkCircle_RaDec);
 
       this.MarkCircleNum ++;
       let Label = "AzAlt_Vue_" + this.MarkCircleNum;
@@ -2804,7 +2976,7 @@ export default {
       this.CalculationPolarPoint(mm);
 
       // 将创建的圆存储到数组中
-      this.Circles.push(MarkCircle_RaDec);
+      // this.Circles.push(MarkCircle_RaDec);
       this.Circles.push(MarkCircle_AltAz);
 
       // var MarkCircle_AltAz_Qt = this.AddMarkCircle(this.$stel, glLayer, 4, "AzAlt_Qt");
@@ -2843,6 +3015,7 @@ export default {
       var mm = this.LastCircle_AzAlt.pos;
       this.vec3_from_sphe(AzAlt.Az_degree, AzAlt.Alt_degree, mm);
       this.LastCircle_AzAlt.pos = mm;
+      this.LastCircle_AzAlt.color = [0, 1, 1, 0.25];
       console.log("AzAlt_Vue circle coordinates:" + mm);
 
       console.log("AzAlt_Vue circle x:" + mm[0]);
@@ -3010,12 +3183,13 @@ export default {
       let fourthPointCartesian = sphericalToCartesian(fourthPointAzAlt.Az_degree, fourthPointAzAlt.Alt_degree);
       console.log("Fourth Point Cartesian:", fourthPointCartesian.x, ',', fourthPointCartesian.y, ',', fourthPointCartesian.z);
 
-      var MarkCircle_fourthPoint = this.AddMarkCircle(this.$stel, glLayer, 4, "fourthPoint");
+      var MarkCircle_fourthPoint = this.AddMarkCircle(this.$stel, glLayer, 4, "Target Point");
       var mm = MarkCircle_fourthPoint.pos;
       mm[0] = fourthPointCartesian.x;
       mm[1] = fourthPointCartesian.y;
       mm[2] = fourthPointCartesian.z;
       MarkCircle_fourthPoint.pos = mm;
+      MarkCircle_fourthPoint.color = [1, 0, 1, 0.25];
 
       this.Circles.push(MarkCircle_fourthPoint);
       
@@ -3080,7 +3254,7 @@ export default {
 
     CalibratePolarAxis() {
       this.$bus.$emit('CalibratePolarAxisMode');
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'StartLoopCapture');
+      // this.$bus.$emit('AppSendMessage', 'Vue_Command', 'StartLoopCapture');
       this.nav = false;
     },
 
@@ -3382,7 +3556,7 @@ html, body, #app {
 
 .btn-confirm:active
 .btn-slider:active {
-  /* transform: scale(0.95); 点击时缩小按钮 */
+  transform: scale(0.95);
   background-color: rgba(255, 255, 255, 0.5);
 }
 

@@ -145,6 +145,7 @@ export default {
     clearChartData() {
       this.chartData1 = [];
       this.chartData2 = [];
+      this.changeRange(0, 50);
       this.renderChart(0, 50, this.yAxis_min, this.yAxis_max);
     },
     RangeSwitch() {

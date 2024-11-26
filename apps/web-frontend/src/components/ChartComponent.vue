@@ -224,6 +224,7 @@ export default {
     
     DataClear() {
       this.$bus.$emit('clearChartData');
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'clearGuiderData');
     },
     RangeSwitch() {
       this.$bus.$emit('ChartRangeSwitch');

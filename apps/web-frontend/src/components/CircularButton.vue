@@ -87,12 +87,15 @@ export default {
 
       isLongPress: false,
       longPressProgress: 0,
+
+      MainCameraConnect: false,
     };
   },
   created() {
     this.$bus.$on('showCaptureImage', this.overProgress);
     this.$bus.$on('SetExpTime',this.SetDuration);
     this.$bus.$on('CameraInExposuring',this.setInProgress);
+    this.$bus.$on('MainCameraConnected', this.MainCameraConnected);
   },
   mounted() {
     this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getCaptureStatus');
@@ -139,7 +142,11 @@ export default {
       const elapsed = Date.now() - this.mousePressTimestamp;
       if (elapsed < this.longPressThreshold) {
         // 处理点击逻辑
-        this.animateProgress();
+        if(this.MainCameraConnect) {
+          this.animateProgress();
+        } else {
+          this.$bus.$emit('showMsgBox', 'Please connect the camera first.', 'error');
+        }
       }
     },
 
@@ -214,6 +221,15 @@ export default {
     setInProgress() {
       this.progress = 0.99;
       this.isClicked = true;
+    },
+
+    MainCameraConnected(num) {
+      if(num === 0){
+        this.MainCameraConnect = false;
+      } else {
+        this.MainCameraConnect = true;
+      }
+      console.log('MainCamera is Connected: ', num);
     },
 
   },

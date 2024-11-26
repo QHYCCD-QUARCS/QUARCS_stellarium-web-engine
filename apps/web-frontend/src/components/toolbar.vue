@@ -13,7 +13,7 @@
       <img class="tbtitle hidden-xs-only" id="stellarium-web-toolbar-logo" src="@/assets/images/logo.svg" width="33" height="33"  style="pointer-events: none;" alt="Stellarium Web Logo"/>
       <span class="tbtitle hidden-xs-only">Q U A R C S</span>
       <v-spacer></v-spacer>
-      <target-search v-show="isTargetSearchShow"></target-search>
+      <target-search v-show="isTargetSearchShow" style="width: 20%;"></target-search>
       <v-spacer></v-spacer>
       <div>
         <div v-if="$store.state.showFPS" class="subheader text-subtitle-2 pr-2" style="user-select: none;">FPS {{ $store.state.stel ? $store.state.stel.fps.toFixed(1) : '?' }}</div>
@@ -206,10 +206,10 @@ export default {
       }
     }
   },
-  mounted: function () {
-    this.GetConnectedDevices();
+  // mounted: function () {
+  //   this.GetConnectedDevices();
 
-  },
+  // },
   methods: {
     toggleNavigationDrawer: function () {
       this.$store.commit('toggleBool', 'showNavigationDrawer')
@@ -314,9 +314,9 @@ export default {
       console.log('Mount is Connected: ', num);
     },
 
-    GetConnectedDevices() {
-      this.$bus.$emit('GetConnectedDevices');
-    },
+    // GetConnectedDevices() {
+    //   this.$bus.$emit('GetConnectedDevices');
+    // },
 
   },
   components: { TargetSearch, DateTimePicker }

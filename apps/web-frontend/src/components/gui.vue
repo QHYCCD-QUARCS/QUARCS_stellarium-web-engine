@@ -7,8 +7,8 @@
 // repository.
 
 <template>
-<div class="click-through" style="position:absolute; z-index: 1; width: 100%; height: 100%; display:flex; align-items: flex-end;">
-  <div v-show="showRedBox" class="red-box" :style="{ top: mouseY + 'px', left: mouseX + 'px', width: RedBoxWidth + 'px', height: RedBoxHeight + 'px' }"></div>
+<div class="click-through" style="position:absolute; z-index: 1; width: 100%; height: 100%; display:flex; align-items: flex-end; pointer-events: none;">
+  <div v-show="showRedBox" class="red-box" :style="{ top: mouseY + 'px', left: mouseX + 'px', width: RedBoxWidth/BinningNum + 'px', height: RedBoxHeight/BinningNum + 'px' }"></div>
   <div v-show="showPHD2BoxAndCross && PHD2BoxView" :class="SwitchPHD2BoxClass" :style="{ top: PHD2Box_Y + 'px', left: PHD2Box_X + 'px', width: PHD2Box_Width + 'px', height: PHD2Box_Height + 'px' }"></div>
   <div v-show="showPHD2BoxAndCross && PHD2CrossView" :class="SwitchPHD2CrossClass" :style="{ top: 0 + 'px', left: PHD2Cross_X + 'px', width: 1 + 'px', height: PHD2Cross_Height + 'px' }"></div>
   <div v-show="showPHD2BoxAndCross && PHD2CrossView" :class="SwitchPHD2CrossClass" :style="{ top: PHD2Cross_Y + 'px', left: 0 + 'px', width: PHD2Cross_Width + 'px', height: 1 + 'px' }"></div>
@@ -43,9 +43,16 @@
 
   <transition name="RightBtn">
     <button v-show="isPolarAxisMode && showSingleSolveBtn" @click="SingleSolveImage" class="get-click btn-SolveImage" style=" background-color: rgba(0, 0, 0, 0.1); ">
-      <div style="display: flex; justify-content: center; align-items: center;">
-        <img src="@/assets/images/svg/ui/Solve.svg" height="25px" style="min-height: 25px; pointer-events: none;"></img>
-      </div>
+      <template v-if="!loadingImageSolve">
+        <div style="display: flex; justify-content: center; align-items: center;">
+          <img src="@/assets/images/svg/ui/Solve.svg" height="25px" style="min-height: 25px; pointer-events: none;"></img>
+        </div>
+      </template>
+      <template v-else>
+        <div class="progress-spinner">
+          <v-progress-circular indeterminate color="white" size="20"></v-progress-circular>
+        </div>
+      </template>
     </button>
   </transition>
 
@@ -146,11 +153,10 @@
     </div>
   </button>
 
-  <button v-show="isPolarAxisMode" @click="QuitPolarAxisMode" class="get-click btn-ShowUISwitch">
-    <!-- <div style="display: flex; justify-content: center; align-items: center;">
-      <img src="@/assets/images/svg/ui/UI_Show.svg" height="20px" style="min-height: 20px">
-    </div> -->
-    <v-icon color="rgba(255, 255, 255)"> mdi-close-outline </v-icon>
+  <button v-show="isPolarAxisMode" @click="QuitPolarAxisMode" class="get-click btn-QuitPolarAxis">
+    <div style="display: flex; justify-content: center; align-items: center;">
+      <img src="@/assets/images/svg/ui/Back.svg" height="35px" style="min-height: 35px; pointer-events: none;"> 
+    </div>
   </button>
 
   <transition name="BottomCanvas">
@@ -173,15 +179,45 @@
     </div>
   </transition>
 
+  <button v-show="isPolarAxisMode" @click="switchPolarAxisTips" class="PolarAxisTips">
+    <v-stepper v-model="currentPolarAxisStep" class="PolarAxisStepper">
+      <v-stepper-header>
+        <v-stepper-step step="1" :complete="currentPolarAxisStep > 1"></v-stepper-step>
+        <v-divider></v-divider>
+        <v-stepper-step step="2" :complete="currentPolarAxisStep > 2"></v-stepper-step>
+        <v-divider></v-divider>
+        <v-stepper-step step="3" :complete="currentPolarAxisStep > 3"></v-stepper-step>
+        <v-divider></v-divider>
+        <v-stepper-step step="4"></v-stepper-step>
+      </v-stepper-header>
+    </v-stepper>
+
+    <span class="PolarAxisTipsText"> 
+      {{ currentPolarAxisStepTips }}
+    </span>
+  </button>
   
 
   <CapturePanel v-show="isCaptureMode" />
 
-  <button v-show="isCaptureMode" @click="getOriginalImage" class="get-click btn-OriginalImage">
-    <div style="display: flex; justify-content: center; align-items: center;">
-      <img src="@/assets/images/svg/ui/OriginalImage.svg" height="20px" style="min-height: 20px; pointer-events: none;"></img>
-    </div>
+  <button :disabled="loadingOriginalImage" v-show="isCaptureMode" @click="getOriginalImage" class="get-click btn-OriginalImage">
+    <template v-if="!loadingOriginalImage">
+      <div style="display: flex; justify-content: center; align-items: center;">
+        <img src="@/assets/images/svg/ui/OriginalImage.svg" height="20px" style="min-height: 20px; pointer-events: none;"></img>
+      </div>
+    </template>
+    <template v-else>
+      <div class="progress-spinner">
+        <v-progress-circular indeterminate color="white" size="20"></v-progress-circular>
+      </div>
+    </template>
   </button>
+
+  <transition name="ToolBar">
+    <div v-show="isCaptureMode" class="Image-Info">
+      <p>{{ ImageInfo }}</p>
+    </div>
+  </transition>
 
   <!-- <button v-show="isCaptureMode" @click="calcWhiteBalanceGains" class="get-click btn-WhiteBalance">
     <div style="display: flex; justify-content: center; align-items: center;">
@@ -190,6 +226,10 @@
   </button> -->
 
   <ImageManagerPanel v-show="ShowImageManagerPanel" />
+
+  <DeviceAllocationPanel v-show="ShowDeviceAllocationPanel" />
+
+  <INDIDebugDialog v-show="ShowINDIDebugDialog"/>
 
   <SchedulePanel v-show="ShowSchedulePanel" class="get-click" style="position: absolute;"/>
   <ScheduleKeyBoard v-show="ShowSchedulePanel" />
@@ -277,6 +317,10 @@ import CapturePanel from '@/components/CapturePanel.vue';
 
 import ImageManagerPanel from '@/components/ImageManagerPanel.vue';
 
+import DeviceAllocationPanel from '@/components/DeviceAllocationPanel.vue';
+
+import INDIDebugDialog from '@/components/indiDebugDialog.vue';
+
 export default {
   data: function () {
     return {
@@ -296,6 +340,12 @@ export default {
       isRedBoxMode: false,
       ShowSchedulePanel: false,
       ShowImageManagerPanel: false,
+      ShowDeviceAllocationPanel: false,
+      ShowINDIDebugDialog: false,
+      loadingOriginalImage: false,
+
+      currentImageWidth: 0,
+      currentImageHeight: 0,
 
       showRedBox: false, // 控制小红框显示与隐藏
       isInitRedBox: true,
@@ -320,7 +370,7 @@ export default {
       ScaleImageWidth: 0,
       ScaleImageHeight: 0,
 
-      FocalLength: 510,         // QHY462C: 130  5.568 3.132
+      FocalLength: 0,         // QHY462C: 130  5.568 3.132
       // CameraSizeWidth: 5.568,   // QHY163M: 510  17.7  13.4
       // CameraSizeHeight: 3.132, 
 
@@ -359,6 +409,19 @@ export default {
 
       PHD2BoxView: true,
       PHD2CrossView: true,
+
+      loadingImageSolve: false,
+
+      currentPolarAxisStep: 1,
+
+      PolarAxisStepTips: [
+        "Rotate the equatorial dec axis by a certain angle and then take photos for analysis.",
+        "The Dec axis remains stationary, rotate the Ra axis by a certain angle, and then take photos for analysis.",
+        "Continue rotating the Ra axis and then take photos for analysis.",
+        "Turn on the loop shooting analysis, keep the Ra and Dec axes still, adjust the equatorial meter to make the two circles in the star chart as close to each other as possible."
+      ],
+
+      BinningNum: 1,
     }
   },
   created() {
@@ -366,6 +429,7 @@ export default {
     this.$bus.$on('add-device', this.handleAddDevice);
     this.$bus.$on('showMsgBox', this.showMessageBox);
     this.$bus.$on('MainCameraSize', this.resizeRedBox);
+    this.$bus.$on('MainCameraBinning', this.SetBinningNum);
     this.$bus.$on('RedBox Side Length (px)', this.RedBoxSizeChange);
     this.$bus.$on('time-selected', this.handleExpTimeSelected);
     // this.$bus.$on('cfw-selected', this.handleCFWSelected);
@@ -375,6 +439,8 @@ export default {
     this.$bus.$on('toggleFocuserPanel', this.toggleFocuserPanel);
     this.$bus.$on('ImageManagerPanelClose', this.toggleImageManagerPanel);
     this.$bus.$on('ImageManagerPanelOpen', this.toggleImageManagerPanel);
+    this.$bus.$on('toggleDeviceAllocationPanel', this.toggleDeviceAllocationPanel);
+    this.$bus.$on('toggleINDIDebugDialog', this.toggleINDIDebugDialog);
     
     // this.$bus.$on('RedBoxClick', this.handleTouchOrMouseDown);
     this.$bus.$on('RedBox_XY', this.RedBox_XY);
@@ -394,9 +460,12 @@ export default {
     this.$bus.$on('GuiderStatus', this.GuiderStatus);
     this.$bus.$on('PHD2StarBoxView', this.togglePHD2StarBox);
     this.$bus.$on('PHD2StarCrossView', this.togglePHD2StarCross);
+    this.$bus.$on("ImageSolveFinished", this.ImageSolveFinished);
+    this.$bus.$on('Focal Length (mm)', this.FocalLengthSet);
+    // this.$bus.$on('SetBinningNum', this.SetBinningNum);
   },
   mounted() {
-    this.resizeRedBox(1920, 1080);
+    // this.resizeRedBox(1920, 1080);
   },
   methods: {
     toggleFloatingBox() {
@@ -441,6 +510,14 @@ export default {
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'ShowAllImageFolder');
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'USBCheck');
       }
+    },
+
+    toggleDeviceAllocationPanel() {
+      this.ShowDeviceAllocationPanel = !this.ShowDeviceAllocationPanel;
+    },
+
+    toggleINDIDebugDialog() {
+      this.ShowINDIDebugDialog = !this.ShowINDIDebugDialog;
     },
 
     showCaptureUI() {
@@ -489,6 +566,15 @@ export default {
     SetRedBoxScale(value) {
       this.RedBoxWidth = this.RedBoxWidth_ * value;
       this.RedBoxHeight = this.RedBoxHeight_ * value;
+    },
+
+    SetBinningNum(num) {
+      this.BinningNum = num;
+      console.log('currentImageBin:', num);
+    },
+
+    FocalLengthSet(num) {
+      this.FocalLength = num;
     },
 
     PHD2BoxPosition(BoxStartX, BoxStartY, BoxWidth, BoxHeight) {
@@ -541,6 +627,9 @@ export default {
     },
 
     resizeRedBox(CameraWidth, CameraHeight) {
+      this.currentImageWidth = CameraWidth;
+      this.currentImageHeight = CameraHeight;
+
       const windowWidth = window.innerWidth;
       const windowHeight = window.innerHeight;
 
@@ -679,18 +768,6 @@ export default {
       this.$bus.$emit('Switch-MainPage');
     },
 
-    // Switch_ExpTime_CFW() {
-    //   if(this.isExpTimeBarShow === true)
-    //   {
-    //     this.isExpTimeBarShow = false;
-    //     this.isCFWSelectBarShow = true;
-    //   }
-    //   else {
-    //     this.isExpTimeBarShow = true;
-    //     this.isCFWSelectBarShow = false;
-    //   }
-    // },
-
     handleExpTimeSelected(time) {
       console.log('QHYCCD | ExpTimeSelected: ', time);
       // 根据需要处理选择的时间
@@ -717,8 +794,29 @@ export default {
       }
     },
 
+    ImageSolveFinished(success) {
+      console.log("Image Solve Finished!!!");
+
+      this.loadingImageSolve = false;
+      
+      if(success) {
+        this.currentPolarAxisStep = Math.min(this.currentPolarAxisStep + 1, 4);
+      }
+    },
+
     SingleSolveImage() {
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'SolveImage:' + this.FocalLength);
+      if(this.FocalLength === 0) {
+        this.showMessageBox('Please set Focal Length first.', 'error');
+        return;
+      }
+
+      if(this.loadingImageSolve) {
+        this.$bus.$emit('showMsgBox', 'Image solve is currently in progress.', 'warning');
+        this.ShowConfirmDialog('Confirm', 'Are you sure you want to cancel capture and solve?', 'EndCaptureAndSolve');
+      } else {
+        this.loadingImageSolve = true;
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'SolveImage:' + this.FocalLength);
+      }
     },
 
     LoopSolveImage() {
@@ -781,6 +879,7 @@ export default {
     },
 
     RecalibratePolarAxis() {
+      this.currentPolarAxisStep = 1;
       console.log('Re calibrate the polar axis');
       this.showSingleSolveBtn = true;
       this.$bus.$emit('RecalibratePolarAxis');
@@ -823,11 +922,19 @@ export default {
         this.$bus.$emit('SwitchOutPutPower', index, false);
       } else if(this.ConfirmToDo === 'Recalibrate') {
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'PHD2Recalibrate');
+      } else if(this.ConfirmToDo === 'EndCaptureAndSolve') {
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'EndCaptureAndSolve');
+        this.loadingImageSolve = false;
       }
     },
 
     getOriginalImage() {
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getOriginalImage');
+      if(this.BinningNum === 1) {
+        this.$bus.$emit('showMsgBox', 'The current image is already the original one.', 'warning');
+      } else {
+        this.loadingOriginalImage = true;
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getOriginalImage');
+      }
     },
 
     ShowCaptureImageProgress(num) {
@@ -842,6 +949,7 @@ export default {
         this.CaptureImageProgressCard = false;
         this.CaptureImageProgressNum = 0;
         this.CaptureImageProgressNum_ = 0;
+        this.loadingOriginalImage = false;
       }
     },
 
@@ -858,7 +966,11 @@ export default {
       } else {
         this.PHD2CrossView = false;
       }
-    }
+    },
+
+    switchPolarAxisTips() {
+      this.currentPolarAxisStep = Math.min(this.currentPolarAxisStep + 1, 4);
+    },
 
     // calcWhiteBalanceGains() {
     //   this.$bus.$emit('calcWhiteBalanceGains');
@@ -917,6 +1029,23 @@ export default {
         }
       ];
     },
+    currentPolarAxisStepTips() {
+      return this.PolarAxisStepTips[this.currentPolarAxisStep - 1];
+    },
+    ImageInfo() {
+      let imageInfo;
+      if(this.currentImageWidth === 0 || this.currentImageHeight === 0){
+        imageInfo = 'N/A';
+      } else {
+        if(this.BinningNum === 1) {
+          imageInfo = 'Original image, Size: [' + this.currentImageWidth + 'x' + this.currentImageHeight +']';
+        } else {
+          imageInfo = 'Binning: ' + this.BinningNum + ', Size: [' + this.currentImageWidth + 'x' + this.currentImageHeight +']';
+        }
+      }
+    
+      return imageInfo;
+    },
   },
   components: { 
     Toolbar, 
@@ -947,6 +1076,8 @@ export default {
     ScheduleKeyBoard,
     CapturePanel,
     ImageManagerPanel,
+    DeviceAllocationPanel,
+    INDIDebugDialog,
   }
 }
 </script>
@@ -1061,7 +1192,7 @@ export default {
   position:absolute;
   width: 35px;
   height: 35px;
-  top: 50px;
+  top: 65px;
   left: 20px;
   
   user-select: none;
@@ -1075,13 +1206,29 @@ export default {
   position:absolute;
   width: 35px;
   height: 35px;
-  top: 95px;
+  top: 105px;
   left: 20px;
   
   user-select: none;
   backdrop-filter: blur(5px);
   background-color: rgba(0, 0, 0, 0.1);
   border-radius: 50%;
+}
+
+.Image-Info {
+  position:absolute;
+  height: 10px;
+  top: 40px;
+  left: 10px;
+
+  text-align: center; 
+  font-size: 10px; 
+  color: rgba(255, 255, 255, 0.5); 
+  
+  user-select: none;
+  /* backdrop-filter: blur(5px); */
+  background-color: rgba(64, 64, 64, 0);
+  border-radius: 3px;
 }
 
 .btn-WhiteBalance {
@@ -1136,7 +1283,7 @@ export default {
   position:absolute;
   width: 35px;
   height: 35px;
-  top: 50px;
+  top: 65px;
   left: 20px;
   
   user-select: none;
@@ -1144,6 +1291,20 @@ export default {
   background-color: rgba(0, 0, 0, 0.1);
   border-radius: 50%;  
   /* border: 1px solid rgba(255, 255, 255, 0.8); */
+}
+
+.btn-QuitPolarAxis {
+  position:absolute;
+  width: 35px;
+  height: 35px;
+  top: 20px;
+  left: 20px;
+  
+  user-select: none;
+  backdrop-filter: blur(5px);  
+  background-color: rgba(0, 0, 0, 0.1);
+  border-radius: 50%;  
+  border: 1px solid rgba(255, 255, 255, 0.8);
 }
 
 
@@ -1368,6 +1529,59 @@ export default {
 .cross-null {
   position: absolute;
   background-color:  rgba(255, 165, 0, 1);
+}
+
+.PolarAxisTips {
+  position: absolute;
+  width: 50%;
+  height: 36px;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  
+  user-select: none;
+  box-sizing: border-box;
+
+  /* backdrop-filter: blur(5px);  */
+  background-color: rgba(64, 64, 64, 0.5);
+
+  border-top-left-radius: 10px;
+  border-top-right-radius: 10px;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.PolarAxisStepper {
+  position: absolute;
+  width: 100%;
+  height: 50px;
+  top: -16px;
+  left: 50%;
+  transform: translateX(-50%);
+
+  background-color: transparent !important;
+  box-shadow: none;
+  /* border-radius: 10px; */
+  /* border: 1px solid rgba(255, 255, 255, 0.8); */
+}
+
+.PolarAxisTipsText {
+  position: absolute; 
+  width: 100%; 
+  top: 36px; 
+  left: 0; 
+
+  text-align: center; 
+  font-size: 14px; 
+  color: rgba(255, 255, 255, 0.5); 
+  user-select: none;
+
+  background-color: rgba(64, 64, 64, 0.5);
+
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+  border-bottom-left-radius: 10px;
+  border-bottom-right-radius: 10px;
 }
 
 </style>
