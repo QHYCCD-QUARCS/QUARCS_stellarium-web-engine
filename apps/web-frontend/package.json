@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@mdi/font": "^3.6.95",
+    "clipboard": "^2.0.11",
     "core-js": "^3.4.4",
     "echarts": "^5.4.3",
     "fitsjs": "^0.6.6",

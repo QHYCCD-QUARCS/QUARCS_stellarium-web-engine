@@ -221,6 +221,7 @@ export default {
       this.calculateTotalPage();
 
       console.log('Deleted folders:', deletedFolders);
+      this.$bus.$emit('SendConsoleLogMsg', 'Deleted folders:'+deletedFolders, 'info');
     },
     convertImageDataToString(imageDataArray) {
       let resultString = '{';
@@ -247,7 +248,8 @@ export default {
       const moveFolders = this.imageFolders.filter(folder => folder.isSelected); // 被删除的文件夹
       const resultString = this.convertImageDataToString(moveFolders)
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'MoveFileToUSB:'+this.FoldersName+resultString);
-      console.log('Deleted folders:', moveFolders)
+      console.log('move folders:', moveFolders)
+      this.$bus.$emit('SendConsoleLogMsg', 'Move folders:'+moveFolders, 'info');
     },
 
     updateImageFolders(CaptureImageFoldersString, ScheduleImageFoldersString) {

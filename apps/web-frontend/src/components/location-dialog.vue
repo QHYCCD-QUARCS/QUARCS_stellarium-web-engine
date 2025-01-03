@@ -68,6 +68,7 @@ export default {
     },
     SetCurrentLocation(lat, lng) {
       console.log('SetCurrentLocation:', lat, ',', lng);
+      this.$bus.$emit('SendConsoleLogMsg', 'Set Current Location:' + lat + ',' + lng, 'info');
       this.$bus.$emit('PolarPointAltitude', lat);
       const loc = {
         short_name: 'Unknown',

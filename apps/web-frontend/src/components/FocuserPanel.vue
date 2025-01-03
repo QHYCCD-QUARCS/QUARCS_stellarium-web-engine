@@ -168,11 +168,13 @@ export default {
       {
         this.inAutoFocus = false;
         console.log('QHYCCD | StopAutoFocus');
+        this.$bus.$emit('SendConsoleLogMsg', 'StopAutoFocus', 'info');
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'StopAutoFocus');
       }
       else
       {
         console.log('QHYCCD | StartAutoFocus');
+        this.$bus.$emit('SendConsoleLogMsg', 'StartAutoFocus', 'info');
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'ClearDataPoints');
         this.$bus.$emit('ClearAllData');
 
@@ -184,6 +186,7 @@ export default {
 
     AutoFocusOver() {
       console.log('QHYCCD | AutoFocusOver');
+      this.$bus.$emit('SendConsoleLogMsg', 'AutoFocusOver', 'info');
       this.inAutoFocus = false;
     },
     
@@ -195,6 +198,7 @@ export default {
       else if(this.MoveSteps === 10000) this.MoveSteps = 100;
 
       console.log('QHYCCD | StepsChange: ', this.MoveSteps);
+      // this.$bus.$emit('SendConsoleLogMsg', 'StepsChange:' + this.MoveSteps, 'info');
     },
 
     SpeedChange() {
@@ -203,18 +207,21 @@ export default {
       else if(this.MoveSpeed === 5) this.MoveSpeed = 1;
 
       console.log('QHYCCD | SpeedChange: ', this.MoveSpeed);
+      this.$bus.$emit('SendConsoleLogMsg', 'SpeedChange:' + this.MoveSpeed, 'info');
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'focusSpeed:'+ this.MoveSpeed);
     },
 
     FocusLeftMove() {
       this.isBtnMoveDisabled = true;
-      console.log('QHYCCD | FocusLeftMove: ');
+      // console.log('QHYCCD | FocusLeftMove: ');
+      this.$bus.$emit('SendConsoleLogMsg', 'Focus Left Move:' + this.MoveSteps, 'info');
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'focusMove:'+ "Left" + ":" + this.MoveSteps);
     },
 
     FocusRightMove() {
       this.isBtnMoveDisabled = true;
-      console.log('QHYCCD | FocusRightMove: ');
+      // console.log('QHYCCD | FocusRightMove: ');
+      this.$bus.$emit('SendConsoleLogMsg', 'Focus Right Move:' + this.MoveSteps, 'info');
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'focusMove:'+ "Right" + ":" + this.MoveSteps);
     },
 
@@ -233,11 +240,13 @@ export default {
 
     FocusGoto() {
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'focusMove:'+ "Target" + ":" + this.TargetPosition);
+      this.$bus.$emit('SendConsoleLogMsg', 'Focus Move to:' + this.TargetPosition, 'info');
     },
 
     MoveDone() {
       this.isBtnMoveDisabled = false;
       console.log('QHYCCD | FocusMoveDone');
+      this.$bus.$emit('SendConsoleLogMsg', 'FocusMoveDone', 'info');
     },
 
     UpdateFWHM(FWHM) {

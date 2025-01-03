@@ -201,6 +201,7 @@ export default {
       }
       this.ImageFiles[this.SelectFilesIndex].isOpen = true;
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'ReadImageFile:' + this.CurrentFolderType + '/' + this.imageDate + this.imageName + '/' + this.SelectFilesName);
+      this.$bus.$emit('SendConsoleLogMsg', 'Read Image File:' + this.CurrentFolderType + '/' + this.imageDate + this.imageName + '/' + this.SelectFilesName, 'info');
     },
 
     toggleFolder() {
@@ -221,6 +222,7 @@ export default {
       this.CurrentFolderType = type;
       if(this.folderOpen) {
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'GetImageFiles:' + type + '/' + this.imageDate + this.imageName);
+        this.$bus.$emit('SendConsoleLogMsg', 'Get Image Files:' + type + '/' + this.imageDate + this.imageName, 'info');
       }
     },
 
@@ -264,6 +266,7 @@ export default {
       const resultString = this.convertImageDataToString(deletedImageFiles)
       // this.$bus.$emit('AppSendMessage', 'Vue_Command', 'ReadImageFile:' + this.CurrentFolderType + '/' + this.imageDate + this.imageName + '/' + this.SelectFilesName);
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'DeleteFile:'+this.CurrentFolderType+resultString);
+      this.$bus.$emit('SendConsoleLogMsg', 'Delete File:'+this.CurrentFolderType+resultString, 'info');
       this.ImageFiles = this.ImageFiles.filter(File => !File.isSelect);
     },
 

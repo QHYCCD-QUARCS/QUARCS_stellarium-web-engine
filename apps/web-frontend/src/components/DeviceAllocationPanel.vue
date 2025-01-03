@@ -169,6 +169,7 @@ export default {
       const DeviceNameIndex = this.DeviceList.findIndex(item => item.DeviceName === name);
       if (DeviceNameIndex !== -1) {
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'BindingDevice:' + type + ':' + this.DeviceList[DeviceNameIndex].DeviceIndex);
+        this.$bus.$emit('SendConsoleLogMsg', 'Binding Device:' + type + ':' + this.DeviceList[DeviceNameIndex].DeviceIndex, 'info');
       }
 
     },
@@ -177,6 +178,7 @@ export default {
       const type = this.DeviceTypes[index].DeviceType;
 
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'UnBindingDevice:' + type);
+      this.$bus.$emit('SendConsoleLogMsg', 'UnBinding Device:' + type, 'info');
 
       this.DeviceTypes[index].isBind = false;
       this.DeviceTypes[index].DeviceName = '';

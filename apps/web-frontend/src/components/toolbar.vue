@@ -34,12 +34,12 @@
         <date-time-picker v-model="pickerDate" :location="$store.state.currentLocation"></date-time-picker>
       </v-menu>
 
-      <span v-if="isConnect">
+      <span v-if="isConnect" @click="toggleRPIHotspotDialog">
         <div style="display: flex; justify-content: center; align-items: center;">
           <img src="@/assets/images/svg/ui/wifi.svg" height="30px" style="min-height: 30px; pointer-events: none;"></img>
         </div>
       </span>
-      <span v-else>
+      <span v-else @click="toggleRPIHotspotDialog">
         <div style="display: flex; justify-content: center; align-items: center;">
           <img src="@/assets/images/svg/ui/wifi_off.svg" height="30px" style="min-height: 30px; pointer-events: none;"></img>
         </div>
@@ -264,6 +264,11 @@ export default {
       this.openStatusCard = !this.openStatusCard;
     },
 
+    toggleRPIHotspotDialog() {
+      this.$bus.$emit('toggleRPIHotspotDialog');
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getHotspotName');
+    },
+
     MainCameraStatus(status) {
       if(status === 'Exposuring') {
         this.MainCameraInProgress = true;
@@ -362,12 +367,13 @@ export default {
 }
 
 .TimerPickBtn {
-    padding: 0.2rem 0.6rem;
-    color: white;
-    cursor: pointer;
+  padding: 0.2rem 0.6rem;
+  color: white;
+  cursor: pointer;
 
-    font-size: 14px;
-    text-align: center;
+  font-size: 14px;
+  text-align: center;
+  user-select: none;
 }
 
 .ScheduleBtn {

@@ -183,6 +183,7 @@ export default {
         // this.$refs.CFWContent.innerText = this.CFWs[this.currentCFWIndex];
         // this.$bus.$emit('cfw-selected', this.currentCFWIndex);
         console.log('QHYCCD | CFWSelected: ', (this.currentCFWIndex+1));
+        this.$bus.$emit('SendConsoleLogMsg', 'SetCFWPosition:' + (this.currentCFWIndex+1), 'info');
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'SetCFWPosition:' + (this.currentCFWIndex+1));
         this.cfwButtonsDisabled = true;
       } else {
@@ -267,6 +268,7 @@ export default {
 
     SetCFWPositionSuccess(num) {
       console.log('Set CFW Position Success: ', num);
+      this.$bus.$emit('SendConsoleLogMsg', 'Set CFW Position Success:' + num, 'info');
       this.cfwButtonsDisabled = false;
     },
 
@@ -301,6 +303,7 @@ export default {
         this.CFWConnect = true;
       }
       console.log('CFW is Connected: ', num);
+      this.$bus.$emit('SendConsoleLogMsg', 'CFW is Connected:' + num, 'info');
     }
     
   },

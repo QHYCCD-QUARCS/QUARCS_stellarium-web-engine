@@ -31,8 +31,14 @@
     <div>
       <button class="btn-stop no-select" @click="stop"><v-icon> mdi-stop-circle-outline </v-icon></button>
     </div>
+
     <div>
-      <button class="btn-speed custom-button no-select" @click="MountSlewRateSwitch"> {{ MountSpeed }} </button>
+      <button class="btn-speed custom-button no-select" @click="MountSlewRateSwitch">
+        <span style="position:absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);">{{ MountSpeed }}</span>
+        <div style="display: flex; justify-content: center; align-items: center;">
+          <img src="@/assets/images/svg/ui/SPEED.svg" height="25px" style="min-height: 25px; pointer-events: none;"></img>
+        </div>
+      </button>
     </div>
     
     <div v-if="showButtons">
@@ -132,7 +138,8 @@ export default {
   methods: {
     handleMouseDownRA(direction) {
       // 在这里实现调整RA的逻辑
-      console.log(`QHYCCD | 调整RA ${direction}`);
+      // console.log(`QHYCCD | 调整RA ${direction}`);
+      this.$bus.$emit('SendConsoleLogMsg', `Mount Move RA ${direction}`, 'info');
       if(direction === 'plus'){
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'MountMoveWest');
       } else {
@@ -142,7 +149,8 @@ export default {
     },
     handleMouseDownDEC(direction) {
       // 在这里实现调整DEC的逻辑
-      console.log(`QHYCCD | 调整DEC ${direction}`);
+      // console.log(`QHYCCD | 调整DEC ${direction}`);
+      this.$bus.$emit('SendConsoleLogMsg', `Mount Move DEC ${direction}`, 'info');
       if(direction === 'plus'){
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'MountMoveNorth');
       } else {
@@ -152,28 +160,33 @@ export default {
     stop() {
       // 在这里实现停止的逻辑
       console.log('QHYCCD | 停止');
+      this.$bus.$emit('SendConsoleLogMsg', 'Mount Move Abort', 'info');
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'MountMoveAbort');
     },
 
     MountPark() {
       console.log('QHYCCD | Park');
+      this.$bus.$emit('SendConsoleLogMsg', 'Mount Park', 'info');
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'MountPark');
     },
     MountTrack() {
       console.log('QHYCCD | Truck');
+      this.$bus.$emit('SendConsoleLogMsg', 'Mount Truck', 'info');
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'MountTrack');
     },
     MountHome() {
       console.log('QHYCCD | Home');
+      this.$bus.$emit('SendConsoleLogMsg', 'Mount Home', 'info');
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'MountHome');
     },
     MountSYNC() {
       console.log('QHYCCD | SYNC');
+      this.$bus.$emit('SendConsoleLogMsg', 'Mount SYNC', 'info');
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'MountSYNC');
     },
     SolveSYNC() {
       console.log('QHYCCD | SolveSYNC');
-
+      this.$bus.$emit('SendConsoleLogMsg', 'Mount Solve SYNC', 'info');
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'SolveSYNC:' + this.FocalLength);
     },
     getTargetRaDec(value) {

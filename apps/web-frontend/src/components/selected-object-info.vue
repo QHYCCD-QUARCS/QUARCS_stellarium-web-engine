@@ -353,6 +353,7 @@ export default {
     printName: function () {
       const Name = this.title;
       console.log('SelectedObject:', Name);
+      this.$bus.$emit('SendConsoleLogMsg', 'SelectedObject:' + Name, 'info');
       this.$bus.$emit('insertObjName',Name);
 
       // Math.floor(this.TargetRa * 100) / 100;

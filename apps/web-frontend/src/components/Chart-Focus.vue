@@ -228,6 +228,7 @@ export default {
       const newDataPoint = [this.currentX, FWHM];
       this.addData_Point(newDataPoint);
       console.log("QHYCCD | UpdateFWHM:", newDataPoint);
+      this.$bus.$emit('SendConsoleLogMsg', 'UpdateFWHM:' + newDataPoint, 'info');
       this.renderChart(this.xAxis_min, this.xAxis_max);
     },
     fitQuadraticCurve(x, y) {
@@ -236,6 +237,7 @@ export default {
     },
     fitQuadraticCurve_minPoint(x, y) {
       console.log("QHYCCD | minPoint:", x, ',', y);
+      this.$bus.$emit('SendConsoleLogMsg', 'minPoint:' + x + ',' + y, 'info');
       this.chartData3 = [];
       const newDataPoint = [x, y];
       this.chartData3.push(newDataPoint);

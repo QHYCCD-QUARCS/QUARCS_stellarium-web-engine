@@ -98,11 +98,10 @@ export default {
   },
   computed: {
     GuiderSwitchBtnClass() {
+      if(!this.isGuiding) {
+        return 'btn-null';
+      } else {
         return [
-          // {
-          //   'btn-LoopExp-true': this.isGuiding, 
-          //   'btn-LoopExp-false': !this.isGuiding, 
-          // },
           {
             'btn-InGuiding': this.CurrentGuiderStatus === 'InGuiding',
             'btn-InCalibration': this.CurrentGuiderStatus === 'InCalibration',
@@ -110,6 +109,7 @@ export default {
             'btn-null': this.CurrentGuiderStatus === 'null',
           }
         ];
+      }
     },
     LoopExpSwitchBtnClass() {
         return [
@@ -220,6 +220,7 @@ export default {
         this.$bus.$emit('showMsgBox', 'Lost guiding star target.', 'error');
       }
       console.log('GuiderStatus:', this.CurrentGuiderStatus);
+      this.$bus.$emit('SendConsoleLogMsg', 'GuiderStatus:' + this.CurrentGuiderStatus, 'info');
     },
     
     DataClear() {

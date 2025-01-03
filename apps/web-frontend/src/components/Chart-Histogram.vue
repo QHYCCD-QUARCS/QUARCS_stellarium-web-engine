@@ -155,7 +155,9 @@ export default {
       this.$bus.$emit('AutoHistogramNum', this.histogram_min, this.histogram_max);
 
       console.log('First Non-Zero Index:', firstNonZeroIndex);
+      this.$bus.$emit('SendConsoleLogMsg', 'First Non-Zero Index:' + firstNonZeroIndex, 'info');
       console.log('Last Non-Zero Index:', lastNonZeroIndex);
+      this.$bus.$emit('SendConsoleLogMsg', 'Last Non-Zero Index:' + lastNonZeroIndex, 'info');
 
             this.renderChart(this.xAxis_min, this.xAxis_max);
     },

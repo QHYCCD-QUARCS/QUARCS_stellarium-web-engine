@@ -12,7 +12,9 @@
   <div v-show="showPHD2BoxAndCross && PHD2BoxView" :class="SwitchPHD2BoxClass" :style="{ top: PHD2Box_Y + 'px', left: PHD2Box_X + 'px', width: PHD2Box_Width + 'px', height: PHD2Box_Height + 'px' }"></div>
   <div v-show="showPHD2BoxAndCross && PHD2CrossView" :class="SwitchPHD2CrossClass" :style="{ top: 0 + 'px', left: PHD2Cross_X + 'px', width: 1 + 'px', height: PHD2Cross_Height + 'px' }"></div>
   <div v-show="showPHD2BoxAndCross && PHD2CrossView" :class="SwitchPHD2CrossClass" :style="{ top: PHD2Cross_Y + 'px', left: 0 + 'px', width: PHD2Cross_Width + 'px', height: 1 + 'px' }"></div>
-  <message-box v-if="isMessageBoxShow" ref="messageBox"></message-box>
+
+  <message-box v-for="(msg, index) in messageList" :key="msg.id" :message="msg.message" :type="msg.type" :Pos="msg.Pos" @close="removeMessage(index)"></message-box>
+  
   <div>
     <transition name="ToolBar">
       <toolbar v-show="showToolbar" v-if="$store.state.showMainToolBar" class="get-click"></toolbar>
@@ -231,6 +233,8 @@
 
   <INDIDebugDialog v-show="ShowINDIDebugDialog"/>
 
+  <RPIHotspotDialog v-show="ShowRPIHotspotDialog" />
+
   <SchedulePanel v-show="ShowSchedulePanel" class="get-click" style="position: absolute;"/>
   <ScheduleKeyBoard v-show="ShowSchedulePanel" />
   <ScheduleList v-show="ShowSchedulePanel" class="get-click" style="position: absolute;"/>
@@ -253,6 +257,45 @@
           <v-icon color="rgba(51, 218, 121)"> mdi-check </v-icon>
         </v-btn>
         <v-spacer></v-spacer>
+      </v-card-actions>
+    </v-card>
+    </v-expand-x-transition>
+  </v-dialog>
+
+  <v-dialog v-model="DSLRsSetupDialog" width="250" persistent>
+    <v-expand-x-transition>
+    <v-card class="flashing-border" style="backdrop-filter: blur(5px); background-color: rgba(64, 64, 64, 0.5);">
+      <v-card-title style="font-size: 15px;">
+        {{ DSLRCameraName }}
+      </v-card-title>
+      
+      <v-card-text>
+        <v-row>
+          <v-col cols="6">
+            <v-text-field v-model="DSLRCameraWidth" label="Width" type="number" outlined dense></v-text-field>
+          </v-col>
+          <v-col cols="6">
+            <v-text-field v-model="DSLRCameraHeight" label="Height" type="number" outlined dense></v-text-field>
+          </v-col>
+        </v-row>
+
+        <v-text-field v-model="DSLRCameraPixelPitch" label="Pixel Pitch" type="number" outlined dense style="margin-top: -20px;"></v-text-field>
+      </v-card-text>
+
+      <v-card-text v-show="showDSLRsTips" style="margin-top: -40px;">
+        <span style="font-size: 10px; color: #2C9DDE; user-select: none; text-align: center; width: 100%;">
+          {{ $t('This is a one-time setup. You can obtain these values from your camera manual or from online sources such as www.digicamdb.com.') }}
+        </span>
+      </v-card-text>
+      
+      <v-card-actions :style="{'margin-top': showDSLRsTips ? '-30px' : '-50px'}">
+        <v-btn @click="showDSLRsTips = !showDSLRsTips" style="background-color: rgba(255, 255, 255, 0.1);">
+          <v-icon color="#2C9DDE"> mdi-help </v-icon>
+        </v-btn>
+        <v-spacer></v-spacer>
+        <v-btn @click="ConfirmDSLRsSetup(DSLRCameraWidth, DSLRCameraHeight, DSLRCameraPixelPitch)" style="background-color: rgba(255, 255, 255, 0.1);"> 
+          <v-icon color="rgb(255, 255, 255)"> mdi-check </v-icon>
+        </v-btn>
       </v-card-actions>
     </v-card>
     </v-expand-x-transition>
@@ -321,12 +364,15 @@ import DeviceAllocationPanel from '@/components/DeviceAllocationPanel.vue';
 
 import INDIDebugDialog from '@/components/indiDebugDialog.vue';
 
+import RPIHotspotDialog from '@/components/RPI-Hotspot.vue';
+
 export default {
   data: function () {
     return {
+      messageList: [],  // 存储消息框的数据
+      messageNum: 0,
       showFloatingBox: false,
       isSettingWindowShow: false,
-      isMessageBoxShow: false,
       isBottomBarShow: true,
       CurrentMainPage: 'Stel',
       isExpTimeBarShow: false,
@@ -342,6 +388,7 @@ export default {
       ShowImageManagerPanel: false,
       ShowDeviceAllocationPanel: false,
       ShowINDIDebugDialog: false,
+      ShowRPIHotspotDialog: false,
       loadingOriginalImage: false,
 
       currentImageWidth: 0,
@@ -389,6 +436,13 @@ export default {
       ConfirmDialogText: 'Text',
 
       ConfirmToDo: '',
+
+      DSLRsSetupDialog: false,
+      DSLRCameraName: '',
+      DSLRCameraWidth: 0,
+      DSLRCameraHeight: 0,
+      DSLRCameraPixelPitch: 0, 
+      showDSLRsTips: false,
 
       CaptureImageProgressCard: false,
       CaptureImageProgressNum: 0,
@@ -441,6 +495,7 @@ export default {
     this.$bus.$on('ImageManagerPanelOpen', this.toggleImageManagerPanel);
     this.$bus.$on('toggleDeviceAllocationPanel', this.toggleDeviceAllocationPanel);
     this.$bus.$on('toggleINDIDebugDialog', this.toggleINDIDebugDialog);
+    this.$bus.$on('toggleRPIHotspotDialog', this.toggleRPIHotspotDialog);
     
     // this.$bus.$on('RedBoxClick', this.handleTouchOrMouseDown);
     this.$bus.$on('RedBox_XY', this.RedBox_XY);
@@ -461,8 +516,11 @@ export default {
     this.$bus.$on('PHD2StarBoxView', this.togglePHD2StarBox);
     this.$bus.$on('PHD2StarCrossView', this.togglePHD2StarCross);
     this.$bus.$on("ImageSolveFinished", this.ImageSolveFinished);
-    this.$bus.$on('Focal Length (mm)', this.FocalLengthSet);
+    // this.$bus.$on('Focal Length (mm)', this.FocalLengthSet);
+    this.$bus.$on('SetFocalLengthNum', this.FocalLengthSet);
+    this.$bus.$on('FocalLength', this.FocalLengthSet);
     // this.$bus.$on('SetBinningNum', this.SetBinningNum);
+    this.$bus.$on('ShowDSLRsSetup', this.ShowDSLRsSetup);
   },
   mounted() {
     // this.resizeRedBox(1920, 1080);
@@ -479,6 +537,7 @@ export default {
       else if(this.showHistogramPanel) {
         this.showHistogramPanel = !this.showHistogramPanel;
       }
+      this.$bus.$emit('SwitchImageToShow', true);
     },
     toggleHistogramPanel() {
       this.showHistogramPanel = !this.showHistogramPanel;
@@ -488,6 +547,7 @@ export default {
       else if(this.showChartsPanel) {
         this.showChartsPanel = !this.showChartsPanel;
       }
+      this.$bus.$emit('SwitchImageToShow', true);
     },
     toggleFocuserPanel() {
       this.showFocuserPanel = !this.showFocuserPanel;
@@ -518,6 +578,10 @@ export default {
 
     toggleINDIDebugDialog() {
       this.ShowINDIDebugDialog = !this.ShowINDIDebugDialog;
+    },
+
+    toggleRPIHotspotDialog() {
+      this.ShowRPIHotspotDialog = !this.ShowRPIHotspotDialog;
     },
 
     showCaptureUI() {
@@ -569,12 +633,14 @@ export default {
     },
 
     SetBinningNum(num) {
-      this.BinningNum = num;
+      // this.BinningNum = num;
       console.log('currentImageBin:', num);
     },
 
     FocalLengthSet(num) {
-      this.FocalLength = num;
+      this.FocalLength = num; 
+      console.log('currentFocalLength:', num);
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'saveToConfigFile:FocalLength:'+ num);
     },
 
     PHD2BoxPosition(BoxStartX, BoxStartY, BoxWidth, BoxHeight) {
@@ -660,6 +726,7 @@ export default {
       const [signal, value] = payload.split(':');
       this.BoxSideLength = value;
       console.log('RedBoxSizeChange: ', this.BoxSideLength);
+      this.$bus.$emit('SendConsoleLogMsg', 'Red Box Size Change:' + this.BoxSideLength, 'info');
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'RedBoxSizeChange:'+ this.BoxSideLength);
     },
 
@@ -697,12 +764,30 @@ export default {
     // 消息框
     showMessageBox(msg,type) {
       console.log("QHYCCD | show Message Box.");
-      this.isMessageBoxShow = true;
-      this.$nextTick(() => {
-        this.$refs.messageBox.show(msg,type);
-      });
+
+      this.messageNum += 1;
+
+      const newMessage = {
+        id: this.messageNum,
+        message: msg,
+        type: type,  // 你可以动态设置不同的消息类型
+        Pos: this.messageList.length
+      };
+      this.messageList.push(newMessage);
+
+      // 设置定时器，5秒后自动移除
+      setTimeout(() => {
+        this.removeMessage(this.messageList.indexOf(newMessage));
+      }, 5000);
     },
     // 消息框
+
+    removeMessage(index) {
+      this.messageList.splice(index, 1);
+      this.messageList.forEach((msg, i) => {
+        msg.Pos = i;  // 重新计算 Pos
+      });
+    },
 
     SwitchMainPage() {
       if(this.CurrentMainPage === 'Stel')
@@ -795,7 +880,8 @@ export default {
     },
 
     ImageSolveFinished(success) {
-      console.log("Image Solve Finished!!!");
+      // console.log("Image Solve Finished!!!");
+      this.$bus.$emit('SendConsoleLogMsg', 'Image Solve Finished!!!', 'info');
 
       this.loadingImageSolve = false;
       
@@ -823,9 +909,11 @@ export default {
       if (this.PlateSolveInProgress) {
         this.PlateSolveInProgress = false;
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'stopLoopSolveImage');
+        this.$bus.$emit('SendConsoleLogMsg', 'stop Loop SolveImage', 'info');
       } else {
         this.PlateSolveInProgress = true;
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'startLoopSolveImage:' + this.FocalLength);
+        this.$bus.$emit('SendConsoleLogMsg', 'start Loop SolveImage', 'info');
       }
     },
 
@@ -844,6 +932,7 @@ export default {
       this.showCaptureUI();
       this.isCaptureMode = false;
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'StopLoopCapture');
+      this.$bus.$emit('SendConsoleLogMsg', 'Stop Loop Capture', 'info');
     },
 
     showSolveImage(img) {
@@ -880,13 +969,15 @@ export default {
 
     RecalibratePolarAxis() {
       this.currentPolarAxisStep = 1;
-      console.log('Re calibrate the polar axis');
+      console.log('Recalibrate the polar axis');
+      this.$bus.$emit('SendConsoleLogMsg', 'Recalibrate the polar axis.', 'info');
       this.showSingleSolveBtn = true;
       this.$bus.$emit('RecalibratePolarAxis');
 
       if (this.PlateSolveInProgress) {
         this.PlateSolveInProgress = false;
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'stopLoopSolveImage');
+        this.$bus.$emit('SendConsoleLogMsg', 'stop Loop Solve Image', 'info');
       }
 
       this.DifferenceText = '';
@@ -922,10 +1013,24 @@ export default {
         this.$bus.$emit('SwitchOutPutPower', index, false);
       } else if(this.ConfirmToDo === 'Recalibrate') {
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'PHD2Recalibrate');
+        this.$bus.$emit('SendConsoleLogMsg', 'PHD2 Recalibrate', 'info');
       } else if(this.ConfirmToDo === 'EndCaptureAndSolve') {
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'EndCaptureAndSolve');
+        this.$bus.$emit('SendConsoleLogMsg', 'End Capture And Solve', 'info');
         this.loadingImageSolve = false;
       }
+    },
+
+    ShowDSLRsSetup(name) {
+      this.DSLRCameraName = name;
+      this.DSLRsSetupDialog = true;
+    },
+
+    ConfirmDSLRsSetup(width, height, pixelPitch) {
+      this.DSLRsSetupDialog = false;
+      console.log('DSLR Camera Info:', width, ',', height, ',', pixelPitch);
+      this.$bus.$emit('SendConsoleLogMsg', 'DSLR Camera Info:' + width + ',' + height + ',' + pixelPitch, 'info');
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'DSLRCameraInfo:' + width + ':' + height + ':' + pixelPitch);
     },
 
     getOriginalImage() {
@@ -1078,6 +1183,7 @@ export default {
     ImageManagerPanel,
     DeviceAllocationPanel,
     INDIDebugDialog,
+    RPIHotspotDialog,
   }
 }
 </script>
