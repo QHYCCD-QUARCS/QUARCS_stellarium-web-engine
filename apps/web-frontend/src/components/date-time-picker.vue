@@ -7,7 +7,7 @@
 // repository.
 
 <template>
-  <v-card width="400" style="backdrop-filter: blur(5px); background-color: rgba(64, 64, 64, 0.5);">
+  <v-card width="400" style="backdrop-filter: blur(5px); background-color: rgba(64, 64, 64, 0.5);" class="dateTimePicker">
     <v-container>
       <v-row justify="space-between" no-gutters class="ma-3">
         <div>
@@ -145,8 +145,12 @@ export default {
       return this.isTimePaused ? 'mdi-play' : 'mdi-pause'
     }
   },
+  created() {
+    this.$bus.$on('ResetTime', this.resetTime);
+  },
   methods: {
     resetTime: function () {
+      console.log('Reset time')
       const m = Moment()
       m.local()
       this.$emit('input', m.format())
@@ -224,6 +228,7 @@ export default {
     window.addEventListener('touchend', function (event) {
       that.stopIncTime()
     })
+    this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getClientSettings')
   },
   watch: {
     sliderStartTime: function () {
@@ -242,5 +247,14 @@ export default {
   margin-top: -10px!important;
   margin-left: 0px;
   margin-right: 0px!important;
+}
+
+.dateTimePicker {
+  pointer-events: auto;
+  position: absolute;
+  
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
 }
 </style>

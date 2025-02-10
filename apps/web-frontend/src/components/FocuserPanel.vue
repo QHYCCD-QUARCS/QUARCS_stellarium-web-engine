@@ -213,14 +213,14 @@ export default {
 
     FocusLeftMove() {
       this.isBtnMoveDisabled = true;
-      // console.log('QHYCCD | FocusLeftMove: ');
+      this.$bus.$emit('FocusInProgress', true);
       this.$bus.$emit('SendConsoleLogMsg', 'Focus Left Move:' + this.MoveSteps, 'info');
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'focusMove:'+ "Left" + ":" + this.MoveSteps);
     },
 
     FocusRightMove() {
       this.isBtnMoveDisabled = true;
-      // console.log('QHYCCD | FocusRightMove: ');
+      this.$bus.$emit('FocusInProgress', true);
       this.$bus.$emit('SendConsoleLogMsg', 'Focus Right Move:' + this.MoveSteps, 'info');
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'focusMove:'+ "Right" + ":" + this.MoveSteps);
     },
@@ -246,6 +246,7 @@ export default {
     MoveDone() {
       this.isBtnMoveDisabled = false;
       console.log('QHYCCD | FocusMoveDone');
+      this.$bus.$emit('FocusInProgress', false);
       this.$bus.$emit('SendConsoleLogMsg', 'FocusMoveDone', 'info');
     },
 
@@ -254,9 +255,6 @@ export default {
     },
 
     loadAndDisplayImage(file) {
-      // const imagePath = 'http://192.168.2.31:8080/img/'+file; //process.env.VUE_APP_IMAGE_FILE
-      // const imagePath = process.env.VUE_APP_IMAGE_FILE + file;
-      // const imagePath = this.ImageFileUrl + file;
       const imagePath = 'img/' + file;
 
       const canvas = document.getElementById('Focus-Canvas');

@@ -68,6 +68,7 @@
             </div>
 
             <v-select v-if="item.inputType === 'select'" v-model="item.value" :label="item.label" :items="item.selectValue" style="width: 150px; display: inline-block;"></v-select>
+            <v-switch v-if="item.inputType === 'switch'" v-model="item.value" :label="item.label" style="width: 170px; display: inline-block; margin-bottom: -35px; margin-top: -35px;"></v-switch>
           </v-card-text>
         </div>
 
@@ -124,18 +125,18 @@
 
           <v-divider :style="{ marginBottom: '10px' }"></v-divider>
 
-          <v-list-item @click.stop="Reboot()" :style="{ height: '36px', marginBottom: '10px' }">
+          <v-list-item @click.stop="RestartRaspberryPi()" :style="{ height: '36px', marginBottom: '10px' }">
             <v-list-item-icon style="margin-right: 10px;">
               <div style="display: flex; justify-content: center; align-items: center;">
                 <img src="@/assets/images/svg/ui/Reboot.svg" height="30px" style="min-height: 30px; pointer-events: none;"></img>
               </div>
             </v-list-item-icon>
             <v-list-item-content>
-              <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Reboot') }}</v-list-item-title>
+              <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Restart') }}</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
 
-          <v-list-item @click.stop="PowerOFF()" :style="{ height: '36px', marginBottom: '10px' }">
+          <v-list-item @click.stop="ShutdownRaspberryPi()" :style="{ height: '36px', marginBottom: '10px' }">
             <v-list-item-icon style="margin-right: 10px;">
               <div style="display: flex; justify-content: center; align-items: center;">
                 <img src="@/assets/images/svg/ui/PowerOFF.svg" height="30px" style="min-height: 30px; pointer-events: none;"></img>
@@ -303,13 +304,14 @@
           <v-list-item-content>
             <v-list-item-title>
               <span>
-                <div :style="{ fontSize: '10px' }">{{ $store.state.currentLocation.short_name }}</div>
+                <div :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Lat & Long') }}</div> 
+                <div :style="{ fontSize: '7px' }">{{ '(' + $store.state.currentLocation.lat + ', ' + $store.state.currentLocation.lng + ')' }}</div> 
               </span>
             </v-list-item-title>
           </v-list-item-content>
         </v-list-item>
 
-        <v-list-item @click.stop="ShowConfirmDialog('Confirm', 'Are you sure you need to refresh?', 'Refresh')" :style="{ height: '36px' }">
+        <v-list-item @click.stop="ShowConfirmDialog('Confirm', $t('Are you sure you need to refresh?'), 'Refresh')" :style="{ height: '36px' }">
           <v-list-item-icon style="margin-right: 10px;">
             <div style="display: flex; justify-content: center; align-items: center;">
               <img :src="require(`@/assets/images/svg/ui/Refresh.svg`)" height="30px" style="min-height: 30px"></img>
@@ -409,7 +411,7 @@ export default {
       networkDisconnected: false, // 添加网络连接状态
 
       QTClientVersion: 'Not connected',
-      VueClientVersion: '20241231',
+      VueClientVersion: '20250115',
 
       // isMessageBoxShow: false,
 
@@ -435,7 +437,14 @@ export default {
 
       // Changing the label name also requires changing the emit signal name
       GuiderConfigItems: [
-      { driverType: 'Guider', label: 'Guider Focal Length (mm)', value: '', inputType: 'text'},
+        { driverType: 'Guider', label: 'Guider Focal Length (mm)', value: '', inputType: 'text'},
+        { driverType: 'Guider', label: 'Multi Star Guider', value: false, inputType: 'switch'},
+        // { driverType: 'Guider', label: 'Guider Pixel size', value: '', inputType: 'text'},
+        { driverType: 'Guider', label: 'Guider Gain', value: '', inputType: 'slider', inputMin: 0, inputMax: 100, inputStep: 1},
+        { driverType: 'Guider', label: 'Calibration step (ms)', value: '', inputType: 'text'},
+        { driverType: 'Guider', label: 'Ra Aggression', value: '', inputType: 'slider', inputMin: 0, inputMax: 100, inputStep: 1},
+        { driverType: 'Guider', label: 'Dec Aggression', value: '', inputType: 'slider', inputMin: 0, inputMax: 100, inputStep: 1},
+
       ],
 
       MainCameraConfigItems: [
@@ -472,6 +481,7 @@ export default {
       FocuserConfigItems: [
         // { driverType: 'Focuser', num: 1, label: 'RedBox Side Length (px)', value: '', inputType: 'text'},
         { driverType: 'Focuser', num: 2, label: 'Min Step', value: '', inputType: 'text' },
+        { driverType: 'Focuser', num: 2, label: 'Sync Focuser Step', value: '', inputType: 'text' },
         
       ],
 
@@ -594,6 +604,13 @@ export default {
     this.$bus.$on('Temperature', this.CameraTemperatureSet);
     this.$bus.$on('Focal Length (mm)', this.FocalLengthSet);
     this.$bus.$on('Guider Focal Length (mm)', this.GuiderFocalLengthSet);
+    this.$bus.$on('Multi Star Guider', this.MultiStarGuiderSet);
+    this.$bus.$on('Guider Pixel size', this.GuiderPixelSizeSet);
+    this.$bus.$on('Guider Gain', this.GuiderGainSet);
+    this.$bus.$on('Calibration step (ms)', this.CalibrationDurationSet);
+    this.$bus.$on('Ra Aggression', this.RaAggressionSet);
+    this.$bus.$on('Dec Aggression', this.DecAggressionSet);
+    this.$bus.$on('Sync Focuser Step', this.SyncFocuserStep);
     this.$bus.$on('ImageProportion', this.setImageProportion);
     this.$bus.$on('MountGoto',this.lookatcircle);
     this.$bus.$on('SwitchImageToShow', this.SwitchImageToShow);
@@ -648,7 +665,7 @@ export default {
               const type = this.CurrentDriverType;
               // 创建一个驱动对象
               const driver = { type, label, value };
-              this.$bus.$emit('add-driver', driver);
+              // this.$bus.$emit('add-driver', driver);
               this.drivers.push(driver);
             }
           }
@@ -663,7 +680,7 @@ export default {
               // 创建一个驱动对象
               const device = { type, label, label };
               console.log('QHYCCD | AddDevice: ',device);
-              this.$bus.$emit('add-device', device);
+              // this.$bus.$emit('add-device', device);
               this.devicesList.push(device);
 
               this.ToBeConnectDevice = [];
@@ -1139,14 +1156,14 @@ export default {
             this.$bus.$emit("ImageSolveFinished", false);
           }
 
-          if (data.message.startsWith('SetCurrentLocation')) {
-            const parts = data.message.split(':');
-            if (parts.length === 3) {
-              this.$bus.$emit('SetCurrentLocation',parts[1], parts[2]);
-              this.CurrentLocationLat = parts[1];
-              this.CurrentLocationLng = parts[2];
-            }
-          }
+          // if (data.message.startsWith('SetCurrentLocation')) {
+          //   const parts = data.message.split(':');
+          //   if (parts.length === 3) {
+          //     this.$bus.$emit('SetCurrentLocation',parts[1], parts[2]);
+          //     this.CurrentLocationLat = parts[1];
+          //     this.CurrentLocationLng = parts[2];
+          //   }
+          // }
 
           if (data.message.startsWith('MainCameraOffsetRange:')) {
             const parts = data.message.split(':');
@@ -1221,6 +1238,21 @@ export default {
               const Box_Y = parseInt(parts[4], 10);
               this.DrawPHD2Box(PHD2ImageSize_X, PHD2ImageSize_Y, Box_X, Box_Y);
             }
+          }
+
+          if (data.message.startsWith('PHD2MultiStarsPosition:')) {
+            const parts = data.message.split(':');
+            if (parts.length === 5) {
+              const PHD2ImageSize_X = parseInt(parts[1], 10);
+              const PHD2ImageSize_Y = parseInt(parts[2], 10);
+              const Box_X = parseInt(parts[3], 10);
+              const Box_Y = parseInt(parts[4], 10);
+              this.DrawPHD2MultiStars(PHD2ImageSize_X, PHD2ImageSize_Y, Box_X, Box_Y);
+            }
+          }
+
+          if (data.message.startsWith('ClearPHD2MultiStars')) {
+            this.$bus.$emit('ClearPHD2MultiStars');
           }
 
           if (data.message.startsWith('PHD2StarCrossPosition:')) {
@@ -1308,6 +1340,41 @@ export default {
               if(parts[1] === 'GuiderFocalLength') {
                 this.GuiderConfigItems[0].value = parts[2];
                 this.$bus.$emit('AppSendMessage', 'Vue_Command', 'GuiderFocalLength:'+ parts[2]);
+              }
+
+              if(parts[1] === 'Coordinates') {
+                const [lat, lng] = parts[2].split(',').map(coord => parseFloat(coord.trim()));
+                this.SetCurrentLocation(lat, lng);
+              }
+
+              if(parts[1] === 'MultiStarGuider') {
+                this.GuiderConfigItems[1].value = (parts[2] === 'true');
+                this.$bus.$emit('AppSendMessage', 'Vue_Command', 'MultiStarGuider:'+ parts[2]);
+              }
+
+              // if(parts[1] === 'GuiderPixelSize') {
+              //   this.GuiderConfigItems[2].value = parts[2];
+              //   this.$bus.$emit('AppSendMessage', 'Vue_Command', 'GuiderPixelSize:'+ parts[2]);
+              // }
+
+              if(parts[1] === 'GuiderGain') {
+                this.GuiderConfigItems[2].value = parts[2];
+                this.$bus.$emit('AppSendMessage', 'Vue_Command', 'GuiderGain:'+ parts[2]);
+              }
+
+              if(parts[1] === 'CalibrationDuration') {
+                this.GuiderConfigItems[3].value = parts[2];
+                this.$bus.$emit('AppSendMessage', 'Vue_Command', 'CalibrationDuration:'+ parts[2]);
+              }
+
+              if(parts[1] === 'RaAggression') {
+                this.GuiderConfigItems[4].value = parts[2];
+                this.$bus.$emit('AppSendMessage', 'Vue_Command', 'RaAggression:'+ parts[2]);
+              }
+
+              if(parts[1] === 'DecAggression') {
+                this.GuiderConfigItems[5].value = parts[2];
+                this.$bus.$emit('AppSendMessage', 'Vue_Command', 'DecAggression:'+ parts[2]);
               }
             }
           }
@@ -1405,6 +1472,30 @@ export default {
 
     locationClicked: function () {
       this.$store.commit('toggleBool', 'showLocationDialog');
+
+      this.$bus.$emit('ResetTime');
+    },
+
+    SetCurrentLocation(lat, lng) {
+      console.log('SetCurrentLocation:', lat, ',', lng);
+      this.$bus.$emit('SendConsoleLogMsg', 'Set Current Location:' + lat + ',' + lng, 'info');
+      this.$bus.$emit('PolarPointAltitude', lat);
+      const loc = {
+        short_name: 'Unknown',
+        country: 'Unknown',
+        lng: lng,
+        lat: lat,
+        alt: 0, 
+        accuracy: 0, 
+        street_address: ''
+      }
+      this.$store.commit('setCurrentLocation', loc); 
+
+      this.$bus.$emit('ShowPositionInfo', lat, lng);
+
+      setTimeout(() => {
+        this.$bus.$emit('ResetTime');
+      }, 1000);
     },
 
     StatusRecovery() {
@@ -1422,14 +1513,6 @@ export default {
       this.isOpenPowerPage = true;
 
       this.drawer_2 = true;
-    },
-
-    Reboot() {
-      
-    },
-
-    PowerOFF() {
-      
     },
 
     QuitToMainApp() {
@@ -1558,6 +1641,12 @@ export default {
       } else if (type === 'CFW') {
         this.$bus.$emit('CFWConnected', 1);
         console.log('Mount is Connected.');
+      } else if (type === 'Focuser') {
+        this.$bus.$emit('FocuserConnected', 1);
+        console.log('Focuser is Connected.');
+      } else if (type === 'Guider') {
+        this.$bus.$emit('GuiderConnected', 1);
+        console.log('Guider is Connected.');
       }
 
       this.$bus.$emit('DeviceConnectSuccess', type, newDevice);
@@ -1639,6 +1728,8 @@ export default {
           this.$bus.$emit('MainCameraConnected', 0);
           this.$bus.$emit('MountConnected', 0);
           this.$bus.$emit('CFWConnected', 0);
+          this.$bus.$emit('FocuserConnected', 0);
+          this.$bus.$emit('GuiderConnected', 0);
           this.claerDeviceList();
         }
       } else {
@@ -1682,6 +1773,16 @@ export default {
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'SwitchOutPutPower:' + index);
         this.SendConsoleLogMsg('Switch OutPutPower' + index, 'info');
       }
+    },
+
+    RestartRaspberryPi() {
+      this.drawer_2 = false;
+      this.ShowConfirmDialog('Restart', 'Are you sure you want to restart the Raspberry Pi?', 'RestartRaspberryPi');
+    },
+
+    ShutdownRaspberryPi() {
+      this.drawer_2 = false;
+      this.ShowConfirmDialog('Shut Down', 'Are you sure you want to shut down the Raspberry Pi?', 'ShutdownRaspberryPi');
     },
 
     ReturnConnectedDevices() {
@@ -1781,7 +1882,7 @@ export default {
     confirmConfiguration(List) {
       List.forEach(item => {
         if (item.value !== '') {
-          console.log(item.label, item.value);
+          // console.log(item.label, item.value);
           this.SendConsoleLogMsg(item.label + ':' + item.value, 'info');
           this.$bus.$emit(item.label, item.label + ':' + item.value);
         }
@@ -1911,43 +2012,65 @@ export default {
       const [signal, value] = payload.split(':'); // 拆分信号和值
       const IntValue = parseInt(value); // 将值转换为 Int 类型
 
-      console.log('Guider Focal Length is set to:', IntValue);
+      // console.log('Guider Focal Length is set to:', IntValue);
       this.SendConsoleLogMsg('Guider Focal Length is set to:' + IntValue, 'info');
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'GuiderFocalLength:'+ IntValue);
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'saveToConfigFile:GuiderFocalLength:'+ IntValue);
     },
 
-    // async readBinFile(fileName) {
-    //   console.log('CaptureTestTime | Read image data start.');
-    //   const startTime = new Date();
+    MultiStarGuiderSet(payload) {
+      const [signal, value] = payload.split(':'); // 拆分信号和值
+      this.SendConsoleLogMsg('Multi Star Guider is set to:' + value, 'info');
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'MultiStarGuider:'+ value);
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'saveToConfigFile:MultiStarGuider:'+ value);
+    },
 
-    //   try {
-    //     const response = await fetch(fileName);
-    //     if (!response.ok) {
-    //       throw new Error('Network response was not ok');
-    //     }
+    GuiderPixelSizeSet(payload) {
+      const [signal, value] = payload.split(':'); // 拆分信号和值
+      const doubleValue = parseFloat(value);
+      this.SendConsoleLogMsg('Guider Pixel size is set to:' + doubleValue, 'info');
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'GuiderPixelSize:'+ doubleValue);
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'saveToConfigFile:GuiderPixelSize:'+ doubleValue);
+    },
 
-    //     const blob = await response.blob();
+    GuiderGainSet(payload) {
+      const [signal, value] = payload.split(':'); // 拆分信号和值
+      const IntValue = parseInt(value);
+      this.SendConsoleLogMsg('Guider Gain is set to:' + IntValue, 'info');
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'GuiderGain:'+ IntValue);
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'saveToConfigFile:GuiderGain:'+ IntValue);
+    },
 
-    //     const fileReader = new FileReader();
-    //     fileReader.onload = () => {
-    //       const arrayBuffer = fileReader.result;
+    CalibrationDurationSet(payload) {
+      const [signal, value] = payload.split(':'); // 拆分信号和值
+      const IntValue = parseInt(value);
+      this.SendConsoleLogMsg('Guider Calibration step is set to:' + IntValue, 'info');
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'CalibrationDuration:'+ IntValue);
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'saveToConfigFile:CalibrationDuration:'+ IntValue);
+    },
 
-    //       const endTime = new Date();
-    //       const elapsedTime = endTime.getTime() - startTime.getTime();
-    //       console.log('CaptureTestTime | Read image data end:', elapsedTime, 'milliseconds');
-    //       this.callShowMessageBox(`Read image data end: '${elapsedTime}' milliseconds.`,'msg');
+    RaAggressionSet(payload) {
+      const [signal, value] = payload.split(':'); // 拆分信号和值
+      const IntValue = parseInt(value);
+      this.SendConsoleLogMsg('Ra Aggression is set to:' + IntValue, 'info');
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'RaAggression:'+ IntValue);
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'saveToConfigFile:RaAggression:'+ IntValue);
+    },
 
-    //       this.processImage(arrayBuffer);
-    //     };
-    //     fileReader.onerror = (error) => {
-    //       console.error('FileReader error:', error);
-    //     };
-    //     fileReader.readAsArrayBuffer(blob);
-    //   } catch (error) {
-    //     console.error('There was a problem with the fetch operation:', error);
-    //   }
-    // },
+    DecAggressionSet(payload) {
+      const [signal, value] = payload.split(':'); // 拆分信号和值
+      const IntValue = parseInt(value);
+      this.SendConsoleLogMsg('Dec Aggression is set to:' + IntValue, 'info');
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'DecAggression:'+ IntValue);
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'saveToConfigFile:DecAggression:'+ IntValue);
+    },
+
+    SyncFocuserStep(payload) {
+      const [signal, value] = payload.split(':'); // 拆分信号和值
+      const IntValue = parseInt(value);
+      this.SendConsoleLogMsg('Sync Focuser Step:' + IntValue, 'info');
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'SyncFocuserStep:'+ IntValue);
+    },
 
     async readBinFile(fileName) {
       console.log('CaptureTestTime | Read image data start.');
@@ -2009,6 +2132,7 @@ export default {
           this.SendConsoleLogMsg('CaptureTestTime | Read image data end:' + elapsedTime + 'milliseconds', 'info');
           if (!this.isPolarAxisMode) {
             this.callShowMessageBox(`Read image data end: '${elapsedTime}' milliseconds.`, 'info');
+            // this.callShowMessageBox($t('Read image data end: {0} milliseconds.', [elapsedTime]), 'info');
           }
 
           this.processImage(this.ImageArrayBuffer);
@@ -2583,6 +2707,16 @@ export default {
       const CrossStartY = Cross_Y / ratioZoomY;
 
       this.$bus.$emit('PHD2CrossPosition', CrossStartX, CrossStartY);
+    },
+
+    DrawPHD2MultiStars(PHD2ImageSize_X, PHD2ImageSize_Y, Star_X, Star_Y) {
+      const ratioZoomX = PHD2ImageSize_X / window.innerWidth;
+      const ratioZoomY = PHD2ImageSize_Y / window.innerHeight;
+
+      const StarStartX = Star_X / ratioZoomX - 12 / 2;
+      const StarStartY = Star_Y / ratioZoomY - 12 / 2;
+
+      this.$bus.$emit('PHD2MultiStarsPosition', StarStartX, StarStartY);
     },
 
     GetAutoStretch(imgData, mode) {
@@ -3640,10 +3774,6 @@ export default {
       // window.location.reload();
       this.nav = false;
       this.$bus.$emit('ShowConfirmDialog', Title, Text, ToDo);
-    },
-
-    GetCurrentLocation() {
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getCurrentLocation');
     },
 
     decrement(item) {

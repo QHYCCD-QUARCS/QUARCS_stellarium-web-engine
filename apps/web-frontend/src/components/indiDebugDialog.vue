@@ -172,7 +172,7 @@ export default {
         console.error('Clipboard.js error: ', err);
         // this.$emit('showToast', 'Failed to copy messages!');
         console.log('Failed to copy messages!');
-        this.$bus.$emit('showMsgBox', 'ailed to copy messages!', 'error');
+        this.$bus.$emit('showMsgBox', 'Failed to copy messages!', 'error');
         document.body.removeChild(button);
       });
       

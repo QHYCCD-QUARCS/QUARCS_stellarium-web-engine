@@ -25,7 +25,7 @@
       </button>
 
       <span v-show="isUpdated" class="TipsText"> 
-        {{ $t('Please connect to the new hotspot in the mobile system settings, it will take about a minute to wait.') }}
+        {{ $t('Please connect to the new hotspot in the mobile phone system settings, it will take about a minute to wait.') }}
       </span>
 
     </div>

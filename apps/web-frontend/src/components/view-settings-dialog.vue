@@ -43,9 +43,6 @@ export default {
     this.$bus.$on('ClientLanguage', this.switchLanguage);
     this.$bus.$on('HighFPSMode', this.switchHighFPSMode);
   },
-  mounted: function () {
-    this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getClientSettings');
-  },
   methods: {
     // 切换语言的方法
     switchLanguage(lang) {
@@ -103,6 +100,7 @@ export default {
       set: function (newValue) {
         window.setHighFrameRate(newValue)
         this.HighFPSMode = newValue
+        console.log('Set High FPS:', this.HighFPSMode)
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'saveToConfigFile:HighFPSMode:'+ newValue)
       }
     }
