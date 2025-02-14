@@ -656,7 +656,7 @@ export default {
         const data = JSON.parse(message.data);
 
         if (data.type === 'QT_Return') {
-          // console.log('QHYCCD | QT_Return');
+          // 从服务端返回的驱动列表
           if (data.message.startsWith('AddDriver:')) {
             const parts = data.message.split(':');
             if (parts.length === 3) {
@@ -670,6 +670,7 @@ export default {
             }
           }
 
+          // 服务端扫描到新的设备
           if (data.message.startsWith('AddDevice:')) {
             const parts = data.message.split(':');
             if (parts.length === 2) {
@@ -694,6 +695,7 @@ export default {
             }
           }
 
+          // 更新当前所连接的设备
           if (data.message.startsWith('updateDevices_:')) {
             const parts = data.message.split(':');
             if (parts.length === 3) {
@@ -703,6 +705,7 @@ export default {
             }
           }
 
+          // 有设备成功连接
           if (data.message.startsWith('ConnectSuccess:')) {
             const parts = data.message.split(':');
             if (parts.length === 3) {
@@ -712,6 +715,7 @@ export default {
             }
           }
 
+          // 有设备连接失败
           if (data.message.startsWith('ConnectFailed:')) {
             const parts = data.message.split(':');
             if (parts.length === 2) {
@@ -721,6 +725,7 @@ export default {
             }
           }
 
+          // 设备扫描失败
           if (data.message.startsWith('ScanFailed:')) {
             const parts = data.message.split(':');
             if (parts.length === 2) {
@@ -730,6 +735,7 @@ export default {
             }
           }
 
+          // 新连接设备的类型
           if (data.message.startsWith('AddDeviceType:')) {
             const parts = data.message.split(':');
             if (parts.length === 2) {
@@ -738,6 +744,7 @@ export default {
             }
           }
 
+          // 有设备需要分配（有多个相机的时候，需要用户分配哪个相机做主相机，哪个相机做导星相机）
           if (data.message.startsWith('DeviceToBeAllocated:')) {
             const parts = data.message.split(':');
             if (parts.length === 4) {
@@ -748,15 +755,18 @@ export default {
             }
           }
 
+          // 显示设备分配面板
           if (data.message.startsWith('ShowDeviceAllocationWindow')) {
             this.$bus.$emit('toggleDeviceAllocationPanel');
             this.nav = false;
           }
 
+          // 主相机曝光完成
           if (data.message.startsWith('ExposureCompleted')) {
             this.$bus.$emit('ExposureCompleted');
           }
 
+          // 拍摄的图像成功保存为JPG图（带图像文件地址）
           if (data.message.startsWith('SaveJpgSuccess:')) {
             const parts = data.message.split(':');
             if (parts.length === 2) {
@@ -765,6 +775,7 @@ export default {
             }
           }
 
+          // 拍摄的图像成功保存为PNG图（带图像文件地址）
           if (data.message.startsWith('SavePngSuccess:')) {
             const parts = data.message.split(':');
             if (parts.length === 2) {
@@ -777,6 +788,7 @@ export default {
             }
           }
 
+          // 拍摄的图像成功保存为Bin文件（带图像文件地址）
           if (data.message.startsWith('SaveBinSuccess:')) {
             const parts = data.message.split(':');
             if (parts.length === 2) {
@@ -789,6 +801,7 @@ export default {
             }
           }
 
+          // 导星相机拍摄的图像成功保存（带图像文件地址）
           if (data.message.startsWith('SaveGuiderImageSuccess:')) {
             const parts = data.message.split(':');
             if (parts.length === 2) {
@@ -800,6 +813,7 @@ export default {
             }
           }
 
+          // 有新的导星数据(散点图)
           if (data.message.startsWith('AddScatterChartData:')) {
             const parts = data.message.split(':');
             if (parts.length === 3) {
@@ -810,6 +824,7 @@ export default {
             }
           }
 
+          // 有新的导星数据(折线图)
           if (data.message.startsWith('AddLineChartData:')) {
             const parts = data.message.split(':');
             if (parts.length === 4) {
@@ -823,6 +838,7 @@ export default {
             }
           }
 
+          // 导星数据的y轴范围
           if (data.message.startsWith('SetLineChartRange:')) {
             const parts = data.message.split(':');
             if (parts.length === 3) {
@@ -832,6 +848,7 @@ export default {
             }
           }
 
+          // 导星的状态
           if (data.message.startsWith('GuiderStatus:')) {
             const parts = data.message.split(':');
             if (parts.length === 2) {
@@ -840,6 +857,7 @@ export default {
             }
           }
 
+          // 电调速度修改成功后的值
           if (data.message.startsWith('FocusChangeSpeedSuccess:')) {
             const parts = data.message.split(':');
             if (parts.length === 2) {
@@ -848,6 +866,7 @@ export default {
             }
           }
 
+          // 电调的位置
           if (data.message.startsWith('FocusPosition:')) {
             const parts = data.message.split(':');
             if (parts.length === 3) {
@@ -857,6 +876,7 @@ export default {
             }
           }
 
+          // 电调移动完成(带星点半高宽值)
           if (data.message.startsWith('FocusMoveDone:')) {
             const parts = data.message.split(':');
             if (parts.length === 2) {
@@ -866,6 +886,7 @@ export default {
             this.$bus.$emit('FocusMoveDone');
           }
 
+          // 主相机的分辨率
           if (data.message.startsWith('MainCameraSize:')) {
             const parts = data.message.split(':');
             if (parts.length === 3) {
@@ -877,6 +898,7 @@ export default {
             }
           }
 
+          // 主相机拍摄的Bin
           if (data.message.startsWith('MainCameraBinning:')) {
             const parts = data.message.split(':');
             if (parts.length === 2) {
@@ -885,6 +907,7 @@ export default {
             }
           }
 
+          // 调焦曲线拟合
           if (data.message.startsWith('fitQuadraticCurve:')) {
             this.$bus.$emit('ClearfitQuadraticCurve');
             const parts = data.message.split(':');
@@ -899,6 +922,7 @@ export default {
             }
           }
 
+          // 调焦曲线的最小值
           if (data.message.startsWith('fitQuadraticCurve_minPoint:')) {
             const parts = data.message.split(':');
 
@@ -908,6 +932,7 @@ export default {
             this.$bus.$emit('fitQuadraticCurve_minPoint', x, y);
           }
           
+          // 赤道仪的Park状态
           if (data.message.startsWith('TelescopePark:')) {
             const parts = data.message.split(':');
             if (parts.length === 2) {
@@ -916,6 +941,7 @@ export default {
             }
           }
 
+          // 赤道仪的跟踪状态
           if (data.message.startsWith('TelescopeTrack:')) {
             const parts = data.message.split(':');
             if (parts.length === 2) {
@@ -932,6 +958,7 @@ export default {
           //   }
           // }
 
+          // 修改赤道仪转动速度成功后的值
           if (data.message.startsWith('MountSetSpeedSuccess:')) {
             const parts = data.message.split(':');
             if (parts.length === 2) {
@@ -940,6 +967,7 @@ export default {
             }
           }
 
+          // 赤道仪的指向
           if (data.message.startsWith('TelescopePierSide:')) {
             const parts = data.message.split(':');
             if (parts.length === 2) {
@@ -948,6 +976,7 @@ export default {
             }
           }
 
+          // 更新计划任务表的进度
           if (data.message.startsWith('UpdateScheduleProcess:')) {
             const parts = data.message.split(':');
             if (parts.length === 3) {
@@ -957,6 +986,7 @@ export default {
             }
           }
 
+          // 恢复计划任务表中的数据
           if (data.message.startsWith('StagingScheduleData:')) {
             console.log('------------------------------');
             const parts = data.message.split('[');
@@ -968,6 +998,7 @@ export default {
             console.log('------------------------------');
           }
 
+          // 主相机的曝光时间选项列表
           if (data.message.startsWith('ExpTimeList:')) {
             const parts = data.message.split(':');
             if (parts.length === 2) {
@@ -975,14 +1006,17 @@ export default {
             }
           }
 
+          // 主相机正在曝光
           if (data.message.startsWith('CameraInExposuring:')) {
             this.$bus.$emit('CameraInExposuring');
           }
 
+          // 电调自动调焦结束
           if (data.message.startsWith('AutoFocusOver:')) {
             this.$bus.$emit('AutoFocusOver');
           }
 
+          // 滤镜轮的档数
           if (data.message.startsWith('CFWPositionMax:')) {
             const parts = data.message.split(':');
             if (parts.length === 2) {
@@ -996,6 +1030,7 @@ export default {
             }
           }
 
+          // 滤镜轮旋转完成以及滤镜轮当前位置
           if (data.message.startsWith('SetCFWPositionSuccess:')) {
             const parts = data.message.split(':');
             if (parts.length === 2) {
@@ -1003,6 +1038,7 @@ export default {
             }
           }
 
+          // 获取滤镜轮的挡位选项列表
           if (data.message.startsWith('getCFWList:')) {
             const parts = data.message.split(':');
             if (parts.length === 2) {
@@ -1010,6 +1046,7 @@ export default {
             }
           }
 
+          // 导星开关按钮的状态
           if (data.message.startsWith('GuiderSwitchStatus:')) {
             const parts = data.message.split(':');
             if (parts.length === 2) {
@@ -1017,6 +1054,7 @@ export default {
             }
           }
 
+          // 导星循环拍摄按钮的状态
           if (data.message.startsWith('GuiderLoopExpStatus:')) {
             const parts = data.message.split(':');
             if (parts.length === 2) {
@@ -1024,6 +1062,7 @@ export default {
             }
           }
 
+          // 赤道仪的RaDec值
           if (data.message.startsWith('TelescopeRADEC:')) {
             const parts = data.message.split(':');
             if (parts.length === 3) {
@@ -1031,6 +1070,7 @@ export default {
             }
           }
 
+          // 赤道仪的状态
           if (data.message.startsWith('TelescopeStatus:')) {
             const parts = data.message.split(':');
             if (parts.length === 2) {
@@ -1038,6 +1078,7 @@ export default {
             }
           }
 
+          // 主相机的状态
           if (data.message.startsWith('MainCameraStatus:')) {
             const parts = data.message.split(':');
             if (parts.length === 2) {
@@ -1045,6 +1086,7 @@ export default {
             }
           }
 
+          // 主相机的温度
           if (data.message.startsWith('MainCameraTemperature:')) {
             const parts = data.message.split(':');
             if (parts.length === 2) {
@@ -1052,6 +1094,7 @@ export default {
             }
           }
 
+          // 保存的图像文件夹所有文件夹名称
           if (data.message.startsWith('ShowAllImageFolder:')) {
             const parts = data.message.split(':');
             if (parts.length === 3) {
@@ -1059,6 +1102,7 @@ export default {
             }
           }
 
+          // 图像文件的名称
           if (data.message.startsWith('ImageFilesName|')) {
             const parts = data.message.split('|');
             if (parts.length === 2) {
@@ -1066,6 +1110,7 @@ export default {
             }
           }
 
+          // 检测的USB设备信息
           if (data.message.startsWith('USBCheck:')) {
             const parts = data.message.split(':');
             if (parts.length === 2) {
@@ -1079,6 +1124,7 @@ export default {
             }
           }
           
+          // 图像保存失败以及原因
           if (data.message.startsWith('ImageSaveErroe:')) {
             const parts = data.message.split(':');
             if (parts.length === 2) {
@@ -1091,6 +1137,7 @@ export default {
             }
           }
 
+          // 星点检测的结果
           if (data.message.startsWith('DetectedStars:')) {
             // this.$bus.$emit('ClearfitQuadraticCurve');
             const parts = data.message.split(':');
@@ -1111,6 +1158,7 @@ export default {
             this.DetectedStarsFinish = true;
           }
 
+          // 拍摄图像解析的结果
           if (data.message.startsWith('SolveImageResult:')) {
             const parts = data.message.split(':');
             if (parts.length === 5) {
@@ -1122,6 +1170,7 @@ export default {
             }
           }
 
+          // 图像解析的视场信息结果
           if (data.message.startsWith('SolveFovResult:')) {
             const parts = data.message.split(':');
             if (parts.length === 9) {
@@ -1137,6 +1186,7 @@ export default {
             }
           }
 
+          // 实时拍摄解析的结果（循环拍摄解析）
           if (data.message.startsWith('RealTimeSolveImageResult:')) {
             const parts = data.message.split(':');
             if (parts.length === 5) {
@@ -1151,6 +1201,7 @@ export default {
             }
           }
 
+          // 图像解析失败以及原因
           if (data.message.startsWith('SolveImageFaild')) {
             this.callShowMessageBox('Solve image faild...','error');
             this.$bus.$emit("ImageSolveFinished", false);
@@ -1165,6 +1216,7 @@ export default {
           //   }
           // }
 
+          // 主相机的Offset能够设置的范围
           if (data.message.startsWith('MainCameraOffsetRange:')) {
             const parts = data.message.split(':');
             if (parts.length === 3) {
@@ -1182,6 +1234,7 @@ export default {
             }
           }
 
+          // 主相机的Gain能够设置的范围
           if (data.message.startsWith('MainCameraGainRange:')) {
             const parts = data.message.split(':');
             if (parts.length === 3) {
@@ -1199,6 +1252,7 @@ export default {
             }
           }
 
+          // 蓝盒子输出电源的状态
           if (data.message.startsWith('OutPutPowerStatus:')) {
             const parts = data.message.split(':');
             if (parts.length === 3) {
@@ -1213,6 +1267,7 @@ export default {
             }
           }
 
+          // PHD2中的星点选取框是否显示
           if (data.message.startsWith('PHD2StarBoxView:')) {
             const parts = data.message.split(':');
             if (parts.length === 2) {
@@ -1221,6 +1276,7 @@ export default {
             }
           }
 
+          // PHD2的星点选取十字线是否显示
           if (data.message.startsWith('PHD2StarCrossView:')) {
             const parts = data.message.split(':');
             if (parts.length === 2) {
@@ -1229,6 +1285,7 @@ export default {
             }
           }
 
+          // PHD2的星点选取框的位置
           if (data.message.startsWith('PHD2StarBoxPosition:')) {
             const parts = data.message.split(':');
             if (parts.length === 5) {
@@ -1240,6 +1297,7 @@ export default {
             }
           }
 
+          // PHD2的多星导星的星点位置
           if (data.message.startsWith('PHD2MultiStarsPosition:')) {
             const parts = data.message.split(':');
             if (parts.length === 5) {
@@ -1251,10 +1309,12 @@ export default {
             }
           }
 
+          // 清除PHD2的多星导星数据
           if (data.message.startsWith('ClearPHD2MultiStars')) {
             this.$bus.$emit('ClearPHD2MultiStars');
           }
 
+          // PHD2的星点选取十字线的位置
           if (data.message.startsWith('PHD2StarCrossPosition:')) {
             const parts = data.message.split(':');
             if (parts.length === 5) {
@@ -1266,6 +1326,7 @@ export default {
             }
           }
 
+          // QT客户端的版本号
           if (data.message.startsWith('QTClientVersion:')) {
             const parts = data.message.split(':');
             if (parts.length === 2) {
@@ -1273,6 +1334,7 @@ export default {
             }
           }
 
+          // 主相机拍摄的图像保存状态
           if (data.message.startsWith('CaptureImageSaveStatus:')) {
             const parts = data.message.split(':');
             if (parts.length === 2) {
@@ -1287,6 +1349,7 @@ export default {
             }
           }
 
+          // INDI Server的日志输出
           if (data.message.startsWith('INDIServerDebug|')) {
             const parts = data.message.split('|');
             if (parts.length === 2) {
@@ -1295,6 +1358,7 @@ export default {
             }
           }
 
+          // QT客户端的日志输出
           if (data.message.startsWith('SendDebugMessage|')) {
             const parts = data.message.split('|');
             if (parts.length === 3) {
@@ -1304,6 +1368,7 @@ export default {
             }
           }
 
+          // 树莓派的热点名字
           if (data.message.startsWith('HotspotName:')) {
             const parts = data.message.split(':');
             if (parts.length === 2) {
@@ -1312,10 +1377,12 @@ export default {
             }
           }
 
+          // 树莓派热点名称修改成功
           if (data.message.startsWith('EditHotspotNameSuccess')) {
             this.$bus.$emit('EditHotspotNameSuccess');
           }
 
+          // 单反相机的名字
           if (data.message.startsWith('DSLRsSetup:')) {
             const parts = data.message.split(':');
             if (parts.length === 2) {
@@ -1324,6 +1391,7 @@ export default {
             }
           }
 
+          // 配置选项的恢复
           if (data.message.startsWith('ConfigureRecovery:')) {
             const parts = data.message.split(':');
             if (parts.length === 3) {
