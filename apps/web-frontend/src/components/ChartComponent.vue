@@ -171,7 +171,7 @@ export default {
 
     GuiderSwitch() {
       if(this.isLoopping) {
-        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'GuiderSwitch');
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'GuiderSwitch:'+!this.isGuiding);
       } else {
         this.$bus.$emit('showMsgBox', 'Please open the loop exposure first.', 'error');
       }
@@ -179,7 +179,7 @@ export default {
 
     LoopExpSwitch() {
       if (this.GuiderConnect) {
-        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'GuiderLoopExpSwitch');
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'GuiderLoopExpSwitch:' + !this.isLoopping);
       } else {
         this.$bus.$emit('showMsgBox', 'Please connect the Guider camera first.', 'error');
       }
@@ -240,10 +240,11 @@ export default {
     GuiderConnected(num) {
       if(num === 0){
         this.GuiderConnect = false;
+        // this.$bus.$emit('showMsgBox', 'Guider is not connected.', 'error');
       } else {
         this.GuiderConnect = true;
+        // this.$bus.$emit('showMsgBox', 'Guider is connected.', 'info');
       }
-      console.log('Guider is Connected: ', num);
     },
   }
 }

@@ -96,6 +96,14 @@ export default {
       CFWConnect: false,
 
       CameraTemperature: '',
+
+      // 按钮状态
+      btnSaveStatus: false, // 保存按钮状态
+      btnCaptureStatus: false, // 拍照按钮状态
+      btnFocusStatus: false, // 聚焦按钮状态
+      btnHistStatus: false, // 直方图按钮状态
+      btnExpTimeStatus: false, // 曝光时间按钮状态
+      btnCFWStatus: false, // 滤光片按钮状态
     };
   },
   created() {
@@ -146,6 +154,10 @@ export default {
   },
   methods: {
     handleExpTimeButtonClick(direction) {
+      if(this.btnExpTimeStatus) {
+        return;
+      }
+      this.btnExpTimeStatus = true;
       if (direction === 'plus') {
         if (this.currentExpTimeIndex < this.ExpTimes.length - 1) {
           this.currentExpTimeIndex++;
@@ -162,9 +174,14 @@ export default {
       // console.log('handleExpTimeButtonClick: ',this.ExpTimes[this.currentExpTimeIndex]);
       // this.$refs.expTimeContent.innerText = this.ExpTimes[this.currentExpTimeIndex];
       this.$bus.$emit('time-selected', this.ExpTimes[this.currentExpTimeIndex]);
+      this.btnExpTimeStatus = false;
     },
 
     handleCFWButtonClick(direction) {
+      if(this.btnCFWStatus) {
+        return;
+      }
+      this.btnCFWStatus = true;
       if(this.CFWConnect) {
         if (direction === 'plus') {
           if (this.currentCFWIndex < this.CFWs.length - 1) {
@@ -189,16 +206,32 @@ export default {
       } else {
         this.$bus.$emit('showMsgBox', 'Please connect the Filter Wheels first.', 'error');
       }
+      this.btnCFWStatus = false;
     },
 
     toggleFocuserPanel() {
+      if(this.btnFocusStatus) {
+        return;
+      }
+      this.btnFocusStatus = true;
       this.$bus.$emit('toggleFocuserPanel');
+      this.btnFocusStatus = false;
     },
     toggleHistogramPanel() {
+      if(this.btnHistStatus) {
+        return;
+      }
+      this.btnHistStatus = true;
       this.$bus.$emit('toggleHistogramPanel');
+      this.btnHistStatus = false;
     },
     CaptureImageSave() {
+      if(this.btnSaveStatus) {
+        return;
+      }
+      this.btnSaveStatus = true;
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'CaptureImageSave');
+      this.btnSaveStatus = false;
     },
 
     CurrentExpTimeList() {

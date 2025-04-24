@@ -17,11 +17,11 @@
         </div>
       </button>
 
-      <button @click="saveMessages" class="save-button">
+      <!-- <button @click="saveMessages" class="save-button">
         <div style="display: flex; justify-content: center; align-items: center;">
           <img src="@/assets/images/svg/ui/Share.svg" height="20px" style="min-height: 20px; pointer-events: none;"></img>
         </div>
-      </button>
+      </button> -->
 
       <button @click="toggleErrorDebug" class="ErrorMsg-button">
         <template v-if="isErrorDebugActive">
@@ -92,6 +92,8 @@ export default {
   created() {
     this.$bus.$on('SendConsoleLog', this.InsertClientDebug);
     this.$bus.$on('SendDebugMessage', this.InsertServerDebug);
+  },
+  mounted() {
   },
   methods: {
     InsertClientDebug(type, message) {
@@ -189,6 +191,8 @@ export default {
         return { color: 'white' };
       } else if (msgtype === 'error') {
         return { color: 'rgb(206, 14, 14)' };
+      } else if (msgtype === 'warning') {
+        return { color: 'rgb(255, 165, 0)' }; // 橙色用于警告消息
       }
       return {};
     },
@@ -304,12 +308,18 @@ export default {
   overflow-y: auto;
   padding: 5px;  /* 去掉内边距 */
   margin: 0;   /* 去掉外边距 */
-  line-height: 1;  /* 设置适当的行间距（小于默认值） */
+  line-height: 0.1;  /* 设置适当的行间距（小于默认值） */
   scroll-behavior: smooth;
   font-family: 'Droid Sans Mono', 'monospace', monospace;
   user-select: none;
+  overflow-x: auto; /* 允许水平滚动 */
 }
 
+.debug-messages p {
+  margin: 0;   /* 设置间距为0 */
+  line-height: 1;  /* 设置行间距为0.1 */
+  white-space: nowrap;
+}
 
 .clear-button {
   position: fixed;

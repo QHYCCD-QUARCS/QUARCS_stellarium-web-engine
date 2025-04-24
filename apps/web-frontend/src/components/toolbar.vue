@@ -58,7 +58,7 @@
           :style="{ top: openStatusCard ? '5px' : '0px', left: openStatusCard ? '5px' : '0px', width: openStatusCard ? '20px' : '15px', height: openStatusCard ? '20px' : '15px'}">
           <span v-if="MainCameraInProgress&&MainCameraConnect">
             <div style="display: flex; justify-content: center; align-items: center;">
-              <img src="@/assets/images/svg/ui/MainCamera-red.svg" :style="{height: openStatusCard ? '20px' : '15px'}" style="pointer-events: none;"></img>
+              <img src="@/assets/images/svg/ui/MainCamera-yellow.svg" :style="{height: openStatusCard ? '20px' : '15px'}" style="pointer-events: none;"></img>
             </div>
           </span>
           <span v-if="!MainCameraInProgress&&MainCameraConnect">
@@ -71,13 +71,24 @@
               <img src="@/assets/images/svg/ui/MainCamera-white.svg" :style="{height: openStatusCard ? '20px' : '15px'}" style="pointer-events: none;"></img>
             </div>
           </span>
+          
+          <!-- <span v-if="...">
+            <div style="display: flex; justify-content: center; align-items: center;">
+              <img src="@/assets/images/svg/ui/MainCamera-red.svg" :style="{height: openStatusCard ? '20px' : '15px'}" style="pointer-events: none;"></img>
+            </div>
+          </span> -->
         </div>
 
         <div style="position: absolute;" 
           :style="{ top: openStatusCard ? '5px' : '0px', left: openStatusCard ? '30px' : '15px', width: openStatusCard ? '20px' : '15px', height: openStatusCard ? '20px' : '15px'}">
-          <span v-if="MountInProgress&&MountConnect">
+          <!-- <span v-if="MountInProgress&&MountConnect">
             <div style="display: flex; justify-content: center; align-items: center;">
               <img src="@/assets/images/svg/ui/Mount-red.svg" :style="{height: openStatusCard ? '20px' : '15px'}" style="pointer-events: none;"></img>
+            </div>
+          </span> -->
+          <span v-if="MountInProgress&&MountConnect">
+            <div style="display: flex; justify-content: center; align-items: center;">
+              <img src="@/assets/images/svg/ui/Mount-yellow.svg" :style="{height: openStatusCard ? '20px' : '15px'}" style="pointer-events: none;"></img>
             </div>
           </span>
           <span v-if="!MountInProgress&&MountConnect">
@@ -94,24 +105,29 @@
 
         <div style="position: absolute;" 
           :style="{ top: openStatusCard ? '5px' : '15px', left: openStatusCard ? '55px' : '0px', width: openStatusCard ? '20px' : '15px', height: openStatusCard ? '20px' : '15px'}">
-          <span v-if="CurrentGuiderStatus === 0">
+          <span v-if="!GuiderConnect">
             <div style="display: flex; justify-content: center; align-items: center;">
               <img src="@/assets/images/svg/ui/Guider-white.svg" :style="{height: openStatusCard ? '20px' : '15px'}" style="pointer-events: none;"></img>
             </div>
           </span>
-          <span v-if="CurrentGuiderStatus === 1">
+          <span v-if="GuiderConnect && GuiderInProgress && !GuiderError">
             <div style="display: flex; justify-content: center; align-items: center;">
               <img src="@/assets/images/svg/ui/Guider-yellow.svg" :style="{height: openStatusCard ? '20px' : '15px'}" style="pointer-events: none;"></img>
             </div>
           </span>
-          <span v-if="CurrentGuiderStatus === 2">
+          <span v-if="GuiderConnect && !GuiderInProgress && !GuiderError">
             <div style="display: flex; justify-content: center; align-items: center;">
               <img src="@/assets/images/svg/ui/Guider-green.svg" :style="{height: openStatusCard ? '20px' : '15px'}" style="pointer-events: none;"></img>
             </div>
           </span>
-          <span v-if="CurrentGuiderStatus === 3">
+          <span v-if="GuiderConnect && GuiderInProgress && GuiderError">
             <div style="display: flex; justify-content: center; align-items: center;">
               <img src="@/assets/images/svg/ui/Guider-red.svg" :style="{height: openStatusCard ? '20px' : '15px'}" style="pointer-events: none;"></img>
+            </div>
+          </span>
+          <span v-if="GuiderConnect && !GuiderInProgress && GuiderError">
+            <div style="display: flex; justify-content: center; align-items: center;">
+              <img src="@/assets/images/svg/ui/Guider-green.svg" :style="{height: openStatusCard ? '20px' : '15px'}" style="pointer-events: none;"></img>
             </div>
           </span>
         </div>
@@ -129,6 +145,11 @@
             </div>
           </span>
           <span v-if="CurrentFocusStatus === 2">
+            <div style="display: flex; justify-content: center; align-items: center;">
+              <img src="@/assets/images/svg/ui/Focuser-yellow.svg" :style="{height: openStatusCard ? '20px' : '15px'}" style="pointer-events: none;"></img>
+            </div>
+          </span>
+          <span v-if="CurrentFocusStatus === 3">
             <div style="display: flex; justify-content: center; align-items: center;">
               <img src="@/assets/images/svg/ui/Focuser-red.svg" :style="{height: openStatusCard ? '20px' : '15px'}" style="pointer-events: none;"></img>
             </div>
@@ -160,14 +181,18 @@ export default {
       isTargetSearchShow: true,
       isConnect: true,
       openStatusCard: false,
+
       MainCameraInProgress: false,
       MountInProgress: true,
-      CurrentGuiderStatus: 0,
+      GuiderInProgress: false,
+      
       CurrentFocusStatus: 0,
 
       MainCameraConnect: false,
-
+      GuiderConnect: false,
       MountConnect: false,
+
+      GuiderError: false,
     }
   },
   created() {
@@ -177,8 +202,11 @@ export default {
 
     this.$bus.$on('MainCameraStatus',this.MainCameraStatus);
     this.$bus.$on('MountStatus',this.MountStatus);
-    this.$bus.$on('GuiderStatus', this.GuiderStatus);
+    // this.$bus.$on('UpdateGuiderToolStatus', this.UpdateGuiderToolStatus);
+    this.$bus.$on('GuiderConnected', this.GuiderConnected);
     this.$bus.$on('GuiderStop', this.GuiderStatusStop);
+    this.$bus.$on('GuiderUpdateStatus', this.GuiderUpdateStatus);
+
     this.$bus.$on('MainCameraConnected', this.MainCameraConnected);
     this.$bus.$on('MountConnected', this.MountConnected);
     this.$bus.$on('FocuserConnected', this.FocuserConnected);
@@ -222,15 +250,6 @@ export default {
   methods: {
     toggleNavigationDrawer: function () {
       this.$store.commit('toggleBool', 'showNavigationDrawer')
-      // this.isDrawerShow = !this.isDrawerShow
-
-      // if(this.isDrawerShow) {
-      //   this.isTargetSearchShow = false;
-      // } else {
-      //   this.isTargetSearchShow = true;
-      // }
-
-      // this.$bus.$emit('ShowNavigationDrawer');
     },
 
     getLocalTime: function () {
@@ -300,15 +319,23 @@ export default {
       }
     },
 
-    GuiderStatus(status) {
-      if(status === 'InGuiding') {
-        this.CurrentGuiderStatus = 2;
-      } else if(status === 'InCalibration') {
-        this.CurrentGuiderStatus = 1;
-      } else if(status === 'StarLostAlert') {
-        this.CurrentGuiderStatus = 3;
-      }
-    },
+    // UpdateGuiderToolStatus(connect, inProgress, error) {
+    //   if(connect === 'true') {
+    //     this.GuiderConnect = true;
+    //   } else {
+    //     this.GuiderConnect = false;
+    //   }
+    //   if(inProgress === 'true') {
+    //     this.GuiderInProgress = true;
+    //   } else {
+    //     this.GuiderInProgress = false;
+    //   }
+    //   if(error === 'true') {
+    //     this.GuiderError = true;
+    //   } else {
+    //     this.GuiderError = false;
+    //   }
+    // },
 
     FocusStatus(status) {
       if(status) {
@@ -319,7 +346,31 @@ export default {
     },
 
     GuiderStatusStop() {
-      this.CurrentGuiderStatus = 0;
+      this.GuiderInProgress = false;
+      this.GuiderError = false;
+    },
+
+    GuiderConnected(status) {
+      if(status === 0) {
+        this.GuiderConnect = false;
+      } else {
+        this.GuiderConnect = true;
+      }
+    },
+
+    GuiderUpdateStatus(status) {
+      if(status === 0) {
+        this.GuiderInProgress = false;
+        this.GuiderError = false;
+      }
+      else if(status === 1) {
+        this.GuiderInProgress = true;
+        this.GuiderError = false;
+      }
+      else if(status === 2) {
+        this.GuiderInProgress = true;
+        this.GuiderError = true;
+      }
     },
 
     MainCameraConnected(num) {

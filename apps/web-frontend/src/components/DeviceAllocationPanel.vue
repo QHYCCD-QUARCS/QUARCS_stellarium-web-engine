@@ -6,7 +6,6 @@
           {{ device.DeviceName }}
         </li>
       </ul> -->
-
       <div class="DeviceTypes-list">
         <DevicePicker v-for="(deviceType, index) in DeviceTypes" :key="index" :DeviceType="deviceType.DeviceType"
           :DeviceName="deviceType.DeviceName" :DeviceBind="deviceType.isBind" :PickerIndex="index" :PickerSelect="deviceType.isSelected"
@@ -18,7 +17,7 @@
       </span>
 
       <ul class="device-list">
-        <li v-for="(device, index) in DeviceList" :key="index" @click="SelectedDeviceName(device)">
+        <li v-for="(device, index) in DeviceList.filter(device => !device.isBind)" :key="index" @click="SelectedDeviceName(device)">
           {{ device.DeviceName }}
         </li>
       </ul>
@@ -43,12 +42,13 @@ export default {
       bottom: 70,
       top: 70,
       DeviceList: [
-        // { DeviceName: 'QHY CCD QHY5III462C-075', isBind: false },
-        // { DeviceName: 'QHY CCD QHY268C-59aa8c4', isBind: false },
-        // { DeviceName: 'LX200 OnStep', isBind: false },
-        // { DeviceName: 'QHY CCD QHY1920M-075', isBind: false },
-        // { DeviceName: 'QHY CCD QHY163C-075', isBind: false },
+        // { DeviceName: 'QHY CCD QHY5III462C-075', DeviceIndex: 0, isBind: false },
+        // { DeviceName: 'QHY CCD QHY268C-59aa8c4', DeviceIndex: 1, isBind: false },
+        // { DeviceName: 'LX200 OnStep', DeviceIndex: 2, isBind: false },
+        // { DeviceName: 'QHY CCD QHY1920M-075', DeviceIndex: 3, isBind: false },
+        // { DeviceName: 'QHY CCD QHY163C-075', DeviceIndex: 4, isBind: false },
       ],
+
 
       DeviceTypes: [
         // { DeviceType: 'Guider', DeviceName: '', isBind: false, isSelected: false },
@@ -79,6 +79,10 @@ export default {
     this.$bus.$on('BindDeviceIndex', this.BindingDevice);
     this.$bus.$on('UnBindDeviceIndex', this.UnBindingDevice);
     this.$bus.$on('claerDeviceAllocationList',this.claerDeviceAllocationList);
+    this.$bus.$on('deleteDeviceTypeAllocationList',this.deleteDeviceTypeAllocationList);
+    this.$bus.$on('deleteDeviceAllocationList',this.deleteDeviceAllocationList);
+    this.$bus.$on('loadBindDeviceList',this.loadBindDeviceList);
+    this.$bus.$on('loadBindDeviceTypeList',this.loadBindDeviceTypeList);
   },
   methods: {
     SelectPickerIndex(num) {
@@ -116,30 +120,34 @@ export default {
     },
 
     DeviceToBeAllocated(index,name) {
-      const exists = this.DeviceList.some(item => item.DeviceName === name);
-      if (exists) {
+      const exists1 = this.DeviceList.some(item => item.DeviceName === name);
+      const exists2 = this.DeviceTypes.some(item => item.DeviceName === name);
+      console.log('this.DeviceList:', this.DeviceList);
+      if (exists1) {
         console.log('Device already exists:', name);
+        this.$bus.$emit('SendConsoleLogMsg', 'Device already exists:' + index + ':' + name, 'info');
       } else {
-        console.log('Add Device To Be Allocated:', index, name);
-        this.DeviceList.push({DeviceName: name, DeviceIndex: index });
+        if (exists2) {
+          this.$bus.$emit('SendConsoleLogMsg', 'Device already exists:' + index + ':' + name, 'info');
+          this.DeviceList.push({DeviceName: name, DeviceIndex: index, isBind: true });
+        } else {
+          this.$bus.$emit('SendConsoleLogMsg', 'Add Device To Be Allocated:' + index + ':' + name, 'info');
+          console.log('Add Device To Be Allocated:', index, name);
+          this.DeviceList.push({DeviceName: name, DeviceIndex: index, isBind: false });
+        }
       }
     },
 
-    DeviceConnectSuccess(type, newDevice) {
-      // for (let i = 0; i < this.DeviceTypes.length; i++) {
-      //   if (this.DeviceTypes[i].DeviceType === type) {
-      //     this.DeviceTypes[i].DeviceName = newDevice;
-      //     this.DeviceTypes[i].isBind = true;
-      //     this.DeviceTypes[i].isSelected = false;
-      //   }
-      // }
+    DeviceConnectSuccess(type, DeviceName, DriverName, isBind = true) {
+      if (type == '' || type == "undefined" || type == null || DriverName == '' || DriverName == "undefined" || DriverName == null){
+        return;
+      }
 
       let found = false;
-
       for (let i = 0; i < this.DeviceTypes.length; i++) {
         if (this.DeviceTypes[i].DeviceType === type) {
-          this.DeviceTypes[i].DeviceName = newDevice;
-          this.DeviceTypes[i].isBind = true;
+          this.DeviceTypes[i].DeviceName = DeviceName;
+          this.DeviceTypes[i].isBind = isBind;
           this.DeviceTypes[i].isSelected = false;
           found = true; // 标记已找到匹配项
           break; // 找到后可以跳出循环，优化性能
@@ -150,15 +158,15 @@ export default {
       if (!found) {
         this.DeviceTypes.push({
           DeviceType: type,
-          DeviceName: newDevice,
-          isBind: true,
+          DeviceName: DeviceName,
+          isBind: isBind,
           isSelected: false,
         });
       }
-
-      const indexToRemove = this.DeviceList.findIndex(item => item.DeviceName === newDevice);
+      const indexToRemove = this.DeviceList.findIndex(item => item.DeviceName === DeviceName);
       if (indexToRemove !== -1) {
-        this.DeviceList.splice(indexToRemove, 1); // 删除该项
+        this.DeviceList[indexToRemove].isBind = isBind;
+        this.$bus.$emit('SendConsoleLogMsg', ' Binding Device Success:' + type + ':' + this.DeviceList[indexToRemove].DeviceIndex+': '+ this.DeviceList[indexToRemove].isBind, 'info');
       }
     },
 
@@ -171,17 +179,21 @@ export default {
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'BindingDevice:' + type + ':' + this.DeviceList[DeviceNameIndex].DeviceIndex);
         this.$bus.$emit('SendConsoleLogMsg', 'Binding Device:' + type + ':' + this.DeviceList[DeviceNameIndex].DeviceIndex, 'info');
       }
-
     },
 
     UnBindingDevice(index) {
       const type = this.DeviceTypes[index].DeviceType;
+      const name = this.DeviceTypes[index].DeviceName;
+
 
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'UnBindingDevice:' + type);
       this.$bus.$emit('SendConsoleLogMsg', 'UnBinding Device:' + type, 'info');
 
       this.DeviceTypes[index].isBind = false;
       this.DeviceTypes[index].DeviceName = '';
+      const indexToRemove = this.DeviceList.findIndex(item => item.DeviceName === name);
+      this.DeviceList[indexToRemove].isBind = false;
+      this.$bus.$emit('UnBindingDevice', type, name,this.DeviceList[index].DriverName);
     },
 
     ClosePanel() {
@@ -192,11 +204,57 @@ export default {
       this.DeviceTypes = [];
       this.DeviceList = [];
     },
+    deleteDeviceTypeAllocationList(type) {
+
+      if (type == "all"){
+        this.claerDeviceAllocationList()
+        this.$bus.$emit('SendConsoleLogMsg', 'All driverType has removed', 'info');
+        return;
+      }
+
+      for (let i = this.DeviceTypes.length - 1; i >= 0; i--) {
+        if (this.DeviceTypes[i].DeviceType === type) {
+          for (let j = this.DeviceList.length - 1; j >= 0; j--) {
+            if (this.DeviceList[j].DeviceName === this.DeviceTypes[i].DeviceName) {
+              this.DeviceList[j].isBind = false;
+              break
+            }
+          }
+          this.DeviceTypes.splice(i, 1);
+          break
+        }
+      }
+      this.$bus.$emit('SendConsoleLogMsg', type + " driverType has removed", 'info');
+    },
+    deleteDeviceAllocationList(deviceName) {
+      for (let i = this.DeviceList.length - 1; i >= 0; i--) {
+        if (this.DeviceList[i].DeviceName === deviceName) {
+          this.DeviceList.splice(i, 1);
+        }
+      }
+      this.$bus.$emit('SendConsoleLogMsg', 'Device(' + deviceName + ') has removed', 'info');
+    },
+
 
     GetConnectedDevices() {
       this.$bus.$emit('GetConnectedDevices');
+      
     },
 
+    loadBindDeviceList(deviceObject) {
+      deviceObject.forEach(device => {
+        for (const [deviceName, deviceIndex, isBind] of Object.entries(device)) {
+          this.DeviceToBeAllocated(deviceIndex, deviceName, isBind);
+        }
+      });
+    },
+
+    loadBindDeviceTypeList(deviceTypeObject) {
+      deviceTypeObject.forEach(deviceType => {
+        const { type, DeviceName, DriverName, isbind } = deviceType;
+        this.DeviceConnectSuccess(type, DeviceName, DriverName, isbind);
+      });
+    }
     
   },
   components: {

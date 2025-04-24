@@ -56,6 +56,7 @@ export default {
   },
   methods: {
     CurrentHotspotName(name) {
+      console.log('CurrentHotspotName', name);
       this.CurrentName = name;
       this.InputText = name;
       this.isUpdated = false;

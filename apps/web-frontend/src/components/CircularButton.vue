@@ -90,6 +90,9 @@ export default {
       longPressProgress: 0,
 
       MainCameraConnect: false,
+      isProcessing: false, // 新增状态变量，表示是否正在处理
+
+      isButtonDisabled: false, // 拍摄按钮是否禁用
     };
   },
   created() {
@@ -97,6 +100,7 @@ export default {
     this.$bus.$on('SetExpTime',this.SetDuration);
     this.$bus.$on('CameraInExposuring',this.setInProgress);
     this.$bus.$on('MainCameraConnected', this.MainCameraConnected);
+    this.$bus.$on('disableCaptureButton', this.disableCaptureButton);
   },
   mounted() {
     this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getCaptureStatus');
@@ -120,6 +124,9 @@ export default {
   },
   methods: {
     handleMouseDown() {
+      if (this.isButtonDisabled) {
+        return; 
+      }
       this.mousePressTimestamp = Date.now();
       if (this.isClicked) {
         this.startLongPressAnimation();
@@ -153,6 +160,7 @@ export default {
 
     animateProgress() {
       if (this.isClicked) return; // 如果已点击，则退出方法
+      console.log('执行点按，触发拍摄');
       this.animationDuration = this.CaptureExpTime;
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'takeExposure:'+this.animationDuration);
       this.$bus.$emit('SendConsoleLogMsg', 'Take Exposure:'+this.animationDuration, 'info');
@@ -194,6 +202,7 @@ export default {
     },
 
     startLongPressAnimation() {
+      console.log('执行长按，触发终止拍摄');
       this.isLongPress = true;
       const startTime = performance.now();
       const animate = (currentTime) => {
@@ -234,6 +243,10 @@ export default {
         this.MainCameraConnect = true;
       }
       console.log('MainCamera is Connected: ', num);
+    },
+
+    disableCaptureButton(status) {
+      this.isButtonDisabled = status;
     },
 
   },
