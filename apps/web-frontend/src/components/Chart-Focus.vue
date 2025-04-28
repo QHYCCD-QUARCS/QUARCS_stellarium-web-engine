@@ -74,7 +74,7 @@ export default {
     endDrag() {
       this.isDragging = false;
       this.deltaX = 0;
-      this.$bus.$emit('setTargetPosition', (this.xAxis_min + this.xAxis_max) / 2);
+      // this.$bus.$emit('setTargetPosition', (this.xAxis_min + this.xAxis_max) / 2);
     },
     renderChart(x_min, x_max) {
       const y_max = this.chartData1.length > 0 ? Math.max(...this.chartData1.map(item => item[1])) * 2 : this.yAxis_max;

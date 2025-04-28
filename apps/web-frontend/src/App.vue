@@ -209,7 +209,7 @@
               </v-list-item-icon>
               <v-list-item-content>
                 <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Restart')
-                  }}</v-list-item-title>
+                }}</v-list-item-title>
               </v-list-item-content>
             </v-list-item>
 
@@ -222,7 +222,7 @@
               </v-list-item-icon>
               <v-list-item-content>
                 <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Shut Down')
-                  }}</v-list-item-title>
+                }}</v-list-item-title>
               </v-list-item-content>
             </v-list-item>
 
@@ -269,7 +269,7 @@
               </v-list-item-icon>
               <v-list-item-content>
                 <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Quit')
-                  }}</v-list-item-title>
+                }}</v-list-item-title>
               </v-list-item-content>
             </v-list-item>
 
@@ -282,7 +282,7 @@
               </v-list-item-icon>
               <v-list-item-content>
                 <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('View Settings')
-                  }}</v-list-item-title>
+                }}</v-list-item-title>
               </v-list-item-content>
             </v-list-item>
             <v-divider></v-divider>
@@ -297,7 +297,7 @@
             </v-list-item-icon>
             <v-list-item-content>
               <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Power Management')
-                }}</v-list-item-title>
+              }}</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
 
@@ -382,7 +382,7 @@
             </v-list-item-icon>
             <v-list-item-content>
               <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Image Files')
-                }}</v-list-item-title>
+              }}</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
 
@@ -395,7 +395,7 @@
             </v-list-item-icon>
             <v-list-item-content>
               <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Logs')
-                }}</v-list-item-title>
+              }}</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
 
@@ -414,7 +414,7 @@
                 <span>
                   <div :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t(device.driverType) }}</div>
                   <div :style="{ fontSize: '7px' }" :class="{ 'connected-device': device.isConnected }">{{ device.device
-                    }}
+                  }}
                   </div>
                 </span>
               </v-list-item-title>
@@ -465,7 +465,7 @@
             </v-list-item-icon>
             <v-list-item-content>
               <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Data Credits')
-                }}</v-list-item-title>
+              }}</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
 
@@ -484,7 +484,9 @@
             <component v-bind:is="guiComponent"></component>
             <canvas id="stel-canvas" ref='stelCanvas' :style="{ zIndex: canvasZIndexStel }"></canvas>
             <canvas ref="mainCanvas" id="mainCamera-canvas" :style="{ zIndex: canvasZIndexMainCamera }"
-              @click="handleMainCanvasClick" @touchstart="handleMainCanvasTouch"></canvas>
+              @click="handleMainCanvasClick" @touchstart="handleMainCanvasTouch" @touchend="handleTouchEnd"
+              @mousedown="handleMouseDown" @mouseup="handleMouseUp" @mousemove="handleMouseMove" @wheel="handleWheel">
+            </canvas>
             <canvas ref="guiderCanvas" id="guiderCamera-canvas" :style="{ zIndex: canvasZIndexGuiderCamera }"
               @click="handleGuiderCanvasClick"></canvas>
             <!-- <img id="imageSrc" alt="Source" :src="imageSrc" crossOrigin = "" /> -->
@@ -657,16 +659,31 @@ export default {
 
       ImageCFA: 'BG',
 
-      CanvasWidth: 1920,
-      CanvasHeight: 1080,
+      CanvasWidth: 1920,  // 主画布宽度
+      CanvasHeight: 1080, // 主画布高度
 
-      scale: 1,
-      translateX: 0,
-      translateY: 0,
-      bufferCanvas: null,
-      bufferCtx: null,
-      imageWidth: 0,
-      imageHeight: 0,
+      scale: 1, // 缩放比例
+      translateX: 0, // 平移x坐标
+      translateY: 0, // 平移y坐标
+      bufferCanvas: null, // 缓冲画布
+      bufferCtx: null, // 缓冲画布上下文
+      visibleWidth: 0, // 可见区域宽度
+      visibleHeight: 0, // 可见区域高度
+      visibleX: 0, // 可见区域x坐标
+      visibleY: 0, // 可见区域y坐标
+      isDragging: false, // 标记画布是否正在拖动
+      pendingScaleChange: false, // 标记画布是否正在缩放
+
+      touchStartX: 0, // 触摸开始x坐标
+      touchStartY: 0, // 触摸开始y坐标
+      startDistance: 0, // 触摸开始距离
+
+      moveIntervalId: null, // 拖动定时器
+      zoomIntervalId: null, // 缩放定时器
+
+
+      imageWidth: 0, // 图像宽度
+      imageHeight: 0, // 图像高度
       drawImgData: null,
       OriginalImage: null,
       detectStarsImg: null,
@@ -759,9 +776,10 @@ export default {
       focuserROIStarsList: [],  // 用来保存ROI区域的星点列表，分别保存x,y,HFR
       selectStarX: -1,
       selectStarY: -1,
-      ROI_x: -1,
-      ROI_y: -1,
-      ROI_length: -1,
+      ROI_x: -1,    // 用来保存ROI区域的x坐标
+      ROI_y: -1,    // 用来保存ROI区域的y坐标
+      ROI_length: -1, // 用来保存ROI区域的长度
+      showSelectStar: false,
     }
   },
   components: {
@@ -809,8 +827,9 @@ export default {
     // this.$bus.$on('DisconnectDriverSuccess', this.disconnectDriversuccess);
     this.$bus.$on('UnBindingDevice', this.UnBindingDevice);
     this.$bus.$on('CloseWebView', this.QuitToMainApp)
-    this.$bus.$on('RedBoxSideLength', this.setRedBoxSideLength);
+    // this.$bus.$on('setRedBoxSideLength', this.setRedBoxSideLength);
     this.$bus.$on('setFocuserState', this.setFocuserState);  // 设置调焦状态和进度
+    this.$bus.$on('setShowSelectStar', this.setShowSelectStar);  // 设置是否显示选择星点
   },
   methods: {
     getLocationHostName() {
@@ -1155,7 +1174,10 @@ export default {
 
 
               case 'CameraInExposuring':
-                this.$bus.$emit('CameraInExposuring');
+                if (parts.length === 2) {
+                  const status = parts[1];
+                  this.$bus.$emit('CameraInExposuring', status);
+                }
                 break;
 
               case 'AutoFocusOver':
@@ -1665,6 +1687,31 @@ export default {
                 }
                 break;
 
+              case 'SetRedBoxState':
+                if (parts.length === 4) {
+                  const length = parts[1];
+                  this.ROI_x = parseFloat(parts[2]);
+                  this.ROI_y = parseFloat(parts[3]);
+                  this.setRedBoxState(length, this.ROI_x, this.ROI_y);
+                }
+                break;
+
+              case 'SetVisibleArea':
+                if (parts.length === 4) {
+                  this.visibleX = parseFloat(parts[1]);
+                  this.visibleY = parseFloat(parts[2]);
+                  this.scale = parseFloat(parts[3]); 
+                  this.SendConsoleLogMsg('update VisibleArea x=' + this.visibleX + ', y=' + this.visibleY + ', scale=' + this.scale, 'info');
+                }
+                break;
+
+              case 'SetSelectStars':
+                if (parts.length === 3) {
+                  this.selectStarX = parseFloat(parts[1]);
+                  this.selectStarY = parseFloat(parts[2]);
+                  this.SendConsoleLogMsg('update SelectStars x=' + this.selectStarX + ', y=' + this.selectStarY, 'info');
+                }
+                break;
               default:
                 console.warn('未处理命令: ', data.message);
                 break;
@@ -1811,13 +1858,14 @@ export default {
     // 状态恢复
     StatusRecovery() {
       this.getQTClientVersion();
+      this.sendMessage('Vue_Command', 'getROIInfo');
       this.sendMessage('Vue_Command', 'getStagingImage');
       this.RecalibratePolarAxis();
       // this.sendMessage('Vue_Command', 'getStagingSolveResult');
       this.sendMessage('Vue_Command', 'getStagingScheduleData');
       this.sendMessage('Vue_Command', 'getStagingSolveResult');
       this.sendMessage('Vue_Command', 'getGPIOsStatus');
-      this.sendMessage('Vue_Command', 'getRedBoxSideLength');
+      
       this.disconnectTimeoutTriggered = false;
     },
 
@@ -2805,11 +2853,13 @@ export default {
         let resizeImg = new cv.Mat();
 
         // 调整图像大小
-        cv.resize(dst, resizeImg, new cv.Size(this.CanvasWidth, this.CanvasHeight), 0, 0, cv.INTER_LINEAR);
-        dst.delete();
+        // cv.resize(dst, resizeImg, new cv.Size(this.CanvasWidth, this.CanvasHeight), 0, 0, cv.INTER_LINEAR);
+        // dst.delete();
 
-        let originalImg8 = this.Bit16To8_Stretch(resizeImg, B, W);
-        resizeImg.delete();
+        // let originalImg8 = this.Bit16To8_Stretch(resizeImg, B, W);
+        // resizeImg.delete();
+        let originalImg8 = this.Bit16To8_Stretch(dst, B, W);
+        dst.delete();
 
         let targetImg8 = this.ImageSoftAWB(originalImg8, gainR, gainB, offset);
 
@@ -2837,6 +2887,12 @@ export default {
         } else {
           let colorData = new ImageData(new Uint8ClampedArray(targetImg8.data), targetImg8.cols, targetImg8.rows);
           this.drawImgData = colorData;
+          // 设置缓冲画布宽高
+          this.bufferCanvas.width = colorData.width;
+          this.bufferCanvas.height = colorData.height;
+          // 绘制缓存画布图像
+          this.bufferCtx.putImageData(colorData, 0, 0);
+          // 绘制主画布图像
           this.drawImageData(this.drawImgData);
 
           const endTime = new Date();
@@ -2858,27 +2914,27 @@ export default {
           const intervalId = setInterval(checkDetectedStarsFinish, 1000);
         }
 
-        if (this.isNotDrawStars) {
-          this.drawImageData(this.drawImgData);
-        } else {
-          if (this.detectStarsImg != null) {
-            this.drawImageData(this.detectStarsImg);
-          } else {
-            this.drawImageData(this.drawImgData);
-          }
-        }
+        // if (this.isNotDrawStars) {
+        //   this.drawImageData(this.drawImgData);
+        // } else {
+        //   if (this.detectStarsImg != null) {
+        //     this.drawImageData(this.detectStarsImg);
+        //   } else {
+        //     this.drawImageData(this.drawImgData);
+        //   }
+        // }
 
-        const windowWidth = window.innerWidth;
-        const windowHeight = window.innerHeight;
+        // const windowWidth = window.innerWidth;
+        // const windowHeight = window.innerHeight;
 
-        const minTranslateX = this.imageWidth - this.CanvasWidth;
-        const minTranslateY = this.imageHeight - this.CanvasHeight;
+        // const minTranslateX = this.imageWidth - this.CanvasWidth;
+        // const minTranslateY = this.imageHeight - this.CanvasHeight;
 
-        // 计算初始的 ScaleImageSize_X 和 ScaleImageSize_Y
-        this.ScaleImageSize_X = Math.floor(minTranslateX / this.CanvasWidth * windowWidth + windowWidth);
-        this.ScaleImageSize_Y = Math.floor(minTranslateY / this.CanvasHeight * windowHeight + windowHeight);
+        // // 计算初始的 ScaleImageSize_X 和 ScaleImageSize_Y
+        // this.ScaleImageSize_X = Math.floor(minTranslateX / this.CanvasWidth * windowWidth + windowWidth);
+        // this.ScaleImageSize_Y = Math.floor(minTranslateY / this.CanvasHeight * windowHeight + windowHeight);
 
-        this.$bus.$emit('ScaleImageSize', this.ScaleImageSize_X, this.ScaleImageSize_Y);
+        // this.$bus.$emit('ScaleImageSize', this.ScaleImageSize_X, this.ScaleImageSize_Y);
 
       } catch (error) {
         this.handleError('Process image data error', 'processImage', error);
@@ -2918,205 +2974,381 @@ export default {
       }
     },
 
-    drawImageData(colorData) {
-      if (!colorData) {
-        console.error('drawImageData error: colorData is null or undefined.');
+    drawImageData() {
+      if (this.bufferCanvas == null) {
+        console.error('drawImageData error: bufferCanvas is null or undefined.');
         return;
       }
-      // Clear buffer canvas
-      this.bufferCtx.clearRect(0, 0, this.bufferCanvas.width, this.bufferCanvas.height);
+      // 可用相关参数
+      // window.innerWidth; // 窗口宽度
+      // window.innerHeight; // 窗口高度
+      // this.scale 缩放比例
+      // this.translateX 平移x坐标
+      // this.translateY 平移y坐标
+      // this.CanvasWidth 主画布宽度 1920
+      // this.CanvasHeight 主画布高度 1080
+      // this.mainCameraSizeX 原始图像宽度
+      // this.mainCameraSizeY 原始图像高度
+      // this.bufferCanvas.width 缓冲画布宽度
+      // this.bufferCanvas.height 缓冲画布高度
+      // this.ImageProportion 图像比例
 
-      // 计算可见区域的位置和大小
-      const visibleWidth = this.bufferCanvas.width / this.scale;
-      const visibleHeight = this.bufferCanvas.height / this.scale;
-      const visibleX = -this.translateX / this.scale;
-      const visibleY = -this.translateY / this.scale;
+      // 计算可见区域
+      const newVisibleWidth = this.bufferCanvas.width * this.scale;
+      const newVisibleHeight = newVisibleWidth / this.ImageProportion;
 
-      // 裁剪 buffer canvas，只绘制可见区域
-      this.bufferCtx.save();
-      this.bufferCtx.beginPath();
-      this.bufferCtx.rect(visibleX, visibleY, visibleWidth, visibleHeight);
-      this.bufferCtx.clip();
+      // 计算可见区域x坐标
+      let newVisibleX = this.visibleX;
+      // 计算可见区域y坐标
+      let newVisibleY = this.visibleY;
 
-      // Draw ImageData on buffer canvas
-      this.bufferCanvas.width = colorData.width;
-      this.bufferCanvas.height = colorData.height;
-      this.bufferCtx.putImageData(colorData, 0, 0);
+      // 避免图像越界
+      if (newVisibleX - newVisibleWidth / 2 < 0) {
+        newVisibleX = newVisibleWidth / 2;
+      } else if (newVisibleX + newVisibleWidth / 2 > this.bufferCanvas.width) {
+        newVisibleX = this.bufferCanvas.width - newVisibleWidth / 2;
+      }
 
-      // 计算调整后的高度
-      const adjustedHeight = colorData.width / this.ImageProportion;
+      if (newVisibleY - newVisibleHeight / 2 < 0) {
+        newVisibleY = newVisibleHeight / 2;
+      } else if (newVisibleY + newVisibleHeight / 2 > this.bufferCanvas.height) {
+        newVisibleY = this.bufferCanvas.height - newVisibleHeight / 2;
+      }
 
-      // 绘制图像
-      this.bufferCtx.drawImage(this.bufferCanvas, this.translateX, this.translateY, colorData.width * this.scale, adjustedHeight * this.scale);
-      this.imageWidth = colorData.width * this.scale;
-      this.imageHeight = adjustedHeight * this.scale;
+      // 更新ROI区域
+      // 计算可见区域的边界
+      const visibleLeft = newVisibleX - newVisibleWidth / 2;
+      const visibleRight = newVisibleX + newVisibleWidth / 2;
+      const visibleTop = newVisibleY - newVisibleHeight / 2;
+      const visibleBottom = newVisibleY + newVisibleHeight / 2;
 
-      // 恢复 buffer canvas 状态
-      this.bufferCtx.restore();
+      // 计算 ROI 区域的边界
+      const roiLeft = this.ROI_x;
+      const roiRight = this.ROI_x + this.ROI_length;
+      const roiTop = this.ROI_y;
+      const roiBottom = this.ROI_y + this.ROI_length;
 
+      // 判断 ROI 区域是否在可见区域内
+      const isRoiInVisible = roiRight >= visibleLeft && roiLeft <= visibleRight && roiBottom >= visibleTop && roiTop <= visibleBottom;
+
+      // 计算 ROI 区域在屏幕上的位置，中心点坐标
+      const roiScreenX = (this.ROI_x - visibleLeft) * (window.innerWidth / newVisibleWidth) + this.RedBoxSideLength * window.innerWidth / newVisibleWidth / 2;
+      const roiScreenY = (this.ROI_y - visibleTop) * (window.innerHeight / newVisibleHeight) + this.RedBoxSideLength * window.innerHeight / newVisibleHeight / 2;
+      this.SendConsoleLogMsg('ROI 区域在屏幕上的位置: ' + roiScreenX + '*' + roiScreenY + '长度 ' + this.RedBoxSideLength * window.innerWidth / newVisibleWidth + '*' + this.RedBoxSideLength * window.innerHeight / newVisibleHeight, 'info');
+      this.$bus.$emit('setRedBoxLength', this.RedBoxSideLength * window.innerWidth / newVisibleWidth, this.RedBoxSideLength * window.innerHeight / newVisibleHeight);
+      this.$bus.$emit('setRedBoxPosition', roiScreenX, roiScreenY, this.ROI_x, this.ROI_y);
+      if (isRoiInVisible) {
+        console.log('ROI 区域在可见区域内, RedBoxSideLength: ', this.RedBoxSideLength * window.innerWidth / newVisibleWidth, ', ', this.RedBoxSideLength * window.innerHeight / newVisibleHeight);
+      } else {
+        console.log('ROI 区域不在可见区域内, RedBoxSideLength: ', this.RedBoxSideLength * window.innerWidth / newVisibleWidth, ', ', this.RedBoxSideLength * window.innerHeight / newVisibleHeight);
+      }
       // Draw buffer canvas on main canvas
       const canvas = this.$refs.mainCanvas;
       const ctx = canvas.getContext('2d');
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(this.bufferCanvas, 0, 0);
+      ctx.drawImage(this.bufferCanvas, newVisibleX - newVisibleWidth / 2, newVisibleY - newVisibleHeight / 2, newVisibleWidth, newVisibleHeight, 0, 0, canvas.width, canvas.height);
+      this.SendConsoleLogMsg('绘制图像,可见区域:' + newVisibleX + ',' + newVisibleY + ',' + newVisibleWidth + ',' + newVisibleHeight, 'info');
+      this.visibleX = newVisibleX;
+      this.visibleY = newVisibleY;
+      this.visibleWidth = newVisibleWidth;
+      this.visibleHeight = newVisibleHeight;
+
+
+      // 发送消息给QT客户端，用于信息图标
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'sendRedBoxState:' + this.RedBoxSideLength + ',' + this.ROI_x + ',' + this.ROI_y);
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'sendVisibleArea:' + this.visibleX + ',' + this.visibleY + ',' + this.scale );
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'sendSelectStars:' + this.selectStarX + ',' + this.selectStarY);
+      // 如果选择了星点，则根据选择位置，在ROI区域中绘制一个圆
+      if (this.selectStarX != -1 && this.selectStarY != -1 && this.showSelectStar) {
+        let radius, canvasStarX, canvasStarY, color;
+
+        // 如果有星点
+        if (this.focuserROIStarsList.length > 0) {
+          // 计算每个星点与选择位置的距离
+          const distances = this.focuserROIStarsList.map(item => {
+            const dx = (item.x + this.ROI_x) - this.selectStarX; // 计算星点与选择位置的x距离 
+            const dy = (item.y + this.ROI_y) - this.selectStarY; // 计算星点与选择位置的y距离
+            return Math.sqrt(dx * dx + dy * dy); // 计算星点与选择位置的距离
+          });
+
+          // 找到距离最小的星点
+          const minDistanceIndex = distances.indexOf(Math.min(...distances));
+          const closestStar = this.focuserROIStarsList[minDistanceIndex];
+
+          // 设置阈值
+          const threshold = 50; // 如果选择位置与星点距离小于阈值，则选择这个星点
+
+          const canvas = this.$refs.mainCanvas;
+          const ctx = canvas.getContext('2d');
+          const canvasWidth = canvas.width;
+          const canvasHeight = canvas.height;
+
+          if (distances[minDistanceIndex] < threshold) {
+            // 如果距离最小的星点的距离小于阈值，那么选择这个星点
+            radius = closestStar.HFR;
+            canvasStarX = closestStar.x + this.ROI_x - visibleLeft; // 这是在可见区域中的星点坐标
+            canvasStarY = closestStar.y + this.ROI_y - visibleTop; // 这是在可见区域中的星点坐标
+            color = 'green'; // 有星点，绘制绿色的圆
+
+            // 更新选择位置为星点位置
+            this.selectStarX = closestStar.x + this.ROI_x;
+            this.selectStarY = closestStar.y + this.ROI_y;
+          } else {
+            // 否则，在选择的位置绘制一个圆
+            radius = 10; // 你可以根据需要调整这个值
+            canvasStarX = this.selectStarX;
+            canvasStarY = this.selectStarY;
+            color = 'red'; // 无星点，绘制红色的圆
+          }
+        } else {
+          // 如果没有星点，也在选择的位置绘制一个圆
+          radius = 10; // 你可以根据需要调整这个值
+          canvasStarX = this.selectStarX;
+          canvasStarY = this.selectStarY;
+          color = 'red'; // 无星点，绘制红色的圆
+        }
+
+        // 获取绘制圆的位置的图像数据
+        const imageData = ctx.getImageData(canvasStarX - radius, canvasStarY - radius, 2 * radius, 2 * radius);
+        // 发送图像数据给显示框
+        this.$bus.$emit('selectStarImage', imageData);
+
+        // 在指定位置开始绘制圆
+        ctx.beginPath();
+        ctx.arc(canvasStarX, canvasStarY, radius, 0, 2 * Math.PI);
+        ctx.strokeStyle = color;
+        ctx.stroke();
+        ctx.closePath();
+      }
     },
 
+    // drawImageData(colorData) {
+    //   if (!colorData) {
+    //     console.error('drawImageData error: colorData is null or undefined.');
+    //     return;
+    //   }
+    //   // Clear buffer canvas
+    //   this.bufferCtx.clearRect(0, 0, this.bufferCanvas.width, this.bufferCanvas.height);
+
+    //   // 计算可见区域的位置和大小
+    //   const visibleWidth = this.bufferCanvas.width / this.scale;
+    //   const visibleHeight = this.bufferCanvas.height / this.scale;
+    //   let visibleX = -this.translateX / this.scale;
+    //   let visibleY = -this.translateY / this.scale;
+
+    //   // 确保可见区域在主画布内
+    //   visibleX = Math.max(0, Math.min(this.bufferCanvas.width - visibleWidth, visibleX));
+    //   visibleY = Math.max(0, Math.min(this.bufferCanvas.height - visibleHeight, visibleY));
+
+    //   this.SendConsoleLogMsg('可见区域: visibleX = ' + visibleX + ', visibleY = ' + visibleY + ', visibleWidth = ' + visibleWidth + ', visibleHeight = ' + visibleHeight, 'info');
+
+
+
+    //   // 裁剪 buffer canvas，只绘制可见区域
+    //   this.bufferCtx.save();
+    //   this.bufferCtx.beginPath();
+    //   this.bufferCtx.rect(visibleX, visibleY, visibleWidth, visibleHeight);
+    //   this.bufferCtx.clip();
+
+    //   // Draw ImageData on buffer canvas
+    //   this.bufferCanvas.width = colorData.width;
+    //   this.bufferCanvas.height = colorData.height;
+    //   this.bufferCtx.putImageData(colorData, 0, 0);
+
+    //   // 计算调整后的高度
+    //   const adjustedHeight = colorData.width / this.ImageProportion;
+
+    //   // 绘制图像
+    //   this.bufferCtx.drawImage(this.bufferCanvas, this.translateX, this.translateY, colorData.width * this.scale, adjustedHeight * this.scale);
+    //   this.imageWidth = colorData.width * this.scale;
+    //   this.imageHeight = adjustedHeight * this.scale;
+
+    //   // 恢复 buffer canvas 状态
+    //   this.bufferCtx.restore();
+
+    //   // Draw buffer canvas on main canvas
+    //   const canvas = this.$refs.mainCanvas;
+    //   const ctx = canvas.getContext('2d');
+    //   ctx.clearRect(0, 0, canvas.width, canvas.height);
+    //   ctx.drawImage(this.bufferCanvas, 0, 0);
+    // },
+
     addEventListeners() {
-      const canvas = this.$refs.mainCanvas;
-      let isDragging = false;
-      let lastX = 0;
-      let lastY = 0;
+      // const canvas = this.$refs.mainCanvas;
+      // let isDragging = false;
+      // let lastX = 0;
+      // let lastY = 0;
 
-      const throttledTouchMove = this.throttle((event) => {
-        event.preventDefault();
-        if (isDragging) {
-          const windowWidth = window.innerWidth;
-          const windowHeight = window.innerHeight;
+      // const throttledTouchMove = this.throttle((event) => {
+      //   event.preventDefault();
+      //   if (isDragging) {
+      //     const windowWidth = window.innerWidth;
+      //     const windowHeight = window.innerHeight;
 
-          const deltaX = (event.touches[0].clientX - lastX) * (this.imageWidth / windowWidth) / this.scale;
-          const deltaY = (event.touches[0].clientY - lastY) * (this.imageHeight / windowHeight) / this.scale;
+      //     const deltaX = (event.touches[0].clientX - lastX) * (this.imageWidth / windowWidth) / this.scale;
+      //     const deltaY = (event.touches[0].clientY - lastY) * (this.imageHeight / windowHeight) / this.scale;
 
-          this.translateX += deltaX;
-          this.translateY += deltaY;
+      //     this.translateX += deltaX;
+      //     this.translateY += deltaY;
 
-          const minTranslateX = this.imageWidth - this.CanvasWidth;
-          const minTranslateY = this.imageHeight - this.CanvasHeight;
+      //     const minTranslateX = this.imageWidth - this.CanvasWidth;
+      //     const minTranslateY = this.imageHeight - this.CanvasHeight;
 
-          this.translateX = Math.min(Math.max(this.translateX, -minTranslateX), 0);
-          this.translateY = Math.min(Math.max(this.translateY, -minTranslateY), 0);
+      //     this.translateX = Math.min(Math.max(this.translateX, -minTranslateX), 0);
+      //     this.translateY = Math.min(Math.max(this.translateY, -minTranslateY), 0);
 
-          // console.log('Move to: ' + Math.floor(-this.translateX/this.CanvasWidth*windowWidth) + ', ' + Math.floor(-this.translateY/this.CanvasHeight*windowHeight));
-          this.$bus.$emit('RedBoxOffset', Math.floor(-this.translateX / this.CanvasWidth * windowWidth), Math.floor(-this.translateY / this.CanvasHeight * windowHeight));
+      //     // console.log('Move to: ' + Math.floor(-this.translateX/this.CanvasWidth*windowWidth) + ', ' + Math.floor(-this.translateY/this.CanvasHeight*windowHeight));
+      //     this.$bus.$emit('RedBoxOffset', Math.floor(-this.translateX / this.CanvasWidth * windowWidth), Math.floor(-this.translateY / this.CanvasHeight * windowHeight));
 
-          const ScaleImageSize_X = Math.floor(minTranslateX / this.CanvasWidth * windowWidth + windowWidth);
-          const ScaleImageSize_Y = Math.floor(minTranslateY / this.CanvasHeight * windowHeight + windowHeight);
-          // console.log('ScaleImageSize: ' + ScaleImageSize_X + ', ' + ScaleImageSize_Y);
-          this.$bus.$emit('ScaleImageSize', ScaleImageSize_X, ScaleImageSize_Y);
+      //     const ScaleImageSize_X = Math.floor(minTranslateX / this.CanvasWidth * windowWidth + windowWidth);
+      //     const ScaleImageSize_Y = Math.floor(minTranslateY / this.CanvasHeight * windowHeight + windowHeight);
+      //     // console.log('ScaleImageSize: ' + ScaleImageSize_X + ', ' + ScaleImageSize_Y);
+      //     this.$bus.$emit('ScaleImageSize', ScaleImageSize_X, ScaleImageSize_Y);
 
-          lastX = event.touches[0].clientX;
-          lastY = event.touches[0].clientY;
-          if (this.isNotDrawStars) {
-            this.drawImageData(this.drawImgData);
-          } else {
-            if (this.detectStarsImg != null) {
-              this.drawImageData(this.detectStarsImg);
-            } else {
-              this.drawImageData(this.drawImgData);
-            }
-          }
-        }
-      }, 100); // 100 毫秒内最多执行一次
+      //     lastX = event.touches[0].clientX;
+      //     lastY = event.touches[0].clientY;
+      //     if (this.isNotDrawStars) {
+      //       this.drawImageData(this.drawImgData);
+      //     } else {
+      //       if (this.detectStarsImg != null) {
+      //         this.drawImageData(this.detectStarsImg);
+      //       } else {
+      //         this.drawImageData(this.drawImgData);
+      //       }
+      //     }
+      //   }
+      // }, 100); // 100 毫秒内最多执行一次
 
-      const throttledGesturechange = this.throttle((event) => {
-        event.preventDefault();
-        const delta = event.scale > 1 ? 0.1 : -0.1;
-        this.scale += delta;
-        this.scale = Math.min(Math.max(this.scale, 1), 3);
-        this.translateX = 0;
-        this.translateY = 0;
-        if (this.isNotDrawStars) {
-          this.drawImageData(this.drawImgData);
-        } else {
-          if (this.detectStarsImg != null) {
-            this.drawImageData(this.detectStarsImg);
-          } else {
-            this.drawImageData(this.drawImgData);
-          }
-        }
-        this.$bus.$emit('RedBoxScale', this.scale);
-        this.$bus.$emit('RedBoxOffset', 0, 0);
-      }, 100); // 100 毫秒内最多执行一次
+      // const throttledGesturechange = this.throttle((event) => {
+      //   event.preventDefault();
+      //   const delta = event.scale > 1 ? 0.1 : -0.1;
+      //   const oldScale = this.scale;
+      //   this.scale += delta;
+      //   this.scale = Math.min(Math.max(this.scale, 1), 3);
 
-      canvas.addEventListener('mousedown', (event) => {
-        event.preventDefault();
-        isDragging = true;
-        lastX = event.offsetX;
-        lastY = event.offsetY;
-        this.$bus.$emit('RedBox_XY', lastX, lastY);
-      });
+      //   // Adjust the position of the image according to the scale ratio
+      //   const scaleRatio = this.scale / oldScale;
+      //   this.translateX *= scaleRatio;
+      //   this.translateY *= scaleRatio;
 
-      canvas.addEventListener('mousemove', (event) => {
-        event.preventDefault();
-        if (isDragging) {
-          const windowWidth = window.innerWidth;
-          const windowHeight = window.innerHeight;
+      //   // Check if the image is out of bounds after scaling
+      //   const minTranslateX = this.imageWidth - this.CanvasWidth;
+      //   const minTranslateY = this.imageHeight - this.CanvasHeight;
+      //   this.translateX = Math.min(Math.max(this.translateX, -minTranslateX), 0);
+      //   this.translateY = Math.min(Math.max(this.translateY, -minTranslateY), 0);
 
-          const deltaX = (event.offsetX - lastX) * (this.imageWidth / windowWidth) / this.scale;
-          const deltaY = (event.offsetY - lastY) * (this.imageHeight / windowHeight) / this.scale;
+      //   if (this.isNotDrawStars) {
+      //     this.drawImageData(this.drawImgData);
+      //   } else {
+      //     if (this.detectStarsImg != null) {
+      //       this.drawImageData(this.detectStarsImg);
+      //     } else {
+      //       this.drawImageData(this.drawImgData);
+      //     }
+      //   }
+      //   this.$bus.$emit('RedBoxScale', this.scale);
+      //   this.$bus.$emit('RedBoxOffset', this.translateX, this.translateY);
+      // }, 100); // 100 毫秒内最多执行一次
 
-          this.translateX += deltaX;
-          this.translateY += deltaY;
+      // canvas.addEventListener('mousedown', (event) => {
+      //   event.preventDefault();
+      //   isDragging = true;
+      //   lastX = event.offsetX;
+      //   lastY = event.offsetY;
+      //   this.$bus.$emit('RedBox_XY', lastX, lastY);
+      // });
 
-          const minTranslateX = this.imageWidth - this.CanvasWidth;
-          const minTranslateY = this.imageHeight - this.CanvasHeight;
+      // canvas.addEventListener('mousemove', (event) => {
+      //   event.preventDefault();
+      //   if (isDragging) {
+      //     const windowWidth = window.innerWidth;
+      //     const windowHeight = window.innerHeight;
 
-          this.translateX = Math.min(Math.max(this.translateX, -minTranslateX), 0);
-          this.translateY = Math.min(Math.max(this.translateY, -minTranslateY), 0);
+      //     const deltaX = (event.offsetX - lastX) * (this.imageWidth / windowWidth) / this.scale;
+      //     const deltaY = (event.offsetY - lastY) * (this.imageHeight / windowHeight) / this.scale;
 
-          console.log('Move to: ' + this.translateX + ', ' + this.translateY);
-          this.$bus.$emit('RedBoxOffset', Math.floor(-this.translateX / this.CanvasWidth * windowWidth), Math.floor(-this.translateY / this.CanvasHeight * windowHeight));
+      //     this.translateX += deltaX;
+      //     this.translateY += deltaY;
 
-          const ScaleImageSize_X = Math.floor(minTranslateX / this.CanvasWidth * windowWidth + windowWidth);
-          const ScaleImageSize_Y = Math.floor(minTranslateY / this.CanvasHeight * windowHeight + windowHeight);
-          // console.log('ScaleImageSize: ' + ScaleImageSize_X + ', ' + ScaleImageSize_Y);
-          this.$bus.$emit('ScaleImageSize', ScaleImageSize_X, ScaleImageSize_Y);
+      //     const minTranslateX = this.imageWidth - this.CanvasWidth;
+      //     const minTranslateY = this.imageHeight - this.CanvasHeight;
 
-          lastX = event.offsetX;
-          lastY = event.offsetY;
-          if (this.isNotDrawStars) {
-            this.drawImageData(this.drawImgData);
-          } else {
-            if (this.detectStarsImg != null) {
-              this.drawImageData(this.detectStarsImg);
-            } else {
-              this.drawImageData(this.drawImgData);
-            }
-          }
-        }
-      });
+      //     this.translateX = Math.min(Math.max(this.translateX, -minTranslateX), 0);
+      //     this.translateY = Math.min(Math.max(this.translateY, -minTranslateY), 0);
 
-      canvas.addEventListener('mouseup', () => { isDragging = false; });
+      //     console.log('Move to: ' + this.translateX + ', ' + this.translateY);
+      //     this.$bus.$emit('RedBoxOffset', Math.floor(-this.translateX / this.CanvasWidth * windowWidth), Math.floor(-this.translateY / this.CanvasHeight * windowHeight));
 
-      canvas.addEventListener('wheel', (event) => {
-        event.preventDefault();
-        const oldScale = this.scale;
-        const delta = event.deltaY > 0 ? -0.1 : 0.1;
-        this.scale += delta;
-        this.scale = Math.min(Math.max(this.scale, 1), 3);
+      //     const ScaleImageSize_X = Math.floor(minTranslateX / this.CanvasWidth * windowWidth + windowWidth);
+      //     const ScaleImageSize_Y = Math.floor(minTranslateY / this.CanvasHeight * windowHeight + windowHeight);
+      //     // console.log('ScaleImageSize: ' + ScaleImageSize_X + ', ' + ScaleImageSize_Y);
+      //     this.$bus.$emit('ScaleImageSize', ScaleImageSize_X, ScaleImageSize_Y);
 
-        // 计算缩放前后的差异，并调整 translateX 和 translateY
-        const scaleRatio = this.scale / oldScale;
-        this.translateX = scaleRatio * (this.translateX - event.offsetX) + event.offsetX;
-        this.translateY = scaleRatio * (this.translateY - event.offsetY) + event.offsetY;
+      //     lastX = event.offsetX;
+      //     lastY = event.offsetY;
+      //     if (this.isNotDrawStars) {
+      //       this.drawImageData(this.drawImgData);
+      //     } else {
+      //       if (this.detectStarsImg != null) {
+      //         this.drawImageData(this.detectStarsImg);
+      //       } else {
+      //         this.drawImageData(this.drawImgData);
+      //       }
+      //     }
+      //   }
+      // });
 
-        if (this.isNotDrawStars) {
-          this.drawImageData(this.drawImgData);
-        } else {
-          if (this.detectStarsImg != null) {
-            this.drawImageData(this.detectStarsImg);
-          } else {
-            this.drawImageData(this.drawImgData);
-          }
-        }
-        this.$bus.$emit('RedBoxScale', this.scale);
-        this.$bus.$emit('RedBoxOffset', this.translateX, this.translateY);
-      });
+      // canvas.addEventListener('mouseup', () => { isDragging = false; });
 
-      // 添加触摸事件监听
-      canvas.addEventListener('touchstart', (event) => {
-        event.preventDefault();
-        isDragging = true;
-        lastX = event.touches[0].clientX;
-        lastY = event.touches[0].clientY;
-        this.$bus.$emit('RedBox_XY', event);
-      });
+      // canvas.addEventListener('wheel', (event) => {
+      //   event.preventDefault(); // 阻止默认事件，例如页面滚动
 
-      canvas.addEventListener('touchmove', throttledTouchMove);
+      //   const oldScale = this.scale; // 保存旧的缩放级别
 
-      canvas.addEventListener('touchend', () => { isDragging = false; });
+      //   // 根据滚轮的滚动方向计算缩放的增量，向前滚动为放大，向后滚动为缩小
+      //   const delta = event.deltaY > 0 ? -0.1 : 0.1;
 
-      // 添加缩放功能
-      canvas.addEventListener('gesturechange', throttledGesturechange);
+      //   // 更新缩放级别
+      //   this.scale += delta;
+
+      //   // 确保缩放级别在1到3之间
+      //   this.scale = Math.min(Math.max(this.scale, 1), 3);
+
+      //   // 计算缩放前后的差异，并根据差异调整图像的位置
+      //   const scaleRatio = this.scale / oldScale;
+      //   this.translateX = scaleRatio * (this.translateX - event.offsetX) + event.offsetX;
+      //   this.translateY = scaleRatio * (this.translateY - event.offsetY) + event.offsetY;
+
+      //   // 根据当前的状态（是否显示星星），选择正确的图像数据进行绘制
+      //   if (this.isNotDrawStars) {
+      //     this.drawImageData(this.drawImgData);
+      //   } else {
+      //     if (this.detectStarsImg != null) {
+      //       this.drawImageData(this.detectStarsImg);
+      //     } else {
+      //       this.drawImageData(this.drawImgData);
+      //     }
+      //   }
+
+      //   // 发送事件，通知其他部分图像的新缩放级别和位置
+      //   this.$bus.$emit('RedBoxScale', this.scale);
+      //   this.$bus.$emit('RedBoxOffset', this.translateX, this.translateY);
+      // });
+      // // 添加触摸事件监听
+      // canvas.addEventListener('touchstart', (event) => {
+      //   event.preventDefault();
+      //   isDragging = true;
+      //   lastX = event.touches[0].clientX;
+      //   lastY = event.touches[0].clientY;
+      //   this.$bus.$emit('RedBox_XY', event);
+      // });
+
+      // canvas.addEventListener('touchmove', throttledTouchMove);
+
+      // canvas.addEventListener('touchend', () => { isDragging = false; });
+
+      // // 添加缩放功能
+      // canvas.addEventListener('gesturechange', throttledGesturechange);
     },
 
     // 节流函数
@@ -4581,8 +4813,10 @@ export default {
       this.sendMessage('Vue_Command', 'disconnectSelectDriver:' + this.currentDisconnectDriverName);
       this.showDisconnectDialog = false;
     },
+
+    // 主画布点击事件
     handleMainCanvasClick(event) {
-      if (!this.enableMainCanvasClick) return; // 如果画布不可点击，则不处理点击事件
+      if (!this.enableMainCanvasClick || this.isDragging) return; // 如果画布不可点击，则不处理点击事件
       console.log('触发鼠标点击事件:', event);
       const canvas = this.$refs.mainCanvas;
       if (!canvas) return; // 确保 canvas 元素存在
@@ -4591,17 +4825,27 @@ export default {
       const y = event.clientY - rect.top;
       console.log('Mouse clicked at:', x, y);
       if (!this.isFocusLoopShooting) {
-        this.$bus.$emit('setRedBoxPosition', x, y);
-        this.ROI_x = x / window.innerWidth * this.mainCameraSizeX;  // 计算ROI的x坐标
-        this.ROI_y = y / window.innerHeight * this.mainCameraSizeY; // 计算ROI的y坐标
+        this.ROI_x = (x / window.innerWidth * this.visibleWidth - this.RedBoxSideLength / 2) + this.visibleX - this.visibleWidth / 2;  // 计算ROI的x坐标
+        this.ROI_y = (y / window.innerHeight * this.visibleHeight - this.RedBoxSideLength / 2) + this.visibleY - this.visibleHeight / 2; // 计算ROI的y坐标
+        this.$bus.$emit('setRedBoxPosition', x, y, this.ROI_x, this.ROI_y);
       } else {
-        this.$bus.$emit('selectStar', x, y);
-        this.selectStarX = x / window.innerWidth * this.mainCameraSizeX; // 计算选择位置的x坐标
-        this.selectStarY = y / window.innerHeight * this.mainCameraSizeY; // 计算选择位置的y坐标
+        this.selectStarX = (x / window.innerWidth * this.visibleWidth); // 计算选择位置的x坐标
+        this.selectStarY = (y / window.innerHeight * this.visibleWidth); // 计算选择位置的y坐标
+
+        if (this.selectStarX >= 0 && this.selectStarX < this.visibleWidth &&
+          this.selectStarY >= 0 && this.selectStarY < this.visibleWidth) {
+          this.SendConsoleLogMsg('Select Star is in ROI', 'info');
+        } else {
+          this.SendConsoleLogMsg('Select Star is not in ROI', 'error');
+          this.selectStarX = -1;
+          this.selectStarY = -1;
+        }
       }
     },
+
+    // 主画布触摸事件
     handleMainCanvasTouch(event) {
-      if (!this.enableMainCanvasClick) return; // 如果画布不可点击，则不处理点击事件
+      if (!this.enableMainCanvasClick || this.isDragging) return; // 如果画布不可点击，则不处理点击事件
       console.log('触发触摸事件:', event);
       if (!this.enableMainCanvasClick || !event.touches || event.touches.length === 0) return;
       const canvas = this.$refs.mainCanvas;
@@ -4613,15 +4857,15 @@ export default {
       console.log('Touch at:', x, y);
       event.preventDefault();// 阻止默认事件，如页面滚动
       if (!this.isFocusLoopShooting) {
-        this.$bus.$emit('setRedBoxPosition', x, y);
-        this.ROI_x = x / window.innerWidth * this.mainCameraSizeX;  // 计算ROI的x坐标
-        this.ROI_y = y / window.innerHeight * this.mainCameraSizeY; // 计算ROI的y坐标
+        this.ROI_x = (x / window.innerWidth * this.visibleWidth - this.RedBoxSideLength / 2) + this.visibleX - this.visibleWidth / 2;  // 计算ROI的x坐标
+        this.ROI_y = (y / window.innerHeight * this.visibleHeight - this.RedBoxSideLength / 2) + this.visibleY - this.visibleHeight / 2; // 计算ROI的y坐标
+        this.$bus.$emit('setRedBoxPosition', x, y, this.ROI_x, this.ROI_y);
       } else {
-        this.selectStarX = x / window.innerWidth * this.mainCameraSizeX; // 计算选择位置的x坐标
-        this.selectStarY = y / window.innerHeight * this.mainCameraSizeY; // 计算选择位置的y坐标
+        this.selectStarX = (x / window.innerWidth * this.visibleWidth); // 计算选择位置的x坐标
+        this.selectStarY = (y / window.innerHeight * this.visibleWidth); // 计算选择位置的y坐标
 
-        if (this.selectStarX > this.ROI_x - this.RedBoxSideLength/2 && this.selectStarX < this.ROI_x + this.RedBoxSideLength/2 &&
-            this.selectStarY > this.ROI_y - this.RedBoxSideLength/2 && this.selectStarY < this.ROI_y + this.RedBoxSideLength/2) {
+        if (this.selectStarX >= 0 && this.selectStarX < this.visibleWidth &&
+          this.selectStarY >= 0 && this.selectStarY < this.visibleWidth) {
           this.SendConsoleLogMsg('Select Star is in ROI', 'info');
         } else {
           this.SendConsoleLogMsg('Select Star is not in ROI', 'error');
@@ -4630,6 +4874,164 @@ export default {
         }
       }
     },
+
+    // 主画布拖动
+    handleMouseDown(event) {
+      if (this.isDragging) return;
+      this.isDragging = true;
+      this.startX = event.clientX;
+      this.startY = event.clientY;
+
+      // 设置一个定时器，每100ms执行一次鼠标移动的逻辑
+      this.moveIntervalId = setInterval(() => {
+        if (!this.isDragging) return;
+
+        const dx = this.startX - this.currentX;
+        const dy = this.startY - this.currentY;
+        if (isNaN(dx) || isNaN(dy)) {
+          return;
+        }
+        let newVisibleX = this.visibleX + dx / window.innerWidth * this.mainCameraSizeX;
+        let newVisibleY = this.visibleY + dy / window.innerHeight * this.mainCameraSizeY;
+        if (newVisibleX < 0) {
+          newVisibleX = 0;
+        }
+        if (newVisibleY < 0) {
+          newVisibleY = 0;
+        }
+        if (newVisibleX > this.mainCameraSizeX) {
+          newVisibleX = this.mainCameraSizeX;
+        }
+        if (newVisibleY > this.mainCameraSizeY) {
+          newVisibleY = this.mainCameraSizeY;
+        }
+
+        this.visibleX = newVisibleX;
+        this.visibleY = newVisibleY;
+
+        this.startX = this.currentX;
+        this.startY = this.currentY;
+        this.drawImageData();
+        this.SendConsoleLogMsg('拖动事件,拖动距离:' + dx + ',' + dy, 'info');
+      }, 100);
+    },
+    handleMouseMove(event) {
+      if (!this.isDragging) return;
+      this.currentX = event.clientX;
+      this.currentY = event.clientY;
+    },
+    handleMouseUp(event) {
+      this.isDragging = false;
+
+      // 清除定时器
+      clearInterval(this.moveIntervalId);
+      this.moveIntervalId = null;
+    },
+    handleWheel(event) {
+      const scaleChange = event.deltaY > 0 ? 0.1 : -0.1; // 根据滚轮的滚动方向，计算缩放比例的变化量
+      let newScale = this.scale + scaleChange; // 更新缩放比例
+      if (newScale < 0.1) {
+        newScale = 0.1;
+      }
+      if (newScale > 1) {
+        newScale = 1;
+      }
+
+      // 如果已经有一个待执行的缩放操作，则直接返回
+      if (this.pendingScaleChange) {
+        return;
+      }
+
+      // 标记有一个待执行的缩放操作
+      this.pendingScaleChange = true;
+
+      // 使用 requestAnimationFrame 来控制缩放操作的执行频率
+      requestAnimationFrame(() => {
+        if (newScale != this.scale) {
+          this.scale = newScale; // 更新缩放比例
+          this.drawImageData();
+          this.SendConsoleLogMsg('缩放比例变化,缩放比例:' + newScale, 'info');
+        } else {
+          this.SendConsoleLogMsg('缩放比例没有变化,缩放比例:' + this.scale, 'info');
+        }
+        this.pendingScaleChange = false; // 清除待执行的缩放操作标记
+      });
+    },
+    handleTouchStart(event) {
+      if (event.touches.length === 1) { // 单指触摸，开始拖动
+        this.SendConsoleLogMsg('触发单指触摸事件', 'info');
+        this.isDragging = true;
+        this.startX = event.touches[0].clientX;
+        this.startY = event.touches[0].clientY;
+
+        // 设置一个定时器，每100ms执行一次触摸移动的逻辑
+        this.moveIntervalId = setInterval(() => {
+          if (!this.isDragging) return;
+
+          const dx = event.touches[0].clientX - this.startX;
+          const dy = event.touches[0].clientY - this.startY;
+
+          this.visibleX += dx / window.innerWidth * this.mainCameraSizeX;
+          this.visibleY += dy / window.innerHeight * this.mainCameraSizeY;
+
+          this.startX = event.touches[0].clientX;
+          this.startY = event.touches[0].clientY;
+          this.drawImageData();
+        }, 100);
+      } else if (event.touches.length === 2) { // 双指触摸，开始缩放
+        this.SendConsoleLogMsg('触发双指触摸事件', 'info');
+        this.isDragging = true;
+        // 计算两个触摸点之间的距离
+        const dx = event.touches[0].clientX - event.touches[1].clientX;
+        const dy = event.touches[0].clientY - event.touches[1].clientY;
+        this.startDistance = Math.sqrt(dx * dx + dy * dy);
+
+        // 设置一个定时器，每100ms执行一次缩放逻辑
+        this.zoomIntervalId = setInterval(() => {
+          if (!this.isDragging) return;
+          const dx = event.touches[0].clientX - event.touches[1].clientX;
+          const dy = event.touches[0].clientY - event.touches[1].clientY;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          if (this.startDistance == 0) {
+            this.startDistance = distance;
+          }
+          // 计算缩放比例的变化量
+          const scaleChange = distance / this.startDistance;
+          let newScale = this.scale * scaleChange; // 更新缩放比例
+          if (newScale < 0.1) {
+            newScale = 0.1;
+          }
+          if (newScale > 1) {
+            newScale = 1;
+          }
+          if (newScale != this.scale) {
+            this.SendConsoleLogMsg('缩放比例变化,缩放比例:' + newScale, 'info');
+            this.scale = newScale; // 更新缩放比例
+            this.drawImageData();
+          } else {
+            this.SendConsoleLogMsg('缩放比例没有变化,缩放比例:' + this.scale, 'info');
+          }
+          this.startDistance = distance; // 更新两个触摸点之间的距离
+        }, 100);
+      } else {
+        this.SendConsoleLogMsg('触发多指触摸事件，获取当前触摸点数量:' + event.touches.length, 'info');
+      }
+    },
+    handleTouchEnd(event) {
+      this.isDragging = false; // 停止拖动
+      // 清除定时器
+      if (this.moveIntervalId) {
+        clearInterval(this.moveIntervalId);
+        this.moveIntervalId = null;
+      }
+      if (this.zoomIntervalId) {
+        clearInterval(this.zoomIntervalId);
+        this.zoomIntervalId = null;
+      }
+    },
+
+
+    // 显示ROI图像
     showRoiImage(fileName, destX, destY) {
       if (this.RedBoxSideLength == 0 || this.RedBoxSideLength == null) {
         this.SendConsoleLogMsg('RedBoxSideLength is 0 or null', 'error');
@@ -4641,151 +5043,85 @@ export default {
       }
       this.isProcessingImage = true;
       const imagePath = 'img/' + fileName;
+      // 创建一个AbortController实例来取消fetch请求
+      const fetchController = new AbortController();
+      const fetchSignal = fetchController.signal;
 
-      const canvas = this.$refs.mainCanvas;
-      if (canvas.getContext) {
-        const ctx = canvas.getContext('2d');
-        const windowWidth = window.innerWidth;
-        const windowHeight = window.innerHeight;
-        const canvasWidth = canvas.width;
-        const canvasHeight = canvas.height;
-        const CameraHeight = this.mainCameraSizeY;
-        const CameraWidth = this.mainCameraSizeX;
+      // 使用 fetch API 获取二进制数据
+      fetch(imagePath, { cache: 'no-store', signal: fetchSignal })
+        .then(response => response.arrayBuffer())
+        .then(buffer => {
+          let src, originalImg8, imgData, awbImg;
+          try {
+            const uint16Array = new Uint16Array(buffer);
+            // 创建一个空的 Mat 对象
+            src = new cv.Mat(this.RedBoxSideLength, this.RedBoxSideLength, cv.CV_16UC1);
+            src.data16U.set(uint16Array);
+            cv.cvtColor(src, src, this.lastImageProcessParams.cvmode);
+            originalImg8 = this.Bit16To8_Stretch(src, this.lastImageProcessParams.B, this.lastImageProcessParams.W);
 
-        // 创建一个AbortController实例来取消fetch请求
-        const fetchController = new AbortController();
-        const fetchSignal = fetchController.signal;
+            src.delete(); // 释放原始的 Mat 对象
+            src = null; // 添加这行代码，确保 src 对象被清理
 
-        // 使用 fetch API 获取二进制数据
-        fetch(imagePath, { cache: 'no-store', signal: fetchSignal })
-          .then(response => response.arrayBuffer())
-          .then(buffer => {
-            let src, originalImg8, imgData, awbImg;
-            try {
-              const uint16Array = new Uint16Array(buffer);
-              // 创建一个空的 Mat 对象
-              src = new cv.Mat(this.RedBoxSideLength, this.RedBoxSideLength, cv.CV_16UC1);
-              src.data16U.set(uint16Array);
-              cv.cvtColor(src, src, this.lastImageProcessParams.cvmode);
-              originalImg8 = this.Bit16To8_Stretch(src, this.lastImageProcessParams.B, this.lastImageProcessParams.W);
+            awbImg = this.ImageSoftAWB(originalImg8, this.lastImageProcessParams.gainR, this.lastImageProcessParams.gainB, this.lastImageProcessParams.offset);
+            originalImg8.delete(); // 释放 Mat 对象
+            originalImg8 = null; // 添加这行代码，确保 originalImg8 对象被清理
 
-              // 只清除目标区域
-              ctx.clearRect(destX / windowWidth * canvasWidth, destY / windowHeight * canvasHeight, src.cols / CameraWidth * canvasWidth, src.rows / CameraHeight * canvasHeight);
-              src.delete(); // 释放原始的 Mat 对象
+            // 将 Mat 对象转换回 ImageData 对象
+            imgData = new ImageData(new Uint8ClampedArray(awbImg.data), awbImg.cols, awbImg.rows);
+            awbImg.delete(); // 释放 Mat 对象
+            awbImg = null; // 添加这行代码，确保 awbImg 对象被清理
+            // 在指定位置开始绘制图像
+            this.bufferCtx.clearRect(this.ROI_x, this.ROI_y, this.RedBoxSideLength, this.RedBoxSideLength);
+            this.bufferCtx.putImageData(imgData, this.ROI_x, this.ROI_y);
+            this.drawImageData();
+            this.focuserPictureFileName = fileName;
+
+          } catch (error) {
+            console.error(`处理图像失败: ${imagePath}`, error);
+          } finally {
+            // 确保 Mat 对象和 ImageData 对象被删除
+            if (src && !src.isDeleted()) {
+              src.delete();
               src = null; // 添加这行代码，确保 src 对象被清理
-
-              awbImg = this.ImageSoftAWB(originalImg8, this.lastImageProcessParams.gainR, this.lastImageProcessParams.gainB, this.lastImageProcessParams.offset);
-              originalImg8.delete(); // 释放 Mat 对象
+            }
+            if (originalImg8 && !originalImg8.isDeleted()) {
+              originalImg8.delete();
               originalImg8 = null; // 添加这行代码，确保 originalImg8 对象被清理
-
-              // 将 Mat 对象转换回 ImageData 对象
-              imgData = new ImageData(new Uint8ClampedArray(awbImg.data), awbImg.cols, awbImg.rows);
-              awbImg.delete(); // 释放 Mat 对象
+            }
+            if (awbImg && !awbImg.isDeleted()) {
+              awbImg.delete();
               awbImg = null; // 添加这行代码，确保 awbImg 对象被清理
-              // 在指定位置开始绘制图像
-              ctx.putImageData(imgData, destX / windowWidth * canvasWidth, destY / windowHeight * canvasHeight);
-              this.focuserPictureFileName = fileName;
-
-              // 如果选择了星点，则根据选择位置，在ROI区域中绘制一个圆
-              if (this.selectStarX != -1 && this.selectStarY != -1) {
-                let radius, canvasStarX, canvasStarY, color;
-
-                // 如果有星点
-                if (this.focuserROIStarsList.length > 0) {
-                  // 计算每个星点与选择位置的距离
-                  const distances = this.focuserROIStarsList.map(item => {
-                    const dx = (this.ROI_x - (this.RedBoxSideLength - item.x)) - this.selectStarX; // 计算星点与选择位置的x距离 
-                    const dy = (this.ROI_y - (this.RedBoxSideLength - item.y)) - this.selectStarY; // 计算星点与选择位置的y距离
-                    return Math.sqrt(dx * dx + dy * dy); // 计算星点与选择位置的距离
-                  });
-
-                  // 找到距离最小的星点
-                  const minDistanceIndex = distances.indexOf(Math.min(...distances));
-                  const closestStar = this.focuserROIStarsList[minDistanceIndex];
-
-                  // 设置阈值
-                  const threshold = 50; // 如果选择位置与星点距离小于阈值，则选择这个星点
-
-                  if (distances[minDistanceIndex] < threshold) {
-                    // 如果距离最小的星点的距离小于阈值，那么选择这个星点
-                    radius = closestStar.HFR;
-                    canvasStarX = (this.ROI_x - (this.RedBoxSideLength - closestStar.x)) / this.mainCameraSizeX * canvasWidth;
-                    canvasStarY = (this.ROI_y - (this.RedBoxSideLength - closestStar.y)) / this.mainCameraSizeY * canvasHeight;
-                    color = 'green'; // 有星点，绘制绿色的圆
-
-                    // 更新选择位置为星点位置
-                    this.selectStarX = (this.ROI_x - (this.RedBoxSideLength - closestStar.x)) / this.mainCameraSizeX * canvasWidth;
-                    this.selectStarY = (this.ROI_y - (this.RedBoxSideLength - closestStar.y)) / this.mainCameraSizeY * canvasHeight;
-                  } else {
-                    // 否则，在选择的位置绘制一个圆
-                    radius = 10; // 你可以根据需要调整这个值
-                    canvasStarX = this.selectStarX;
-                    canvasStarY = this.selectStarY;
-                    color = 'red'; // 无星点，绘制红色的圆
-                  }
-                } else {
-                  // 如果没有星点，也在选择的位置绘制一个圆
-                  radius = 10; // 你可以根据需要调整这个值
-                  canvasStarX = this.selectStarX;
-                  canvasStarY = this.selectStarY;
-                  color = 'red'; // 无星点，绘制红色的圆
-                }
-
-                // 获取绘制圆的位置的图像数据
-                const imageData = ctx.getImageData(canvasStarX - radius, canvasStarY - radius, 2 * radius, 2 * radius);
-                // 发送图像数据给显示框
-                this.$bus.$emit('selectStarImage', imageData);
-
-                // 在指定位置开始绘制圆
-                ctx.beginPath();
-                ctx.arc(canvasStarX, canvasStarY, radius, 0, 2 * Math.PI);
-                ctx.strokeStyle = color;
-                ctx.stroke();
-                ctx.closePath();
-              }
-            } catch (error) {
-              console.error(`处理图像失败: ${imagePath}`, error);
-            } finally {
-              // 确保 Mat 对象和 ImageData 对象被删除
-              if (src && !src.isDeleted()) {
-                src.delete();
-                src = null; // 添加这行代码，确保 src 对象被清理
-              }
-              if (originalImg8 && !originalImg8.isDeleted()) {
-                originalImg8.delete();
-                originalImg8 = null; // 添加这行代码，确保 originalImg8 对象被清理
-              }
-              if (awbImg && !awbImg.isDeleted()) {
-                awbImg.delete();
-                awbImg = null; // 添加这行代码，确保 awbImg 对象被清理
-              }
-              // 确保 buffer 被清理
-              buffer = null;
-              this.isProcessingImage = false;
             }
-          })
-          .catch(error => {
-            if (error.name === 'AbortError') {
-              console.log('Fetch request cancelled');
-            } else {
-              console.error(`获取图像失败: ${imagePath}`, error);
-            }
+            // 确保 buffer 被清理
+            buffer = null;
             this.isProcessingImage = false;
-          });
-
-        // 在组件卸载时取消 fetch 请求
-        this.$once('hook:beforeDestroy', () => {
-          fetchController.abort();
+          }
+        })
+        .catch(error => {
+          if (error.name === 'AbortError') {
+            console.log('Fetch request cancelled');
+          } else {
+            console.error(`获取图像失败: ${imagePath}`, error);
+          }
+          this.isProcessingImage = false;
         });
-      }
+
+      // 在组件卸载时取消 fetch 请求
+      this.$once('hook:beforeDestroy', () => {
+        fetchController.abort();
+      });
     },
-    setRedBoxSideLength(length) {
-      this.SendConsoleLogMsg('setRedBoxSideLength:' + length, 'info');
+    setRedBoxState(length, x, y) {
+      this.SendConsoleLogMsg('setRedBoxState:' + length + ',' + x + ',' + y, 'info');
       this.RedBoxSideLength = parseInt(length);
+      this.ROI_x = x;
+      this.ROI_y = y;
       let redBoxSideLengthItem = this.MainCameraConfigItems.find(item => item.label === 'RedBox Side Length (px)');
       if (redBoxSideLengthItem) {
         redBoxSideLengthItem.value = length;
       }
+      this.$bus.$emit('setRedBoxPosition', x, y, this.ROI_x, this.ROI_y);
     },
     setFocuserState(state) {
       if (state === 'selectstars') {
@@ -4793,6 +5129,9 @@ export default {
       } else {
         this.isFocusLoopShooting = false;
       }
+    },
+    setShowSelectStar(state) {
+      this.showSelectStar = state;
     },
   },
   computed: {

@@ -61,12 +61,12 @@
           </span>
         </button>
 
-        <button @click="FocusGoto" @touchend="active" class="get-click btn-Goto">
+        <!-- <button @click="FocusGoto" @touchend="active" class="get-click btn-Goto">
           <div style="display: flex; justify-content: center; align-items: center;">
             <img src="@/assets/images/svg/ui/Move.svg" height="10px"
               style="min-height: 10px; pointer-events: none;"></img>
           </div>
-        </button>
+        </button> -->
         <!-- <button :disabled="isBtnMoveDisabled" @click="FocusRightMove" @touchend="active" class="get-click btn-Right">
           <div style="display: flex; justify-content: center; align-items: center;">
             <img src="@/assets/images/svg/ui/arrow-right-circle.svg" height="20px"
@@ -82,7 +82,7 @@
           </div>
         </button>
 
-        <button @click="StepsChange" @touchend="active" class="get-click btn-Steps">
+        <!-- <button @click="StepsChange" @touchend="active" class="get-click btn-Steps">
           <span v-if="MoveSteps === 100">
             <div style="display: flex; justify-content: center; align-items: center;">
               <img src="@/assets/images/svg/ui/step_100.svg" height="25px"
@@ -114,7 +114,7 @@
             </div>
           </span>
         </button>
-      </div>
+      </div> -->
 
       <div class="Canvas-Bar">
         <canvas ref="FocusCanvas" id="Focus-Canvas"></canvas>
@@ -252,6 +252,7 @@ export default {
     },
 
     FocusMove(direction) {
+      if (this.inAutoFocus) return;
       this.isBtnMoveDisabled = true;
       if (direction === 'left') {
         this.$bus.$emit('FocusInProgress', true);
@@ -362,21 +363,26 @@ export default {
       this.$bus.$emit('disableCaptureButton', this.isLoopActive);
       if (this.isLoopActive) {
         this.$bus.$emit('setFocuserState', 'selectstars'); // 设置焦距状态为选择星点
+        this.$bus.$emit('setShowSelectStar', true);
       } else {
         this.$bus.$emit('setFocuserState', 'setROI'); // 设置焦距状态为设置ROI区域
+        this.$bus.$emit('setShowSelectStar', false);
       }
     },
     startFocusLoopSjootingfile(message) {
       this.isLoopActive = false;
       this.$bus.$emit('disableCaptureButton', this.isLoopActive);
       this.$bus.$emit('SendConsoleLogMsg', message, 'warning');
+      this.$bus.$emit('setShowSelectStar', false);
     },
     setFocuserLoopingState(state) {
       if (state === 'true') {
         this.isLoopActive = true;
+        this.$bus.$emit('setShowSelectStar', true);
       }
       else {
         this.isLoopActive = false;
+        this.$bus.$emit('setShowSelectStar', false);
       }
       this.$bus.$emit('disableCaptureButton', this.isLoopActive);
     },

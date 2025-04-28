@@ -231,9 +231,14 @@ export default {
       this.isLongPress = false;
     },
 
-    setInProgress() {
-      this.progress = 0.99;
-      this.isClicked = true;
+    setInProgress(state) {
+      if(state === 'True'){
+        this.progress = 0.99;
+        this.isClicked = true;
+      } else {
+        this.progress = 0;
+        this.isClicked = false;
+      }
     },
 
     MainCameraConnected(num) {

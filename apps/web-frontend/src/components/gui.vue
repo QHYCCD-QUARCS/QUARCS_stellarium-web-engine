@@ -318,9 +318,7 @@
 
           <v-card-text v-show="showDSLRsTips" style="margin-top: -40px;">
             <span style="font-size: 10px; color: #2C9DDE; user-select: none; text-align: center; width: 100%;">
-              {{ $t('This is a one-time setup. You can obtain these values from your camera manual or from online
-              sources
-              such as www.digicamdb.com.') }}
+              {{ $t('This is a one-time setup. You can obtain these values from your camera manual or from online sources such as www.digicamdb.com.') }}
             </span>
           </v-card-text>
 
@@ -571,17 +569,17 @@ export default {
     this.$bus.$on('toggleRPIHotspotDialog', this.toggleRPIHotspotDialog);
     this.$bus.$on('toggleDateTimePicker', this.toggleDateTimePicker);
     // this.$bus.$on('RedBoxClick', this.handleTouchOrMouseDown);
-    this.$bus.$on('RedBox_XY', this.RedBox_XY);
-    this.$bus.$on('RedBoxOffset', this.setRedBoxOffset);
-    this.$bus.$on('RedBoxScale', this.SetRedBoxScale);
-    this.$bus.$on('ScaleImageSize', this.setScaleImageSize);
+    // this.$bus.$on('RedBox_XY', this.RedBox_XY);
+    // this.$bus.$on('RedBoxOffset', this.setRedBoxOffset);
+    // this.$bus.$on('RedBoxScale', this.SetRedBoxScale);
+    // this.$bus.$on('ScaleImageSize', this.setScaleImageSize);
     this.$bus.$on('CalibratePolarAxisMode', this.CalibratePolarAxisMode);
     this.$bus.$on('showSolveImage', this.showSolveImage);
     this.$bus.$on('HideSingleSolveBtn', this.HideSingleSolveBtn);
     this.$bus.$on('ShowAzAltText', this.ShowAzAltText);
     this.$bus.$on('ShowCurrentAzAltText', this.ShowCurrentAzAltText);
     this.$bus.$on('ShowConfirmDialog', this.ShowConfirmDialog);
-    this.$bus.$on('CameraInExposuring', this.SwitchMainPage);
+    // this.$bus.$on('CameraInExposuring', this.SwitchMainPage);
     this.$bus.$on('ShowCaptureImageProgress', this.ShowCaptureImageProgress);
     this.$bus.$on('PHD2BoxPosition', this.PHD2BoxPosition);
     this.$bus.$on('ClearPHD2MultiStars', this.ClearPHD2MultiStars);
@@ -601,7 +599,8 @@ export default {
     this.$bus.$on('setParsingProgress', this.setParsingProgress);
     this.$bus.$on('LoopSolveImageFinished', this.LoopSolveImageFinished);
     this.$bus.$on('setRedBoxPosition', this.setRedBoxPosition);
-    this.$bus.$on('getRedBoxSideLength', this.getRedBoxSideLength);
+    this.$bus.$on('setRedBoxLength', this.setRedBoxLength);
+    this.$bus.$on('getRedBoxState', this.getRedBoxState);
     this.$bus.$on('selectStar', this.selectStar);
   },
   mounted() {
@@ -734,26 +733,26 @@ export default {
 
     },
 
-    RedBox_XY(event) {
-      if (this.isRedBoxMode) {
-        // this.mouseX = X;
-        // this.mouseY = Y;
-        this.handleTouchOrMouseDown(event);
-      }
-    },
+    // RedBox_XY(event) {
+    //   if (this.isRedBoxMode) {
+    //     // this.mouseX = X;
+    //     // this.mouseY = Y;
+    //     this.handleTouchOrMouseDown(event);
+    //   }
+    // },
 
-    setRedBoxOffset(X, Y) {
-      this.RedBoxOffset_X = X;
-      this.RedBoxOffset_Y = Y;
-      // console.log('RedBoxOffset:', this.RedBoxOffset_Y);
-      this.mouseX = this.mouseX_ - this.RedBoxOffset_X;
-      this.mouseY = this.mouseY_ - this.RedBoxOffset_Y;
-    },
+    // setRedBoxOffset(X, Y) {
+    //   this.RedBoxOffset_X = X;
+    //   this.RedBoxOffset_Y = Y;
+    //   // console.log('RedBoxOffset:', this.RedBoxOffset_Y);
+    //   this.mouseX = this.mouseX_ - this.RedBoxOffset_X;
+    //   this.mouseY = this.mouseY_ - this.RedBoxOffset_Y;
+    // },
 
-    SetRedBoxScale(value) {
-      this.RedBoxWidth = this.RedBoxWidth_ * value;
-      this.RedBoxHeight = this.RedBoxHeight_ * value;
-    },
+    // SetRedBoxScale(value) {
+    //   this.RedBoxWidth = this.RedBoxWidth_ * value;
+    //   this.RedBoxHeight = this.RedBoxHeight_ * value;
+    // },
 
     SetBinningNum(num) {
       // this.BinningNum = num;
@@ -802,69 +801,72 @@ export default {
       }
     },
 
-    setScaleImageSize(width, height) {
-      this.ScaleImageWidth = width;
-      this.ScaleImageHeight = height;
-      // console.log('ScaleImageSize: ' + this.ScaleImageWidth + ', ' + this.ScaleImageHeight);
-    },
+    // setScaleImageSize(width, height) {
+    //   this.ScaleImageWidth = width;
+    //   this.ScaleImageHeight = height;
+    //   // console.log('ScaleImageSize: ' + this.ScaleImageWidth + ', ' + this.ScaleImageHeight);
+    // },
 
-    setRedBoxPosition(x, y) {
-      let xisside = 0;
-      let yisside = 0;
+    setRedBoxPosition(x, y,ROI_x,ROI_y) {
       // 计算 RedBox 的中心位置
       const halfBoxWidth = Math.floor(this.RedBoxWidth / 2);
       const halfBoxHeight = Math.floor(this.RedBoxHeight / 2);
 
-      // 确保 RedBox 中心坐标 (x, y) 不会使 RedBox 超出画布边界
-      const windowWidth = window.innerWidth;
-      const windowHeight = window.innerHeight;
+      // // 确保 RedBox 中心坐标 (x, y) 不会使 RedBox 超出画布边界
+      // const windowWidth = window.innerWidth;
+      // const windowHeight = window.innerHeight;
 
-      // 调整 x 和 y 使得 RedBox 保持在画布内
-      if (x - halfBoxWidth < 0) {
-        x = halfBoxWidth;
-        xisside = 1;
-      } else if (x + halfBoxWidth > windowWidth) {
-        x = windowWidth - halfBoxWidth;
-        xisside = 2;
-      }
+      // // 调整 x 和 y 使得 RedBox 保持在画布内
+      // if (x - halfBoxWidth < 0) {
+      //   x = halfBoxWidth;
+      //   xisside = 1;
+      // } else if (x + halfBoxWidth > windowWidth) {
+      //   x = windowWidth - halfBoxWidth;
+      //   xisside = 2;
+      // }
 
-      if (y - halfBoxHeight < 0) {
-        y = halfBoxHeight;
-        yisside = 1;
-      } else if (y + halfBoxHeight > windowHeight) {
-        y = windowHeight - halfBoxHeight;
-        yisside = 2;
-      }
+      // if (y - halfBoxHeight < 0) {
+      //   y = halfBoxHeight;
+      //   yisside = 1;
+      // } else if (y + halfBoxHeight > windowHeight) {
+      //   y = windowHeight - halfBoxHeight;
+      //   yisside = 2;
+      // }
 
-      this.$bus.$emit('SendConsoleLogMsg', '图像偏移: x=' + this.RedBoxOffset_X + ',y=' + this.RedBoxOffset_Y, 'info');
+      // this.$bus.$emit('SendConsoleLogMsg', '图像偏移: x=' + this.RedBoxOffset_X + ',y=' + this.RedBoxOffset_Y, 'info');
 
-      if ((x - halfBoxWidth) % 2 != 0) {
-        if (xisside == 1) {
-          x = x + 1;
-        }
-        else if (xisside == 2) {
-          x = x - 1;
-        }
-      }
-      if ((y - halfBoxHeight) % 2 != 0) {
-        if (yisside == 1) {
-          y = y + 1;
-        }
-        else if (yisside == 2) {
-          y = y - 1;
-        }
-      }
+      // 计算中心点坐标
+      x = x - halfBoxWidth;
+      y = y - halfBoxHeight;
+
+      // 确保 RedBox 的中心坐标 (x, y) 是偶数
+      // if ((x - halfBoxWidth) % 2 != 0) {
+      //     x = x + 1;
+      // }
+      // if ((y - halfBoxHeight) % 2 != 0) {
+      //     y = y + 1;
+      // }
 
       // 更新 RedBox 的位置
-      this.mouseX = Math.floor(x - halfBoxWidth);
-      this.mouseX_ = Math.floor(x - halfBoxWidth);
-      this.mouseY = Math.floor(y - halfBoxHeight);
-      this.mouseY_ = Math.floor(y - halfBoxHeight);
+      this.mouseX = Math.floor(x);
+      this.mouseX_ = Math.floor(x);
+      this.mouseY = Math.floor(y);
+      this.mouseY_ = Math.floor(y);
 
       console.log('Updated RedBox position: ', this.mouseX, ',', this.mouseY);
+      
 
       // 发送更新位置的消息
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'RedBox:' + this.mouseX + ":" + this.mouseY + ":" + windowWidth + ":" + windowHeight);
+
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'setROIPosition:' + ROI_x + ":" + ROI_y);
+      // this.$bus.$emit('AppSendMessage', 'Vue_Command', 'RedBox:' + this.mouseX + ":" + this.mouseY + ":" + window.innerWidth + ":" + window.innerHeight);
+    },
+
+    setRedBoxLength(width, height) {
+      this.RedBoxWidth = width;
+      this.RedBoxWidth_ = width;
+      this.RedBoxHeight = height;
+      this.RedBoxHeight_ = height;
     },
 
     // handleTouchOrMouseDown(event) {
@@ -896,25 +898,27 @@ export default {
 
       this.RedBoxWidth = this.BoxSideLength * windowWidth / CameraWidth;
       this.RedBoxHeight = this.BoxSideLength * windowHeight / CameraHeight;
-      this.$bus.$emit('SendConsoleLogMsg', '设置小红框大小: ' + this.RedBoxWidth + ', ' + this.RedBoxHeight, 'info');
-      this.$bus.$emit('RedBoxSideLength', this.BoxSideLength);
+      // this.$bus.$emit('SendConsoleLogMsg', '设置小红框大小: ' + this.RedBoxWidth + ', ' + this.RedBoxHeight, 'info');
+      // this.$bus.$emit('RedBoxSideLength', this.BoxSideLength);
       this.ImageProportion = CameraWidth / CameraHeight;
       this.$bus.$emit('ImageProportion', this.ImageProportion);
-      // this.RedBoxHeight = this.RedBoxHeight * this.ImageProportion;
+      // // this.RedBoxHeight = this.RedBoxHeight * this.ImageProportion;
 
-      this.RedBoxWidth_ = this.RedBoxWidth;
-      this.RedBoxHeight_ = this.RedBoxHeight;
+      // this.RedBoxWidth_ = this.RedBoxWidth;
+      // this.RedBoxHeight_ = this.RedBoxHeight;
 
-      console.log('RedBoxSize:', this.RedBoxWidth, ', ', this.RedBoxHeight);
+      // console.log('RedBoxSize:', this.RedBoxWidth, ', ', this.RedBoxHeight);
 
       if (this.isInitRedBox === true) {
         // 将小红框置于界面中央
         this.mouseX = (windowWidth - this.RedBoxWidth) / 2; // 100是小红框的宽度
+        this.mouseX_ = (windowWidth - this.RedBoxWidth) / 2; // 100是小红框的宽度
         this.mouseY = (windowHeight - this.RedBoxHeight) / 2; // 100是小红框的高度
+        this.mouseY_ = (windowHeight - this.RedBoxHeight) / 2; // 100是小红框的高度
         this.isInitRedBox = false;
       }
 
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'RedBox:' + Math.floor((this.mouseX + this.RedBoxOffset_X) / this.ScaleImageWidth * windowWidth) + ":" + Math.floor((this.mouseY + this.RedBoxOffset_Y) / this.ScaleImageHeight * windowHeight) + ":" + windowWidth + ":" + windowHeight);  //TODO: BoxSize
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'RedBox:' + this.mouseX + ":" + this.mouseY + ":" + windowWidth + ":" + windowHeight);  //TODO: BoxSize
     },
 
     RedBoxSizeChange(payload) {
@@ -1331,7 +1335,7 @@ export default {
     setParsingProgress(show) {
       this.showParsingProgress = show;
     },
-    getRedBoxSideLength() {
+    getRedBoxState() {
       this.$bus.$emit('RedBoxSideLength:' + this.BoxSideLength);
     },
 
