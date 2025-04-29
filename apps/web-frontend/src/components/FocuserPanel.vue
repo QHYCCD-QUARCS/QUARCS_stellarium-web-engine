@@ -8,9 +8,13 @@
       <div class="buttons-container">
 
         <button @click="toggleLoopShooting" :class="{'btn-loop-shooting': true, 'active-loop': isLoopActive}" class="get-click">
-          循环拍摄
+          <div style="display: flex; justify-content: center; align-items: center;">
+            <img :src="require(isLoopActive ? '@/assets/images/svg/ui/ROI-Capturing.svg' : '@/assets/images/svg/ui/ROI-Capture.svg')" height="25px"
+              :class="{'rotate-animation': isLoopActive}"
+              style="min-height: 25px; pointer-events: none;"></img>
+          </div>
         </button>
-        
+
         <!-- <button  @click="SpeedChange" @touchend="active" class="get-click btn-Speed"><v-icon>mdi-run-fast</v-icon></button> -->
         <button @click="SpeedChange" @touchend="active" class="get-click btn-Speed">
           <span v-if="MoveSpeed === 1">
@@ -32,6 +36,28 @@
             </div>
           </span>
         </button>
+
+        <button @click="ROIChange" @touchend="active" class="get-click btn-ROI">
+        <span v-if="ROI_length === 100">
+          <div style="display: flex; justify-content: center; align-items: center;">
+            <img src="@/assets/images/svg/ui/ROI-100.svg" height="25px"
+              style="min-height: 25px; pointer-events: none;"></img>
+          </div>
+        </span>
+        <span v-if="ROI_length === 300">
+          <div style="display: flex; justify-content: center; align-items: center;">
+            <img src="@/assets/images/svg/ui/ROI-300.svg" height="25px"
+              style="min-height: 25px; pointer-events: none;"></img>
+          </div>
+        </span>
+        <span v-if="ROI_length === 500">
+          <div style="display: flex; justify-content: center; align-items: center;">
+            <img src="@/assets/images/svg/ui/ROI-500.svg" height="25px"
+              style="min-height: 25px; pointer-events: none;"></img>
+          </div>
+        </span>
+      </button>
+
         <!-- <button :disabled="isBtnMoveDisabled" @click="FocusLeftMove" @touchend="active" class="get-click btn-Left">
         <div style="display: flex; justify-content: center; align-items: center;">
           <img src="@/assets/images/svg/ui/arrow-left-circle.svg" height="20px" style="min-height: 20px; pointer-events: none;"></img>
@@ -46,7 +72,7 @@
         </button>
 
         <!-- <button  @click="AutoFocus" @touchend="active" class="get-click btn-Auto"><v-icon>mdi-focus-auto</v-icon></button> -->
-        <button @click="AutoFocus" @touchend="active" class="get-click btn-Auto">
+        <!-- <button @click="AutoFocus" @touchend="active" class="get-click btn-Auto">
           <span v-if="inAutoFocus">
             <div style="display: flex; justify-content: center; align-items: center;">
               <img src="@/assets/images/svg/ui/StopAutoFocus.svg" height="20px"
@@ -59,7 +85,7 @@
                 style="min-height: 20px; pointer-events: none;"></img>
             </div>
           </span>
-        </button>
+        </button> -->
 
         <!-- <button @click="FocusGoto" @touchend="active" class="get-click btn-Goto">
           <div style="display: flex; justify-content: center; align-items: center;">
@@ -113,8 +139,8 @@
                 style="min-height: 25px; pointer-events: none;"></img>
             </div>
           </span>
-        </button>
-      </div> -->
+        </button> -->
+      </div>
 
       <div class="Canvas-Bar">
         <canvas ref="FocusCanvas" id="Focus-Canvas"></canvas>
@@ -165,6 +191,9 @@ export default {
       inAutoFocus: false, // 自动对焦是否开启
       isLoopActive: false, // 新增状态控制循环拍摄是否激活
 
+
+      ROI_length: 300,
+
     };
   },
   components: {
@@ -206,6 +235,7 @@ export default {
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getFocuserLoopingState');
     },
     AutoFocus() {
+      if (this.isMoveInProgress) return;
       if (this.inAutoFocus) {
         this.inAutoFocus = false;
         console.log('QHYCCD | StopAutoFocus');
@@ -251,9 +281,21 @@ export default {
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'focusSpeed:' + this.MoveSpeed);
     },
 
+    ROIChange() {
+      if (this.ROI_length === 100) this.ROI_length = 300;
+      else if (this.ROI_length === 300) this.ROI_length = 500;
+      else if (this.ROI_length === 500) this.ROI_length = 100;
+
+      console.log('QHYCCD | ROIChange: ', this.ROI_length);
+      this.$bus.$emit('SendConsoleLogMsg', 'setRedBoxSideLength:' + this.ROI_length, 'info');
+      this.$bus.$emit('setRedBoxSideLength', this.ROI_length); // 更新app.vue中的RedBoxSideLength
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'RedBoxSizeChange:' + this.ROI_length); // 更新qtserver中的RedBoxSideLength
+      this.$bus.$emit('RedBox Side Length (px)', this.ROI_length); // 更新gui.vue中的RedBoxSideLength
+    },
+
     FocusMove(direction) {
       if (this.inAutoFocus) return;
-      this.isBtnMoveDisabled = true;
+      // this.isBtnMoveDisabled = true;
       if (direction === 'left') {
         this.$bus.$emit('FocusInProgress', true);
         this.$bus.$emit('SendConsoleLogMsg', 'Focus Left Move:' + this.MoveSteps, 'info');
@@ -269,7 +311,7 @@ export default {
     },
 
     FocusAbort() {
-      this.isBtnMoveDisabled = false;
+      // this.isBtnMoveDisabled = false;
       this.$bus.$emit('FocusInProgress', false);
       this.$bus.$emit('SendConsoleLogMsg', 'Focus Abort', 'info');
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'focusMoveStop');
@@ -475,6 +517,18 @@ export default {
   box-sizing: border-box;
 }
 
+.btn-ROI {
+  width: 30px;
+  height: 30px;
+
+  user-select: none;
+  background-color: rgba(64, 64, 64, 0.5);
+  backdrop-filter: blur(5px);
+  border: none;
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+
 .btn-Auto {
   width: 30px;
   height: 30px;
@@ -622,7 +676,8 @@ export default {
 }
 
 .btn-loop-shooting {
-  background-color: rgba(64, 64, 64, 0.5); /* 默认背景色 */
+  background-color: rgba(64, 64, 64, 0.5);
+  /* 默认背景色 */
   backdrop-filter: blur(5px);
   border: none;
   border-radius: 5px;
@@ -630,6 +685,21 @@ export default {
 }
 
 .active-loop {
-  background-color: green; /* 激活时的背景色 */
+  background-color: green;
+  /* 激活时的背景色 */
+}
+
+.rotate-animation {
+  animation: rotate 2s linear infinite;
+}
+
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>

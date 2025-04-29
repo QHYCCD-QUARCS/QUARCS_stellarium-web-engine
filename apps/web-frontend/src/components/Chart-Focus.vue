@@ -48,6 +48,7 @@ export default {
     this.$bus.$on('ClearfitQuadraticCurve', this.clearChartData2);
     this.$bus.$on('ClearAllData', this.ClearAllData);
     this.$bus.$on('updateFocusChartWidth', this.initChart);
+    this.$bus.$on('addData_Point', this.addData_Point);
   },
   methods: {
     initChart(Width) {
@@ -178,7 +179,14 @@ export default {
       this.myChart.setOption(option);
     },
     addData_Point(newDataPoint) {
-      this.chartData1.push(newDataPoint);
+      const existingPointIndex = this.chartData1.findIndex(point => point[0] === newDataPoint[0]);
+      if (existingPointIndex !== -1) {
+        // If the x value already exists, update the y value
+        this.chartData1[existingPointIndex] = newDataPoint;
+      } else {
+        // If the x value does not exist, add the new data point
+        this.chartData1.push(newDataPoint);
+      }
       this.renderChart(this.xAxis_min, this.xAxis_max);
     },
     addData_Line(newDataPoint) {

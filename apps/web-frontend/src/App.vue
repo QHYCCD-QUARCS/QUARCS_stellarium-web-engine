@@ -484,7 +484,7 @@
             <component v-bind:is="guiComponent"></component>
             <canvas id="stel-canvas" ref='stelCanvas' :style="{ zIndex: canvasZIndexStel }"></canvas>
             <canvas ref="mainCanvas" id="mainCamera-canvas" :style="{ zIndex: canvasZIndexMainCamera }"
-              @click="handleMainCanvasClick" @touchstart="handleMainCanvasTouch" @touchend="handleTouchEnd"
+              @click="handleMainCanvasClick" @touchstart="handleTouchStart" @touchmove="handleTouchMove" @touchend="handleTouchEnd"
               @mousedown="handleMouseDown" @mouseup="handleMouseUp" @mousemove="handleMouseMove" @wheel="handleWheel">
             </canvas>
             <canvas ref="guiderCanvas" id="guiderCamera-canvas" :style="{ zIndex: canvasZIndexGuiderCamera }"
@@ -780,6 +780,13 @@ export default {
       ROI_y: -1,    // 用来保存ROI区域的y坐标
       ROI_length: -1, // 用来保存ROI区域的长度
       showSelectStar: false,
+
+      isOneTouch: false,
+      currentTouchX: [0, 0],
+      currentTouchY: [0, 0],
+      startTouchX: [0, 0],
+      startTouchY: [0, 0],
+      startTouchDistance: 0,
     }
   },
   components: {
@@ -827,9 +834,10 @@ export default {
     // this.$bus.$on('DisconnectDriverSuccess', this.disconnectDriversuccess);
     this.$bus.$on('UnBindingDevice', this.UnBindingDevice);
     this.$bus.$on('CloseWebView', this.QuitToMainApp)
-    // this.$bus.$on('setRedBoxSideLength', this.setRedBoxSideLength);
+    this.$bus.$on('setRedBoxSideLength', this.setRedBoxSideLength);
     this.$bus.$on('setFocuserState', this.setFocuserState);  // 设置调焦状态和进度
     this.$bus.$on('setShowSelectStar', this.setShowSelectStar);  // 设置是否显示选择星点
+    this.$bus.$on('ScaleChange', this.ScaleChange);
   },
   methods: {
     getLocationHostName() {
@@ -1712,6 +1720,16 @@ export default {
                   this.SendConsoleLogMsg('update SelectStars x=' + this.selectStarX + ', y=' + this.selectStarY, 'info');
                 }
                 break;
+
+              case 'addData_Point':
+                if (parts.length === 3) {
+                  const x = parseFloat(parts[1]);
+                  const y = parseFloat(parts[2]);
+                  this.$bus.$emit('addData_Point', [x, y]);
+                }
+                break;
+
+                
               default:
                 console.warn('未处理命令: ', data.message);
                 break;
@@ -3055,9 +3073,9 @@ export default {
 
 
       // 发送消息给QT客户端，用于信息图标
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'sendRedBoxState:' + this.RedBoxSideLength + ',' + this.ROI_x + ',' + this.ROI_y);
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'sendVisibleArea:' + this.visibleX + ',' + this.visibleY + ',' + this.scale );
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'sendSelectStars:' + this.selectStarX + ',' + this.selectStarY);
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'sendRedBoxState:' + this.RedBoxSideLength + ':' + this.ROI_x + ':' + this.ROI_y);
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'sendVisibleArea:' + this.visibleX + ':' + this.visibleY + ':' + this.scale );
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'sendSelectStars:' + this.selectStarX + ':' + this.selectStarY);
       // 如果选择了星点，则根据选择位置，在ROI区域中绘制一个圆
       if (this.selectStarX != -1 && this.selectStarY != -1 && this.showSelectStar) {
         let radius, canvasStarX, canvasStarY, color;
@@ -3066,9 +3084,9 @@ export default {
         if (this.focuserROIStarsList.length > 0) {
           // 计算每个星点与选择位置的距离
           const distances = this.focuserROIStarsList.map(item => {
-            const dx = (item.x + this.ROI_x) - this.selectStarX; // 计算星点与选择位置的x距离 
-            const dy = (item.y + this.ROI_y) - this.selectStarY; // 计算星点与选择位置的y距离
-            return Math.sqrt(dx * dx + dy * dy); // 计算星点与选择位置的距离
+            const dx = item.x + this.ROI_x; // 计算星点在全局的x坐标 
+            const dy = item.y + this.ROI_y; // 计算星点在全局的y坐标
+            return Math.sqrt((dx - this.selectStarX) * (dx - this.selectStarX) + (dy - this.selectStarY) * (dy - this.selectStarY)); // 计算星点与选择位置的距离
           });
 
           // 找到距离最小的星点
@@ -3078,16 +3096,11 @@ export default {
           // 设置阈值
           const threshold = 50; // 如果选择位置与星点距离小于阈值，则选择这个星点
 
-          const canvas = this.$refs.mainCanvas;
-          const ctx = canvas.getContext('2d');
-          const canvasWidth = canvas.width;
-          const canvasHeight = canvas.height;
-
           if (distances[minDistanceIndex] < threshold) {
             // 如果距离最小的星点的距离小于阈值，那么选择这个星点
             radius = closestStar.HFR;
-            canvasStarX = closestStar.x + this.ROI_x - visibleLeft; // 这是在可见区域中的星点坐标
-            canvasStarY = closestStar.y + this.ROI_y - visibleTop; // 这是在可见区域中的星点坐标
+            canvasStarX = (closestStar.x + this.ROI_x - visibleLeft) * ctx.canvas.width / newVisibleWidth;
+            canvasStarY = (closestStar.y + this.ROI_y - visibleTop) * ctx.canvas.height / newVisibleHeight;
             color = 'green'; // 有星点，绘制绿色的圆
 
             // 更新选择位置为星点位置
@@ -3096,15 +3109,15 @@ export default {
           } else {
             // 否则，在选择的位置绘制一个圆
             radius = 10; // 你可以根据需要调整这个值
-            canvasStarX = this.selectStarX;
-            canvasStarY = this.selectStarY;
+            canvasStarX = (this.selectStarX - visibleLeft) * ctx.canvas.width / newVisibleWidth;
+            canvasStarY = (this.selectStarY - visibleTop) * ctx.canvas.height / newVisibleHeight;
             color = 'red'; // 无星点，绘制红色的圆
           }
         } else {
           // 如果没有星点，也在选择的位置绘制一个圆
           radius = 10; // 你可以根据需要调整这个值
-          canvasStarX = this.selectStarX;
-          canvasStarY = this.selectStarY;
+          canvasStarX = (this.selectStarX - visibleLeft) * ctx.canvas.width / newVisibleWidth;
+          canvasStarY = (this.selectStarY - visibleTop) * ctx.canvas.height / newVisibleHeight;
           color = 'red'; // 无星点，绘制红色的圆
         }
 
@@ -4816,6 +4829,7 @@ export default {
 
     // 主画布点击事件
     handleMainCanvasClick(event) {
+      this.SendConsoleLogMsg('触发鼠标点击事件:', 'info');
       if (!this.enableMainCanvasClick || this.isDragging) return; // 如果画布不可点击，则不处理点击事件
       console.log('触发鼠标点击事件:', event);
       const canvas = this.$refs.mainCanvas;
@@ -4827,13 +4841,13 @@ export default {
       if (!this.isFocusLoopShooting) {
         this.ROI_x = (x / window.innerWidth * this.visibleWidth - this.RedBoxSideLength / 2) + this.visibleX - this.visibleWidth / 2;  // 计算ROI的x坐标
         this.ROI_y = (y / window.innerHeight * this.visibleHeight - this.RedBoxSideLength / 2) + this.visibleY - this.visibleHeight / 2; // 计算ROI的y坐标
-        this.$bus.$emit('setRedBoxPosition', x, y, this.ROI_x, this.ROI_y);
+        // this.$bus.$emit('setRedBoxPosition', x, y, this.ROI_x, this.ROI_y);
       } else {
-        this.selectStarX = (x / window.innerWidth * this.visibleWidth); // 计算选择位置的x坐标
-        this.selectStarY = (y / window.innerHeight * this.visibleWidth); // 计算选择位置的y坐标
+        this.selectStarX = (x / window.innerWidth * this.visibleWidth) + this.visibleX - this.visibleWidth / 2; // 计算选择位置的x坐标
+        this.selectStarY = (y / window.innerHeight * this.visibleHeight) + this.visibleY - this.visibleHeight / 2; // 计算选择位置的y坐标
 
-        if (this.selectStarX >= 0 && this.selectStarX < this.visibleWidth &&
-          this.selectStarY >= 0 && this.selectStarY < this.visibleWidth) {
+        if (this.selectStarX >= this.visibleX - this.visibleWidth / 2 && this.selectStarX < this.visibleX + this.visibleWidth / 2 &&
+          this.selectStarY >= this.visibleY - this.visibleHeight / 2 && this.selectStarY < this.visibleY + this.visibleHeight / 2) {
           this.SendConsoleLogMsg('Select Star is in ROI', 'info');
         } else {
           this.SendConsoleLogMsg('Select Star is not in ROI', 'error');
@@ -4841,42 +4855,12 @@ export default {
           this.selectStarY = -1;
         }
       }
-    },
-
-    // 主画布触摸事件
-    handleMainCanvasTouch(event) {
-      if (!this.enableMainCanvasClick || this.isDragging) return; // 如果画布不可点击，则不处理点击事件
-      console.log('触发触摸事件:', event);
-      if (!this.enableMainCanvasClick || !event.touches || event.touches.length === 0) return;
-      const canvas = this.$refs.mainCanvas;
-      if (!canvas) return; // 确保 canvas 元素存在
-      const touch = event.touches[0];
-      const rect = canvas.getBoundingClientRect();// 获取 canvas 元素的边界矩形
-      const x = touch.clientX - rect.left;
-      const y = touch.clientY - rect.top;
-      console.log('Touch at:', x, y);
-      event.preventDefault();// 阻止默认事件，如页面滚动
-      if (!this.isFocusLoopShooting) {
-        this.ROI_x = (x / window.innerWidth * this.visibleWidth - this.RedBoxSideLength / 2) + this.visibleX - this.visibleWidth / 2;  // 计算ROI的x坐标
-        this.ROI_y = (y / window.innerHeight * this.visibleHeight - this.RedBoxSideLength / 2) + this.visibleY - this.visibleHeight / 2; // 计算ROI的y坐标
-        this.$bus.$emit('setRedBoxPosition', x, y, this.ROI_x, this.ROI_y);
-      } else {
-        this.selectStarX = (x / window.innerWidth * this.visibleWidth); // 计算选择位置的x坐标
-        this.selectStarY = (y / window.innerHeight * this.visibleWidth); // 计算选择位置的y坐标
-
-        if (this.selectStarX >= 0 && this.selectStarX < this.visibleWidth &&
-          this.selectStarY >= 0 && this.selectStarY < this.visibleWidth) {
-          this.SendConsoleLogMsg('Select Star is in ROI', 'info');
-        } else {
-          this.SendConsoleLogMsg('Select Star is not in ROI', 'error');
-          this.selectStarX = -1;
-          this.selectStarY = -1;
-        }
-      }
+      this.drawImageData();
     },
 
     // 主画布拖动
     handleMouseDown(event) {
+      this.SendConsoleLogMsg('触发鼠标按下事件:', 'info');
       if (this.isDragging) return;
       this.isDragging = true;
       this.startX = event.clientX;
@@ -4916,11 +4900,13 @@ export default {
       }, 100);
     },
     handleMouseMove(event) {
+      this.SendConsoleLogMsg('触发鼠标移动事件:', 'info');
       if (!this.isDragging) return;
       this.currentX = event.clientX;
       this.currentY = event.clientY;
     },
     handleMouseUp(event) {
+      this.SendConsoleLogMsg('触发鼠标抬起事件:', 'info');
       this.isDragging = false;
 
       // 清除定时器
@@ -4928,6 +4914,7 @@ export default {
       this.moveIntervalId = null;
     },
     handleWheel(event) {
+      this.SendConsoleLogMsg('触发鼠标滚轮事件:', 'info');
       const scaleChange = event.deltaY > 0 ? 0.1 : -0.1; // 根据滚轮的滚动方向，计算缩放比例的变化量
       let newScale = this.scale + scaleChange; // 更新缩放比例
       if (newScale < 0.1) {
@@ -4957,46 +4944,136 @@ export default {
         this.pendingScaleChange = false; // 清除待执行的缩放操作标记
       });
     },
+
+    handleMainCanvasTouch(event) {
+      this.SendConsoleLogMsg('触发触摸事件:', 'info');
+      if (!this.enableMainCanvasClick || this.isDragging) return; // 如果画布不可点击，则不处理点击事件
+      console.log('触发触摸事件:', event);
+      if (!this.enableMainCanvasClick || !event.touches || event.touches.length === 0) return;
+      const canvas = this.$refs.mainCanvas;
+      if (!canvas) return; // 确保 canvas 元素存在
+      const touch = event.touches[0];
+      const rect = canvas.getBoundingClientRect();// 获取 canvas 元素的边界矩形
+      const x = touch.clientX - rect.left;
+      const y = touch.clientY - rect.top;
+      console.log('Touch at:', x, y);
+      event.preventDefault();// 阻止默认事件，如页面滚动
+      if (!this.isFocusLoopShooting) {
+        this.ROI_x = (x / window.innerWidth * this.visibleWidth - this.RedBoxSideLength / 2) + this.visibleX - this.visibleWidth / 2;  // 计算ROI的x坐标
+        this.ROI_y = (y / window.innerHeight * this.visibleHeight - this.RedBoxSideLength / 2) + this.visibleY - this.visibleHeight / 2; // 计算ROI的y坐标
+        // this.$bus.$emit('setRedBoxPosition', x, y, this.ROI_x, this.ROI_y);
+      } else {
+        this.selectStarX = (x / window.innerWidth * this.visibleWidth) + this.visibleX - this.visibleWidth / 2; // 计算选择位置的x坐标
+        this.selectStarY = (y / window.innerHeight * this.visibleHeight) + this.visibleY - this.visibleHeight / 2; // 计算选择位置的y坐标
+
+        if (this.selectStarX >= this.visibleX - this.visibleWidth / 2 && this.selectStarX < this.visibleX + this.visibleWidth / 2 &&
+          this.selectStarY >= this.visibleY - this.visibleHeight / 2 && this.selectStarY < this.visibleY + this.visibleHeight / 2) {
+          this.SendConsoleLogMsg('Select Star is in ROI', 'info');
+        } else {
+          this.SendConsoleLogMsg('Select Star is not in ROI', 'error');
+          this.selectStarX = -1;
+          this.selectStarY = -1;
+        }
+      }
+      this.drawImageData();
+    },
     handleTouchStart(event) {
+      this.SendConsoleLogMsg('触发触摸开始事件:', 'info');
       if (event.touches.length === 1) { // 单指触摸，开始拖动
+        this.isOneTouch = true;
         this.SendConsoleLogMsg('触发单指触摸事件', 'info');
         this.isDragging = true;
         this.startX = event.touches[0].clientX;
         this.startY = event.touches[0].clientY;
+        // 清除可能存在的双指触摸的定时器
+        if (this.zoomIntervalId) {
+          clearInterval(this.zoomIntervalId);
+          this.zoomIntervalId = null;
+        }
 
+        
+        this.handleMainCanvasTouch(event);
+      } else if (event.touches.length >= 2) { // 双指触摸，开始缩放
+        this.isOneTouch = false;
+        this.SendConsoleLogMsg('触发双指触摸事件', 'info');
+        this.isDragging = true;
+        // 计算两个触摸点之间的距离
+        const dx = this.currentTouchX[0] - this.currentTouchX[1];
+        const dy = this.currentTouchY[0] - this.currentTouchY[1];
+        this.startTouchDistance = Math.sqrt(dx * dx + dy * dy);
+        // 清除可能存在的单指触摸的定时器
+        if (this.moveIntervalId) {
+          clearInterval(this.moveIntervalId);
+          this.moveIntervalId = null;
+        }
+
+
+      } else {
+        this.SendConsoleLogMsg('触发多指触摸事件，获取当前触摸点数量:' + event.touches.length, 'info');
+      }
+    },
+
+    handleTouchMove(event) {
+      this.SendConsoleLogMsg('触发触摸移动事件:', 'info');
+      if (!this.isDragging) return;
+      if (event.touches.length == 1) {
+        this.currentTouchX[0] = event.touches[0].clientX;
+        this.currentTouchY[0] = event.touches[0].clientY;
+        if (this.zoomIntervalId) {
+          clearInterval(this.zoomIntervalId);
+          this.zoomIntervalId = null;
+        }
+        if (this.moveIntervalId != null) {
+          return;
+        }
         // 设置一个定时器，每100ms执行一次触摸移动的逻辑
         this.moveIntervalId = setInterval(() => {
-          if (!this.isDragging) return;
+          if (!this.isDragging || !this.isOneTouch) return;
 
-          const dx = event.touches[0].clientX - this.startX;
-          const dy = event.touches[0].clientY - this.startY;
+          const dx = this.startTouchX[0] - this.currentTouchX[0];
+          const dy = this.startTouchY[0] - this.currentTouchY[0];
+          if (isNaN(dx) || isNaN(dy)) {
+            return;
+          }
+          if (dx == 0 && dy == 0) {
+            return;
+          }
 
           this.visibleX += dx / window.innerWidth * this.mainCameraSizeX;
           this.visibleY += dy / window.innerHeight * this.mainCameraSizeY;
 
-          this.startX = event.touches[0].clientX;
-          this.startY = event.touches[0].clientY;
+          this.startTouchX[0] = this.currentTouchX[0];
+          this.startTouchY[0] = this.currentTouchY[0];
           this.drawImageData();
         }, 100);
-      } else if (event.touches.length === 2) { // 双指触摸，开始缩放
-        this.SendConsoleLogMsg('触发双指触摸事件', 'info');
-        this.isDragging = true;
-        // 计算两个触摸点之间的距离
-        const dx = event.touches[0].clientX - event.touches[1].clientX;
-        const dy = event.touches[0].clientY - event.touches[1].clientY;
-        this.startDistance = Math.sqrt(dx * dx + dy * dy);
 
+      } else if (event.touches.length >= 2) {
+        this.currentTouchX[0] = event.touches[0].clientX;
+        this.currentTouchY[0] = event.touches[0].clientY;
+        this.currentTouchX[1] = event.touches[1].clientX;
+        this.currentTouchY[1] = event.touches[1].clientY;
+
+        // 清除可能存在的单指触摸的定时器
+        if (this.moveIntervalId) {
+          clearInterval(this.moveIntervalId);
+          this.moveIntervalId = null;
+        }
+        if (this.zoomIntervalId != null) {
+          return;
+        }
         // 设置一个定时器，每100ms执行一次缩放逻辑
         this.zoomIntervalId = setInterval(() => {
-          if (!this.isDragging) return;
-          const dx = event.touches[0].clientX - event.touches[1].clientX;
-          const dy = event.touches[0].clientY - event.touches[1].clientY;
+          if (!this.isDragging || !this.isOneTouch) return;
+          const dx = this.currentTouchX[0] - this.currentTouchX[1];
+          const dy = this.currentTouchY[0] - this.currentTouchY[1];
           const distance = Math.sqrt(dx * dx + dy * dy);
-          if (this.startDistance == 0) {
-            this.startDistance = distance;
+          this.SendConsoleLogMsg('距离变化 distance:' + distance, 'info');
+          if (this.startTouchDistance == 0) {
+            this.startTouchDistance = distance;
           }
           // 计算缩放比例的变化量
-          const scaleChange = distance / this.startDistance;
+          const scaleChange = distance / this.startTouchDistance;
+          this.SendConsoleLogMsg('距离变化比例 scaleChange:' + scaleChange, 'info');
           let newScale = this.scale * scaleChange; // 更新缩放比例
           if (newScale < 0.1) {
             newScale = 0.1;
@@ -5011,13 +5088,15 @@ export default {
           } else {
             this.SendConsoleLogMsg('缩放比例没有变化,缩放比例:' + this.scale, 'info');
           }
-          this.startDistance = distance; // 更新两个触摸点之间的距离
+          this.startTouchDistance = distance; // 更新两个触摸点之间的距离
         }, 100);
       } else {
         this.SendConsoleLogMsg('触发多指触摸事件，获取当前触摸点数量:' + event.touches.length, 'info');
       }
     },
+
     handleTouchEnd(event) {
+      this.SendConsoleLogMsg('触发触摸结束事件:', 'info');
       this.isDragging = false; // 停止拖动
       // 清除定时器
       if (this.moveIntervalId) {
@@ -5030,6 +5109,20 @@ export default {
       }
     },
 
+    ScaleChange(type) {
+      if (type == '+') {
+        this.scale -= 0.1;
+      } else if (type == '-') {
+        this.scale += 0.1;
+      }
+      if (this.scale < 0.1) {
+        this.scale = 0.1;
+      }
+      if (this.scale > 1) {
+        this.scale = 1;
+      }
+      this.drawImageData();
+    },
 
     // 显示ROI图像
     showRoiImage(fileName, destX, destY) {
@@ -5132,6 +5225,9 @@ export default {
     },
     setShowSelectStar(state) {
       this.showSelectStar = state;
+    },
+    setRedBoxSideLength(length) {
+      this.RedBoxSideLength = parseInt(length);
     },
   },
   computed: {

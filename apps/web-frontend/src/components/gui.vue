@@ -173,6 +173,21 @@
       </div>
     </button>
 
+    <button v-show="isShowScaleChange" @click="ScaleChange('+')" class="get-click btn-ScaleAdd">
+      <div style="display: flex; justify-content: center; align-items: center;">
+        <img src="@/assets/images/svg/ui/ScaleAdd.svg" height="20px"
+          style="min-height: 20px; pointer-events: none;"></img>
+      </div>
+    </button>
+
+    <button v-show="isShowScaleChange" @click="ScaleChange('-')" class="get-click btn-ScaleSub">
+      <div style="display: flex; justify-content: center; align-items: center;">
+        <img src="@/assets/images/svg/ui/ScaleSub.svg" height="20px"
+          style="min-height: 20px; pointer-events: none;"></img>
+      </div>
+    </button>
+
+
 
     <button v-show="isPolarAxisMode" @click="QuitPolarAxisMode" class="get-click btn-QuitPolarAxis">
       <div style="display: flex; justify-content: center; align-items: center;">
@@ -528,6 +543,7 @@ export default {
 
       showParsingProgress: false,  // 控制解析进度文本框的显示
       parsingProgressList: [],     // 存储解析进度的列表
+      isShowScaleChange: false,
 
       previousState: {        // 保存隐藏时的ui状态
         isShowImage: false,
@@ -541,7 +557,8 @@ export default {
         isCFWSelectBarShow: false,
         isMainSwitchShow: false,
         showFocuserPanel: false,
-        showChartsPanel: false
+        showChartsPanel: false,
+        isShowScaleChange: false
       },
 
       selectStarX: 0, // 选择星点的X坐标
@@ -683,6 +700,7 @@ export default {
       this.isRedBoxMode = this.previousState.isRedBoxMode;
       this.showToolbar = this.previousState.showToolbar;
       this.isCaptureMode = this.previousState.isCaptureMode;
+      this.isShowScaleChange = this.previousState.isShowScaleChange;
       this.showFloatingBox = this.previousState.showFloatingBox;
       this.showHistogramPanel = this.previousState.showHistogramPanel;
       this.isExpTimeBarShow = this.previousState.isExpTimeBarShow;
@@ -703,6 +721,7 @@ export default {
         isRedBoxMode: this.isRedBoxMode,             // 显示与隐藏小红框
         showToolbar: this.showToolbar,               // 显示与隐藏工具栏
         isCaptureMode: this.isCaptureMode,           // 显示与隐藏拍照模式
+        isShowScaleChange: this.isShowScaleChange,   // 显示与隐藏缩放按钮
         showFloatingBox: this.showFloatingBox,       // 显示与隐藏浮动框
         showHistogramPanel: this.showHistogramPanel, // 显示与隐藏直方图面板
         isExpTimeBarShow: this.isExpTimeBarShow,     // 显示与隐藏曝光时间条
@@ -921,13 +940,12 @@ export default {
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'RedBox:' + this.mouseX + ":" + this.mouseY + ":" + windowWidth + ":" + windowHeight);  //TODO: BoxSize
     },
 
-    RedBoxSizeChange(payload) {
-      const [signal, value] = payload.split(':');
-      this.BoxSideLength = value;
-      console.log('RedBoxSizeChange: ', this.BoxSideLength);
-      this.$bus.$emit('SendConsoleLogMsg', 'Red Box Size Change:' + this.BoxSideLength, 'info');
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'RedBoxSizeChange:' + this.BoxSideLength);
-      this.$bus.$emit('RedBoxSideLength', this.BoxSideLength);
+    RedBoxSizeChange(length) {
+      this.BoxSideLength = length;
+      // console.log('RedBoxSizeChange: ', this.BoxSideLength);
+      // this.$bus.$emit('SendConsoleLogMsg', 'Red Box Size Change:' + this.BoxSideLength, 'info');
+      // this.$bus.$emit('AppSendMessage', 'Vue_Command', 'RedBoxSizeChange:' + this.BoxSideLength);
+      // this.$bus.$emit('RedBoxSideLength', this.BoxSideLength);
     },
 
     // handleAddDriver(driver) {
@@ -997,6 +1015,7 @@ export default {
 
         this.isStellariumMode = false;
         this.isCaptureMode = true;
+        this.isShowScaleChange = true;
         this.isGuiderMode = false;
 
         this.showMountSwitch = true;
@@ -1017,7 +1036,7 @@ export default {
         this.isStellariumMode = false;
         this.isCaptureMode = false;
         this.isGuiderMode = true;
-
+        this.isShowScaleChange = false;
         this.showMountSwitch = true;
 
         this.showChartsPanel = true;
@@ -1035,7 +1054,7 @@ export default {
         this.isStellariumMode = true;
         this.isCaptureMode = false;
         this.isGuiderMode = false;
-
+        this.isShowScaleChange = false;
         this.showMountSwitch = true;
 
         this.showChartsPanel = false;
@@ -1135,6 +1154,7 @@ export default {
     QuitPolarAxisMode() {
       this.showCaptureUI();
       this.isCaptureMode = false;
+      this.isShowScaleChange = false;
       if (this.lastMainPage === 'None') {
         this.CurrentMainPage = 'MainCamera';
       } else {
@@ -1343,6 +1363,10 @@ export default {
       this.$bus.$emit('SendConsoleLogMsg', 'Select Star: ' + x + ', ' + y, 'info');
       this.selectStarX = x;
       this.selectStarY = y;
+    },
+
+    ScaleChange(type) {
+      this.$bus.$emit('ScaleChange', type);
     },
 
   },
@@ -1665,6 +1689,32 @@ export default {
   background-color: rgba(0, 0, 0, 0.1);
   border-radius: 50%;
   /* border: 1px solid rgba(255, 255, 255, 0.8); */
+}
+
+.btn-ScaleAdd {
+  position: absolute;
+  width: 35px;
+  height: 35px;
+  top: 145px;
+  left: 20px;
+
+  user-select: none;
+  backdrop-filter: blur(5px);
+  background-color: rgba(0, 0, 0, 0.1);
+  border-radius: 50%;
+}
+
+.btn-ScaleSub {
+  position: absolute;
+  width: 35px;
+  height: 35px;
+  top: 185px;
+  left: 20px;
+
+  user-select: none;
+  backdrop-filter: blur(5px);
+  background-color: rgba(0, 0, 0, 0.1);
+  border-radius: 50%;
 }
 
 .btn-QuitPolarAxis {
