@@ -13,8 +13,7 @@
       style="left: 170px; backdrop-filter: blur(5px); background-color: rgba(0, 0, 0, 0.1);">
 
       <div v-show="isOpenDevicePage">
-        <span
-          style="position: absolute; top: 0px; left: 50%; transform: translateX(-50%); font-size: 30px; color: rgba(255, 255, 255, 0.5); user-select: none;">
+        <span style="position: absolute; top: 0px; left: 50%; transform: translateX(-50%); font-size: 30px; color: rgba(255, 255, 255, 0.5); user-select: none;">
           {{ $t(CurrentDriverType) }}
           <v-divider></v-divider>
         </span>
@@ -22,7 +21,7 @@
         <div :style="{ width: DeviceIsConnected ? '200px' : '200px' }"
           style="position: absolute; top: 50px; max-height: calc(100% - 95px); overflow-y: auto;">
 
-          <div v-show="!DeviceIsConnected" style="text-align: center;">
+          <!-- <div v-show="!DeviceIsConnected" style="text-align: center;">
             <span style="display: inline-block; font-size: 15px; color: rgba(255, 255, 255, 0.5); user-select: none;">
               {{ $t('Device Connection') }}
             </span>
@@ -55,9 +54,9 @@
                 </button>
               </v-col>
             </v-row>
-          </div>
+          </div> -->
 
-          <!-- <div v-show="!DeviceIsConnected" style="text-align: center;">
+          <div v-show="!DeviceIsConnected" style="text-align: center;">
             <span style="display: inline-block; font-size: 15px; color: rgba(255, 255, 255, 0.5); user-select: none;">
               {{ $t('Device Connection') }}
             </span>
@@ -81,7 +80,7 @@
               </v-col>
             </v-row>
 
-          </div> -->
+          </div>
 
           <div v-show="DeviceIsConnected" v-for="(item, index) in CurrentConfigItems()" :key="index"
             style="text-align: center; width: 200px;">
@@ -128,18 +127,20 @@
 
         </div>
 
-        <div v-show="DeviceIsConnected" style="text-align: center; position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px;">
-          <button @click="confirmConfiguration(CurrentConfigItems())" class="btn-confirm" style="display: inline-block; user-select: none;">
+        <!-- <div v-show="DeviceIsConnected"
+          style="text-align: center; position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px;">
+          <button @click="confirmConfiguration(CurrentConfigItems())" class="btn-confirm"
+            style="display: inline-block; user-select: none;">
             <v-icon color="rgba(255, 255, 255)">mdi-check-bold</v-icon>
           </button>
           <button @click="disconnectDriver" class="btn-confirm" style="display: inline-block; background-color: red;">
             <div style="display: flex; justify-content: center; align-items: center;">
               <v-icon color="white">mdi-link-off</v-icon>
             </div>
-          </button>
-        </div>
+          </button>s
+        </div> -->
 
-        <!-- <div v-show="DeviceIsConnected"
+        <div v-show="DeviceIsConnected"
           style="text-align: center; position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); display: flex; justify-content: center; width: 100%;">
           <button @click="confirmConfiguration(CurrentConfigItems())" class="btn-confirm"
             style="display: inline-block; user-select: none;">
@@ -147,92 +148,94 @@
           </button>
         </div>
 
-      </div> -->
-
-      <div v-show="isOpenPowerPage">
-        <span
-          style="position: absolute; top: 0px; left: 50%; transform: translateX(-50%); font-size: 26px; color: rgba(255, 255, 255, 0.5); user-select: none; white-space: nowrap; ">
-          {{ $t('Power Management') }}
-          <v-divider></v-divider>
-        </span>
-
-        <div style="position: absolute; top: 50px; max-height: calc(100% - 50px); width: 200px; overflow-y: auto;">
-          <v-list dense>
-
-            <v-list-item @click.stop="SwitchOutPutPower(1, OutPutPower_1_ON)"
-              :style="{ height: '36px', marginBottom: '10px' }">
-              <v-list-item-icon style="margin-right: 10px;">
-                <div style="display: flex; justify-content: center; align-items: center;">
-                  <img src="@/assets/images/svg/ui/OutPutPower.svg" height="30px"
-                    style="min-height: 30px; pointer-events: none;"></img>
-                </div>
-              </v-list-item-icon>
-              <v-list-item-content>
-                <v-list-item-title>
-                  <span>
-                    <div :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('OutPut Power 1') }}</div>
-                    <div :style="{ fontSize: '7px' }" :class="{ 'connected-device': OutPutPower_1_ON }">{{
-                      OutPutPower_1_ON ?
-                        '[ON]' : '[OFF]' }}</div>
-                  </span>
-                </v-list-item-title>
-
-              </v-list-item-content>
-            </v-list-item>
-
-            <v-list-item @click.stop="SwitchOutPutPower(2, OutPutPower_2_ON)"
-              :style="{ height: '36px', marginBottom: '10px' }">
-              <v-list-item-icon style="margin-right: 10px;">
-                <div style="display: flex; justify-content: center; align-items: center;">
-                  <img src="@/assets/images/svg/ui/OutPutPower.svg" height="30px"
-                    style="min-height: 30px; pointer-events: none;"></img>
-                </div>
-              </v-list-item-icon>
-              <v-list-item-content>
-                <v-list-item-title>
-                  <span>
-                    <div :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('OutPut Power 2') }}</div>
-                    <div :style="{ fontSize: '7px' }" :class="{ 'connected-device': OutPutPower_2_ON }">{{
-                      OutPutPower_2_ON ?
-                        '[ON]' : '[OFF]' }}</div>
-                  </span>
-                </v-list-item-title>
-
-              </v-list-item-content>
-            </v-list-item>
-
-            <v-divider :style="{ marginBottom: '10px' }"></v-divider>
-
-            <v-list-item @click.stop="RestartRaspberryPi()" :style="{ height: '36px', marginBottom: '10px' }">
-              <v-list-item-icon style="margin-right: 10px;">
-                <div style="display: flex; justify-content: center; align-items: center;">
-                  <img src="@/assets/images/svg/ui/Reboot.svg" height="30px"
-                    style="min-height: 30px; pointer-events: none;"></img>
-                </div>
-              </v-list-item-icon>
-              <v-list-item-content>
-                <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Restart')
-                  }}</v-list-item-title>
-              </v-list-item-content>
-            </v-list-item>
-
-            <v-list-item @click.stop="ShutdownRaspberryPi()" :style="{ height: '36px', marginBottom: '10px' }">
-              <v-list-item-icon style="margin-right: 10px;">
-                <div style="display: flex; justify-content: center; align-items: center;">
-                  <img src="@/assets/images/svg/ui/PowerOFF.svg" height="30px"
-                    style="min-height: 30px; pointer-events: none;"></img>
-                </div>
-              </v-list-item-icon>
-              <v-list-item-content>
-                <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Shut Down')
-                  }}</v-list-item-title>
-              </v-list-item-content>
-            </v-list-item>
-
-          </v-list>
-        </div>
-
       </div>
+
+        <div v-show="isOpenPowerPage">
+          <span
+            style="position: absolute; top: 0px; left: 50%; transform: translateX(-50%); font-size: 26px; color: rgba(255, 255, 255, 0.5); user-select: none; white-space: nowrap; ">
+            {{ $t('Power Management') }}
+            <v-divider></v-divider>
+          </span>
+
+          <div style="position: absolute; top: 50px; max-height: calc(100% - 50px); width: 200px; overflow-y: auto;">
+            <v-list dense>
+
+              <v-list-item @click.stop="SwitchOutPutPower(1, OutPutPower_1_ON)"
+                :style="{ height: '36px', marginBottom: '10px' }">
+                <v-list-item-icon style="margin-right: 10px;">
+                  <div style="display: flex; justify-content: center; align-items: center;">
+                    <img src="@/assets/images/svg/ui/OutPutPower.svg" height="30px"
+                      style="min-height: 30px; pointer-events: none;"></img>
+                  </div>
+                </v-list-item-icon>
+                <v-list-item-content>
+                  <v-list-item-title>
+                    <span>
+                      <div :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('OutPut Power 1') }}
+                      </div>
+                      <div :style="{ fontSize: '7px' }" :class="{ 'connected-device': OutPutPower_1_ON }">{{
+                        OutPutPower_1_ON ?
+                          '[ON]' : '[OFF]' }}</div>
+                    </span>
+                  </v-list-item-title>
+
+                </v-list-item-content>
+              </v-list-item>
+
+              <v-list-item @click.stop="SwitchOutPutPower(2, OutPutPower_2_ON)"
+                :style="{ height: '36px', marginBottom: '10px' }">
+                <v-list-item-icon style="margin-right: 10px;">
+                  <div style="display: flex; justify-content: center; align-items: center;">
+                    <img src="@/assets/images/svg/ui/OutPutPower.svg" height="30px"
+                      style="min-height: 30px; pointer-events: none;"></img>
+                  </div>
+                </v-list-item-icon>
+                <v-list-item-content>
+                  <v-list-item-title>
+                    <span>
+                      <div :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('OutPut Power 2') }}
+                      </div>
+                      <div :style="{ fontSize: '7px' }" :class="{ 'connected-device': OutPutPower_2_ON }">{{
+                        OutPutPower_2_ON ?
+                          '[ON]' : '[OFF]' }}</div>
+                    </span>
+                  </v-list-item-title>
+
+                </v-list-item-content>
+              </v-list-item>
+
+              <v-divider :style="{ marginBottom: '10px' }"></v-divider>
+
+              <v-list-item @click.stop="RestartRaspberryPi()" :style="{ height: '36px', marginBottom: '10px' }">
+                <v-list-item-icon style="margin-right: 10px;">
+                  <div style="display: flex; justify-content: center; align-items: center;">
+                    <img src="@/assets/images/svg/ui/Reboot.svg" height="30px"
+                      style="min-height: 30px; pointer-events: none;"></img>
+                  </div>
+                </v-list-item-icon>
+                <v-list-item-content>
+                  <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Restart')
+                    }}</v-list-item-title>
+                </v-list-item-content>
+              </v-list-item>
+
+              <v-list-item @click.stop="ShutdownRaspberryPi()" :style="{ height: '36px', marginBottom: '10px' }">
+                <v-list-item-icon style="margin-right: 10px;">
+                  <div style="display: flex; justify-content: center; align-items: center;">
+                    <img src="@/assets/images/svg/ui/PowerOFF.svg" height="30px"
+                      style="min-height: 30px; pointer-events: none;"></img>
+                  </div>
+                </v-list-item-icon>
+                <v-list-item-content>
+                  <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Shut Down')
+                    }}</v-list-item-title>
+                </v-list-item-content>
+              </v-list-item>
+
+            </v-list>
+          </div>
+
+        </div>
 
     </v-navigation-drawer>
 
@@ -272,7 +275,7 @@
               </v-list-item-icon>
               <v-list-item-content>
                 <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Quit')
-                  }}</v-list-item-title>
+                }}</v-list-item-title>
               </v-list-item-content>
             </v-list-item>
 
@@ -285,7 +288,7 @@
               </v-list-item-icon>
               <v-list-item-content>
                 <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('View Settings')
-                  }}</v-list-item-title>
+                }}</v-list-item-title>
               </v-list-item-content>
             </v-list-item>
             <v-divider></v-divider>
@@ -300,7 +303,7 @@
             </v-list-item-icon>
             <v-list-item-content>
               <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Power Management')
-                }}</v-list-item-title>
+              }}</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
 
@@ -385,7 +388,7 @@
             </v-list-item-icon>
             <v-list-item-content>
               <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Image Files')
-                }}</v-list-item-title>
+              }}</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
 
@@ -398,7 +401,7 @@
             </v-list-item-icon>
             <v-list-item-content>
               <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Logs')
-                }}</v-list-item-title>
+              }}</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
 
@@ -417,7 +420,7 @@
                 <span>
                   <div :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t(device.driverType) }}</div>
                   <div :style="{ fontSize: '7px' }" :class="{ 'connected-device': device.isConnected }">{{ device.device
-                    }}
+                  }}
                   </div>
                 </span>
               </v-list-item-title>
@@ -468,7 +471,7 @@
             </v-list-item-icon>
             <v-list-item-content>
               <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Data Credits')
-                }}</v-list-item-title>
+              }}</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
 
@@ -2887,7 +2890,7 @@ export default {
 
         // let originalImg8 = this.Bit16To8_Stretch(resizeImg, B, W);
         // resizeImg.delete();
-        
+
 
         if (this.isPolarAxisMode) {
           // 调整图像大小
@@ -3153,7 +3156,7 @@ export default {
         ctx.stroke();
         ctx.closePath();
       }
-      
+
     },
 
     // drawImageData(colorData) {
