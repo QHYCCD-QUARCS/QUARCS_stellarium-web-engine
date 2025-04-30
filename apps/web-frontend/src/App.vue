@@ -2887,33 +2887,42 @@ export default {
 
         // let originalImg8 = this.Bit16To8_Stretch(resizeImg, B, W);
         // resizeImg.delete();
-        let originalImg8 = this.Bit16To8_Stretch(dst, B, W);
-        dst.delete();
-
-        let targetImg8 = this.ImageSoftAWB(originalImg8, gainR, gainB, offset);
-
-        let OriginalImageData = new ImageData(new Uint8ClampedArray(originalImg8.data), originalImg8.cols, originalImg8.rows);
-        this.OriginalImage = OriginalImageData;
-
-        originalImg8.delete();
-
-        this.lastImageProcessParams = {
-          gainR: gainR,
-          gainB: gainB,
-          offset: offset,
-          CFA: CFA,
-          mode: mode,
-          B: B,
-          W: W,
-          cvmode: cvmode,
-        };
-
-        modifiedCanvas.width = this.CanvasWidth;
-        modifiedCanvas.height = this.CanvasHeight;
+        
 
         if (this.isPolarAxisMode) {
+          // 调整图像大小
+          cv.resize(dst, resizeImg, new cv.Size(this.CanvasWidth, this.CanvasHeight), 0, 0, cv.INTER_LINEAR);
+          dst.delete();
+
+          let originalImg8 = this.Bit16To8_Stretch(resizeImg, B, W);
+          resizeImg.delete();
+
+          let targetImg8 = this.ImageSoftAWB(originalImg8, gainR, gainB, offset);
           this.$bus.$emit('showSolveImage', targetImg8);
         } else {
+          let originalImg8 = this.Bit16To8_Stretch(dst, B, W);
+          dst.delete();
+
+          let targetImg8 = this.ImageSoftAWB(originalImg8, gainR, gainB, offset);
+
+          let OriginalImageData = new ImageData(new Uint8ClampedArray(originalImg8.data), originalImg8.cols, originalImg8.rows);
+          this.OriginalImage = OriginalImageData;
+
+          originalImg8.delete();
+
+          this.lastImageProcessParams = {
+            gainR: gainR,
+            gainB: gainB,
+            offset: offset,
+            CFA: CFA,
+            mode: mode,
+            B: B,
+            W: W,
+            cvmode: cvmode,
+          };
+
+          modifiedCanvas.width = this.CanvasWidth;
+          modifiedCanvas.height = this.CanvasHeight;
           let colorData = new ImageData(new Uint8ClampedArray(targetImg8.data), targetImg8.cols, targetImg8.rows);
           this.drawImgData = colorData;
           // 设置缓冲画布宽高
@@ -2999,7 +3008,7 @@ export default {
       } else {
         // document.addEventListener('click', this.handleTouchOrMouseDown);
         this.enableMainCanvasClick = true;
-        this.drawImageData(this.detectStarsImg);
+        // this.drawImageData(this.detectStarsImg);
       }
     },
 
@@ -3082,7 +3091,7 @@ export default {
       this.visibleWidth = newVisibleWidth;
       this.visibleHeight = newVisibleHeight;
 
-
+      this.$bus.$emit('setCurrentMainCanvasHasImage', true); // 发送给电调，用于判断是否可以进行循环拍摄
       // 发送消息给QT客户端，用于信息图标
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'sendRedBoxState:' + this.RedBoxSideLength + ':' + this.ROI_x + ':' + this.ROI_y);
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'sendVisibleArea:' + this.visibleX + ':' + this.visibleY + ':' + this.scale);
@@ -3144,6 +3153,7 @@ export default {
         ctx.stroke();
         ctx.closePath();
       }
+      
     },
 
     // drawImageData(colorData) {

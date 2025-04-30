@@ -191,6 +191,8 @@ export default {
       inAutoFocus: false, // 自动对焦是否开启
       isLoopActive: false, // 新增状态控制循环拍摄是否激活
 
+      currentMainCanvasHasImage: false,
+
 
       ROI_length: 300,
 
@@ -220,6 +222,7 @@ export default {
     this.$bus.$on('startFocusLoopSjootingfile', this.startFocusLoopSjootingfile);
     this.$bus.$on('setFocuserLoopingState', this.setFocuserLoopingState);
     this.$bus.$on('selectStarImage', this.selectStarImage);
+    this.$bus.$on('setCurrentMainCanvasHasImage', this.setCurrentMainCanvasHasImage);
   },
   methods: {
     updatePosition() {
@@ -400,6 +403,10 @@ export default {
     active() { },
 
     toggleLoopShooting() {
+      if (!this.currentMainCanvasHasImage) {
+        this.$bus.$emit('showMsgBox', 'Please take a picture first!', 'warning');
+        return;
+      }
       this.isLoopActive = !this.isLoopActive;
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'FocusLoopShooting:' + this.isLoopActive);
       this.$bus.$emit('disableCaptureButton', this.isLoopActive);
@@ -429,6 +436,9 @@ export default {
       this.$bus.$emit('disableCaptureButton', this.isLoopActive);
     },
 
+    setCurrentMainCanvasHasImage(hasImage) {
+      this.currentMainCanvasHasImage = hasImage;
+    }
   }
 }
 </script>
