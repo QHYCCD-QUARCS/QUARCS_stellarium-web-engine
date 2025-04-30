@@ -4876,6 +4876,8 @@ export default {
       this.isDragging = true;
       this.startX = event.clientX;
       this.startY = event.clientY;
+      this.currentX = event.clientX;
+      this.currentY = event.clientY;
 
       // 设置一个定时器，每100ms执行一次鼠标移动的逻辑
       this.moveIntervalId = setInterval(() => {
@@ -4886,8 +4888,8 @@ export default {
         if (isNaN(dx) || isNaN(dy)) {
           return;
         }
-        let newVisibleX = this.visibleX + dx / window.innerWidth * this.mainCameraSizeX;
-        let newVisibleY = this.visibleY + dy / window.innerHeight * this.mainCameraSizeY;
+        let newVisibleX = this.visibleX + dx / window.innerWidth * this.visibleWidth;
+        let newVisibleY = this.visibleY + dy / window.innerHeight * this.visibleHeight;
         if (newVisibleX < 0) {
           newVisibleX = 0;
         }
@@ -4957,9 +4959,9 @@ export default {
     },
 
     handleMainCanvasTouch(event) {
-      this.SendConsoleLogMsg('触发触摸事件:', 'info');
+      // this.SendConsoleLogMsg('触发触摸事件:', 'info');
       if (!this.enableMainCanvasClick || this.isDragging) return; // 如果画布不可点击，则不处理点击事件
-      console.log('触发触摸事件:', event);
+      // console.log('触发触摸事件:', event);
       if (!this.enableMainCanvasClick || !event.touches || event.touches.length === 0) return;
       const canvas = this.$refs.mainCanvas;
       if (!canvas) return; // 确保 canvas 元素存在
@@ -4989,13 +4991,15 @@ export default {
       this.drawImageData();
     },
     handleTouchStart(event) {
-      this.SendConsoleLogMsg('触发触摸开始事件:', 'info');
+      // this.SendConsoleLogMsg('触发触摸开始事件:', 'info');
       if (event.touches.length === 1) { // 单指触摸，开始拖动
         this.isOneTouch = true;
-        this.SendConsoleLogMsg('触发单指触摸事件', 'info');
+        // this.SendConsoleLogMsg('触发单指触摸事件', 'info');
         this.isDragging = true;
         this.startX = event.touches[0].clientX;
         this.startY = event.touches[0].clientY;
+        this.currentX = event.touches[0].clientX;
+        this.currentY = event.touches[0].clientY;
         // 清除可能存在的双指触摸的定时器
         if (this.zoomIntervalId) {
           clearInterval(this.zoomIntervalId);
@@ -5006,7 +5010,7 @@ export default {
         this.handleMainCanvasTouch(event);
       } else if (event.touches.length >= 2) { // 双指触摸，开始缩放
         this.isOneTouch = false;
-        this.SendConsoleLogMsg('触发双指触摸事件', 'info');
+        // this.SendConsoleLogMsg('触发双指触摸事件', 'info');
         this.isDragging = true;
         // 计算两个触摸点之间的距离
         const dx = this.currentTouchX[0] - this.currentTouchX[1];
@@ -5020,12 +5024,12 @@ export default {
 
 
       } else {
-        this.SendConsoleLogMsg('触发多指触摸事件，获取当前触摸点数量:' + event.touches.length, 'info');
+        // this.SendConsoleLogMsg('触发多指触摸事件，获取当前触摸点数量:' + event.touches.length, 'info');
       }
     },
 
     handleTouchMove(event) {
-      this.SendConsoleLogMsg('触发触摸移动事件:', 'info');
+      // this.SendConsoleLogMsg('触发触摸移动事件:', 'info');
       if (!this.isDragging) return;
       if (event.touches.length == 1) {
         this.currentTouchX[0] = event.touches[0].clientX;
@@ -5050,8 +5054,8 @@ export default {
             return;
           }
 
-          this.visibleX += dx / window.innerWidth * this.mainCameraSizeX;
-          this.visibleY += dy / window.innerHeight * this.mainCameraSizeY;
+          this.visibleX += dx / window.innerWidth * this.visibleWidth;
+          this.visibleY += dy / window.innerHeight * this.visibleHeight;
 
           this.startTouchX[0] = this.currentTouchX[0];
           this.startTouchY[0] = this.currentTouchY[0];
