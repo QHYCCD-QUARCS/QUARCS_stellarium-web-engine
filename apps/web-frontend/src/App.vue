@@ -22,22 +22,25 @@
         <div :style="{ width: DeviceIsConnected ? '200px' : '200px' }"
           style="position: absolute; top: 50px; max-height: calc(100% - 95px); overflow-y: auto;">
 
-          <!-- <div v-show="!DeviceIsConnected" style="text-align: center;">
-          <span style="display: inline-block; font-size: 15px; color: rgba(255, 255, 255, 0.5); user-select: none;">
-            {{ $t('Device Connection') }}
-          </span>
-          <v-select :label="$t('Select Driver')" :items="drivers" item-text="label" item-value="value" v-model="selectedDriver" style="width: 150px; display: inline-block;"></v-select>
+          <div v-show="!DeviceIsConnected" style="text-align: center;">
+            <span style="display: inline-block; font-size: 15px; color: rgba(255, 255, 255, 0.5); user-select: none;">
+              {{ $t('Device Connection') }}
+            </span>
+            <v-select :label="$t('Select Driver')" :items="drivers" item-text="label" item-value="value"
+              v-model="selectedDriver" style="width: 150px; display: inline-block;"></v-select>
 
-          <v-row no-gutters>
+            <v-row no-gutters>
               <v-col cols="4">
-              <button @click="clearDriver" class="btn-confirm" style="display: inline-block;">
-                <div style="display: flex; justify-content: center; align-items: center;">
-                  <img src="@/assets/images/svg/ui/delete.svg" height="20px" style="min-height: 20px; pointer-events: none;"></img>
-                </div>
-              </button>
-            </v-col>
+                <button @click="clearDriver" class="btn-confirm" style="display: inline-block;">
+                  <div style="display: flex; justify-content: center; align-items: center;">
+                    <img src="@/assets/images/svg/ui/delete.svg" height="20px"
+                      style="min-height: 20px; pointer-events: none;"></img>
+                  </div>
+                </button>
+              </v-col>
               <v-col cols="4">
-                <button v-if="!isConnecting" @click="connectDriver(selectedDriver)" class="btn-confirm" style="display: inline-block; background-color: green;">
+                <button v-if="!isConnecting" @click="connectDriver(selectedDriver)" class="btn-confirm"
+                  style="display: inline-block; background-color: green;">
                   <div style="display: flex; justify-content: center; align-items: center;">
                     <v-icon color="white">mdi-link</v-icon>
                   </div>
@@ -45,16 +48,16 @@
                 <v-progress-circular v-else indeterminate color="green" size="24"></v-progress-circular>
               </v-col>
               <v-col cols="4">
-              <button @click="confirmDriver" class="btn-confirm" style="display: inline-block;">
-                <template>
-                  <v-icon color="rgba(255, 255, 255)">mdi-check-bold</v-icon>
-                </template>
-</button>
-</v-col>
-</v-row>
-</div> -->
+                <button @click="confirmDriver" class="btn-confirm" style="display: inline-block;">
+                  <template>
+                    <v-icon color="rgba(255, 255, 255)">mdi-check-bold</v-icon>
+                  </template>
+                </button>
+              </v-col>
+            </v-row>
+          </div>
 
-          <div v-show="!DeviceIsConnected" style="text-align: center;">
+          <!-- <div v-show="!DeviceIsConnected" style="text-align: center;">
             <span style="display: inline-block; font-size: 15px; color: rgba(255, 255, 255, 0.5); user-select: none;">
               {{ $t('Device Connection') }}
             </span>
@@ -78,7 +81,7 @@
               </v-col>
             </v-row>
 
-          </div>
+          </div> -->
 
           <div v-show="DeviceIsConnected" v-for="(item, index) in CurrentConfigItems()" :key="index"
             style="text-align: center; width: 200px;">
@@ -125,7 +128,7 @@
 
         </div>
 
-        <!-- <div v-show="DeviceIsConnected" style="text-align: center; position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px;">
+        <div v-show="DeviceIsConnected" style="text-align: center; position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px;">
           <button @click="confirmConfiguration(CurrentConfigItems())" class="btn-confirm" style="display: inline-block; user-select: none;">
             <v-icon color="rgba(255, 255, 255)">mdi-check-bold</v-icon>
           </button>
@@ -134,9 +137,9 @@
               <v-icon color="white">mdi-link-off</v-icon>
             </div>
           </button>
-        </div> -->
+        </div>
 
-        <div v-show="DeviceIsConnected"
+        <!-- <div v-show="DeviceIsConnected"
           style="text-align: center; position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); display: flex; justify-content: center; width: 100%;">
           <button @click="confirmConfiguration(CurrentConfigItems())" class="btn-confirm"
             style="display: inline-block; user-select: none;">
@@ -144,7 +147,7 @@
           </button>
         </div>
 
-      </div>
+      </div> -->
 
       <div v-show="isOpenPowerPage">
         <span
@@ -209,7 +212,7 @@
               </v-list-item-icon>
               <v-list-item-content>
                 <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Restart')
-                }}</v-list-item-title>
+                  }}</v-list-item-title>
               </v-list-item-content>
             </v-list-item>
 
@@ -222,7 +225,7 @@
               </v-list-item-icon>
               <v-list-item-content>
                 <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Shut Down')
-                }}</v-list-item-title>
+                  }}</v-list-item-title>
               </v-list-item-content>
             </v-list-item>
 
@@ -269,7 +272,7 @@
               </v-list-item-icon>
               <v-list-item-content>
                 <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Quit')
-                }}</v-list-item-title>
+                  }}</v-list-item-title>
               </v-list-item-content>
             </v-list-item>
 
@@ -282,7 +285,7 @@
               </v-list-item-icon>
               <v-list-item-content>
                 <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('View Settings')
-                }}</v-list-item-title>
+                  }}</v-list-item-title>
               </v-list-item-content>
             </v-list-item>
             <v-divider></v-divider>
@@ -297,7 +300,7 @@
             </v-list-item-icon>
             <v-list-item-content>
               <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Power Management')
-              }}</v-list-item-title>
+                }}</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
 
@@ -382,7 +385,7 @@
             </v-list-item-icon>
             <v-list-item-content>
               <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Image Files')
-              }}</v-list-item-title>
+                }}</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
 
@@ -395,7 +398,7 @@
             </v-list-item-icon>
             <v-list-item-content>
               <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Logs')
-              }}</v-list-item-title>
+                }}</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
 
@@ -414,7 +417,7 @@
                 <span>
                   <div :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t(device.driverType) }}</div>
                   <div :style="{ fontSize: '7px' }" :class="{ 'connected-device': device.isConnected }">{{ device.device
-                  }}
+                    }}
                   </div>
                 </span>
               </v-list-item-title>
@@ -465,7 +468,7 @@
             </v-list-item-icon>
             <v-list-item-content>
               <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Data Credits')
-              }}</v-list-item-title>
+                }}</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
 
@@ -484,8 +487,9 @@
             <component v-bind:is="guiComponent"></component>
             <canvas id="stel-canvas" ref='stelCanvas' :style="{ zIndex: canvasZIndexStel }"></canvas>
             <canvas ref="mainCanvas" id="mainCamera-canvas" :style="{ zIndex: canvasZIndexMainCamera }"
-              @click="handleMainCanvasClick" @touchstart="handleTouchStart" @touchmove="handleTouchMove" @touchend="handleTouchEnd"
-              @mousedown="handleMouseDown" @mouseup="handleMouseUp" @mousemove="handleMouseMove" @wheel="handleWheel">
+              @click="handleMainCanvasClick" @touchstart="handleTouchStart" @touchmove="handleTouchMove"
+              @touchend="handleTouchEnd" @mousedown="handleMouseDown" @mouseup="handleMouseUp"
+              @mousemove="handleMouseMove" @wheel="handleWheel">
             </canvas>
             <canvas ref="guiderCanvas" id="guiderCamera-canvas" :style="{ zIndex: canvasZIndexGuiderCamera }"
               @click="handleGuiderCanvasClick"></canvas>
@@ -914,8 +918,15 @@ export default {
                   // 创建一个驱动对象
                   const driver = { type, label, value };
 
+                  // if (type === 'MainCamera' && label === "QHY CCD2") {
+                  //   break;
+                  // }
+                  // if (type === 'Guider' && label === "QHY CCD") {
+                  //   break;
+                  // }
+
                   // 检查label是否为"QHY CCD"或"QFocuser"，如果是，则插入到数组首位
-                  if (label === "QHY CCD" || label === "QFocuser") {
+                  if (label === "QHY CCD" || label === "QFocuser" || label === "QHY CCD2") {
                     this.drivers.unshift(driver); // 将新驱动添加到数组的开始位置
                   } else {
                     this.drivers.push(driver); // 将新驱动添加到数组的末尾
@@ -1708,7 +1719,7 @@ export default {
                 if (parts.length === 4) {
                   this.visibleX = parseFloat(parts[1]);
                   this.visibleY = parseFloat(parts[2]);
-                  this.scale = parseFloat(parts[3]); 
+                  this.scale = parseFloat(parts[3]);
                   this.SendConsoleLogMsg('update VisibleArea x=' + this.visibleX + ', y=' + this.visibleY + ', scale=' + this.scale, 'info');
                 }
                 break;
@@ -1729,7 +1740,7 @@ export default {
                 }
                 break;
 
-                
+
               default:
                 console.warn('未处理命令: ', data.message);
                 break;
@@ -1883,7 +1894,7 @@ export default {
       this.sendMessage('Vue_Command', 'getStagingScheduleData');
       this.sendMessage('Vue_Command', 'getStagingSolveResult');
       this.sendMessage('Vue_Command', 'getGPIOsStatus');
-      
+
       this.disconnectTimeoutTriggered = false;
     },
 
@@ -3074,7 +3085,7 @@ export default {
 
       // 发送消息给QT客户端，用于信息图标
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'sendRedBoxState:' + this.RedBoxSideLength + ':' + this.ROI_x + ':' + this.ROI_y);
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'sendVisibleArea:' + this.visibleX + ':' + this.visibleY + ':' + this.scale );
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'sendVisibleArea:' + this.visibleX + ':' + this.visibleY + ':' + this.scale);
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'sendSelectStars:' + this.selectStarX + ':' + this.selectStarY);
       // 如果选择了星点，则根据选择位置，在ROI区域中绘制一个圆
       if (this.selectStarX != -1 && this.selectStarY != -1 && this.showSelectStar) {
@@ -4991,7 +5002,7 @@ export default {
           this.zoomIntervalId = null;
         }
 
-        
+
         this.handleMainCanvasTouch(event);
       } else if (event.touches.length >= 2) { // 双指触摸，开始缩放
         this.isOneTouch = false;
