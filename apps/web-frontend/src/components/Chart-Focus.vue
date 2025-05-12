@@ -163,7 +163,7 @@ export default {
           },
           {
             name: 'MiddleLine',
-            type: 'line',
+            type: '天文事件实时网站',
             data: [
               [(this.xAxis_min + this.xAxis_max) / 2, this.yAxis_min],
               [(this.xAxis_min + this.xAxis_max) / 2, y_max]
@@ -182,6 +182,7 @@ export default {
       const existingPointIndex = this.chartData1.findIndex(point => point[0] === newDataPoint[0]);
       if (existingPointIndex !== -1) {
         // If the x value already exists, update the y value
+        if (newDataPoint[1] == 0 || newDataPoint[1] == this.chartData1[existingPointIndex][1]) return;
         this.chartData1[existingPointIndex] = newDataPoint;
       } else {
         // If the x value does not exist, add the new data point

@@ -72,7 +72,7 @@
         </button>
 
         <!-- <button  @click="AutoFocus" @touchend="active" class="get-click btn-Auto"><v-icon>mdi-focus-auto</v-icon></button> -->
-        <!-- <button @click="AutoFocus" @touchend="active" class="get-click btn-Auto">
+        <button @click="AutoFocus" @touchend="active" class="get-click btn-Auto">
           <span v-if="inAutoFocus">
             <div style="display: flex; justify-content: center; align-items: center;">
               <img src="@/assets/images/svg/ui/StopAutoFocus.svg" height="20px"
@@ -85,7 +85,7 @@
                 style="min-height: 20px; pointer-events: none;"></img>
             </div>
           </span>
-        </button> -->
+        </button>
 
         <!-- <button @click="FocusGoto" @touchend="active" class="get-click btn-Goto">
           <div style="display: flex; justify-content: center; align-items: center;">
@@ -196,6 +196,8 @@ export default {
 
       ROI_length: 300,
 
+      FocuserIsConnected: false,
+
     };
   },
   components: {
@@ -223,6 +225,7 @@ export default {
     this.$bus.$on('setFocuserLoopingState', this.setFocuserLoopingState);
     this.$bus.$on('selectStarImage', this.selectStarImage);
     this.$bus.$on('setCurrentMainCanvasHasImage', this.setCurrentMainCanvasHasImage);
+    this.$bus.$on('FocuserConnected', this.setFocuserIsConnected);
   },
   methods: {
     updatePosition() {
@@ -238,6 +241,10 @@ export default {
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getFocuserLoopingState');
     },
     AutoFocus() {
+      if (!this.FocuserIsConnected) {
+        this.$bus.$emit('showMsgBox', 'Focuser is not connected!', 'warning');
+        return;
+      }
       if (this.isMoveInProgress) return;
       if (this.inAutoFocus) {
         this.inAutoFocus = false;
@@ -264,6 +271,10 @@ export default {
     },
 
     StepsChange() {
+      if (!this.FocuserIsConnected) {
+        this.$bus.$emit('showMsgBox', 'Focuser is not connected!', 'warning');
+        return;
+      }
       if (this.MoveSteps === 100) this.MoveSteps = 500;
       else if (this.MoveSteps === 500) this.MoveSteps = 1000;
       else if (this.MoveSteps === 1000) this.MoveSteps = 5000;
@@ -275,6 +286,10 @@ export default {
     },
 
     SpeedChange() {
+      if (!this.FocuserIsConnected) {
+        this.$bus.$emit('showMsgBox', 'Focuser is not connected!', 'warning');
+        return;
+      }
       if (this.MoveSpeed === 1) this.MoveSpeed = 3;
       else if (this.MoveSpeed === 3) this.MoveSpeed = 5;
       else if (this.MoveSpeed === 5) this.MoveSpeed = 1;
@@ -297,6 +312,10 @@ export default {
     },
 
     FocusMove(direction) {
+      if (!this.FocuserIsConnected) {
+        this.$bus.$emit('showMsgBox', 'Focuser is not connected!', 'warning');
+        return;
+      }
       if (this.inAutoFocus) return;
       // this.isBtnMoveDisabled = true;
       if (direction === 'left') {
@@ -438,7 +457,14 @@ export default {
 
     setCurrentMainCanvasHasImage(hasImage) {
       this.currentMainCanvasHasImage = hasImage;
-    }
+    },
+    setFocuserIsConnected(isConnected) {
+      if (isConnected == 1) {
+        this.FocuserIsConnected = true;
+      } else {
+        this.FocuserIsConnected = false;
+      }
+    } 
   }
 }
 </script>

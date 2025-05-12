@@ -1,93 +1,114 @@
 <template>
   <transition name="panel">
-  <div class="mount-control-panel" :style="{ top: top + 'px', right: right + 'px', width: width + 'px', height: height + 'px' }">
-    <span style="position: absolute; top: 3%; left: 50%; transform: translate(-50%, -50%); font-size: 10px; color: rgba(255, 255, 255, 0.5); user-select: none;"> 
-      {{ MountPierSide }}
-    </span>
-
-    <div class="Direction-Btn">
-      <button class="ra-plus no-select" @touchstart="handleMouseDownRA('plus')" @touchend="stop">
-        <div style="display: flex; justify-content: center; align-items: center;">
-          <img src="@/assets/images/svg/ui/RA+.svg" height="40px" style="min-height: 40px; pointer-events: none;"></img>
-        </div>
-      </button>
-      <button class="ra-minus no-select" @touchstart="handleMouseDownRA('minus')" @touchend="stop">
-        <div style="display: flex; justify-content: center; align-items: center;">
-          <img src="@/assets/images/svg/ui/RA-.svg" height="40px" style="min-height: 40px; pointer-events: none;"></img>
-        </div>
-      </button>
-      <button class="dec-plus no-select" @touchstart="handleMouseDownDEC('plus')" @touchend="stop">
-        <div style="display: flex; justify-content: center; align-items: center;">
-          <img src="@/assets/images/svg/ui/DEC+.svg" height="40px" style="min-height: 40px; pointer-events: none;"></img>
-        </div>
-      </button>
-      <button class="dec-minus no-select" @touchstart="handleMouseDownDEC('minus')" @touchend="stop">
-        <div style="display: flex; justify-content: center; align-items: center;">
-          <img src="@/assets/images/svg/ui/DEC-.svg" height="40px" style="min-height: 40px; pointer-events: none;"></img>
-        </div>
-      </button>
-    </div>
-
-    <div>
-      <button class="btn-stop no-select" @click="stop"><v-icon> mdi-stop-circle-outline </v-icon></button>
-    </div>
-
-    <div>
-      <button class="btn-speed custom-button no-select" @click="MountSlewRateSwitch">
-        <span style="position:absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);">{{ MountSpeed }}</span>
-        <div style="display: flex; justify-content: center; align-items: center;">
-          <img src="@/assets/images/svg/ui/SPEED.svg" height="25px" style="min-height: 25px; pointer-events: none;"></img>
-        </div>
-      </button>
-    </div>
-    
-    <div v-if="showButtons">
-      <button v-bind:class="{ 'btn-park-on no-select': ParkSwitch, 'btn-park no-select': !ParkSwitch }" @click="MountPark">
-        <div style="display: flex; justify-content: center; align-items: center;">
-          <img src="@/assets/images/svg/ui/Park.svg" height="25px" style="min-height: 25px; pointer-events: none;"></img>
-        </div>
-      </button>
-      <button v-bind:class="{ 'btn-track-on no-select': TrackSwitch, 'btn-track no-select': !TrackSwitch }" @click="MountTrack"><v-icon> mdi-target </v-icon></button>
-      <button class="custom-button btn-home no-select" @click="MountHome">
-        <div style="display: flex; justify-content: center; align-items: center;">
-          <img src="@/assets/images/svg/ui/Home.svg" height="20px" style="min-height: 20px; pointer-events: none;"></img>
-        </div>
-      </button>
-      <button class="custom-button btn-sync no-select" @click="MountSYNC">
-        <div style="display: flex; justify-content: center; align-items: center;">
-          <img src="@/assets/images/svg/ui/Sync.svg" height="20px" style="min-height: 20px; pointer-events: none;"></img>
-        </div>
-      </button>
-
-      <button class="custom-button btn-slove no-select" @click="SolveSYNC">
-        <div style="display: flex; justify-content: center; align-items: center;">
-          <img src="@/assets/images/svg/ui/Solve.svg" height="25px" style="min-height: 25px; pointer-events: none;"></img>
-        </div>
-      </button>
-    </div>
-
-    <div>
-      <span v-if="isIDLE" class="icon-container">
-        <div style="display: flex; justify-content: center; align-items: center;">
-          <img src="@/assets/images/svg/ui/Status-idle.svg" height="15px" style="min-height: 15px; pointer-events: none;"></img>
-        </div>
+    <div class="mount-control-panel"
+      :style="{ top: top + 'px', right: right + 'px', width: width + 'px', height: height + 'px' }">
+      <span
+        style="position: absolute; top: 3%; left: 50%; transform: translate(-50%, -50%); font-size: 10px; color: rgba(255, 255, 255, 0.5); user-select: none;">
+        {{ MountPierSide }}
       </span>
-      <span v-else class="icon-container">
-        <div style="display: flex; justify-content: center; align-items: center;">
-          <img src="@/assets/images/svg/ui/Status-busy.svg" height="15px" style="min-height: 15px; pointer-events: none;"></img>
-        </div>
-      </span>
-    </div>
 
-    <div>
-      <button class="btn-close no-select" @click="PanelClose">
-        <div style="display: flex; justify-content: center; align-items: center;">
-          <img src="@/assets/images/svg/ui/OFF.svg" height="12px" style="min-height: 12px; pointer-events: none;"></img>
-        </div>
-      </button>
-    </div>
+      <div class="Direction-Btn">
+        <button class="ra-plus no-select" @touchstart="handleMouseDownRA('plus')" @touchend="stop"
+          @mousedown="handleMouseDownRA('plus')" @mouseup="stop">
+          <div style="display: flex; justify-content: center; align-items: center;">
+            <img src="@/assets/images/svg/ui/RA+.svg" height="40px"
+              style="min-height: 40px; pointer-events: none;"></img>
+          </div>
+        </button>
+        <button class="ra-minus no-select" @touchstart="handleMouseDownRA('minus')" @touchend="stop"
+          @mousedown="handleMouseDownRA('minus')" @mouseup="stop">
+          <div style="display: flex; justify-content: center; align-items: center;">
+            <img src="@/assets/images/svg/ui/RA-.svg" height="40px"
+              style="min-height: 40px; pointer-events: none;"></img>
+          </div>
+        </button>
+        <button class="dec-plus no-select" @touchstart="handleMouseDownDEC('plus')" @touchend="stop"
+          @mousedown="handleMouseDownDEC('plus')" @mouseup="stop">
+          <div style="display: flex; justify-content: center; align-items: center;">
+            <img src="@/assets/images/svg/ui/DEC+.svg" height="40px"
+              style="min-height: 40px; pointer-events: none;"></img>
+          </div>
+        </button>
+        <button class="dec-minus no-select" @touchstart="handleMouseDownDEC('minus')" @touchend="stop"
+          @mousedown="handleMouseDownDEC('minus')" @mouseup="stop">
+          <div style="display: flex; justify-content: center; align-items: center;">
+            <img src="@/assets/images/svg/ui/DEC-.svg" height="40px"
+              style="min-height: 40px; pointer-events: none;"></img>
+          </div>
+        </button>
+      </div>
 
-  </div>
+      <div>
+        <button class="btn-stop no-select" @click="stop"><v-icon> mdi-stop-circle-outline </v-icon></button>
+      </div>
+
+      <div>
+        <button class="btn-speed custom-button no-select" @click="MountSlewRateSwitch">
+          <span style="position:absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);">{{ MountSpeed
+            }}</span>
+          <div style="display: flex; justify-content: center; align-items: center;">
+            <img src="@/assets/images/svg/ui/SPEED.svg" height="25px"
+              style="min-height: 25px; pointer-events: none;"></img>
+          </div>
+        </button>
+      </div>
+
+      <div v-if="showButtons">
+        <button v-bind:class="{ 'btn-park-on no-select': ParkSwitch, 'btn-park no-select': !ParkSwitch }"
+          @click="MountPark">
+          <div style="display: flex; justify-content: center; align-items: center;">
+            <img src="@/assets/images/svg/ui/Park.svg" height="25px"
+              style="min-height: 25px; pointer-events: none;"></img>
+          </div>
+        </button>
+        <button v-bind:class="{ 'btn-track-on no-select': TrackSwitch, 'btn-track no-select': !TrackSwitch }"
+          @click="MountTrack"><v-icon> mdi-target </v-icon></button>
+        <button class="custom-button btn-home no-select" @click="MountHome">
+          <div style="display: flex; justify-content: center; align-items: center;">
+            <img src="@/assets/images/svg/ui/Home.svg" height="20px"
+              style="min-height: 20px; pointer-events: none;"></img>
+          </div>
+        </button>
+        <button class="custom-button btn-sync no-select" @click="MountSYNC">
+          <div style="display: flex; justify-content: center; align-items: center;">
+            <img src="@/assets/images/svg/ui/Sync.svg" height="20px"
+              style="min-height: 20px; pointer-events: none;"></img>
+          </div>
+        </button>
+
+        <button class="custom-button btn-slove no-select" @click="SolveSYNC">
+          <div style="display: flex; justify-content: center; align-items: center;">
+            <img src="@/assets/images/svg/ui/Solve.svg" height="25px"
+              style="min-height: 25px; pointer-events: none;"></img>
+          </div>
+        </button>
+      </div>
+
+      <div>
+        <span v-if="isIDLE" class="icon-container">
+          <div style="display: flex; justify-content: center; align-items: center;">
+            <img src="@/assets/images/svg/ui/Status-idle.svg" height="15px"
+              style="min-height: 15px; pointer-events: none;"></img>
+          </div>
+        </span>
+        <span v-else class="icon-container">
+          <div style="display: flex; justify-content: center; align-items: center;">
+            <img src="@/assets/images/svg/ui/Status-busy.svg" height="15px"
+              style="min-height: 15px; pointer-events: none;"></img>
+          </div>
+        </span>
+      </div>
+
+      <div>
+        <button class="btn-close no-select" @click="PanelClose">
+          <div style="display: flex; justify-content: center; align-items: center;">
+            <img src="@/assets/images/svg/ui/OFF.svg" height="12px"
+              style="min-height: 12px; pointer-events: none;"></img>
+          </div>
+        </button>
+      </div>
+
+    </div>
   </transition>
 </template>
 
@@ -102,7 +123,7 @@ export default {
       startY: 0,
       width: 150,
       height: 240,
-      
+
       isExpanded: true,
       showButtons: true,
 
@@ -129,29 +150,29 @@ export default {
     this.$bus.$on('MountParkSwitch', this.MountParkSwitch);
     this.$bus.$on('MountTrackSwitch', this.MountTrackSwitch);
     // this.$bus.$on('MountTotalSlewRate',this.MountTotalSlewRate);
-    this.$bus.$on('newMountSlewRate',this.newMountSlewRate);
-    this.$bus.$on('TargetRaDec',this.getTargetRaDec);
-    this.$bus.$on('MountGoto',this.MountGoto);
-    this.$bus.$on('MountStatus',this.MountStatus);
-    this.$bus.$on('updateMountPierSide',this.updateMountPierSide);
+    this.$bus.$on('newMountSlewRate', this.newMountSlewRate);
+    this.$bus.$on('TargetRaDec', this.getTargetRaDec);
+    this.$bus.$on('MountGoto', this.MountGoto);
+    this.$bus.$on('MountStatus', this.MountStatus);
+    this.$bus.$on('updateMountPierSide', this.updateMountPierSide);
   },
   methods: {
     handleMouseDownRA(direction) {
       // 在这里实现调整RA的逻辑
       // console.log(`QHYCCD | 调整RA ${direction}`);
       this.$bus.$emit('SendConsoleLogMsg', `Mount Move RA ${direction}`, 'info');
-      if(direction === 'plus'){
+      if (direction === 'plus') {
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'MountMoveWest');
       } else {
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'MountMoveEast');
       }
-      
+
     },
     handleMouseDownDEC(direction) {
       // 在这里实现调整DEC的逻辑
       // console.log(`QHYCCD | 调整DEC ${direction}`);
       this.$bus.$emit('SendConsoleLogMsg', `Mount Move DEC ${direction}`, 'info');
-      if(direction === 'plus'){
+      if (direction === 'plus') {
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'MountMoveNorth');
       } else {
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'MountMoveSouth');
@@ -198,14 +219,14 @@ export default {
     },
 
     MountStatus(status) {
-      if(status === 'Slewing') {
+      if (status === 'Slewing') {
         this.isIDLE = false;
-      } 
+      }
       else {
         this.isIDLE = true;
       }
     },
-    
+
     // MountTotalSlewRate(num) {
     //   console.log('MountTotalSlewRate:',num);
     //   this.SpeedTotalNum = [];
@@ -221,25 +242,21 @@ export default {
     MountSlewRateSwitch() {
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'MountSpeedSwitch');
     },
-    
+
     MountParkSwitch(Switch) {
-      if(Switch === 'ON')
-      {
+      if (Switch === 'ON') {
         this.ParkSwitch = true;
       }
-      else
-      {
+      else {
         this.ParkSwitch = false;
       }
     },
-    
+
     MountTrackSwitch(Switch) {
-      if(Switch === 'ON')
-      {
+      if (Switch === 'ON') {
         this.TrackSwitch = true;
       }
-      else
-      {
+      else {
         this.TrackSwitch = false;
       }
     },
@@ -271,6 +288,7 @@ export default {
   from {
     right: -150px;
   }
+
   to {
     right: 10px;
   }
@@ -280,6 +298,7 @@ export default {
   from {
     right: 10px;
   }
+
   to {
     right: -150px;
   }
@@ -314,8 +333,8 @@ export default {
 
 .ra-plus {
   /* clip-path: polygon(0 0, 100% 0, 100% 59%, 90% 60%, 80% 64%, 70% 71%, 60% 75%, 50% 50%, 42% 60%, 36% 70%, 32% 80%, 30% 90%, 29% 100%, 0 100%); */
-  
-  position:absolute;
+
+  position: absolute;
   width: 57.5px;
   height: 57.5px;
   top: 0px;
@@ -331,8 +350,8 @@ export default {
 
 .ra-minus {
   /* clip-path: polygon(100% 0, 0 0, 0 29%, 10% 30%, 20% 32%, 30% 36%, 40% 42%, 50% 50%, 58% 60%, 64% 70%, 68% 80%, 70% 90%, 71% 100%, 100% 100%); */
-  
-  position:absolute;
+
+  position: absolute;
   width: 57.5px;
   height: 57.5px;
   top: 0px;
@@ -348,8 +367,8 @@ export default {
 
 .dec-plus {
   /* clip-path: polygon(0 100%, 100% 100%, 100% 71%, 90% 70%, 80% 68%, 70% 64%, 60% 58%, 50% 50%, 42% 40%, 36% 30%, 32% 20%, 30% 10%, 29% 0, 0 0); */
-  
-  position:absolute;
+
+  position: absolute;
   width: 57.5px;
   height: 57.5px;
   top: 62.5px;
@@ -365,8 +384,8 @@ export default {
 
 .dec-minus {
   /* clip-path: polygon(100% 100%, 0 100%, 0 71%, 10% 70%, 20% 68%, 30% 64%, 40% 58%, 50% 50%, 58% 40%, 64% 30%, 68% 20%, 70% 10%, 71% 0, 100% 0); */
-  
-  position:absolute;
+
+  position: absolute;
   width: 57.5px;
   height: 57.5px;
   top: 62.5px;
@@ -382,16 +401,18 @@ export default {
 
 .btn-stop {
   border-radius: 50%;
-  position:absolute;
+  position: absolute;
   width: 60px;
   height: 60px;
   top: 45px;
   left: 41px;
-  
+
   background-color: rgba(255, 0, 0, 0.5);
   /* border: 1px solid rgba(255, 255, 255, 0.8); */
-  backdrop-filter: blur(5px); /* 添加毛玻璃效果 */
-  box-sizing: border-box; /* 设置box-sizing为border-box */
+  backdrop-filter: blur(5px);
+  /* 添加毛玻璃效果 */
+  box-sizing: border-box;
+  /* 设置box-sizing为border-box */
   border: none;
 }
 
@@ -403,7 +424,8 @@ export default {
 .btn-home:active,
 .btn-close:active,
 .btn-sync:active {
-  transform: scale(0.95); /* 点击时缩小按钮 */
+  transform: scale(0.95);
+  /* 点击时缩小按钮 */
   background-color: rgba(255, 255, 255, 0.7);
 }
 
@@ -414,8 +436,10 @@ export default {
   /* transform: scale(0.95); */
   background-color: rgba(255, 255, 255, 0.7);
 }
+
 .btn-stop:active {
-  transform: scale(0.95); /* 点击时缩小按钮 */
+  transform: scale(0.95);
+  /* 点击时缩小按钮 */
   background-color: rgba(255, 0, 0, 0.5);
 }
 
@@ -423,8 +447,8 @@ export default {
   user-select: none;
 }
 
-.btn-park{
-  position:absolute;
+.btn-park {
+  position: absolute;
   width: 35px;
   height: 35px;
   bottom: 55px;
@@ -437,8 +461,8 @@ export default {
   box-sizing: border-box;
 }
 
-.btn-track{
-  position:absolute;
+.btn-track {
+  position: absolute;
   width: 35px;
   height: 35px;
   bottom: 55px;
@@ -451,8 +475,8 @@ export default {
   box-sizing: border-box;
 }
 
-.btn-park-on{
-  position:absolute;
+.btn-park-on {
+  position: absolute;
   width: 35px;
   height: 35px;
   bottom: 55px;
@@ -465,8 +489,8 @@ export default {
   box-sizing: border-box;
 }
 
-.btn-track-on{
-  position:absolute;
+.btn-track-on {
+  position: absolute;
   width: 35px;
   height: 35px;
   bottom: 55px;
@@ -479,16 +503,16 @@ export default {
   box-sizing: border-box;
 }
 
-.btn-home{
-  position:absolute;
+.btn-home {
+  position: absolute;
   width: 35px;
   height: 35px;
   bottom: 55px;
   right: 10px;
 }
 
-.btn-sync{
-  position:absolute;
+.btn-sync {
+  position: absolute;
   width: 35px;
   height: 35px;
   bottom: 10px;
@@ -496,7 +520,7 @@ export default {
 }
 
 .btn-speed {
-  position:absolute;
+  position: absolute;
   width: 35px;
   height: 35px;
   bottom: 10px;
@@ -504,7 +528,7 @@ export default {
 }
 
 .btn-slove {
-  position:absolute;
+  position: absolute;
   width: 35px;
   height: 35px;
   bottom: 10px;
@@ -546,5 +570,4 @@ export default {
   border: none;
   border-radius: 50%;
 }
-
 </style>

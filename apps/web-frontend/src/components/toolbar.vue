@@ -16,6 +16,14 @@
       <target-search v-show="isTargetSearchShow" style="width: 20%;"></target-search>
       <v-spacer></v-spacer>
       <div>
+        <div class="subheader text-subtitle-2 pr-2" style="user-select: none;">
+          CPU T {{ cpuTemp !== null ? cpuTemp + '°C' : '--' }} <!-- 添加单位，并只在 cpuTemp 为 null 时显示 '--' -->
+        </div>
+        <div class="subheader text-subtitle-2 pr-2" style="user-select: none;">
+          CPU U {{ cpuUsage !== null ? cpuUsage + '%' : '--' }} <!-- 添加单位，并只在 cpuUsage 为 null 时显示 '--' -->
+        </div>
+      </div>
+      <div>
         <div v-if="$store.state.showFPS" class="subheader text-subtitle-2 pr-2" style="user-select: none;">FPS {{ $store.state.stel ? $store.state.stel.fps.toFixed(1) : '?' }}</div>
         <div class="subheader text-subtitle-2" style="user-select: none;">FOV {{ fov }}</div>
       </div>
@@ -193,6 +201,9 @@ export default {
       MountConnect: false,
 
       GuiderError: false,
+
+      cpuTemp: null,
+      cpuUsage: null,
     }
   },
   created() {
@@ -211,6 +222,8 @@ export default {
     this.$bus.$on('MountConnected', this.MountConnected);
     this.$bus.$on('FocuserConnected', this.FocuserConnected);
     this.$bus.$on('FocusInProgress', this.FocusStatus);
+
+    this.$bus.$on('updateCPUInfo', this.updateCPUInfo);
   },
   computed: {
     fov: function () {
@@ -218,6 +231,12 @@ export default {
       const fov = this.$store.state.stel.fov * 180 / Math.PI
       return fov.toPrecision(3) + '°'
     },
+    // cpuTemp: function () {
+    //   return this.$store.state.cpuTemp
+    // },
+    // cpuUsage: function () {
+    //   return this.$store.state.cpuUsage
+    // },
 
     time: {
       get: function () {
@@ -393,7 +412,14 @@ export default {
 
     FocuserConnected(num) {
       this.CurrentFocusStatus = num;
-    }
+    },
+
+    updateCPUInfo(cpuTemp, cpuUsage) {
+      this.cpuTemp = cpuTemp;
+      this.cpuUsage = cpuUsage;
+      console.log('CPU Temp: ', this.cpuTemp);
+      console.log('CPU Usage: ', this.cpuUsage);
+    },
 
     // GetConnectedDevices() {
     //   this.$bus.$emit('GetConnectedDevices');

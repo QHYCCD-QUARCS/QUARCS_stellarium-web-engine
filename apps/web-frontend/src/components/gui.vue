@@ -320,14 +320,14 @@
           <v-card-text>
             <v-row>
               <v-col cols="6">
-                <v-text-field v-model="DSLRCameraWidth" label="Width" type="number" outlined dense></v-text-field>
+                <v-text-field v-model="DSLRCameraWidth" label="Width(px)" type="number" outlined dense></v-text-field>
               </v-col>
               <v-col cols="6">
-                <v-text-field v-model="DSLRCameraHeight" label="Height" type="number" outlined dense></v-text-field>
+                <v-text-field v-model="DSLRCameraHeight" label="Height(px)" type="number" outlined dense></v-text-field>
               </v-col>
             </v-row>
 
-            <v-text-field v-model="DSLRCameraPixelPitch" label="Pixel Pitch" type="number" outlined dense
+            <v-text-field v-model="DSLRCameraPixelPitch" label="Pixel Pitch(µm)" type="number" outlined dense
               style="margin-top: -20px;"></v-text-field>
           </v-card-text>
 
