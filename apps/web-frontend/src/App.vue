@@ -5475,6 +5475,10 @@ export default {
 </script>
 
 <style>
+body {
+  background-color: black;
+}
+
 a {
   color: #82b1ff;
 }

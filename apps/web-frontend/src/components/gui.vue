@@ -876,8 +876,9 @@ export default {
       
 
       // 发送更新位置的消息
-
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'setROIPosition:' + ROI_x + ":" + ROI_y);
+      if (ROI_x !== 0 && ROI_y !== 0) {
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'setROIPosition:' + ROI_x + ":" + ROI_y);
+      }
       // this.$bus.$emit('AppSendMessage', 'Vue_Command', 'RedBox:' + this.mouseX + ":" + this.mouseY + ":" + window.innerWidth + ":" + window.innerHeight);
     },
 
