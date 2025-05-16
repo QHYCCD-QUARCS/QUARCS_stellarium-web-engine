@@ -86,6 +86,8 @@ export default {
 
     this.$bus.$on('StagingScheduleData',this.RecoveryScheduleData);
 
+    this.$bus.$on('TianWen',this.AddTianWenRow);
+
   },
   mounted() {
     console.log('initialize ScheduleTable------------------------------');
@@ -465,6 +467,23 @@ export default {
         this.$set(this.cellValues, key, this.initialColumnValues[column] || '');
       }
 
+    },
+    AddTianWenRow(notice_type, ra, dec) {
+      this.numberOfRows += 1;
+      const newinitialColumnValues = {
+        1: notice_type,
+        2: 'ra:'+ ra + ',dec:' + dec,
+        3: 'Now',
+        4: '1 s',
+        5: 'L',
+        6: '1',
+        7: 'Light',
+        8: 'OFF',
+      };
+      for (let column = 1; column <= this.numberOfColumns; column++) {
+        const key = `${this.numberOfRows}-${column}`;
+        this.$set(this.cellValues, key, newinitialColumnValues[column] || '');
+      }
     },
 
     initializeTable() {

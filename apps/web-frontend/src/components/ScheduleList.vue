@@ -68,6 +68,7 @@ export default {
       this.$refs.listA.scrollTo(0, scrollTop);
     });
     this.$bus.$on('UpdateScheduleProcess', this.setScheduleItemList);
+    this.$bus.$on('TianWen', this.addTianWen);
   },
   methods: {
     setScheduleItemList(RowNum, Process) {
@@ -187,6 +188,9 @@ export default {
       this.$bus.$emit('scrollEventA', this.$refs.listA.scrollTop);
       // console.log('ScrollTop: ', this.$refs.listA.scrollTop);
     },
+    addTianWen() {
+      this.itemList.push('0%');
+    }
   },
 };
 </script>

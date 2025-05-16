@@ -1773,6 +1773,15 @@ export default {
                 }
                 break;
 
+              case 'TianWen':
+                if (parts.length === 4) {
+                  const notice_type = parts[1];
+                  const ra = parts[2];
+                  const dec = parts[3];
+                  this.$bus.$emit('TianWen', notice_type, ra, dec);
+                }
+                break;
+
               default:
                 console.warn('未处理命令: ', data.message);
                 break;
@@ -3790,14 +3799,16 @@ export default {
 
         this.drawImgData = new ImageData(new Uint8ClampedArray(stretchImage.data), stretchImage.cols, stretchImage.rows);
 
+        this.bufferCtx.putImageData(drawImgData, 0, 0);
         // Draw the image on canvas
         if (this.isNotDrawStars) {
-          this.drawImageData(this.drawImgData);
+          // *************
+          this.drawImageData();
         } else {
           if (this.detectStarsImg != null) {
-            this.drawImageData(this.detectStarsImg);
+            this.drawImageData();
           } else {
-            this.drawImageData(this.drawImgData);
+            this.drawImageData();
           }
         }
 
@@ -3834,6 +3845,7 @@ export default {
       } else {
         console.error('ImageGainB configuration item not found.');
       }
+
 
       // this.processImage(this.ImageArrayBuffer);
     },
