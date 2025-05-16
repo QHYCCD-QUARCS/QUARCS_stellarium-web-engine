@@ -3151,6 +3151,7 @@ export default {
       } else {
         console.log('ROI 区域不在可见区域内, RedBoxSideLength: ', this.RedBoxSideLength * window.innerWidth / newVisibleWidth, ', ', this.RedBoxSideLength * window.innerHeight / newVisibleHeight);
       }
+      123123
       // Draw buffer canvas on main canvas
       const canvas = this.$refs.mainCanvas;
       const ctx = canvas.getContext('2d');
