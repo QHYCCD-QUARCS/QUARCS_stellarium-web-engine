@@ -240,7 +240,11 @@ export default {
     },
 
     MountSlewRateSwitch() {
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'MountSpeedSwitch');
+      if (this.MountSpeed !== -1) {
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'MountSpeedSwitch');
+      }else{
+        this.$bus.$emit('SendConsoleLogMsg', 'Mount not has speed or Mount is not connected!', 'warning');
+      }
     },
 
     MountParkSwitch(Switch) {

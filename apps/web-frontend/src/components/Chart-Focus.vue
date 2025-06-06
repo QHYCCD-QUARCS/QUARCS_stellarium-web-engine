@@ -34,7 +34,9 @@ export default {
       FWHMMax: 0,
       isDragging: false,
       startX: 0,
-      deltaX: 0
+      deltaX: 0,
+      x_min: -60000,
+      x_max: 60000
     };
   },
   mounted() {
@@ -42,13 +44,17 @@ export default {
   },
   created() {
     this.$bus.$on('FocusPosition', this.changeRange_x);
-    this.$bus.$on('UpdateFWHM', this.UpdateFWHM);
-    this.$bus.$on('fitQuadraticCurve', this.fitQuadraticCurve);
-    this.$bus.$on('fitQuadraticCurve_minPoint', this.fitQuadraticCurve_minPoint);
+    // this.$bus.$on('UpdateFWHM', this.UpdateFWHM);
+    // this.$bus.$on('fitQuadraticCurve', this.fitQuadraticCurve);
+    // this.$bus.$on('fitQuadraticCurve_minPoint', this.fitQuadraticCurve_minPoint);
+
     this.$bus.$on('ClearfitQuadraticCurve', this.clearChartData2);
     this.$bus.$on('ClearAllData', this.ClearAllData);
     this.$bus.$on('updateFocusChartWidth', this.initChart);
     this.$bus.$on('addData_Point', this.addData_Point);
+    this.$bus.$on('addMinPointData_Point', this.addMinPointData_Point);
+    this.$bus.$on('addLineData_Point', this.addLineData_Point);
+    this.$bus.$on('setFocusChartRange', this.setFocusChartRange);
   },
   methods: {
     initChart(Width) {
@@ -77,7 +83,7 @@ export default {
       this.deltaX = 0;
       // this.$bus.$emit('setTargetPosition', (this.xAxis_min + this.xAxis_max) / 2);
     },
-    renderChart(x_min, x_max) {
+    renderChart(lowerBound, upperBound) {
       const y_max = this.chartData1.length > 0 ? Math.max(...this.chartData1.map(item => item[1])) * 2 : this.yAxis_max;
       const option = {
         grid: {
@@ -88,8 +94,8 @@ export default {
           containLabel: true
         },
         xAxis: {
-          min: x_min,
-          max: x_max,
+          min: lowerBound,
+          max: upperBound,
           axisLine: {
             lineStyle: {
               color: 'rgba(200, 200, 200, 0.5)'  // x轴线颜色
@@ -162,14 +168,40 @@ export default {
             symbolSize: 4
           },
           {
-            name: 'MiddleLine',
-            type: '天文事件实时网站',
+            name: 'xMinLine',
+            type: 'line',
             data: [
-              [(this.xAxis_min + this.xAxis_max) / 2, this.yAxis_min],
-              [(this.xAxis_min + this.xAxis_max) / 2, y_max]
+              [this.x_min, this.yAxis_min],
+              [this.x_min, y_max]
             ],
             lineStyle: {
-              color: 'rgba(75, 155, 250, 0.7)',
+              color: 'red',
+              width: 1
+            },
+            symbol: 'none'
+          },
+          {
+            name: 'xMaxLine',
+            type: 'line',
+            data: [
+              [this.x_max, this.yAxis_min],
+              [this.x_max, y_max]
+            ],
+            lineStyle: {
+              color: 'red',
+              width: 1
+            },
+            symbol: 'none'
+          },
+          {
+            name: 'currentPosition',
+            type: 'line',
+            data: [
+              [this.currentX, this.yAxis_min],
+              [this.currentX, y_max]
+            ],
+            lineStyle: {
+              color: 'green',
               width: 1
             },
             symbol: 'none'
@@ -178,7 +210,8 @@ export default {
       };
       this.myChart.setOption(option);
     },
-    addData_Point(newDataPoint) {
+    addData_Point(x,y) {
+      const newDataPoint = [x, y];
       const existingPointIndex = this.chartData1.findIndex(point => point[0] === newDataPoint[0]);
       if (existingPointIndex !== -1) {
         // If the x value already exists, update the y value
@@ -190,17 +223,26 @@ export default {
       }
       this.renderChart(this.xAxis_min, this.xAxis_max);
     },
-    addData_Line(newDataPoint) {
-      this.chartData2.push(newDataPoint);
+    // 绘制折线
+    addLineData_Point(dataList) {
+      this.chartData2 = dataList;
       this.renderChart(this.xAxis_min, this.xAxis_max);
     },
+    addMinPointData_Point(x,y) {
+      const newDataPoint = [x, y];
+      this.chartData3.push(newDataPoint);
+      this.renderChart(this.xAxis_min, this.xAxis_max);
+    },
+    // 更改显示的x轴范围
     changeRange_x(current, target) {
-      this.xAxis_min = Number(target) - 3000;
-      this.xAxis_max = Number(target) + 3000;
-      this.currentX = target;
+      this.xAxis_min = Number(current) - 3000;
+      this.xAxis_max = Number(current) + 3000;
+      this.currentX = current;
       console.log("QHYCCD | changeRange_x:", current, this.xAxis_min, this.xAxis_max);
       this.renderChart(this.xAxis_min, this.xAxis_max);
     },
+
+    // 清除数据
     clearChartData1() {
       this.chartData1 = [];
       this.renderChart(this.xAxis_min, this.xAxis_max);
@@ -217,6 +259,7 @@ export default {
       this.FWHMMax = 15;
       this.renderChart(this.xAxis_min, this.xAxis_max);
     },
+    // 切换显示范围
     RangeSwitch() {
       if (this.range === 4) {
         this.range = 2;
@@ -233,23 +276,30 @@ export default {
       }
       this.renderChart(this.xAxis_min, this.xAxis_max);
     },
-    UpdateFWHM(FWHM) {
-      const newDataPoint = [this.currentX, FWHM];
-      this.addData_Point(newDataPoint);
-      console.log("QHYCCD | UpdateFWHM:", newDataPoint);
-      this.$bus.$emit('SendConsoleLogMsg', 'UpdateFWHM:' + newDataPoint, 'info');
-      this.renderChart(this.xAxis_min, this.xAxis_max);
-    },
-    fitQuadraticCurve(x, y) {
-      const newDataPoint = [x, y];
-      this.addData_Line(newDataPoint);
-    },
-    fitQuadraticCurve_minPoint(x, y) {
-      console.log("QHYCCD | minPoint:", x, ',', y);
-      this.$bus.$emit('SendConsoleLogMsg', 'minPoint:' + x + ',' + y, 'info');
-      this.chartData3 = [];
-      const newDataPoint = [x, y];
-      this.chartData3.push(newDataPoint);
+    // 更新FWHM
+    // UpdateFWHM(FWHM) {
+    //   const newDataPoint = [this.currentX, FWHM];
+    //   this.addData_Point(newDataPoint);
+    //   // console.log("QHYCCD | UpdateFWHM:", newDataPoint);
+    //   // this.$bus.$emit('SendConsoleLogMsg', 'UpdateFWHM:' + newDataPoint, 'info');
+    //   this.renderChart(this.xAxis_min, this.xAxis_max);
+    // },
+    // 拟合二次曲线
+    // fitQuadraticCurve(x, y) {
+    //   const newDataPoint = [x, y];
+    //   this.addData_Line(newDataPoint);
+    // },
+    // 拟合二次曲线最小点
+    // fitQuadraticCurve_minPoint(x, y) {
+    //   console.log("QHYCCD | minPoint:", x, ',', y);
+    //   this.$bus.$emit('SendConsoleLogMsg', 'minPoint:' + x + ',' + y, 'info');
+    //   this.chartData3 = [];
+    //   const newDataPoint = [x, y];
+    //   this.chartData3.push(newDataPoint);
+    // },
+    setFocusChartRange(lowerBound, upperBound) {
+      this.x_min = lowerBound;
+      this.x_max = upperBound;
     }
   }
 }

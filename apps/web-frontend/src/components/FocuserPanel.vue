@@ -63,8 +63,8 @@
           <img src="@/assets/images/svg/ui/arrow-left-circle.svg" height="20px" style="min-height: 20px; pointer-events: none;"></img>
         </div>
       </button> -->
-        <button :disabled="isBtnMoveDisabled" @mousedown="FocusMove('left')" @mouseup="FocusAbort"
-          @touchstart="FocusMove('left')" @touchend="FocusAbort" class="get-click btn-Left">
+        <button :disabled="isBtnMoveDisabled" @mousedown="FocusMove('left')" @mouseup="FocusAbort" @mouseleave="FocusAbort"
+          @touchstart="FocusMove('left')" @touchend="FocusAbort" @touchcancel="FocusAbort" class="get-click btn-Left">
           <div style="display: flex; justify-content: center; align-items: center;">
             <img src="@/assets/images/svg/ui/arrow-left-circle.svg" height="20px"
               style="min-height: 20px; pointer-events: none;"></img>
@@ -100,8 +100,8 @@
           </div>
         </button> -->
 
-        <button :disabled="isBtnMoveDisabled" @mousedown="FocusMove('right')" @mouseup="FocusAbort"
-          @touchstart="FocusMove('right')" @touchend="FocusAbort" class="get-click btn-Right">
+        <button :disabled="isBtnMoveDisabled" @mousedown="FocusMove('right')" @mouseup="FocusAbort" @mouseleave="FocusAbort"
+          @touchstart="FocusMove('right')" @touchend="FocusAbort" @touchcancel="FocusAbort" class="get-click btn-Right">
           <div style="display: flex; justify-content: center; align-items: center;">
             <img src="@/assets/images/svg/ui/arrow-right-circle.svg" height="20px"
               style="min-height: 20px; pointer-events: none;"></img>
@@ -153,7 +153,7 @@
       <div class="State-Bar" :style="{ left: 80 + 'px', right: 80 + 'px', fontSize: '8px' }">
         <div style="text-align: left;"> Current:{{ this.CurrentPosition }}</div>
         <div style="text-align: center;"> FWHM:{{ this.FWHM }}</div>
-        <div style="text-align: right;">Target:{{ this.TargetPosition }} </div>
+        <!-- <div style="text-align: right;">Target:{{ this.TargetPosition }} </div> -->
       </div>
 
       <div class="Steps-Bar" :style="{ fontSize: '8px' }">
@@ -182,7 +182,7 @@ export default {
       MoveSpeed_: 1,
 
       CurrentPosition: 0,
-      TargetPosition: 0,
+      // TargetPosition: 0,
       FWHM: 0,
 
       isBtnMoveDisabled: false, // 调焦按钮是否禁用
@@ -215,10 +215,10 @@ export default {
     // this.$bus.$on('AutoHistogramNum', this.setAutoHistogramNum);
     this.$bus.$on('FocusChangeSpeedSuccess', this.ShowSpeedNum);
     this.$bus.$on('FocusPosition', this.ShowPositionNum);
-    this.$bus.$on('FocusMoveDone', this.MoveDone);
+    // this.$bus.$on('FocusMoveDone', this.MoveDone);
     this.$bus.$on('UpdateFWHM', this.UpdateFWHM);
     this.$bus.$on('showRoiImage', this.loadAndDisplayImage);
-    this.$bus.$on('setTargetPosition', this.setTargetPosition);
+    // this.$bus.$on('setTargetPosition', this.setTargetPosition);
     this.$bus.$on('AutoFocusOver', this.AutoFocusOver);
     this.$bus.$on('getFocuserMoveState', this.getFocuserMoveState);
     this.$bus.$on('startFocusLoopSjootingfile', this.startFocusLoopSjootingfile);
@@ -226,6 +226,8 @@ export default {
     this.$bus.$on('selectStarImage', this.selectStarImage);
     this.$bus.$on('setCurrentMainCanvasHasImage', this.setCurrentMainCanvasHasImage);
     this.$bus.$on('FocuserConnected', this.setFocuserIsConnected);
+    this.$bus.$on('setRedBoxSideLength', this.setRedBoxSideLength);
+    this.$bus.$on('syncROI_length', this.syncROI_length);
   },
   methods: {
     updatePosition() {
@@ -238,7 +240,7 @@ export default {
       const newWidth = screenWidth - (this.ComponentPadding * 2);
       // console.log('Update Focus Chart width:', newWidth);
       this.$bus.$emit('updateFocusChartWidth', newWidth);
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getFocuserLoopingState');
+      
     },
     AutoFocus() {
       if (!this.FocuserIsConnected) {
@@ -304,11 +306,21 @@ export default {
       else if (this.ROI_length === 300) this.ROI_length = 500;
       else if (this.ROI_length === 500) this.ROI_length = 100;
 
-      console.log('QHYCCD | ROIChange: ', this.ROI_length);
-      this.$bus.$emit('SendConsoleLogMsg', 'setRedBoxSideLength:' + this.ROI_length, 'info');
-      this.$bus.$emit('setRedBoxSideLength', this.ROI_length); // 更新app.vue中的RedBoxSideLength
+      this.syncROI_length();
+    },
+    setRedBoxSideLength(length) {
+      if (length === '100') this.ROI_length = 100;
+      else if (length === '300') this.ROI_length = 300;
+      else if (length === '500') this.ROI_length = 500;
+      else this.ROI_length = 300;
+      console.log('QHYCCD | setRedBoxSideLength: ', this.ROI_length);
+      this.syncROI_length();
+    },
+    // 同步ROI长度
+    syncROI_length() {
+      this.$bus.$emit('SendConsoleLogMsg', 'QHYCCD | ROIChange:' + this.ROI_length, 'info');
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'RedBoxSizeChange:' + this.ROI_length); // 更新qtserver中的RedBoxSideLength
-      this.$bus.$emit('RedBox Side Length (px)', this.ROI_length); // 更新gui.vue中的RedBoxSideLength
+      this.$bus.$emit('RedBoxSizeChange', this.ROI_length); // 更新gui.vue和app.vue中的RedBoxSideLength
     },
 
     FocusMove(direction) {
@@ -363,26 +375,27 @@ export default {
 
     ShowPositionNum(current, target) {
       this.CurrentPosition = current;
-      this.TargetPosition = target;
+      // this.TargetPosition = target;
     },
 
-    setTargetPosition(target) {
-      this.TargetPosition = parseInt(target, 10);
-    },
+    // setTargetPosition(target) {
+    //   this.TargetPosition = parseInt(target, 10);
+    // },
 
-    FocusGoto() {
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'focusMove:' + "Target" + ":" + this.TargetPosition);
-      this.$bus.$emit('SendConsoleLogMsg', 'Focus Move to:' + this.TargetPosition, 'info');
-    },
+    // FocusGoto() {
+    //   this.$bus.$emit('AppSendMessage', 'Vue_Command', 'focusMove:' + "Target" + ":" + this.TargetPosition);
+    //   this.$bus.$emit('SendConsoleLogMsg', 'Focus Move to:' + this.TargetPosition, 'info');
+    // },
 
-    MoveDone() {
-      this.isBtnMoveDisabled = false;
-      console.log('QHYCCD | FocusMoveDone');
-      this.$bus.$emit('FocusInProgress', false);
-      this.$bus.$emit('SendConsoleLogMsg', 'FocusMoveDone', 'info');
-    },
+    // MoveDone() {
+    //   this.isBtnMoveDisabled = false;
+    //   console.log('QHYCCD | FocusMoveDone');
+    //   this.$bus.$emit('FocusInProgress', false);
+    //   this.$bus.$emit('SendConsoleLogMsg', 'FocusMoveDone', 'info');
+    // },
 
-    UpdateFWHM(FWHM) {
+    UpdateFWHM(current, FWHM) {
+      this.CurrentPosition = current;
       this.FWHM = FWHM;
     },
 

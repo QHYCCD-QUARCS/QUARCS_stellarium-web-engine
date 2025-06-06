@@ -83,10 +83,10 @@
       confirmConfiguration(item) {
         // 在这里处理确认按钮的逻辑，可以访问item.value来获取输入框的值
         console.log(`QHYCCD | confirmConfiguration: `, item.num , ',', item.value);
-        if(item.num === 1)
-        {
-          this.$bus.$emit('RedBoxSizeChange', item.value);
-        }
+        // if(item.num === 1)
+        // {
+        //   this.$bus.$emit('RedBoxSizeChange', item.value);
+        // }
       },
       SwitchPage() {
         if (this.activeMenu === 'connection') { this.activeMenu = 'configuration'; }

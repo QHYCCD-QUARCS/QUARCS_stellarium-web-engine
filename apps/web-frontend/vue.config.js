@@ -1,6 +1,12 @@
 module.exports = {
   runtimeCompiler: true,
   publicPath: process.env.CDN_ENV ? process.env.CDN_ENV : '/',
+  productionSourceMap: true,
+
+  devServer: {
+    https: false,  // 禁用HTTPS
+    port: 8080
+  },
 
   chainWebpack: config => {
     // workaround taken from webpack/webpack#6642
@@ -49,6 +55,7 @@ module.exports = {
   configureWebpack: {
     optimization: {
       minimize: false
-    }
+    },
+    devtool: 'source-map'
   }
 }

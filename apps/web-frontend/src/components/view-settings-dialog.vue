@@ -46,7 +46,9 @@ export default {
   methods: {
     // 切换语言的方法
     switchLanguage(lang) {
+      // this.$bus.$emit('SendConsoleLogMsg', "当前语言:" + lang, 'info');
       this.$i18n.locale = lang;
+      this.selectedLanguage = this.$i18n.locale;
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'saveToConfigFile:ClientLanguage:'+ lang);
     },
     switchHighFPSMode(Value) {

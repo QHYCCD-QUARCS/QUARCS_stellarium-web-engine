@@ -40,9 +40,9 @@
             </v-container>
           </v-card-title>
           <div style="height: 375px">
-              <v-btn light fab class="mx-0 pa-0" @click.native.stop="centerOnRealPosition()" style="position: absolute; z-index: 10000; bottom: 16px; right: 12px;">
+              <!-- <v-btn light fab class="mx-0 pa-0" @click.native.stop="centerOnRealPosition()" style="position: absolute; z-index: 10000; bottom: 16px; right: 12px;">
                 <v-icon>mdi-crosshairs-gps</v-icon>
-              </v-btn>
+              </v-btn> -->
             <l-map class="black--text" ref="myMap" :center="mapCenter" :zoom="10" style="width: 100%; height: 375px;" :options="{zoomControl: false}">
               <l-control-zoom position="topright"></l-control-zoom>
               <l-tile-layer :url="url" attribution='&copy; <a target="_blank" rel="noopener" href="http://osm.org/copyright">OpenStreetMap</a> contributors'></l-tile-layer>
@@ -158,6 +158,7 @@ export default {
     },
     useLocation: function () {
       this.$emit('locationSelected', this.locationForDetail)
+      this.$emit('resetLocation', this.locationForDetail.lat, this.locationForDetail.lng)
     },
     setPickLocationMode: function () {
       this.mode = 'pick'
@@ -189,6 +190,7 @@ export default {
       var pos = { lat: event.target._latlng.lat, lng: event.target._latlng.lng, accuracy: 0 }
       console.log('dragEnd pos: ' + pos.lat + ',' +pos.lng)
       swh.geoCodePosition(pos, that).then((p) => { that.pickLocation = p; that.setPickLocationMode() })
+      this.$emit('resetLocation', pos.lat, pos.lng)
     }
   },
   components: { LMap, LTileLayer, LMarker, LCircle, LTooltip, LControlZoom }

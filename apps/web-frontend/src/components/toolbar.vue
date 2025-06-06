@@ -269,6 +269,7 @@ export default {
   methods: {
     toggleNavigationDrawer: function () {
       this.$store.commit('toggleBool', 'showNavigationDrawer')
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'localMessage');
     },
 
     getLocalTime: function () {
@@ -417,8 +418,8 @@ export default {
     updateCPUInfo(cpuTemp, cpuUsage) {
       this.cpuTemp = cpuTemp;
       this.cpuUsage = cpuUsage;
-      console.log('CPU Temp: ', this.cpuTemp);
-      console.log('CPU Usage: ', this.cpuUsage);
+      // console.log('CPU Temp: ', this.cpuTemp);
+      // console.log('CPU Usage: ', this.cpuUsage);
     },
 
     // GetConnectedDevices() {

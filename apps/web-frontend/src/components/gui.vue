@@ -159,7 +159,7 @@
   </button> -->
 
     <!-- <button v-show="isCaptureMode" @click="hideCaptureUI" class="get-click btn-UISwitch"> <v-icon> mdi-flip-to-back </v-icon> </button> -->
-    <button v-show="isShowImage" @click="hideCaptureUI" class="get-click btn-UISwitch">
+    <button v-show="isShowImage && isShowHideUi" @click="hideCaptureUI" class="get-click btn-UISwitch">
       <div style="display: flex; justify-content: center; align-items: center;">
         <img src="@/assets/images/svg/ui/UI_Hide.svg" height="20px"
           style="min-height: 20px; pointer-events: none;"></img>
@@ -167,7 +167,7 @@
     </button>
 
     <!-- <button v-show="isRedBoxMode" @click="showCaptureUI" class="get-click btn-ShowUISwitch"> <v-icon> mdi-flip-to-front </v-icon> </button> -->
-    <button v-show="!isShowImage" @click="showCaptureUI" class="get-click btn-ShowUISwitch">
+    <button v-show="!isShowImage && isShowHideUi" @click="showCaptureUI" class="get-click btn-ShowUISwitch">
       <div style="display: flex; justify-content: center; align-items: center;">
         <img src="@/assets/images/svg/ui/UI_Show.svg" height="20px" style="min-height: 20px; pointer-events: none;">
       </div>
@@ -367,7 +367,7 @@
 
 
     <!-- 更新命令显示文本框的命名为解析进度显示 -->
-    <div v-if="showParsingProgress"
+    <div v-if="showParsingProgress && isPolarAxisMode"
       style="background-color: rgba(0, 0, 0, 0.7); color: white; padding: 10px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 300px; height: 150px; display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden;">
       <div v-for="(progress, index) in parsingProgressList" :key="index" style="margin-top: 5px;">
         {{ progress }}
@@ -426,30 +426,31 @@ import Moment from 'moment'
 export default {
   data: function () {
     return {
-      messageList: [],  // 存储消息框的数据
-      messageNum: 0,
-      showFloatingBox: false,
-      isSettingWindowShow: false,
-      isBottomBarShow: true,
-      CurrentMainPage: 'Stel',
+      messageList: [],  // 用于存储消息框的数据
+      messageNum: 0,    // 消息数量
+      showFloatingBox: false,  // 是否显示浮动框
+      isSettingWindowShow: false,  // 是否显示设置窗口
+      isBottomBarShow: true,  // 是否显示底部栏
+      CurrentMainPage: 'Stel',  // 当前主页面
       // 极轴对准页面前处于的页面
-      lastMainPage: 'None',
-      isExpTimeBarShow: false,
-      isCFWSelectBarShow: false,
-      showChartsPanel: false,
-      showHistogramPanel: false,
-      showFocuserPanel: false,
-      showToolbar: true,
-      showMountSwitch: true,
-      isMainSwitchShow: true,
-      isRedBoxMode: false,
-      ShowSchedulePanel: false,
-      ShowImageManagerPanel: false,
-      ShowDeviceAllocationPanel: false,
-      ShowINDIDebugDialog: false,
-      ShowRPIHotspotDialog: false,
-      ShowDateTimePicker: false,
-      loadingOriginalImage: false,
+      lastMainPage: 'None',  // 上一个主页面
+      isExpTimeBarShow: false,  // 是否显示曝光时间栏
+      isCFWSelectBarShow: false,  // 是否显示CFW选择栏
+      showChartsPanel: false,  // 是否显示图表面板
+      showHistogramPanel: false,  // 是否显示直方图面板
+      showFocuserPanel: false,  // 是否显示聚焦面板
+      showToolbar: true,  // 是否显示工具栏
+      showMountSwitch: true,  // 是否显示安装开关
+      isMainSwitchShow: true,  // 是否显示主开关
+      isRedBoxMode: false,  // 是否为红框模式
+      ShowSchedulePanel: false,  // 是否显示日程面板
+      ShowImageManagerPanel: false,  // 是否显示图像管理器面板
+      ShowDeviceAllocationPanel: false,  // 是否显示设备分配面板
+      ShowINDIDebugDialog: false,  // 是否显示INDI调试对话框
+      ShowRPIHotspotDialog: false,  // 是否显示RPI热点对话框
+      ShowDateTimePicker: false,  // 是否显示日期时间选择器
+      loadingOriginalImage: false,  // 是否正在加载原始图像
+      isShowHideUi: true,  // 是否显示隐藏用户界面
 
       currentImageWidth: 0,
       currentImageHeight: 0,
@@ -475,8 +476,8 @@ export default {
       RedBoxOffset_X: 0,
       RedBoxOffset_Y: 0,
 
-      ScaleImageWidth: 0,
-      ScaleImageHeight: 0,
+      Scale: 1,
+      
 
       FocalLength: 0,         // QHY462C: 130  5.568 3.132
       // CameraSizeWidth: 5.568,   // QHY163M: 510  17.7  13.4
@@ -572,7 +573,7 @@ export default {
     this.$bus.$on('showMsgBox', this.showMessageBox);
     this.$bus.$on('MainCameraSize', this.resizeRedBox);
     this.$bus.$on('MainCameraBinning', this.SetBinningNum);
-    this.$bus.$on('RedBox Side Length (px)', this.RedBoxSizeChange);
+    this.$bus.$on('RedBoxSizeChange', this.setOriginalRedBoxLength);
     this.$bus.$on('time-selected', this.handleExpTimeSelected);
     // this.$bus.$on('cfw-selected', this.handleCFWSelected);
     this.$bus.$on('toggleSchedulePanel', this.toggleSchedulePanel);
@@ -617,11 +618,14 @@ export default {
     this.$bus.$on('LoopSolveImageFinished', this.LoopSolveImageFinished);
     this.$bus.$on('setRedBoxPosition', this.setRedBoxPosition);
     this.$bus.$on('setRedBoxLength', this.setRedBoxLength);
+    // this.$bus.$on('setOriginalRedBoxSideLength', this.setOriginalRedBoxLength);
     this.$bus.$on('getRedBoxState', this.getRedBoxState);
     this.$bus.$on('selectStar', this.selectStar);
+    this.$bus.$on('setScale', this.setScale);
   },
   mounted() {
     // this.resizeRedBox(1920, 1080);
+    // this.$bus.$emit('syncROI_length');
   },
   methods: {
     toggleFloatingBox() {
@@ -708,6 +712,7 @@ export default {
       this.isMainSwitchShow = this.previousState.isMainSwitchShow;
       this.showFocuserPanel = this.previousState.showFocuserPanel;
       this.showChartsPanel = this.previousState.showChartsPanel;
+      this.isShowHideUi = this.previousState.isShowHideUi;
       // this.isPolarAxisMode = this.previousState.isPolarAxisMode;
 
       // 发送极轴模式状态更新
@@ -728,7 +733,8 @@ export default {
         isCFWSelectBarShow: this.isCFWSelectBarShow, // 显示与隐藏滤镜轮选择器
         isMainSwitchShow: this.isMainSwitchShow,     // 显示与隐藏主页切换按钮
         showFocuserPanel: this.showFocuserPanel,   // 显示与隐藏聚焦器面板
-        showChartsPanel: this.showChartsPanel      // 显示与隐藏图表面板
+        showChartsPanel: this.showChartsPanel,      // 显示与隐藏图表面板
+        isShowHideUi: this.isShowHideUi,            // 显示与隐藏隐藏用户界面
 
       };
 
@@ -779,7 +785,11 @@ export default {
     },
 
     FocalLengthSet(num) {
-      this.FocalLength = num;
+      if (num === '') {
+        this.FocalLength = 0;
+      }else{
+        this.FocalLength = num;
+      }
       console.log('currentFocalLength:', num);
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'saveToConfigFile:FocalLength:' + num);
     },
@@ -826,7 +836,7 @@ export default {
     //   // console.log('ScaleImageSize: ' + this.ScaleImageWidth + ', ' + this.ScaleImageHeight);
     // },
 
-    setRedBoxPosition(x, y,ROI_x,ROI_y) {
+    setRedBoxPosition(x, y) {
       // 计算 RedBox 的中心位置
       const halfBoxWidth = Math.floor(this.RedBoxWidth / 2);
       const halfBoxHeight = Math.floor(this.RedBoxHeight / 2);
@@ -876,17 +886,28 @@ export default {
       
 
       // 发送更新位置的消息
-      if (ROI_x !== 0 && ROI_y !== 0) {
-        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'setROIPosition:' + ROI_x + ":" + ROI_y);
-      }
+      // if (ROI_x !== 0 && ROI_y !== 0) {
+      //   this.$bus.$emit('AppSendMessage', 'Vue_Command', 'setROIPosition:' + ROI_x + ":" + ROI_y);
+      // }
       // this.$bus.$emit('AppSendMessage', 'Vue_Command', 'RedBox:' + this.mouseX + ":" + this.mouseY + ":" + window.innerWidth + ":" + window.innerHeight);
     },
 
     setRedBoxLength(width, height) {
+
       this.RedBoxWidth = width;
       this.RedBoxWidth_ = width;
       this.RedBoxHeight = height;
       this.RedBoxHeight_ = height;
+    },
+
+    setOriginalRedBoxLength(length) {
+      console.log('初始化小红框大小: RedBoxWidth: ', this.RedBoxWidth, ', RedBoxHeight: ', this.RedBoxHeight, ', BoxSideLength: ', this.BoxSideLength, ', Scale: ', this.Scale);
+      this.RedBoxWidth = ((length / this.BoxSideLength) * this.RedBoxWidth) ;
+      this.RedBoxHeight = ((length / this.BoxSideLength) * this.RedBoxHeight) ;
+      this.RedBoxWidth_ = ((length / this.BoxSideLength) * this.RedBoxWidth) ;
+      this.RedBoxHeight_ = ((length / this.BoxSideLength) * this.RedBoxHeight) ;
+      this.BoxSideLength = length;
+      console.log('更新小红框大小: RedBoxWidth: ', this.RedBoxWidth, ', RedBoxHeight: ', this.RedBoxHeight, ', BoxSideLength: ', this.BoxSideLength, ', Scale: ', this.Scale);
     },
 
     // handleTouchOrMouseDown(event) {
@@ -913,11 +934,11 @@ export default {
       this.currentImageWidth = CameraWidth;
       this.currentImageHeight = CameraHeight;
 
-      const windowWidth = window.innerWidth;
-      const windowHeight = window.innerHeight;
+      // const windowWidth = window.innerWidth;
+      // const windowHeight = window.innerHeight;
 
-      this.RedBoxWidth = this.BoxSideLength * windowWidth / CameraWidth;
-      this.RedBoxHeight = this.BoxSideLength * windowHeight / CameraHeight;
+      // this.RedBoxWidth = this.BoxSideLength * windowWidth / CameraWidth / this.Scale;
+      // this.RedBoxHeight = this.BoxSideLength * windowHeight / CameraHeight / this.Scale;
       // this.$bus.$emit('SendConsoleLogMsg', '设置小红框大小: ' + this.RedBoxWidth + ', ' + this.RedBoxHeight, 'info');
       // this.$bus.$emit('RedBoxSideLength', this.BoxSideLength);
       this.ImageProportion = CameraWidth / CameraHeight;
@@ -929,25 +950,25 @@ export default {
 
       // console.log('RedBoxSize:', this.RedBoxWidth, ', ', this.RedBoxHeight);
 
-      if (this.isInitRedBox === true) {
-        // 将小红框置于界面中央
-        this.mouseX = (windowWidth - this.RedBoxWidth) / 2; // 100是小红框的宽度
-        this.mouseX_ = (windowWidth - this.RedBoxWidth) / 2; // 100是小红框的宽度
-        this.mouseY = (windowHeight - this.RedBoxHeight) / 2; // 100是小红框的高度
-        this.mouseY_ = (windowHeight - this.RedBoxHeight) / 2; // 100是小红框的高度
-        this.isInitRedBox = false;
-      }
+      // if (this.isInitRedBox === true) {
+      //   // 将小红框置于界面中央
+      //   this.mouseX = (windowWidth - this.RedBoxWidth) / 2; // 100是小红框的宽度
+      //   this.mouseX_ = (windowWidth - this.RedBoxWidth) / 2; // 100是小红框的宽度
+      //   this.mouseY = (windowHeight - this.RedBoxHeight) / 2; // 100是小红框的高度
+      //   this.mouseY_ = (windowHeight - this.RedBoxHeight) / 2; // 100是小红框的高度
+      //   this.isInitRedBox = false;
+      // }
 
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'RedBox:' + this.mouseX + ":" + this.mouseY + ":" + windowWidth + ":" + windowHeight);  //TODO: BoxSize
+      // this.$bus.$emit('AppSendMessage', 'Vue_Command', 'RedBox:' + this.mouseX + ":" + this.mouseY + ":" + windowWidth + ":" + windowHeight);  //TODO: BoxSize
     },
 
-    RedBoxSizeChange(length) {
-      this.BoxSideLength = length;
-      // console.log('RedBoxSizeChange: ', this.BoxSideLength);
-      // this.$bus.$emit('SendConsoleLogMsg', 'Red Box Size Change:' + this.BoxSideLength, 'info');
-      // this.$bus.$emit('AppSendMessage', 'Vue_Command', 'RedBoxSizeChange:' + this.BoxSideLength);
-      // this.$bus.$emit('RedBoxSideLength', this.BoxSideLength);
-    },
+    // RedBoxSizeChange(length) {
+    //   this.BoxSideLength = length;
+    //   // console.log('RedBoxSizeChange: ', this.BoxSideLength);
+    //   // this.$bus.$emit('SendConsoleLogMsg', 'Red Box Size Change:' + this.BoxSideLength, 'info');
+    //   // this.$bus.$emit('AppSendMessage', 'Vue_Command', 'RedBox Side Length (px):' + this.BoxSideLength);
+    //   // this.$bus.$emit('RedBoxSideLength', this.BoxSideLength);
+    // },
 
     // handleAddDriver(driver) {
     //   if (driver.type === 'Mount') {
@@ -1144,8 +1165,8 @@ export default {
       this.$bus.$emit('showStelCanvas');
       this.lastMainPage = this.CurrentMainPage;
       this.CurrentMainPage = 'Stel';
-      this.isBottomBarShow = true;
       this.hideCaptureUI(true);
+      this.isBottomBarShow = true;
       this.isPolarAxisMode = true;
       this.$bus.$emit('PolarAxisMode', this.isPolarAxisMode);
       this.isRedBoxMode = false;
@@ -1154,6 +1175,7 @@ export default {
 
     QuitPolarAxisMode() {
       this.showCaptureUI();
+      this.isPolarAxisMode = false;
       this.isCaptureMode = false;
       this.isShowScaleChange = false;
       if (this.lastMainPage === 'None') {
@@ -1368,6 +1390,10 @@ export default {
 
     ScaleChange(type) {
       this.$bus.$emit('ScaleChange', type);
+    },
+
+    setScale(scale) {
+      this.Scale = scale;
     },
 
   },
