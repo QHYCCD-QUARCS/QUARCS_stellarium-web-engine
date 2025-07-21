@@ -374,6 +374,23 @@
       </div>
     </div>
 
+    <!-- 更新进度对话框 -->
+    <UpdateProgressDialog 
+      :visible="showUpdateDialog"
+      @close="closeUpdateDialog"
+      @retry="retryUpdate"
+    />
+
+    <!-- <div v-show="showLocationInputs && isPolarAxisMode" style="position: absolute; top: 22px; left: 60px;">
+      <location-focal-inputs 
+        @location-update="handleLocationUpdate"
+      />
+    </div> -->
+    <AutomaticPolarAlignmentCalibration
+      :visible.sync="isCalibrationVisible"
+      :auto-start="false"
+    />
+
   </div>
 
 </template>
@@ -423,6 +440,12 @@ import RPIHotspotDialog from '@/components/RPI-Hotspot.vue';
 import DateTimePicker from '@/components/date-time-picker.vue'
 import Moment from 'moment'
 
+import UpdateProgressDialog from '@/components/UpdateProgressDialog.vue';
+
+import AutomaticPolarAlignmentCalibration from '@/components/AutomaticPolarAlignmentCalibration.vue'
+
+// import LocationFocalInputs from '@/components/LocationFocalInputs.vue';
+
 export default {
   data: function () {
     return {
@@ -451,6 +474,8 @@ export default {
       ShowDateTimePicker: false,  // 是否显示日期时间选择器
       loadingOriginalImage: false,  // 是否正在加载原始图像
       isShowHideUi: true,  // 是否显示隐藏用户界面
+      showLocationInputs: false, // 是否显示经纬度输入框
+      isCalibrationVisible: false,  // 是否显示自动对极轴页面
 
       currentImageWidth: 0,
       currentImageHeight: 0,
@@ -477,7 +502,7 @@ export default {
       RedBoxOffset_Y: 0,
 
       Scale: 1,
-      
+
 
       FocalLength: 0,         // QHY462C: 130  5.568 3.132
       // CameraSizeWidth: 5.568,   // QHY163M: 510  17.7  13.4
@@ -565,6 +590,8 @@ export default {
       selectStarX: 0, // 选择星点的X坐标
       selectStarY: 0, // 选择星点的Y坐标
 
+      showUpdateDialog: false, // 是否显示更新进度对话框
+
     }
   },
   created() {
@@ -607,10 +634,10 @@ export default {
     this.$bus.$on('PHD2StarBoxView', this.togglePHD2StarBox);
     this.$bus.$on('PHD2StarCrossView', this.togglePHD2StarCross);
     this.$bus.$on("ImageSolveFinished", this.ImageSolveFinished);
-    // this.$bus.$on('Focal Length (mm)', this.FocalLengthSet);
+    this.$bus.$on('Focal Length (mm)', this.FocalLengthSet);
     this.$bus.$on('SetFocalLengthNum', this.FocalLengthSet);
     this.$bus.$on('FocalLength', this.FocalLengthSet);
-    // this.$bus.$on('SetBinningNum', this.SetBinningNum);
+    this.$bus.$on('SetBinningNum', this.SetBinningNum);
     this.$bus.$on('ShowDSLRsSetup', this.ShowDSLRsSetup);
     this.$bus.$on('ShowPositionInfo', this.ShowPositionInfo);
     this.$bus.$on('ParseInfoEmitted', this.addParsingProgress);
@@ -622,6 +649,8 @@ export default {
     this.$bus.$on('getRedBoxState', this.getRedBoxState);
     this.$bus.$on('selectStar', this.selectStar);
     this.$bus.$on('setScale', this.setScale);
+    this.$bus.$on('reRunUpdate', this.reRunUpdate);   // 用于在更新失败后重新运行更新
+    this.$bus.$on('closeUpdateDialog', this.closeUpdateDialog);
   },
   mounted() {
     // this.resizeRedBox(1920, 1080);
@@ -780,14 +809,14 @@ export default {
     // },
 
     SetBinningNum(num) {
-      // this.BinningNum = num;
+      this.BinningNum = num;
       console.log('currentImageBin:', num);
     },
 
     FocalLengthSet(num) {
       if (num === '') {
         this.FocalLength = 0;
-      }else{
+      } else {
         this.FocalLength = num;
       }
       console.log('currentFocalLength:', num);
@@ -883,7 +912,7 @@ export default {
       this.mouseY_ = Math.floor(y);
 
       console.log('Updated RedBox position: ', this.mouseX, ',', this.mouseY);
-      
+
 
       // 发送更新位置的消息
       // if (ROI_x !== 0 && ROI_y !== 0) {
@@ -902,10 +931,10 @@ export default {
 
     setOriginalRedBoxLength(length) {
       console.log('初始化小红框大小: RedBoxWidth: ', this.RedBoxWidth, ', RedBoxHeight: ', this.RedBoxHeight, ', BoxSideLength: ', this.BoxSideLength, ', Scale: ', this.Scale);
-      this.RedBoxWidth = ((length / this.BoxSideLength) * this.RedBoxWidth) ;
-      this.RedBoxHeight = ((length / this.BoxSideLength) * this.RedBoxHeight) ;
-      this.RedBoxWidth_ = ((length / this.BoxSideLength) * this.RedBoxWidth) ;
-      this.RedBoxHeight_ = ((length / this.BoxSideLength) * this.RedBoxHeight) ;
+      this.RedBoxWidth = ((length / this.BoxSideLength) * this.RedBoxWidth);
+      this.RedBoxHeight = ((length / this.BoxSideLength) * this.RedBoxHeight);
+      this.RedBoxWidth_ = ((length / this.BoxSideLength) * this.RedBoxWidth);
+      this.RedBoxHeight_ = ((length / this.BoxSideLength) * this.RedBoxHeight);
       this.BoxSideLength = length;
       console.log('更新小红框大小: RedBoxWidth: ', this.RedBoxWidth, ', RedBoxHeight: ', this.RedBoxHeight, ', BoxSideLength: ', this.BoxSideLength, ', Scale: ', this.Scale);
     },
@@ -1088,7 +1117,7 @@ export default {
         this.$bus.$emit('ShowTargetSearch');
       }
 
-      this.$bus.$emit('Switch-MainPage');
+      this.$bus.$emit('showCanvas',this.CurrentMainPage);
     },
 
     handleExpTimeSelected(time) {
@@ -1162,30 +1191,39 @@ export default {
     },
 
     CalibratePolarAxisMode() {
-      this.$bus.$emit('showStelCanvas');
-      this.lastMainPage = this.CurrentMainPage;
-      this.CurrentMainPage = 'Stel';
-      this.hideCaptureUI(true);
-      this.isBottomBarShow = true;
-      this.isPolarAxisMode = true;
-      this.$bus.$emit('PolarAxisMode', this.isPolarAxisMode);
-      this.isRedBoxMode = false;
-      document.removeEventListener('click', this.handleTouchOrMouseDown);
+      // this.$bus.$emit('showStelCanvas');
+      // this.lastMainPage = this.CurrentMainPage;
+      // this.CurrentMainPage = 'Stel';
+      // this.hideCaptureUI(true);
+
+      // this.showMountSwitch = true;
+      // this.isBottomBarShow = true;
+      // this.isPolarAxisMode = true;
+      // this.showLocationInputs = true;
+      // this.$bus.$emit('PolarAxisMode', this.isPolarAxisMode);
+      // this.isRedBoxMode = false;
+      // document.removeEventListener('click', this.handleTouchOrMouseDown);
+      this.$bus.$emit('showPolarAlignment');           // 显示校准界面
     },
 
     QuitPolarAxisMode() {
-      this.showCaptureUI();
-      this.isPolarAxisMode = false;
-      this.isCaptureMode = false;
-      this.isShowScaleChange = false;
-      if (this.lastMainPage === 'None') {
-        this.CurrentMainPage = 'MainCamera';
-      } else {
-        this.CurrentMainPage = this.lastMainPage;
-      }
-      this.lastMainPage = 'None';
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'StopLoopCapture');
-      this.$bus.$emit('SendConsoleLogMsg', 'Stop Loop Capture', 'info');
+      // this.showCaptureUI();
+      // this.isPolarAxisMode = false;
+      // // this.isCaptureMode = false;
+      // // this.isShowScaleChange = false;
+      // this.showLocationInputs = false;
+      
+      // if (this.lastMainPage === 'None') {
+      //   this.CurrentMainPage = 'MainCamera';
+      // } else {
+      //   this.CurrentMainPage = this.lastMainPage;
+      // }
+      // this.$bus.$emit('PolarAxisMode', this.isPolarAxisMode);
+      // this.$bus.$emit('showCanvas',this.CurrentMainPage);
+      // this.lastMainPage = 'None';
+      // this.$bus.$emit('AppSendMessage', 'Vue_Command', 'StopLoopCapture');
+      // this.$bus.$emit('SendConsoleLogMsg', 'Stop Loop Capture', 'info');
+      this.$bus.$emit('hidePolarAlignment');           // 隐藏校准界面
     },
 
     showSolveImage(img) {
@@ -1244,12 +1282,12 @@ export default {
     },
 
     ShowAzAltText(Az1, Alt1, Az2, Alt2) {
-      this.DifferenceText = Az1.toFixed(3) + ', ' + Alt1.toFixed(3);
-      this.TargetText = Az2.toFixed(3) + ', ' + Alt2.toFixed(3);
+      this.DifferenceText = `${this.$t('Azimuth Offset')}: ${Az1.toFixed(3)}°, ${this.$t('Altitude Offset')}: ${Alt1.toFixed(3)}°`;
+      this.TargetText = `${this.$t('Target Azimuth')}: ${Az2.toFixed(3)}°, ${this.$t('Target Altitude')}: ${Alt2.toFixed(3)}°`;
     },
 
     ShowCurrentAzAltText(Az, Alt) {
-      this.CurrentText = Az.toFixed(3) + ', ' + Alt.toFixed(3);
+      this.CurrentText = `${this.$t('Current')}: ${Az.toFixed(3)}°, ${Alt.toFixed(3)}°`;
     },
 
     ShowConfirmDialog(title, text, ToDo) {
@@ -1282,6 +1320,12 @@ export default {
         // this.$bus.$emit('SendConsoleLogMsg', '关闭树莓派并退出', 'info');
         this.$bus.$emit('CloseWebView');
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'ShutdownRaspberryPi');
+      } else if (this.ConfirmToDo === 'restartQtServer') {
+        this.$bus.$emit('AppSendMessage', 'Process_Command_Return', 'restartQtServer');
+        window.location.reload();
+      } else if (this.ConfirmToDo.startsWith('updateCurrentClient')) {
+        this.$bus.$emit('AppSendMessage', 'Process_Command_Return', this.ConfirmToDo);
+        this.showUpdateDialog = true;
       }
     },
 
@@ -1297,20 +1341,20 @@ export default {
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'DSLRCameraInfo:' + width + ':' + height + ':' + pixelPitch);
     },
 
-    // getOriginalImage() {
-    //   if(this.BinningNum === 1) {
-    //     this.$bus.$emit('showMsgBox', 'The current image is already the original one.', 'warning');
-    //   } else {
-    //     this.loadingOriginalImage = true;
-    //     this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getOriginalImage');
-    //   }
-    // },
-
     getOriginalImage() {
-      this.$bus.$emit('showMsgBox', 'Reload the original image.', 'info');
-      this.loadingOriginalImage = true;
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getOriginalImage');
+      if(this.BinningNum === 1) {
+        this.$bus.$emit('showMsgBox', 'The current image is already the original one.', 'warning');
+      } else {
+        this.loadingOriginalImage = true;
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getOriginalImage');
+      }
     },
+
+    // getOriginalImage() {
+    //   this.$bus.$emit('showMsgBox', 'Reload the original image.', 'info');
+    //   this.loadingOriginalImage = true;
+    //   this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getOriginalImage');
+    // },
 
     ShowCaptureImageProgress(num) {
       this.CaptureImageProgressCard = true;
@@ -1395,7 +1439,13 @@ export default {
     setScale(scale) {
       this.Scale = scale;
     },
-
+    reRunUpdate() {
+      this.showUpdateDialog = false;
+      this.$bus.$emit('AppSendMessage', 'Process_Command_Return','VueClientVersion:'+process.env.VUE_APP_VERSION);
+    },
+    closeUpdateDialog() {
+      this.showUpdateDialog = false;
+    }
   },
   computed: {
     pluginsGuiComponents: function () {
@@ -1504,11 +1554,15 @@ export default {
     INDIDebugDialog,
     RPIHotspotDialog,
     DateTimePicker,
+    UpdateProgressDialog,
+    AutomaticPolarAlignmentCalibration,
+    // LocationFocalInputs,
   }
 }
 </script>
 
-<style>
+<style scoped>
+
 /* .v-overlay__scrim {
   display: none !important;
 } */

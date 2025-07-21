@@ -25,7 +25,7 @@
           cursor: selectedIndex === index ? 'grab' : 'default',
         }"
       >
-        {{ item }}
+        Process: {{ processValues[index] || 0 }}%
       </div>
     </div>
 
@@ -42,7 +42,7 @@
       </span>
     </button>
 
-    <button class="get-click btn-Process"> Process: 0% </button>
+    <button class="get-click btn-Process"> Process: {{ processValue }}% </button>
     
   </div>
 </template>
@@ -59,6 +59,7 @@ export default {
       selectedIndex: null, // 存储选中项的索引
       isItemSelected: false,
       startY: null,
+      processValues: {}, // 存储每个表格的进度
     };
   },
   created() {
@@ -72,13 +73,30 @@ export default {
   },
   methods: {
     setScheduleItemList(RowNum, Process) {
+      // 检查行号是否有效
+      if (RowNum === null || RowNum === undefined || RowNum < 0 || RowNum >= this.itemList.length) {
+        console.warn(`Invalid row number: ${RowNum}`);
+        return;
+      }
+
+      // 检查进度值是否有效
+      if (Process === null || Process === undefined) {
+        console.warn(`Invalid process value for row ${RowNum}`);
+        return;
+      }
+
       this.itemList[RowNum] = Process + '%';
+      this.updateProcess(RowNum, Process);
     },
     handleItemClick(index) {
+      if (index === null || index === undefined || index < 0 || index >= this.itemList.length) {
+        console.warn(`Invalid item index: ${index}`);
+        return;
+      }
+
       console.log(`Item clicked: ${this.itemList[index]}`);
-      // 切换选中状态
       if (this.selectedIndex === index) {
-        this.selectedIndex = null; // 如果已经选中，再次点击取消选中
+        this.selectedIndex = null;
         this.isItemSelected = false;
         this.$bus.$emit('NoSelectedScheduleRow');
       } else {
@@ -89,22 +107,24 @@ export default {
       }
     },
     EditList() {
-      if(this.isItemSelected === false)
-      {
+      if(this.isItemSelected === false) {
+        const newIndex = this.itemList.length;
         this.itemList.push('0%');
+        this.updateProcess(newIndex, 0); // 初始化新表格的进度
         this.$bus.$emit('AddScheduleRow');
-      }
-      else
-      {
-        // 删除选中的列表项
-        if (this.selectedIndex !== null) {
-          this.$bus.$emit('DeleteSelectedScheduleRow',this.selectedIndex + 1);
+      } else {
+        if (this.selectedIndex !== null && this.selectedIndex >= 0 && this.selectedIndex < this.itemList.length) {
+          this.$bus.$emit('DeleteSelectedScheduleRow', this.selectedIndex + 1);
           this.itemList.splice(this.selectedIndex, 1);
+          // 删除对应的进度值
+          this.$delete(this.processValues, this.selectedIndex);
           this.selectedIndex = null;
           this.isItemSelected = false;
           this.$bus.$emit('NoSelectedScheduleRow');
+        } else {
+          console.warn('Invalid selected index for deletion');
         }
-      } 
+      }
     },
     active() {},
     handleTouchStart(event, index) {
@@ -148,17 +168,31 @@ export default {
       this.startY = null;
     },
     handleDragOver(event, targetIndex) {
-      if (this.dragIndex !== null && this.dragIndex !== targetIndex) {
+      if (this.dragIndex !== null && 
+          this.dragIndex !== targetIndex && 
+          this.dragIndex >= 0 && 
+          this.dragIndex < this.itemList.length &&
+          targetIndex >= 0 && 
+          targetIndex < this.itemList.length) {
+        
         const rect = event.currentTarget.getBoundingClientRect();
         const mouseY = event.touches[0].clientY;
         const offsetY = mouseY - rect.top;
+        
+        // 保存拖拽项的进度值
+        const draggedProcess = this.processValues[this.dragIndex];
+        
         this.itemList.splice(targetIndex, 0, this.itemList.splice(this.dragIndex, 1)[0]);
         this.dragIndex = targetIndex;
         this.selectedIndex = targetIndex;
 
-        this.$bus.$emit('MoveScheduleRow',targetIndex + 1);
+        // 更新进度值的位置
+        if (draggedProcess !== undefined) {
+          this.$set(this.processValues, targetIndex, draggedProcess);
+        }
 
-        // Apply offsetY
+        this.$bus.$emit('MoveScheduleRow', targetIndex + 1);
+
         if (offsetY < rect.height / 2) {
           this.offsetY = offsetY;
         } else {
@@ -190,7 +224,24 @@ export default {
     },
     addTianWen() {
       this.itemList.push('0%');
-    }
+    },
+    updateProcess(index, value) {
+      // 检查索引是否有效
+      if (index === null || index === undefined || index < 0 || index >= this.itemList.length) {
+        console.warn(`Invalid table index: ${index}`);
+        return;
+      }
+
+      // 检查进度值是否有效
+      if (value === null || value === undefined) {
+        console.warn(`Invalid process value for table ${index}`);
+        return;
+      }
+
+      // 确保进度值在0-100之间
+      const validValue = Math.min(Math.max(Number(value), 0), 100);
+      this.$set(this.processValues, index, validValue);
+    },
   },
 };
 </script>

@@ -78,7 +78,7 @@ export default {
     this.$bus.$on('DeviceConnectSuccess', this.DeviceConnectSuccess);
     this.$bus.$on('BindDeviceIndex', this.BindingDevice);
     this.$bus.$on('UnBindDeviceIndex', this.UnBindingDevice);
-    this.$bus.$on('claerDeviceAllocationList',this.claerDeviceAllocationList);
+    this.$bus.$on('clearDeviceAllocationList',this.clearDeviceAllocationList);
     this.$bus.$on('deleteDeviceTypeAllocationList',this.deleteDeviceTypeAllocationList);
     this.$bus.$on('deleteDeviceAllocationList',this.deleteDeviceAllocationList);
     this.$bus.$on('loadBindDeviceList',this.loadBindDeviceList);
@@ -200,14 +200,14 @@ export default {
       this.$bus.$emit('toggleDeviceAllocationPanel');
     },
 
-    claerDeviceAllocationList() {
+    clearDeviceAllocationList() {
       this.DeviceTypes = [];
       this.DeviceList = [];
     },
     deleteDeviceTypeAllocationList(type) {
 
       if (type == "all"){
-        this.claerDeviceAllocationList()
+        this.clearDeviceAllocationList()
         this.$bus.$emit('SendConsoleLogMsg', 'All driverType has removed', 'info');
         return;
       }

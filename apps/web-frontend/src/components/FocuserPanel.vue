@@ -198,6 +198,8 @@ export default {
 
       FocuserIsConnected: false,
 
+      moveStartTime: 0,  // 电调移动按下时间记录
+
     };
   },
   components: {
@@ -221,7 +223,7 @@ export default {
     // this.$bus.$on('setTargetPosition', this.setTargetPosition);
     this.$bus.$on('AutoFocusOver', this.AutoFocusOver);
     this.$bus.$on('getFocuserMoveState', this.getFocuserMoveState);
-    this.$bus.$on('startFocusLoopSjootingfile', this.startFocusLoopSjootingfile);
+    this.$bus.$on('startFocusLoopFailed', this.startFocusLoopFailed);
     this.$bus.$on('setFocuserLoopingState', this.setFocuserLoopingState);
     this.$bus.$on('selectStarImage', this.selectStarImage);
     this.$bus.$on('setCurrentMainCanvasHasImage', this.setCurrentMainCanvasHasImage);
@@ -247,10 +249,13 @@ export default {
         this.$bus.$emit('showMsgBox', 'Focuser is not connected!', 'warning');
         return;
       }
-      if (this.isMoveInProgress) return;
+      if (this.isMoveInProgress) {
+        this.$bus.$emit('showMsgBox', 'Focuser is moving!', 'warning');
+        return;
+      }
       if (this.inAutoFocus) {
         this.inAutoFocus = false;
-        console.log('QHYCCD | StopAutoFocus');
+        // console.log('QHYCCD | StopAutoFocus');
         this.$bus.$emit('SendConsoleLogMsg', 'StopAutoFocus', 'info');
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'StopAutoFocus');
       }
@@ -298,7 +303,11 @@ export default {
 
       console.log('QHYCCD | SpeedChange: ', this.MoveSpeed);
       this.$bus.$emit('SendConsoleLogMsg', 'SpeedChange:' + this.MoveSpeed, 'info');
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'focusSpeed:' + this.MoveSpeed);
+      if (this.MoveSpeed === 1) {
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'focusSpeed:0');
+      } else {
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'focusSpeed:' + this.MoveSpeed);
+      }
     },
 
     ROIChange() {
@@ -329,7 +338,10 @@ export default {
         return;
       }
       if (this.inAutoFocus) return;
-      // this.isBtnMoveDisabled = true;
+      
+      // 记录按下时间
+      this.moveStartTime = new Date().getTime();
+      
       if (direction === 'left') {
         this.$bus.$emit('FocusInProgress', true);
         this.$bus.$emit('SendConsoleLogMsg', 'Focus Left Move:' + this.MoveSteps, 'info');
@@ -345,10 +357,21 @@ export default {
     },
 
     FocusAbort() {
-      // this.isBtnMoveDisabled = false;
+      if (!this.isMoveInProgress) return;
+      const pressDuration = new Date().getTime() - this.moveStartTime;
+      this.isMoveInProgress = false;
       this.$bus.$emit('FocusInProgress', false);
-      this.$bus.$emit('SendConsoleLogMsg', 'Focus Abort', 'info');
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'focusMoveStop');
+      
+      // 区分点按和长按
+      if (pressDuration < 200) {
+        // 点按操作 - 移动固定步数
+        this.$bus.$emit('SendConsoleLogMsg', `Focus Click Move: ${this.MoveSteps} steps`, 'info');
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'focusMoveStop:true');
+      } else {
+        // 长按操作 - 停止连续移动
+        this.$bus.$emit('SendConsoleLogMsg', 'Focus Abort', 'info');
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'focusMoveStop:false');
+      }
     },
 
     getFocuserMoveState() {
@@ -441,6 +464,7 @@ export default {
       }
       this.isLoopActive = !this.isLoopActive;
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'FocusLoopShooting:' + this.isLoopActive);
+      // this.$bus.$emit('setFocuserLoopingState', this.isLoopActive);
       this.$bus.$emit('disableCaptureButton', this.isLoopActive);
       if (this.isLoopActive) {
         this.$bus.$emit('setFocuserState', 'selectstars'); // 设置焦距状态为选择星点
@@ -450,7 +474,7 @@ export default {
         this.$bus.$emit('setShowSelectStar', false);
       }
     },
-    startFocusLoopSjootingfile(message) {
+    startFocusLoopFailed(message) {
       this.isLoopActive = false;
       this.$bus.$emit('disableCaptureButton', this.isLoopActive);
       this.$bus.$emit('SendConsoleLogMsg', message, 'warning');

@@ -269,7 +269,7 @@ export default {
   methods: {
     toggleNavigationDrawer: function () {
       this.$store.commit('toggleBool', 'showNavigationDrawer')
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'localMessage');
+      // this.$bus.$emit('AppSendMessage', 'Vue_Command', 'localMessage');
     },
 
     getLocalTime: function () {

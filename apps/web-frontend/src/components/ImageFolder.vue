@@ -144,18 +144,22 @@ export default {
       this.canClick = false; // 设置为不可点击
       // console.log("Button clicked");
 
-      this.toggleFolder();
+      // 修改：单点打开文件夹
+      if(!this.folderOpen) {
+        this.folderOpen = true;
+        this.$bus.$emit('ImageFolderOpen', 'true');
+      }
 
       // 恢复点击权限
       setTimeout(() => {
         this.canClick = true;
-      }, 100); // 1秒后恢复
+      }, 100);
     },
 
     handleLongPress() {
+      // 修改：长按选择文件夹
       if(!this.folderOpen) {
-        this.folderOpen = true;
-        this.$bus.$emit('ImageFolderOpen', 'true');
+        this.$bus.$emit('SelectFolderIndex', this.folderIndex);
       }
     },
 
@@ -184,28 +188,29 @@ export default {
       if (!this.canClick) return;
       this.canClick = false;
 
-      // this.toggleFolder();
-      console.log('Click File Name:', this.SelectFilesName);
-      this.ImageFiles[this.SelectFilesIndex].isSelect = !this.ImageFiles[this.SelectFilesIndex].isSelect;
-
-      // 恢复点击权限
-      setTimeout(() => {
-        this.canClick = true;
-      }, 100); // 1秒后恢复
-    },
-
-    handleFilesLongPress() {
-      console.log('LongPress File Name:', this.SelectFilesName);
+      // 修改：单点打开文件
+      console.log('Click to Open File:', this.SelectFilesName);
       for (let i = 0; i < this.ImageFiles.length; i++) {
         this.ImageFiles[i].isOpen = false;
       }
       this.ImageFiles[this.SelectFilesIndex].isOpen = true;
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'ReadImageFile:' + this.CurrentFolderType + '/' + this.imageDate + this.imageName + '/' + this.SelectFilesName);
       this.$bus.$emit('SendConsoleLogMsg', 'Read Image File:' + this.CurrentFolderType + '/' + this.imageDate + this.imageName + '/' + this.SelectFilesName, 'info');
+
+      // 恢复点击权限
+      setTimeout(() => {
+        this.canClick = true;
+      }, 100);
+    },
+
+    handleFilesLongPress() {
+      // 修改：长按选择文件
+      console.log('LongPress to Select File:', this.SelectFilesName);
+      this.ImageFiles[this.SelectFilesIndex].isSelect = !this.ImageFiles[this.SelectFilesIndex].isSelect;
     },
 
     toggleFolder() {
-      // this.folderSelect = !this.folderSelect; // Toggle folder state
+      // 这个方法现在不再被 handleClick 调用，但保留给其他可能的用途
       if(!this.folderOpen) {
         this.$bus.$emit('SelectFolderIndex', this.folderIndex);
       }

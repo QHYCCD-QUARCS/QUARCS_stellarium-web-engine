@@ -20,9 +20,10 @@
         </span>
 
         <div :style="{ width: DeviceIsConnected ? '200px' : '200px' }"
-          style="position: absolute; top: 50px; max-height: calc(100% - 95px); overflow-y: auto;">
+          style="position: absolute; top: 50px; max-height: calc(100% - 95px); overflow-y: auto;"
+          class="params-container">
 
-          <div v-show="!DeviceIsConnected" style="text-align: center;">
+          <!-- <div v-show="!DeviceIsConnected" style="text-align: center;">
             <span style="display: inline-block; font-size: 15px; color: rgba(255, 255, 255, 0.5); user-select: none;">
               {{ $t('Device Connection') }}
             </span>
@@ -57,7 +58,44 @@
                   <template>
                     <v-icon color="rgba(255, 255, 255)">mdi-check-bold</v-icon>
                   </template>
+</button>
+</v-col>
+</v-row>
+</div> -->
+
+          <div v-show="!DeviceIsConnected" style="text-align: center;">
+            <span style="display: inline-block; font-size: 15px; color: rgba(255, 255, 255, 0.5); user-select: none;">
+              {{ $t('Device Connection') }}
+            </span>
+
+            <!-- 驱动选择下拉框，添加@change事件 -->
+            <v-select :label="$t('Select Driver')" :items="drivers" item-text="label" item-value="value"
+              v-model="selectedDriver" @change="confirmDriver" style="width: 150px; display: inline-block;">
+            </v-select>
+
+            <!-- 波特率下拉框，添加@change事件 -->
+            <v-select v-if="CurrentDriverType === 'Mount' || CurrentDriverType === 'Focuser'" :label="$t('Baud Rate')"
+              :items="BaudRateItems" item-text="label" item-value="value" v-model="BaudRateSelected"
+              @change="confirmDriver" style="width: 150px; display: inline-block;">
+            </v-select>
+
+            <v-row no-gutters>
+              <v-col cols="6">
+                <button @click="clearDriver" class="btn-confirm" style="display: inline-block;">
+                  <div style="display: flex; justify-content: center; align-items: center;">
+                    <img src="@/assets/images/svg/ui/delete.svg" height="20px"
+                      style="min-height: 20px; pointer-events: none;"></img>
+                  </div>
                 </button>
+              </v-col>
+              <v-col cols="6">
+                <button v-if="!isConnecting" @click="connectDriver(selectedDriver)" class="btn-confirm"
+                  style="display: inline-block; background-color: green;">
+                  <div style="display: flex; justify-content: center; align-items: center;">
+                    <v-icon color="white">mdi-link</v-icon>
+                  </div>
+                </button>
+                <v-progress-circular v-else indeterminate color="green" size="24"></v-progress-circular>
               </v-col>
             </v-row>
           </div>
@@ -88,46 +126,58 @@
 
           </div> -->
 
+
           <div v-show="DeviceIsConnected" v-for="(item, index) in CurrentConfigItems()" :key="index"
-            style="text-align: center; width: 200px;">
-            <span v-if="index === 0"
-              style="display: inline-block; font-size: 15px; color: rgba(255, 255, 255, 0.5); user-select: none;">
+            class="config-item">
+            <!-- 标题，仅在第一个项目显示 -->
+            <span v-if="index === 0" class="config-title">
               {{ $t('Device Config Items') }}
             </span>
-            <v-card-text>
-              <v-text-field v-if="item.inputType === 'text'" v-model="item.value" :label="item.label"
-                style="width: 150px; display: inline-block;"></v-text-field>
 
-              <div v-if="item.inputType === 'slider'"
-                style="text-align: left; height: 30px; width: 150px; display: inline-block; margin-bottom: 20px;">
-                <span
-                  style="display: inline-block; font-size: 15px; color: rgba(255, 255, 255, 0.5); user-select: none;">{{
-                    item.label }}: {{ item.value }}</span>
+            <!-- 配置项卡片内容 -->
+            <v-card-text>
+              <!-- 文本输入类型 -->
+              <v-text-field v-if="item.inputType === 'text'" v-model="item.value" :label="item.label"
+                @input="handleConfigChange(item.label, item.value)" class="config-input">
+              </v-text-field>
+
+              <!-- 滑动条类型 -->
+              <div v-if="item.inputType === 'slider'" class="slider-container">
+                <span class="slider-label">
+                  {{ item.label }}: {{ item.value }}
+                </span>
                 <div>
-                  <button @click="decrement(item)" class="get-click btn-slider"
-                    style="position: absolute; left: 25px; transform: translateY(5px); user-select: none; font-size: 5px;">
-                    <div style="display: flex; justify-content: center; align-items: center;">
-                      <img src="@/assets/images/svg/ui/Minus.svg" height="10px"
-                        style="min-height: 10px; pointer-events: none;"></img>
+                  <!-- 减小按钮 -->
+                  <button @click="decrementAndNotify(item)" class="get-click btn-slider btn-minus">
+                    <div class="btn-content">
+                      <img src="@/assets/images/svg/ui/Minus.svg" height="10px" class="btn-icon">
                     </div>
                   </button>
+
+                  <!-- 滑动条 -->
                   <v-slider v-model="item.value" :step="item.inputStep" :max="item.inputMax" :min="item.inputMin"
-                    color="white" class="align-center"
-                    style="position: absolute; left: 45px; width: calc(100% - 90px);"></v-slider>
-                  <button @click="increment(item)" class="get-click btn-slider"
-                    style="position: absolute; right: 25px; transform: translateY(5px); user-select: none; font-size: 5px;">
-                    <div style="display: flex; justify-content: center; align-items: center;">
-                      <img src="@/assets/images/svg/ui/Plus.svg" height="10px"
-                        style="min-height: 10px; pointer-events: none;"></img>
+                    @change="handleConfigChange(item.label, item.value)" color="white"
+                    class="align-center slider-control">
+                  </v-slider>
+
+                  <!-- 增加按钮 -->
+                  <button @click="incrementAndNotify(item)" class="get-click btn-slider btn-plus">
+                    <div class="btn-content">
+                      <img src="@/assets/images/svg/ui/Plus.svg" height="10px" class="btn-icon">
                     </div>
                   </button>
                 </div>
               </div>
 
+              <!-- 选择框类型 -->
               <v-select v-if="item.inputType === 'select'" v-model="item.value" :label="item.label"
-                :items="item.selectValue" style="width: 150px; display: inline-block;"></v-select>
+                @change="handleConfigChange(item.label, item.value)" :items="item.selectValue" class="config-input">
+              </v-select>
+
+              <!-- 开关类型 -->
               <v-switch v-if="item.inputType === 'switch'" v-model="item.value" :label="item.label"
-                style="width: 170px; display: inline-block; margin-bottom: -35px; margin-top: -35px;"></v-switch>
+                @change="handleConfigChange(item.label, item.value)" class="config-switch">
+              </v-switch>
             </v-card-text>
           </div>
 
@@ -135,15 +185,15 @@
 
         <div v-show="DeviceIsConnected"
           style="text-align: center; position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px;">
-          <button @click="confirmConfiguration(CurrentConfigItems())" class="btn-confirm"
+          <!-- <button @click="confirmConfiguration(CurrentConfigItems())" class="btn-confirm"
             style="display: inline-block; user-select: none;">
             <v-icon color="rgba(255, 255, 255)">mdi-check-bold</v-icon>
-          </button>
+          </button> -->
           <button @click="disconnectDriver" class="btn-confirm" style="display: inline-block; background-color: red;">
             <div style="display: flex; justify-content: center; align-items: center;">
               <v-icon color="white">mdi-link-off</v-icon>
             </div>
-          </button>s
+          </button>
         </div>
 
         <!-- <div v-show="DeviceIsConnected"
@@ -237,6 +287,19 @@
                   }}</v-list-item-title>
               </v-list-item-content>
             </v-list-item>
+            <!-- 强制更新 -->
+            <v-list-item @click.stop="ForceUpdate()" :style="{ height: '36px', marginBottom: '10px' }">
+              <v-list-item-icon style="margin-right: 10px;">
+                <div style="display: flex; justify-content: center; align-items: center;">
+                  <img src="@/assets/images/svg/ui/PowerOFF.svg" height="30px"
+                    style="min-height: 30px; pointer-events: none;"></img>
+                </div>
+              </v-list-item-icon>
+              <v-list-item-content>
+                <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Force Update')
+                  }}</v-list-item-title>
+              </v-list-item-content>
+            </v-list-item>
 
           </v-list>
         </div>
@@ -246,9 +309,10 @@
     </v-navigation-drawer>
 
     <v-navigation-drawer v-model="nav" app :stateless="drawer_2" temporary width="170"
-      style="backdrop-filter: blur(5px); background-color: rgba(0, 0, 0, 0.1);"> <!-- stateless temporary  -->
+      style="backdrop-filter: blur(5px); background-color: rgba(0, 0, 0, 0.1);">
       <v-layout column fill-height>
         <v-list dense>
+          <!-- 客户端版本和服务器版本信息 -->
           <template>
             <div style="display: flex; justify-content: center; align-items: center;">
               <span style="font-size: 10px; color: rgba(255, 255, 255, 0.5); user-select: none; white-space: nowrap;">
@@ -271,35 +335,35 @@
             <v-divider></v-divider>
           </template>
 
-          <template>
-            <v-list-item @click.stop="QuitToMainApp()" :style="{ height: '36px' }">
-              <v-list-item-icon style="margin-right: 10px;">
-                <div style="display: flex; justify-content: center; align-items: center;">
-                  <img src="@/assets/images/svg/ui/Quit.svg" height="30px"
-                    style="min-height: 30px; pointer-events: none;"></img>
-                </div>
-              </v-list-item-icon>
-              <v-list-item-content>
-                <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Quit')
+          <!-- 退出(Quit) -->
+          <v-list-item @click.stop="QuitToMainApp()" :style="{ height: '36px' }">
+            <v-list-item-icon style="margin-right: 10px;">
+              <div style="display: flex; justify-content: center; align-items: center;">
+                <img src="@/assets/images/svg/ui/Quit.svg" height="30px"
+                  style="min-height: 30px; pointer-events: none;"></img>
+              </div>
+            </v-list-item-icon>
+            <v-list-item-content>
+              <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Quit')
                 }}</v-list-item-title>
-              </v-list-item-content>
-            </v-list-item>
+            </v-list-item-content>
+          </v-list-item>
 
-            <v-list-item @click.stop="toggleStoreValue('showViewSettingsDialog')" :style="{ height: '36px' }">
-              <v-list-item-icon style="margin-right: 10px;">
-                <div style="display: flex; justify-content: center; align-items: center;">
-                  <img src="@/assets/images/svg/ui/Setting.svg" height="30px"
-                    style="min-height: 30px; pointer-events: none;"></img>
-                </div>
-              </v-list-item-icon>
-              <v-list-item-content>
-                <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('View Settings')
+          <!-- 视图设置(View Settings) -->
+          <v-list-item @click.stop="toggleStoreValue('showViewSettingsDialog')" :style="{ height: '36px' }">
+            <v-list-item-icon style="margin-right: 10px;">
+              <div style="display: flex; justify-content: center; align-items: center;">
+                <img src="@/assets/images/svg/ui/Setting.svg" height="30px"
+                  style="min-height: 30px; pointer-events: none;"></img>
+              </div>
+            </v-list-item-icon>
+            <v-list-item-content>
+              <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('View Settings')
                 }}</v-list-item-title>
-              </v-list-item-content>
-            </v-list-item>
-            <v-divider></v-divider>
-          </template>
+            </v-list-item-content>
+          </v-list-item>
 
+          <!-- 电源管理(Power Management) -->
           <v-list-item @click.stop="openPowerManagerPage()" :style="{ height: '36px' }">
             <v-list-item-icon style="margin-right: 10px;">
               <div style="display: flex; justify-content: center; align-items: center;">
@@ -309,25 +373,36 @@
             </v-list-item-icon>
             <v-list-item-content>
               <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Power Management')
-              }}</v-list-item-title>
+                }}</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
 
-          <!-- <v-list-item :disabled="loadingConnectAllDevice" @touchstart="startConnectBtnPress"
-            @touchend="endConnectBtnPress" :style="{ height: '36px' }">
+          <v-divider></v-divider>
+
+          <!-- 设备列表(动态生成) -->
+          <v-list-item v-for="(device, index) in devices" :key="index" @click.stop="selectDevice(device)"
+            :style="{ height: '36px' }">
             <v-list-item-icon style="margin-right: 10px;">
               <div style="display: flex; justify-content: center; align-items: center;">
-                <img src="@/assets/images/svg/ui/Connect.svg" height="30px"
-                  style="min-height: 30px; pointer-events: none;"></img>
+                <img :src="require(`@/assets/images/svg/ui/${device.driverType}.svg`)" height="30px"
+                  style="min-height: 30px"></img>
               </div>
             </v-list-item-icon>
             <v-list-item-content>
-              <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px', userSelect: 'none' }">{{
-                $t('Connect All') }}</v-list-item-title>
-              <v-progress-linear v-if="loadingConnectAllDevice" indeterminate color="white"
-                height="5"></v-progress-linear>
+              <v-list-item-title>
+                <span>
+                  <div :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t(device.driverType) }}</div>
+                  <div :style="{ fontSize: '7px' }" :class="{ 'connected-device': device.isConnected }">{{
+                    device.device }}
+                  </div>
+                </span>
+              </v-list-item-title>
             </v-list-item-content>
-          </v-list-item> -->
+          </v-list-item>
+
+          <v-divider></v-divider>
+
+          <!-- 连接所有(Connect All) -->
           <v-list-item :disabled="loadingConnectAllDevice" @touchstart="startConnectBtnPress"
             @touchend="endConnectBtnPress" @mousedown="startConnectBtnPress" @mouseup="endConnectBtnPress"
             :style="{ height: '36px' }">
@@ -346,6 +421,7 @@
             </v-list-item-content>
           </v-list-item>
 
+          <!-- 断开所有连接(Disconnect All) -->
           <v-list-item @click.stop="disconnectAllDevice(false)" :style="{ height: '36px' }">
             <v-list-item-icon style="margin-right: 10px;">
               <div style="display: flex; justify-content: center; align-items: center;">
@@ -359,6 +435,7 @@
             </v-list-item-content>
           </v-list-item>
 
+          <!-- 设备分配(Device Allocation) -->
           <v-list-item @click.stop="DeviceAllocation()" :style="{ height: '36px' }">
             <v-list-item-icon style="margin-right: 10px;">
               <div style="display: flex; justify-content: center; align-items: center;">
@@ -368,10 +445,11 @@
             </v-list-item-icon>
             <v-list-item-content>
               <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{
-                $t('DeviceAllocation') }}</v-list-item-title>
+                $t('Device Allocation') }}</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
 
+          <!-- 校准极轴(Calibrate Polar Axis) -->
           <v-list-item @click.stop="CalibratePolarAxis()" :style="{ height: '36px' }">
             <v-list-item-icon style="margin-right: 10px;">
               <div style="display: flex; justify-content: center; align-items: center;">
@@ -381,10 +459,11 @@
             </v-list-item-icon>
             <v-list-item-content>
               <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{
-                $t('CalibratePolarAxis') }}</v-list-item-title>
+                $t('Calibrate Polar Axis') }}</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
 
+          <!-- 图像文件(Image Files) -->
           <v-list-item @click.stop="OpenIamgeFolder()" :style="{ height: '36px' }">
             <v-list-item-icon style="margin-right: 10px;">
               <div style="display: flex; justify-content: center; align-items: center;">
@@ -394,10 +473,11 @@
             </v-list-item-icon>
             <v-list-item-content>
               <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Image Files')
-              }}</v-list-item-title>
+                }}</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
 
+          <!-- 日志(Logs) -->
           <v-list-item @click.stop="OpenDebugLog()" :style="{ height: '36px' }">
             <v-list-item-icon style="margin-right: 10px;">
               <div style="display: flex; justify-content: center; align-items: center;">
@@ -407,33 +487,13 @@
             </v-list-item-icon>
             <v-list-item-content>
               <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Logs')
-              }}</v-list-item-title>
+                }}</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
 
           <v-divider></v-divider>
 
-          <v-list-item v-for="(device, index) in devices" :key="index" @click.stop="selectDevice(device)"
-            :style="{ height: '36px' }">
-            <v-list-item-icon style="margin-right: 10px;">
-              <div style="display: flex; justify-content: center; align-items: center;">
-                <img :src="require(`@/assets/images/svg/ui/${device.driverType}.svg`)" height="30px"
-                  style="min-height: 30px"></img>
-              </div>
-            </v-list-item-icon>
-            <v-list-item-content>
-              <v-list-item-title>
-                <span>
-                  <div :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t(device.driverType) }}</div>
-                  <div :style="{ fontSize: '7px' }" :class="{ 'connected-device': device.isConnected }">{{ device.device}}
-                  </div>
-                </span>
-              </v-list-item-title>
-            </v-list-item-content>
-          </v-list-item>
-
-          <v-divider></v-divider>
-
+          <!-- 纬度和经度(Lat & Long) -->
           <v-list-item @click.stop="locationClicked()" :style="{ height: '36px' }">
             <v-list-item-icon style="margin-right: 10px;">
               <div style="display: flex; justify-content: center; align-items: center;">
@@ -451,6 +511,7 @@
             </v-list-item-content>
           </v-list-item>
 
+          <!-- 刷新页面(Refresh Page) -->
           <v-list-item @click.stop="ShowConfirmDialog('Confirm', $t('Are you sure you need to refresh?'), 'Refresh')"
             :style="{ height: '36px' }">
             <v-list-item-icon style="margin-right: 10px;">
@@ -467,6 +528,7 @@
             </v-list-item-content>
           </v-list-item>
 
+          <!-- 数据版权(Data Credits) -->
           <v-list-item @click.stop="toggleStoreValue('showDataCreditsDialog')" :style="{ height: '36px' }">
             <v-list-item-icon style="margin-right: 10px;">
               <div style="display: flex; justify-content: center; align-items: center;">
@@ -476,13 +538,15 @@
             </v-list-item-icon>
             <v-list-item-content>
               <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Data Credits')
-              }}</v-list-item-title>
+                }}</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
 
         </v-list>
       </v-layout>
     </v-navigation-drawer>
+
+
 
 
     <v-main>
@@ -502,7 +566,8 @@
             <canvas ref="guiderCanvas" id="guiderCamera-canvas" :style="{ zIndex: canvasZIndexGuiderCamera }"
               @click="handleGuiderCanvasClick"></canvas>
             <!-- <img id="imageSrc" alt="Source" :src="imageSrc" crossOrigin = "" /> -->
-
+            <ProgressBar :progress="progressValue" :description="progressDescription" :showDescription="true"
+              :isShow="currentcanvas === 'MainCamera'" />
           </div>
         </div>
 
@@ -534,6 +599,7 @@ import swh from '@/assets/sw_helpers.js'
 import Moment from 'moment'
 import BackgroundImage from '@/assets/images/svg/ui/Background.svg';
 import ErrorImage from '@/assets/images/svg/ui/errorImage.svg';
+import ProgressBar from '@/components/ProgressBar.vue';
 
 let glTestCircle;
 let glLayer;
@@ -590,7 +656,7 @@ export default {
         { name: '导星镜', driverType: 'Guider', type: 'CCDs', ListNum: "1", isget: false, device: '', BaudRate: 9600, driverName: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_Guider' },
         { name: '主相机', driverType: 'MainCamera', type: 'CCDs', ListNum: "20", isget: false, device: '', BaudRate: 9600, driverName: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_MainCamera' },
         { name: '赤道仪', driverType: 'Mount', type: 'Telescopes', ListNum: "0", isget: false, device: '', BaudRate: 9600, driverName: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_Mount' },
-        { name: '望远镜', driverType: 'Telescopes', device: '', isConnected: false },
+        { name: '望远镜', driverType: 'Telescopes', device: '', isConnected: true },
         { name: '电动调焦器', driverType: 'Focuser', type: 'Focusers', ListNum: "22", isget: false, device: '', BaudRate: 9600, driverName: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_Focuser' },
         { name: '电子极轴镜', driverType: 'PoleCamera', type: 'CCDs', ListNum: "2", isget: false, device: '', BaudRate: 9600, driverName: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_PoleCamera' },
         { name: '滤镜轮', driverType: 'CFW', type: 'Filter Wheels', ListNum: "21", isget: false, device: '', BaudRate: 9600, driverName: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_CFW' },
@@ -610,25 +676,26 @@ export default {
 
       MainCameraConfigItems: [
         // vue处理参数
-        { driverType: 'MainCamera', label: 'ImageGainR', value: '1', inputType: 'slider', inputMin: 0, inputMax: 3, inputStep: 0.01 },
-        { driverType: 'MainCamera', label: 'ImageGainB', value: '1', inputType: 'slider', inputMin: 0, inputMax: 3, inputStep: 0.01 },
-        { driverType: 'MainCamera', label: 'ImageOffset', value: '', inputType: 'slider', inputMin: 0, inputMax: 255, inputStep: 0.1},
-        { driverType: 'MainCamera', label: 'ImageCFA', value: '', inputType: 'select', selectValue: ['GR', 'GB', 'BG', 'RGGB'] },
+        { driverType: 'MainCamera', label: 'ImageCFA', value: '', inputType: 'select', selectValue: ['GR', 'GB', 'BG', 'RGGB', 'null'] },
         // 硬件处理参数
         { driverType: 'MainCamera', label: 'Binning', value: '', inputType: 'slider', inputMin: 1, inputMax: 4, inputStep: 1 },
-        { driverType: 'MainCamera', label: 'Temperature', value: '', inputType: 'slider', inputMin: -50, inputMax: 30, inputStep: 1 },
+        { driverType: 'MainCamera', label: 'Temperature', value: '', inputType: 'select',selectValue : [5,0,-5,-10,-15,-20,-25] },
         { driverType: 'MainCamera', label: 'Gain', value: '', inputType: 'slider', inputMin: 0, inputMax: 0, inputStep: 1 },
         { driverType: 'MainCamera', label: 'Offset', value: '', inputType: 'slider', inputMin: 0, inputMax: 0, inputStep: 1 },
+        // vue处理参数
+        // { driverType: 'MainCamera', label: 'ImageGainR', value: '1', inputType: 'slider', inputMin: 0, inputMax: 3, inputStep: 0.01 },
+        // { driverType: 'MainCamera', label: 'ImageGainB', value: '1', inputType: 'slider', inputMin: 0, inputMax: 3, inputStep: 0.01 },
+        // { driverType: 'MainCamera', label: 'ImageOffset', value: '', inputType: 'slider', inputMin: 0, inputMax: 255, inputStep: 0.1 },
         // { driverType: 'MainCamera', label: 'RedBox Side Length (px)', value: '', inputType: 'text' },
-        { driverType: 'MainCamera', label: 'ExpTime [1]', value: '', inputType: 'text' },
-        { driverType: 'MainCamera', label: 'ExpTime [2]', value: '', inputType: 'text' },
-        { driverType: 'MainCamera', label: 'ExpTime [3]', value: '', inputType: 'text' },
-        { driverType: 'MainCamera', label: 'ExpTime [4]', value: '', inputType: 'text' },
-        { driverType: 'MainCamera', label: 'ExpTime [5]', value: '', inputType: 'text' },
-        { driverType: 'MainCamera', label: 'ExpTime [6]', value: '', inputType: 'text' },
-        { driverType: 'MainCamera', label: 'ExpTime [7]', value: '', inputType: 'text' },
-        { driverType: 'MainCamera', label: 'ExpTime [8]', value: '', inputType: 'text' },
-        { driverType: 'MainCamera', label: 'ExpTime [9]', value: '', inputType: 'text' },
+        // { driverType: 'MainCamera', label: 'ExpTime [1]', value: '', inputType: 'text' },
+        // { driverType: 'MainCamera', label: 'ExpTime [2]', value: '', inputType: 'text' },
+        // { driverType: 'MainCamera', label: 'ExpTime [3]', value: '', inputType: 'text' },
+        // { driverType: 'MainCamera', label: 'ExpTime [4]', value: '', inputType: 'text' },
+        // { driverType: 'MainCamera', label: 'ExpTime [5]', value: '', inputType: 'text' },
+        // { driverType: 'MainCamera', label: 'ExpTime [6]', value: '', inputType: 'text' },
+        // { driverType: 'MainCamera', label: 'ExpTime [7]', value: '', inputType: 'text' },
+        // { driverType: 'MainCamera', label: 'ExpTime [8]', value: '', inputType: 'text' },
+        // { driverType: 'MainCamera', label: 'ExpTime [9]', value: '', inputType: 'text' },
         // 在这里添加更多的配置项
       ],
 
@@ -674,6 +741,8 @@ export default {
       ImageOffset: 0,
 
       ImageCFA: 'BG',
+
+      cameraBin: 1,   // 当前相机binning
 
       CanvasWidth: 1920,  // 主画布宽度
       CanvasHeight: 1080, // 主画布高度
@@ -780,26 +849,25 @@ export default {
       enableMainCanvasClick: false, // 控制画布是否可以点击，用来移动调焦选择框和选星
 
       lastImageProcessParams: { // 最后处理图像的参数
-        gainR: 1,
-        gainB: 1,
-        offset: 0,
-        CFA: 'BG',
-        mode: 1,
-        B: 0,
-        W: 65535,
-        cvmode: 0,
+        blackLevel: 0,
+        whiteLevel: 65535,
+        CFA: 'null',
+        analysis: null,
+        isColorCamera: false,
       },
       focuserPictureFileName: '',  // 焦距图片文件名
       isProcessingImage: false,   // 控制是否正在处理图像
       isFocusLoopShooting: false,  // 控制是否进行ROi循环拍摄
-      // focuserROIStarsList: [],  // 用来保存ROI区域的星点列表，分别保存x,y,HFR
+      focuserROIStarsList: [],  // 用来保存ROI区域的星点列表，分别保存x,y,HFR
       selectStarX: -1,
       selectStarY: -1,
       DrawSelectStarX: -1,
       DrawSelectStarY: -1,
       DrawSelectStarHFR: -1,
-      ROI_x: -1,    // 用来保存ROI区域的x坐标
-      ROI_y: -1,    // 用来保存ROI区域的y坐标
+      ROI_x: -1,    // 用来保存ROI区域的x坐标,在vue中计算
+      ROI_y: -1,    // 用来保存ROI区域的y坐标,在vue中计算
+      ROI_x_qt: -1,    // 用来保存ROI区域的x坐标,在qt中计算
+      ROI_y_qt: -1,    // 用来保存ROI区域的y坐标,在qt中计算
       ROI_length: 300, // 用来保存ROI区域的长度
       showSelectStar: false,
 
@@ -822,18 +890,29 @@ export default {
       BaudRateSelected: 9600, // 波特率选择
       cpuTemp: null,  // CPU温度
       cpuUsage: null, // CPU使用率
+
+      progressValue: 0,// 控制图像处理进度条的变量
+      progressDescription: '', // 控制进度条显示内容
+
+      calculateGain: true, // 控制是否计算白平衡增益
+      lutCache : {
+        lastParams: null, // 用于存储上次的参数
+        lutR: null,
+        lutG: null,
+        lutB: null
+      },
     }
   },
   components: {
     Gui,
     GuiLoader,
+    ProgressBar,
     // MessageBox,
   },
   created() {
     this.$bus.$on('AppSendMessage', this.sendMessage);
     this.$bus.$on('AppUpdateDevices', this.updateDevices);
     this.$bus.$on('Switch-MainPage', this.handleButtonTestClick);
-    this.$bus.$on('AutoHistogramNum', this.setAutoHistogramNum);
     this.$bus.$on('HandleHistogramNum', this.applyHistStretch);
     this.$bus.$on('ImageGainR', this.ImageGainSet);
     this.$bus.$on('ImageGainB', this.ImageGainSet);
@@ -842,6 +921,7 @@ export default {
     this.$bus.$on('Gain', this.GainSet);
     this.$bus.$on('Offset', this.OffsetSet);
     this.$bus.$on('ImageCFA', this.ImageCFASet);
+    // this.$bus.$on('MainCameraCFA', this.ImageCFASet);
     this.$bus.$on('Temperature', this.CameraTemperatureSet);
     this.$bus.$on('Focal Length (mm)', this.FocalLengthSet);
     this.$bus.$on('Guider Focal Length (mm)', this.GuiderFocalLengthSet);
@@ -873,8 +953,38 @@ export default {
     this.$bus.$on('setFocuserState', this.setFocuserState);  // 设置调焦状态和进度
     this.$bus.$on('setShowSelectStar', this.setShowSelectStar);  // 设置是否显示选择星点
     this.$bus.$on('ScaleChange', this.ScaleChange);
+    this.$bus.$on('showCanvas', this.showCanvas);
+    
+    this.memoryCheckInterval = setInterval(this.checkMemoryUsage, 30000);
+    
+
   },
   methods: {
+    checkMemoryUsage() {
+      if (window.performance && window.performance.memory) {
+        const memoryInfo = window.performance.memory;
+        const used = Math.round(memoryInfo.usedJSHeapSize/1048576);
+        const limit = Math.round(memoryInfo.jsHeapSizeLimit/1048576);
+        
+        console.log(`内存使用: ${used}MB / ${limit}MB`);
+        
+        if (memoryInfo.usedJSHeapSize > memoryInfo.jsHeapSizeLimit * 0.7) {
+          this.$bus.$emit('showWarning', this.$i18n.locale === 'cn' ? 
+            '内存使用接近限制，请保存工作后刷新页面' : 
+            'Memory usage is approaching limit. Please save your work and refresh the page.');
+            
+          // 可选：尝试手动触发垃圾回收
+          if (window.gc) {
+            try { window.gc(); } catch (e) {}
+          }
+        }
+      }
+    },
+    
+
+    preventDefault(event) {
+      event.preventDefault();
+    },
     getLocationHostName() {
       const hostname = window.location.hostname;
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -905,7 +1015,7 @@ export default {
         this.StatusRecovery();
         console.log('process.env.NODE_ENV:', process.env.NODE_ENV);
       };
-      
+
       this.websocket.onmessage = (message) => {
         // console.log('QHYCCD | Received message:', message.data);
 
@@ -1075,12 +1185,19 @@ export default {
                 }
                 break;
 
+
               case 'SaveGuiderImageSuccess':
                 if (parts.length === 2) {
                   const fileName = parts[1];
                   this.loadAndDisplayImage('img/' + fileName);
                 }
                 break;
+              case 'GuideSize':
+                if (parts.length === 3) {
+                  const col = parts[1];
+                  const row = parts[2];
+                  this.$bus.$emit("GuideSize",col,row);
+                }
 
               case 'AddScatterChartData':
                 if (parts.length === 3) {
@@ -1137,7 +1254,7 @@ export default {
                 if (parts.length === 3) {
                   const CurrentPosition = parts[1];
                   const FWHM = parts[2];
-                  this.$bus.$emit('UpdateFWHM',CurrentPosition, FWHM);
+                  this.$bus.$emit('UpdateFWHM', CurrentPosition, FWHM);
                   this.$bus.$emit('addData_Point', CurrentPosition, FWHM);
                 }
                 break;
@@ -1151,15 +1268,15 @@ export default {
                 break;
               case 'addLineData_Point':
                 if (parts.length === 2) {
-                    const dataList = parts[1].split(',');  // 将字符串分割成数组
-                    const coordinates = [];
-                    for (let i = 0; i < dataList.length-1; i += 2) {
-                        const x = parseInt(dataList[i]);
-                        const y = parseFloat(dataList[i + 1]);
-                        const coordinate = [x, y];
-                        coordinates.push(coordinate);
-                    }
-                    this.$bus.$emit('addLineData_Point', coordinates);
+                  const dataList = parts[1].split(',');  // 将字符串分割成数组
+                  const coordinates = [];
+                  for (let i = 0; i < dataList.length - 1; i += 2) {
+                    const x = parseInt(dataList[i]);
+                    const y = parseFloat(dataList[i + 1]);
+                    const coordinate = [x, y];
+                    coordinates.push(coordinate);
+                  }
+                  this.$bus.$emit('addLineData_Point', coordinates);
                 }
                 break;
               case 'MainCameraSize':
@@ -1174,8 +1291,9 @@ export default {
 
               case 'MainCameraBinning':
                 if (parts.length === 2) {
-                  const bin = parseInt(parts[1]);
-                  this.$bus.$emit('MainCameraBinning', bin);
+                  this.cameraBin = parseInt(parts[1]);
+                  this.MainCameraConfigItems.find(item => item.label === 'Binning').value = this.cameraBin;
+                  this.$bus.$emit('MainCameraBinning', this.cameraBin);
                 }
                 break;
 
@@ -1302,6 +1420,7 @@ export default {
               case 'TelescopeRADEC':
                 if (parts.length === 3) {
                   this.UpdateCirclePos(parts[1], parts[2]);
+                  this.$bus.$emit('updateCurrentLocation',parts[1], parts[2]);
                 }
                 break;
 
@@ -1416,6 +1535,7 @@ export default {
                 this.callShowMessageBox('Solve image faild...', 'error');
                 this.$bus.$emit("ImageSolveFinished", false);
                 this.$bus.$emit('setParsingProgress', false);
+                this.$bus.$emit('MountOperationComplete', 'solve');
                 break;
 
               case 'MainCameraOffsetRange':
@@ -1570,8 +1690,10 @@ export default {
                       if (device.driverType === 'Telescopes') {
                         if (parts[2] === '' || parts[2] === NaN) {
                           device.device = '';
-                        }else{
+                          device.isConnected = false;
+                        } else {
                           device.device = parts[2] + ' mm';
+                          device.isConnected = true;
                         }
                       }
                     }
@@ -1583,8 +1705,11 @@ export default {
                   }
 
                   if (parts[1] === 'Coordinates') {
-                    const [lat, lng] = parts[2].split(',').map(coord => parseFloat(coord.trim()));
-                    this.SetCurrentLocation(lat, lng);
+                    const [latStr, lngStr, isAutoStr] = parts[2].split(',').map(item => item.trim());
+                    const lat = parseFloat(latStr);
+                    const lng = parseFloat(lngStr);
+                    const isAuto = isAutoStr === 'true' || isAutoStr === '1';
+                    this.SetCurrentLocation(lat, lng, isAuto);
                   }
 
                   if (parts[1] === 'MultiStarGuider') {
@@ -1747,10 +1872,10 @@ export default {
                 }
                 break;
 
-              case 'startFocusLoopSjootingfile':
+              case 'startFocusLoopFailed':
                 if (parts.length === 2) {
                   const message = parts[1];
-                  this.$bus.$emit('startFocusLoopSjootingfile', message);
+                  this.$bus.$emit('startFocusLoopFailed', message);
                 }
                 break;
 
@@ -1766,14 +1891,14 @@ export default {
                 }
                 break;
 
-              // case 'focuserROIStarsList':
-              //   if (parts.length === 4) {
-              //     const x = parts[1];
-              //     const y = parts[2];
-              //     const HFR = parts[3];
-              //     this.focuserROIStarsList.push({ x, y, HFR });
-              //   }
-              //   break;
+              case 'focuserROIStarsList':
+                if (parts.length === 4) {
+                  const x = parts[1];
+                  const y = parts[2];
+                  const HFR = parts[3];
+                  this.focuserROIStarsList.push({ x, y, HFR });
+                }
+                break;
 
               // case 'clearFocuserROIStarsList':
               //   this.focuserROIStarsList = [];
@@ -1788,11 +1913,13 @@ export default {
                 break;
 
               case 'SetRedBoxState':
-                if (parts.length === 4) {
+                if (parts.length === 6) {
                   const length = parts[1];
                   this.ROI_x = parseFloat(parts[2]);
                   this.ROI_y = parseFloat(parts[3]);
-                  this.setRedBoxState(length, this.ROI_x, this.ROI_y);
+                  this.ROI_x_qt = parseFloat(parts[4]);
+                  this.ROI_y_qt = parseFloat(parts[5]);
+                  this.setRedBoxState(length, this.ROI_x, this.ROI_y, this.ROI_x_qt, this.ROI_y_qt);
                   console.log('设置红色ROI框: ', length, this.ROI_x, this.ROI_y);
                 }
                 break;
@@ -1852,7 +1979,7 @@ export default {
                   const lat = parts[1];
                   const lon = parts[2];
                   const language = parts[3];
-                  this.SendConsoleLogMsg('localMessage: ' + lat + ',' + lon + ',' + language, 'info');
+                  this.SendConsoleLogMsg('2------------获得参数设置localMessage: ' + lat + ',' + lon + ',' + language, 'info');
                   if (language == 'zh') {
                     this.$bus.$emit('ClientLanguage', 'cn');
                   } else {
@@ -1861,8 +1988,84 @@ export default {
                   this.$bus.$emit('setLocationLatAndLon', lat, lon);
                 }
                 break;
-              
 
+              case 'isAutoLocation':
+                if (parts.length === 2) {
+                  const isAutoLocation = parts[1];
+                  this.$bus.$emit('isAutoLocation', isAutoLocation);
+                }
+                break;
+
+              case 'sendGetLocation':
+                if (parts.length === 3) {
+                  const lat = parts[1];
+                  const lon = parts[2];
+                  this.SendConsoleLogMsg('sendGetLocation: ' + lat + ',' + lon, 'info');
+                  this.$bus.$emit('sendGetLocation', lat, lon);
+                }
+                break;
+
+              case 'MainCameraCFA':
+                if (parts.length === 2) {
+                  let value = parts[1];
+                  if (value === '') {
+                    value = 'null';
+                  } else if (value === 'GRBG') {
+                    value = 'GR';
+                  } else if (value === 'GBRG') {
+                    value = 'GB';
+                  } else if (value === 'BGGR') {
+                    value = 'BG';
+                  } else if (value === 'RG') {
+                    value = 'RGGB';
+                  }
+                  this.ImageCFA = value;
+                  console.log("获取到的主相机参数  MainCameraCFA: ", this.ImageCFA);
+                  this.MainCameraConfigItems.find(item => item.label === 'ImageCFA').value = this.ImageCFA;
+                }
+                break;
+
+              case 'CameraNotIdle':
+                this.callShowMessageBox('Camera is not idle', 'error');
+                this.$bus.$emit('MountOperationComplete', 'solve');
+                break;
+
+              case 'MainCameraNotConnect':
+                this.callShowMessageBox('Main Camera is not connect', 'error');
+                this.$bus.$emit('MountOperationComplete', 'solve');
+                break;
+              case 'ServerInitSuccess':
+                this.callShowMessageBox('Server init success', 'success');
+                window.location.reload();
+                break;
+              case 'PolarAlignmentState':
+                if (parts.length === 4) {
+                  const state = parts[1];
+                  const message = parts[2];
+                  const percentage = parts[3];
+                  this.$bus.$emit('PolarAlignmentState', state, message, percentage);
+                }
+                break;
+              case 'PolarAlignmentAdjustmentGuideData':
+                if (parts.length === 13) {
+                  const ra = parseFloat(parts[1]);
+                  const dec = parseFloat(parts[2]);
+                  const maxra = parseFloat(parts[3]);
+                  const minra = parseFloat(parts[4]);
+                  const maxdec = parseFloat(parts[5]);
+                  const mindec = parseFloat(parts[6]);
+                  const targetra = parseFloat(parts[7]);
+                  const targetdec = parseFloat(parts[8]);
+                  this.$bus.$emit('FieldDataUpdate', [ra, dec, maxra, minra, maxdec, mindec,targetra,targetdec]);
+                  
+                  const offsetra = parseFloat(parts[9]);
+                  const offsetdec = parseFloat(parts[10]);
+                  const adjustmentra = parts[11];
+                  const adjustmentdec = parts[12];
+                  this.$bus.$emit('updateCardInfo', ra, dec, targetra, targetdec, offsetra, offsetdec, adjustmentra, adjustmentdec);
+
+                }
+                break;
 
               default:
                 console.warn('未处理命令: ', data.message);
@@ -1874,6 +2077,36 @@ export default {
           // 处理确认消息
           const messageId = data.msgid;
           this.handleMessageResponse(messageId);
+        } else if (data.type === 'Process_Command') {
+          console.log('Process_Command: ', data.message);
+          // 处理返回消息
+          const parts = data.message.split(':');
+          if (parts[0] === 'qtServerIsOver') {
+            this.callShowMessageBox('QT Server is over', 'error');
+            this.ShowConfirmDialog('restart', 'QT server encountered a segmentation fault or is frozen, please restart or exit!', 'restartQtServer');
+          }
+          else if (parts[0] === 'checkHasNewUpdatePack') {
+            if (parts.length === 2) {
+              const version = parts[1];
+              this.SendConsoleLogMsg('获取到更新包版本: ' + version, 'info');
+              
+              this.ShowConfirmDialog('ForceUpdate', this.$t('checkHasNewUpdatePack') + ': ' + version + '，' + this.$t('updateConfirm'), 'updateCurrentClient:'+version);
+            }
+          }
+          else if (parts[0] === 'No_update_pack_found') {
+            this.callShowMessageBox(this.$t('No_update_pack_found'), 'error');
+          }else if (parts[0] === 'update_progress') {
+            this.$bus.$emit('update_progress', data.message);
+          }else if (parts[0] === 'update_error') {
+            this.$bus.$emit('update_error', data.message);
+          }else if (parts[0] === 'update_success') {
+            this.$bus.$emit('update_success', data.message);
+          }else if (parts[0] === 'testQtServerProcess') {
+            
+          }
+          else{
+            console.warn('未处理命令: ', data.message);
+          }
         }
 
         this.receivedMessages.push(data.message); // 将接收到的消息添加到数组中
@@ -1996,11 +2229,11 @@ export default {
       this.$bus.$emit('ResetTime');
     },
 
-    SetCurrentLocation(lat, lng) {
+    SetCurrentLocation(lat, lng, isAuto) {
       console.log('SetCurrentLocation:', lat, ',', lng);
       this.$bus.$emit('SendConsoleLogMsg', 'Set Current Location:' + lat + ',' + lng, 'info');
       this.$bus.$emit('PolarPointAltitude', lat);
-      this.$bus.$emit('resetLocation', lat, lng);
+      this.$bus.$emit('resetLocation', lat, lng, isAuto);
       const loc = {
         short_name: 'Unknown',
         country: 'Unknown',
@@ -2024,14 +2257,15 @@ export default {
       this.getQTClientVersion();                // 获取QTClient版本
       this.sendMessage('Vue_Command', 'getROIInfo'); // 获取ROI信息
       this.sendMessage('Vue_Command', 'localMessage'); // 获取位置信息
+      this.sendMessage('Vue_Command', 'getLastSelectDevice'); // 获取上一次选择的设备
       this.sendMessage('Vue_Command', 'getMainCameraParameters'); // 获取主相机参数
       this.RecalibratePolarAxis(); // 重新校准极轴
-      // this.sendMessage('Vue_Command', 'getStagingSolveResult'); // 获取定标结果
+      this.sendMessage('Vue_Command', 'getStagingSolveResult'); // 获取定标结果
       this.sendMessage('Vue_Command', 'getFocuserLoopingState'); // 获取焦距器循环状态
       this.sendMessage('Vue_Command', 'getStagingScheduleData'); // 获取定标计划数据
       this.sendMessage('Vue_Command', 'getStagingSolveResult'); // 获取定标结果
       this.sendMessage('Vue_Command', 'getGPIOsStatus'); // 获取GPIO状态
-      this.sendMessage('Vue_Command', 'getStagingImage'); // 获取最后拍摄的图像
+      // this.sendMessage('Vue_Command', 'getStagingImage'); // 获取最后拍摄的图像
 
       this.disconnectTimeoutTriggered = false;
     },
@@ -2127,6 +2361,7 @@ export default {
           device.BaudRate = 9600;
         }
       });
+      this.selectedDriver = '';
     },
     confirmDevice() {
       // 确定设备的逻辑
@@ -2194,36 +2429,40 @@ export default {
       if (event.type === 'touchstart') {
         this.isTouching = true;
         this.isConnectBtnLongPress = false; // 重置长按标记
-        this.ConnectBtnPressTimer = setTimeout(() => {
-          this.isConnectBtnLongPress = true; // 标记为长按
-          this.handleConnectBtnLongPress();
-        }, this.ConnectBtnlongPressThreshold);
+        // this.ConnectBtnPressTimer = setTimeout(() => {
+        //   this.isConnectBtnLongPress = true; // 标记为长按
+        //   this.handleConnectBtnLongPress();
+        // }, this.ConnectBtnlongPressThreshold);
+        this.handleConnectBtnClick();
       }
       // 如果是鼠标事件，且没有正在进行的触摸事件，则处理
       else if (event.type === 'mousedown' && !this.isTouching) {
         this.isConnectBtnLongPress = false; // 重置长按标记
-        this.ConnectBtnPressTimer = setTimeout(() => {
-          this.isConnectBtnLongPress = true; // 标记为长按
-          this.handleConnectBtnLongPress();
-        }, this.ConnectBtnlongPressThreshold);
+        // this.ConnectBtnPressTimer = setTimeout(() => {
+        //   this.isConnectBtnLongPress = true; // 标记为长按
+        //   this.handleConnectBtnLongPress();
+        // }, this.ConnectBtnlongPressThreshold);
+        this.handleConnectBtnClick();
       }
     },
     endConnectBtnPress(event) {
       // 如果是触摸事件，处理并重置标记
       if (event.type === 'touchend') {
         clearTimeout(this.ConnectBtnPressTimer); // 清除定时器
-        if (!this.isConnectBtnLongPress) {
-          this.handleConnectBtnClick(); // 如果不是长按，则触发点击事件
-        }
+        // if (!this.isConnectBtnLongPress) {
+        //   this.handleConnectBtnClick(); // 如果不是长按，则触发点击事件
+        // }
+        this.handleConnectBtnClick(); 
         this.ConnectBtnPressTimer = null; // 重置定时器
         this.isTouching = false; // 重置触摸标记
       }
       // 如果是鼠标事件，且没有正在进行的触摸事件，则处理
       else if (event.type === 'mouseup' && !this.isTouching) {
         clearTimeout(this.ConnectBtnPressTimer); // 清除定时器
-        if (!this.isConnectBtnLongPress) {
-          this.handleConnectBtnClick(); // 如果不是长按，则触发点击事件
-        }
+        // if (!this.isConnectBtnLongPress) {
+        //   this.handleConnectBtnClick(); // 如果不是长按，则触发点击事件
+        // }
+        this.handleConnectBtnClick(); 
         this.ConnectBtnPressTimer = null; // 重置定时器
       }
     },
@@ -2342,14 +2581,15 @@ export default {
           this.$bus.$emit('CFWConnected', 0);
           this.$bus.$emit('FocuserConnected', 0);
           this.$bus.$emit('GuiderConnected', 0);
-          this.claerDeviceList();
+          this.clearDeviceList();
         }
       } else {
         this.callShowMessageBox('No devices have been connected.', 'error');
       }
+      this.selectedDriver = '';
     },
 
-    // claerDeviceList() {
+    // clearDeviceList() {
     //   this.devices.forEach(device => {
     //     device.isConnected = false;
     //     device.isget = false;
@@ -2359,21 +2599,20 @@ export default {
     //   this.ToBeConnectDevice = [];
     //   this.devicesList = [];
     //   this.drivers = [];
-    //   this.$bus.$emit('claerDeviceAllocationList');
+    //   this.$bus.$emit('clearDeviceAllocationList');
     // },
 
-    claerDeviceList() {
+    clearDeviceList() {
       this.devices.forEach(device => {
-        device.device = "";
+        device.device = device.driverName;
         device.isConnected = false;
         device.isget = false;
-        device.driverName = '';
         device.BaudRate = 9600;
       });
       this.ToBeConnectDevice = [];
       this.devicesList = [];
       this.drivers = [];
-      this.$bus.$emit('claerDeviceAllocationList');
+      this.$bus.$emit('clearDeviceAllocationList');
     },
 
     SwitchOutPutPower(index, isPowerON) {
@@ -2394,6 +2633,11 @@ export default {
     ShutdownRaspberryPi() {
       this.drawer_2 = false;
       this.ShowConfirmDialog('Shut Down', 'Are you sure you want to shut down the Raspberry Pi?', 'ShutdownRaspberryPi');
+    },
+
+    ForceUpdate() {
+      this.drawer_2 = false;
+      this.ShowConfirmDialog('Force Update', 'Are you sure you want to force update the Raspberry Pi?', 'ForceUpdate');
     },
 
     ReturnConnectedDevices() {
@@ -2499,9 +2743,9 @@ export default {
           // console.log(item.label, item.value);
           this.SendConsoleLogMsg(item.label + ':' + item.value, 'info');
           this.$bus.$emit(item.label, item.label + ':' + item.value);
-        }else if (item.value == '' && item.label === 'Focal Length (mm)'){
+        } else if (item.value == '' && item.label === 'Focal Length (mm)') {
           this.SendConsoleLogMsg(item.label + 'is NULL', 'info');
-          this.$bus.$emit(item.label, item.label+ ':' );
+          this.$bus.$emit(item.label, item.label + ':');
         }
       });
       this.callShowMessageBox('Configuration has been modified!', 'success');
@@ -2570,7 +2814,7 @@ export default {
     BinningSet(payload) {
       const [signal, value] = payload.split(':'); // 拆分信号和值
       const IntValue = parseInt(value); // 将值转换为 Int 类型
-
+      this.cameraBin = IntValue;
       console.log('Image Binning is set to:', IntValue);
       this.SendConsoleLogMsg('Image Binning is set to:' + IntValue, 'info');
       this.sendMessage('Vue_Command', 'SetBinning:' + IntValue);
@@ -2598,13 +2842,25 @@ export default {
     ImageCFASet(payload) {
       const [signal, value] = payload.split(':'); // 拆分信号和值
 
-      if (['GR', 'GB', 'BG', 'RGGB'].includes(value)) {
+      // if (['GR', 'GB', 'BG', 'RGGB','null'].includes(value)) {
+      if (['GR', 'GB', 'BG', 'RG', 'GRBG', 'GBRG', 'BGGR', 'RGGB', 'null', ''].includes(value)) {
+        if (value === '') {
+          value = 'null';
+        } else if (value === 'GRBG') {
+          value = 'GR';
+        } else if (value === 'GBRG') {
+          value = 'GB';
+        } else if (value === 'BGGR') {
+          value = 'BG';
+        } else if (value === 'RG') {
+          value = 'RGGB';
+        }
         this.ImageCFA = value;
-        console.log('ImageCFA is set to:', value);
+        // console.log('ImageCFA is set to:', value);
         this.SendConsoleLogMsg('ImageCFA is set to:' + value, 'info');
         this.sendMessage('Vue_Command', 'ImageCFA:' + value);
       } else {
-        console.log(`Invalid value for ImageCFA: '${value}'. Please set it to one of 'GR', 'GB', 'BG', 'RGGB'.`);
+        // console.log(`Invalid value for ImageCFA: '${value}'. Please set it to one of 'GR', 'GB', 'BG', 'RGGB'.`);
         this.callShowMessageBox(`Invalid value for ImageCFA: '${value}'. Please set it to one of 'GR', 'GB', 'BG', 'RGGB'.`, 'error');
       }
     },
@@ -2620,15 +2876,15 @@ export default {
 
     FocalLengthSet(payload) {
       const [signal, value] = payload.split(':'); // 拆分信号和值
-      
+
       for (const device of this.devices) {
         if (device.driverType === 'Telescopes') {
-          
+
           if (value === '' || value === NaN) {
             device.device = '';
             this.SendConsoleLogMsg('Focal Length is set to:' + 0, 'info');
             this.$bus.$emit('SetFocalLengthNum', '');
-          }else{
+          } else {
             const IntValue = parseInt(value); // 将值转换为 Int 类型
             device.device = value + ' mm';
             this.SendConsoleLogMsg('Focal Length is set to:' + IntValue, 'info');
@@ -2644,7 +2900,7 @@ export default {
       const [signal, value] = payload.split(':'); // 拆分信号和值
       const IntValue = parseInt(value); // 将值转换为 Int 类型
 
-      
+
       this.SendConsoleLogMsg('Guider Focal Length is set to:' + IntValue, 'info');
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'GuiderFocalLength:' + IntValue);
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'saveToConfigFile:GuiderFocalLength:' + IntValue);
@@ -2759,10 +3015,10 @@ export default {
                 loaded += value.byteLength;
                 const percent = (loaded / total) * 100;
                 if (Math.round(percent) % 10 === 0) {
-                  this.SendConsoleLogMsg(`Progress: ${Math.round(percent)}%`, 'info');
+                  // this.SendConsoleLogMsg(`Progress: ${Math.round(percent)}%`, 'info');
                   this.updateCaptureImageProgress(Math.round(percent));
                 }
-                this.SendConsoleLogMsg(`当前进度: ${Math.round(percent)}%`, 'info');
+                // this.SendConsoleLogMsg(`当前进度: ${Math.round(percent)}%`, 'info');
                 controller.enqueue(value);
                 push();
               }).catch(error => {
@@ -2817,6 +3073,8 @@ export default {
         this.isDownloadingImage = false; // 确保在任何情况下都重置状态
       }
     },
+
+
     // async readBinFile(fileName, retryCount = 1) {
     //   while (this.isDownloadingImage) {
     //     await new Promise(resolve => setTimeout(resolve, 1000));
@@ -2926,6 +3184,753 @@ export default {
       this.ImageProportion = value;
     },
 
+    async processImage(imgArray, histogramMin = -1, histogramMax = -1, options = {}) {
+      let { calculateHistogram = true } = options;
+      this.progressValue = 0;
+      this.progressDescription = this.$i18n.locale === 'cn' ? '开始处理图像...' : 'Processing image...';
+      let mat = null;
+      let targetImg8 = null;
+      let resizeImg = null;
+
+      // 使用setTimeout和Promise创建非阻塞处理
+      const processAsync = (fn) => {
+        return new Promise(resolve => {
+          setTimeout(() => {
+            const result = fn();
+            resolve(result);
+          }, 0);
+        });
+      };
+
+      try {
+        if (!(imgArray instanceof ArrayBuffer) && !ArrayBuffer.isView(imgArray)) {
+          throw new Error("Input must be ArrayBuffer or TypedArray");
+        }
+        let uintArray = new Uint16Array(imgArray);
+
+        if (uintArray.length != parseInt(this.mainCameraSizeY) * parseInt(this.mainCameraSizeX)) {
+          throw new Error("Image size mismatch");
+        }
+        // 创建Mat对象
+        await processAsync(() => {
+          mat = new cv.Mat(parseInt(this.mainCameraSizeY), parseInt(this.mainCameraSizeX), cv.CV_16UC1);
+          mat.data16U.set(uintArray);
+          this.progressValue = 10;
+          this.progressDescription = this.$i18n.locale === 'cn' ? '创建Mat对象...' : 'Creating Mat object...';
+          return true;
+        });
+
+        // 用户自定义参数
+        let CFA = this.ImageCFA;
+        let isColorCamera = false;
+        let mode = 1;
+        let blackLevel, whiteLevel;
+
+        if (histogramMin == -1 && histogramMax == -1) {
+          // 获取自动拉伸参数
+          const result = await processAsync(() => {
+            const res = this.GetAutoStretch(mat, mode);
+            this.progressValue = 20;
+            this.progressDescription = this.$i18n.locale === 'cn' ? '获取自动拉伸参数...' : 'Getting auto stretch parameters...';
+            return res;
+          });
+
+          calculateHistogram = true;
+          // 从结果中提取值
+          blackLevel = result.blackLevel;
+          whiteLevel = result.whiteLevel;
+        } else {
+          blackLevel = histogramMin;  // 现在可以正常工作
+          whiteLevel = histogramMax;  // 现在可以正常工作
+        }
+
+        // 根据CFA设置颜色转换模式
+        if (CFA === 'GR') {
+          isColorCamera = true;
+        } else if (CFA === 'GB') {
+          isColorCamera = true;
+        } else if (CFA === 'BG') {
+          isColorCamera = true;
+        } else if (CFA === 'RGGB') {
+          isColorCamera = true;
+        } else {
+          isColorCamera = false;
+        }
+        console.log("当前拍摄参数:isColorCamera:", isColorCamera, "CFA:", CFA);
+        // 计算直方图
+        const analysis = await processAsync(() => {
+          const result = isColorCamera
+            ? this.analyzeImageStatistics(mat, 'bayer', CFA, { calculateGain: this.calculateGain, calculateHistogram: calculateHistogram })
+            : this.analyzeImageStatistics(mat, 'gray', { calculateGain: this.calculateGain, calculateHistogram: calculateHistogram });
+
+          if (this.ImageGainR != 1 || this.ImageGainB != 1 || this.ImageOffset != 0) {
+            result.gainR = this.ImageGainR;
+            result.gainB = this.ImageGainB;
+            result.offset = this.ImageOffset;
+          }
+
+          this.progressValue = 40;
+          this.progressDescription = this.$i18n.locale === 'cn' ? '计算直方图...' : 'Calculating histogram...';
+          return result;
+        });
+
+        if (analysis.histogram) {
+          this.$bus.$emit('showHistogram', analysis.histogram);  // 更新 直方图数据
+          this.$bus.$emit('ChangeDialPosition', blackLevel, whiteLevel);  // 更新直方图的显示轴
+          this.$bus.$emit('AutoHistogramNum', blackLevel, whiteLevel);
+        }
+
+        this.lastImageProcessParams = {
+          blackLevel: blackLevel,
+          whiteLevel: whiteLevel,
+          CFA: CFA,
+          analysis: analysis,
+          isColorCamera: isColorCamera,
+        };
+
+        // 使用增益和拉伸，并转化为8位图像
+        targetImg8 = await processAsync(() => {
+          const result = isColorCamera
+            ? this.applyStretchAndGain(mat, analysis, 'bayer', CFA, blackLevel, whiteLevel)
+            : this.applyStretchAndGain(mat, analysis, 'gray', CFA, blackLevel, whiteLevel);
+
+          // 释放mat
+          if (mat) {
+            mat.delete();
+            mat = null;
+          }
+
+          this.progressValue = 60;
+          this.progressDescription = this.$i18n.locale === 'cn' ? '根据参数处理...' : 'Processing with parameters...';
+          return result;
+        });
+
+        // 根据模式处理图像
+        if (this.isPolarAxisMode) {
+          await processAsync(() => {
+            resizeImg = new cv.Mat();
+            cv.resize(targetImg8, resizeImg, new cv.Size(this.CanvasWidth, this.CanvasHeight), 0, 0, cv.INTER_LINEAR);
+
+            if (targetImg8) {
+              targetImg8.delete();
+              targetImg8 = null;
+            }
+            this.progressValue = 0;
+            return true;
+          });
+
+          this.$bus.$emit('showSolveImage', resizeImg);
+
+          if (resizeImg) {
+            resizeImg.delete();
+            resizeImg = null;
+          }
+        } else {
+          // 转换为ImageData对象
+          const colorData = await processAsync(() => {
+            const data = new ImageData(
+              new Uint8ClampedArray(targetImg8.data),
+              targetImg8.cols,
+              targetImg8.rows
+            );
+
+            if (targetImg8) {
+              targetImg8.delete();
+              targetImg8 = null;
+            }
+            if (resizeImg) {
+              resizeImg.delete();
+              resizeImg = null;
+            }
+            this.progressValue = 80;
+            this.progressDescription = this.$i18n.locale === 'cn' ? '转换为ImageData对象...' : 'Converting to ImageData object...';
+            return data;
+          });
+
+          this.drawImgData = true;
+
+          // 设置缓冲画布
+          await processAsync(() => {
+            this.bufferCanvas.width = colorData.width;
+            this.bufferCanvas.height = colorData.height;
+            this.bufferCtx.putImageData(colorData, 0, 0);
+            this.progressValue = 90;
+            this.progressDescription = this.$i18n.locale === 'cn' ? '绘制缓冲画布图像...' : 'Drawing buffer canvas image...';
+            return true;
+          });
+
+          // 绘制主画布图像
+          this.progressValue = 100;
+          this.progressDescription = this.$i18n.locale === 'cn' ? '绘制主画布图像...' : 'Drawing main canvas image...';
+          this.drawImageData();
+        }
+      } catch (error) {
+        this.handleError('Process image data error', 'processImage', error);
+        this.progressValue = 0;
+        this.progressDescription = '';
+      } finally {
+        this.progressValue = 0;
+        // 确保所有Mat对象都被释放
+        if (mat) {
+          mat.delete();
+          mat = null;
+        }
+        if (targetImg8) {
+          targetImg8.delete();
+          targetImg8 = null;
+        }
+        if (resizeImg) {
+          resizeImg.delete();
+          resizeImg = null;
+        }
+        // 处理后检查内存
+        this.checkMemoryUsage();
+        // 在处理完大量数据后手动请求垃圾回收
+        if (window.gc) {
+          try { window.gc(); } catch (e) {}
+        }
+      }
+    },
+
+
+    /**
+     * 获取自动拉伸参数，返回黑色和白色阈值
+     * @param {cv.Mat} imgMat 输入的图像Mat对象
+     * @param {int} mode 模式
+     * @returns {int，int} 黑色和白色阈值
+     */
+    GetAutoStretch(imgMat, mode) {
+      // 仅支持 Mat 类型输入，并假定为16位图像
+      // 使用 OpenCV 的 meanStdDev 函数直接计算均值和标准差
+      const means = new cv.Mat();
+      const stdDevs = new cv.Mat();
+
+      // 高效计算均值和标准差
+      cv.meanStdDev(imgMat, means, stdDevs);
+
+      // 获取计算结果
+      const mean = means.doubleAt(0, 0);
+      const stdDev = stdDevs.doubleAt(0, 0);
+
+      // 释放临时 Mat 对象
+      means.delete();
+      stdDevs.delete();
+
+      // 根据模式设置标准差倍数
+      let a, b;
+      switch (mode) {
+        case 0: a = 3; b = 5; break;
+        case 1: a = 2; b = 5; break;
+        case 2: a = 3; b = 8; break;
+        default: a = 2; b = 8;
+      }
+
+      // 固定为16位图像处理
+      const maxValue = 65535;
+
+      // 计算黑白点
+      let blackLevel = Math.round(Math.max(0, mean - stdDev * a));
+      let whiteLevel = Math.round(Math.min(maxValue, mean + stdDev * b));
+
+      // 确保 blackLevel < whiteLevel
+      if (blackLevel >= whiteLevel) {
+        blackLevel = whiteLevel - 1;
+      }
+
+      return { blackLevel, whiteLevel };
+    },
+
+    /**
+     * 分析16位图像并计算直方图和白平衡增益
+     * @param {cv.Mat} img16 - 输入的16位图像Mat对象
+     * @param {string} imageType - 图像类型: 'gray'(灰度图) 或 'bayer'(Bayer格式)
+     * @param {string} bayerPattern - Bayer模式，如果imageType为'bayer'则需提供: 'RGGB', 'GR', 'GB', 'BG'
+     * @param {Object} options - 可选参数
+     * @param {number} options.bins - 直方图箱数，默认256
+     * @param {boolean} options.calculateGain - 是否计算白平衡增益参数，默认true
+     * @param {boolean} options.usePercentile - 是否使用百分位计算增益，默认true
+     * @param {number} options.lowPercentile - 下截断百分位，默认1
+     * @param {number} options.highPercentile - 上截断百分位，默认99
+     * @returns {Object} 直方图数据和增益参数
+     */
+    analyzeImageStatistics(img16, imageType, bayerPattern = 'RGGB', options = {}) {
+      // 首先检查输入Mat是否有效
+      if (!img16 || img16.rows <= 0 || img16.cols <= 0) {
+        console.error('无效的图像数据');
+        return {};
+      }
+
+      const { calculateGain = true, calculateHistogram = true } = options;
+      const result = {};
+
+
+      // 设置直方图参数
+      const step = 4;
+
+      // 安全访问函数
+      const safeUshortAt = (mat, y, x) => {
+        if (y >= 0 && y < mat.rows && x >= 0 && x < mat.cols) {
+          try {
+            return mat.ushortAt(y, x);
+          } catch (e) {
+            console.error(`访问位置错误: (${y},${x})`);
+            return 0;
+          }
+        }
+        return 0;
+      };
+
+      // 安全掩码设置
+      const safeUcharAt = (mask, y, x, value) => {
+        if (y >= 0 && y < mask.rows && x >= 0 && x < mask.cols) {
+          try {
+            mask.ucharAt(y, x, value);
+          } catch (e) {
+            console.error(`设置掩码错误: (${y},${x})`);
+          }
+        }
+      };
+
+      if (imageType === 'gray') {
+        if (calculateHistogram) {
+          // 计算直方图
+          const histData = Array(65536).fill(0);
+          for (let i = 0; i < img16.rows; i += step) {
+            for (let j = 0; j < img16.cols; j += step) {
+              try {
+                histData[safeUshortAt(img16, i, j)]++;
+              } catch (e) {
+                // 忽略错误继续执行
+              }
+            }
+          }
+          result.histogram = histData;
+        }
+      } else if (imageType === 'bayer') {
+        // 确保图像大小足够进行Bayer处理
+        if (img16.rows < 2 || img16.cols < 2) {
+          console.error('图像尺寸过小，无法进行Bayer处理');
+          return {};
+        }
+
+        const rows = img16.rows;
+        const cols = img16.cols;
+
+        // 创建掩码 - 使用稀疏采样
+        const maskR = new cv.Mat(rows, cols, cv.CV_8UC1, new cv.Scalar(0));
+        const maskG = new cv.Mat(rows, cols, cv.CV_8UC1, new cv.Scalar(0));
+        const maskB = new cv.Mat(rows, cols, cv.CV_8UC1, new cv.Scalar(0));
+
+        // 确定采样步长 - 大图像时采用更大步长
+        const sampleStep = Math.max(2, Math.floor(Math.min(rows, cols) / 200) * 2);
+
+        // 确定Bayer模式位置
+        let rOffsets, gOffsets, bOffsets;
+        switch (bayerPattern) {
+          case 'RGGB':
+            rOffsets = [{ y: 0, x: 0 }];
+            gOffsets = [{ y: 0, x: 1 }, { y: 1, x: 0 }];
+            bOffsets = [{ y: 1, x: 1 }];
+            break;
+          case 'GR':
+            gOffsets = [{ y: 0, x: 0 }, { y: 1, x: 1 }];
+            rOffsets = [{ y: 0, x: 1 }];
+            bOffsets = [{ y: 1, x: 0 }];
+            break;
+          case 'GB':
+            gOffsets = [{ y: 0, x: 0 }, { y: 1, x: 1 }];
+            bOffsets = [{ y: 0, x: 1 }];
+            rOffsets = [{ y: 1, x: 0 }];
+            break;
+          case 'BG':
+            bOffsets = [{ y: 0, x: 0 }];
+            gOffsets = [{ y: 0, x: 1 }, { y: 1, x: 0 }];
+            rOffsets = [{ y: 1, x: 1 }];
+            break;
+          default:
+            rOffsets = [{ y: 0, x: 0 }];
+            gOffsets = [{ y: 0, x: 1 }, { y: 1, x: 0 }];
+            bOffsets = [{ y: 1, x: 1 }];
+        }
+
+        // 采样数据用于增益计算
+        const rValues = [];
+        const gValues = [];
+        const bValues = [];
+
+        // 采样设置掩码和收集采样数据
+        for (let y = 0; y < rows; y += sampleStep) {
+          for (let x = 0; x < cols; x += sampleStep) {
+            // 处理红色通道
+            for (const pos of rOffsets) {
+              const py = y + pos.y;
+              const px = x + pos.x;
+              if (py < rows && px < cols && py >= 0 && px >= 0) {
+                try {
+                  maskR.ucharAt(py, px, 255);
+                  if (calculateGain && y % (sampleStep * 2) === 0 && x % (sampleStep * 2) === 0) {
+                    rValues.push(safeUshortAt(img16, py, px));
+                  }
+                } catch (e) {
+                  console.error(`R通道错误：(${py},${px})`, e);
+                }
+              }
+            }
+
+            // 处理绿色通道
+            for (const pos of gOffsets) {
+              const py = y + pos.y;
+              const px = x + pos.x;
+              if (py < rows && px < cols && py >= 0 && px >= 0) {
+                try {
+                  maskG.ucharAt(py, px, 255);
+                  if (calculateGain && y % (sampleStep * 2) === 0 && x % (sampleStep * 2) === 0) {
+                    gValues.push(safeUshortAt(img16, py, px));
+                  }
+                } catch (e) {
+                  console.error(`G通道错误：(${py},${px})`, e);
+                }
+              }
+            }
+
+            // 处理蓝色通道
+            for (const pos of bOffsets) {
+              const py = y + pos.y;
+              const px = x + pos.x;
+              if (py < rows && px < cols && py >= 0 && px >= 0) {
+                try {
+                  maskB.ucharAt(py, px, 255);
+                  if (calculateGain && y % (sampleStep * 2) === 0 && x % (sampleStep * 2) === 0) {
+                    bValues.push(safeUshortAt(img16, py, px));
+                  }
+                } catch (e) {
+                  console.error(`B通道错误：(${py},${px})`, e);
+                }
+              }
+            }
+          }
+        }
+
+        if (calculateHistogram) {
+          // 计算三个通道的直方图
+          const histDataR = Array(65536).fill(0);
+          const histDataG = Array(65536).fill(0);
+          const histDataB = Array(65536).fill(0);
+          
+          // 确保安全访问
+          const maxRows = rows - 1;
+          const maxCols = cols - 1;
+          
+          for (let i = 0; i < maxRows; i += 2) {
+            for (let j = 0; j < maxCols; j += 2) {
+              try {
+                if (bayerPattern === 'RGGB') {
+                  histDataR[safeUshortAt(img16, i, j)]++;
+                  const g1 = safeUshortAt(img16, i + 1, j);
+                  const g2 = safeUshortAt(img16, i, j + 1);
+                  histDataG[Math.floor((g1 + g2) / 2)]++;
+                  histDataB[safeUshortAt(img16, i + 1, j + 1)]++;
+                } else if (bayerPattern === 'GR') {
+                  const g1 = safeUshortAt(img16, i, j);
+                  const g2 = safeUshortAt(img16, i + 1, j + 1);
+                  histDataG[Math.floor((g1 + g2) / 2)]++;
+                  histDataR[safeUshortAt(img16, i + 1, j)]++;
+                  histDataB[safeUshortAt(img16, i, j + 1)]++;
+                } else if (bayerPattern === 'GB') {
+                  const g1 = safeUshortAt(img16, i, j);
+                  const g2 = safeUshortAt(img16, i + 1, j + 1);
+                  histDataG[Math.floor((g1 + g2) / 2)]++;
+                  histDataB[safeUshortAt(img16, i + 1, j)]++;
+                  histDataR[safeUshortAt(img16, i, j + 1)]++;
+                } else if (bayerPattern === 'BG') {
+                  histDataB[safeUshortAt(img16, i, j)]++;
+                  const g1 = safeUshortAt(img16, i + 1, j);
+                  const g2 = safeUshortAt(img16, i, j + 1);
+                  histDataG[Math.floor((g1 + g2) / 2)]++;
+                  histDataR[safeUshortAt(img16, i + 1, j + 1)]++;
+                }
+              } catch (e) {
+                console.error(`直方图计算错误：(${i},${j})`, e);
+              }
+            }
+          }
+          result.histogram = [histDataR, histDataG, histDataB];
+        }
+
+        // 计算白平衡增益参数 - 使用快速中位数近似法
+        if (calculateGain && rValues.length > 0 && gValues.length > 0 && bValues.length > 0) {
+          try {
+            // 快速计算中位数而非排序全部数组
+            const rMean = this.truncatedMean(rValues);
+            const gMean = this.truncatedMean(gValues);
+            const bMean = this.truncatedMean(bValues);
+
+            // 计算增益
+            const gainR = Math.min(Math.max(gMean / rMean, 0.1), 2);
+            const gainB = Math.min(Math.max(gMean / bMean, 0.1), 2);
+
+            result.whiteBalance = {
+              gainR: gainR,
+              gainB: gainB
+            };
+          } catch (e) {
+            console.error("白平衡增益计算错误", e);
+            result.whiteBalance = { gainR: 1.0, gainB: 1.0 };
+          }
+        }
+
+        // 释放资源
+        try {
+          maskR.delete();
+          maskG.delete();
+          maskB.delete();
+        } catch (e) {
+          console.error("释放资源错误", e);
+        }
+      }
+      
+      return result;
+    },
+
+    /**
+     * 使用截断均值计算 - 去除上下一定比例的极值后计算平均值
+     * @param {Array} arr - 输入数据数组
+     * @param {number} lowerPercent - 下截断百分比，默认5%
+     * @param {number} upperPercent - 上截断百分比，默认5%
+     * @returns {number} 截断均值
+     */
+     truncatedMean(arr, lowerPercent = 5, upperPercent = 5) {
+      if (arr.length === 0) return 0;
+      
+      // 过滤极端黑点和过饱和点
+      const filtered = arr.filter(v => v > 100 && v < 65000);
+      if (filtered.length === 0) return arr.length > 0 ? arr[0] : 0;
+      
+      // 对于特别大的数组，采样处理
+      let workingArray = filtered;
+      if (filtered.length > 10000) {
+        workingArray = [];
+        const step = Math.ceil(filtered.length / 5000);
+        for (let i = 0; i < filtered.length; i += step) {
+          workingArray.push(filtered[i]);
+        }
+      }
+      
+      // 排序数组
+      workingArray.sort((a, b) => a - b);
+      
+      // 计算截断点
+      const lowerCutoff = Math.floor(workingArray.length * (lowerPercent / 100));
+      const upperCutoff = Math.floor(workingArray.length * (1 - upperPercent / 100));
+      
+      // 获取截断后的子数组
+      const truncated = workingArray.slice(lowerCutoff, upperCutoff);
+      
+      // 计算平均值
+      if (truncated.length === 0) return workingArray[Math.floor(workingArray.length / 2)];
+      
+      const sum = truncated.reduce((acc, val) => acc + val, 0);
+      return sum / truncated.length;
+    },
+    /**
+     * 快速计算中位数 - 使用随机选择算法
+     */
+    quickMedian(arr) {
+      if (arr.length === 0) return 0;
+      if (arr.length < 100) {
+        // 小数组直接排序
+        const sortedArr = [...arr].sort((a, b) => a - b);
+        return sortedArr[Math.floor(sortedArr.length / 2)];
+      }
+
+      // 大数组随机采样
+      const samples = [];
+      for (let i = 0; i < 100; i++) {
+        samples.push(arr[Math.floor(Math.random() * arr.length)]);
+      }
+      samples.sort((a, b) => a - b);
+      return samples[50]; // 返回采样的中位数
+    },
+
+    /**
+     * 应用白平衡和亮度拉伸，将16位图像转换为8位图像
+     * @param {cv.Mat} img16 - 输入的16位图像Mat对象
+     * @param {Object} analysis - 从analyzeImageStatistics获取的分析结果
+     * @param {string} imageType - 图像类型: 'gray'(灰度图) 或 'bayer'(彩色相机)
+     * @param {string} bayerPattern - Bayer模式，仅当imageType为'bayer'时需要
+     * @param {Object} stretchParams - 手动指定拉伸参数，可选
+     * @param {number} stretchParams.blackLevel - 黑点值 
+     * @param {number} stretchParams.whiteLevel - 白点值
+     * @returns {cv.Mat} 处理后的8位RGBA图像
+     */
+    applyStretchAndGain(img16, analysis, imageType, bayerPattern = 'RGGB', blackLevel, whiteLevel) {
+      // 确保黑点小于白点
+      if (blackLevel >= whiteLevel) {
+        blackLevel = whiteLevel - 1;
+      }
+
+      // 计算转换比例和偏移
+      const scale = 255.0 / (whiteLevel - blackLevel);
+      const offset = -blackLevel * scale;
+
+      if (imageType === 'gray') {
+        // 单色相机 - 一步转换到8位RGBA
+        const rgbaImg = new cv.Mat();
+        const gray8 = new cv.Mat();
+
+        img16.convertTo(gray8, cv.CV_8U, scale, offset);
+        cv.cvtColor(gray8, rgbaImg, cv.COLOR_GRAY2RGBA);
+        gray8.delete();
+
+        return rgbaImg;
+      } else {
+        // 彩色相机处理
+        let gainR = 1.0, gainB = 1.0;
+        if (analysis && analysis.whiteBalance) {
+          gainR = analysis.whiteBalance.gainR;
+          gainB = analysis.whiteBalance.gainB;
+        }
+
+        // 使用LUT优化白平衡和拉伸
+        // 1. 创建三个LUT表
+        const { lutR, lutG, lutB } = this.getLUT(blackLevel, whiteLevel, gainR, gainB);
+
+        // 3. 创建8位输出图像
+        const img8 = new cv.Mat(img16.rows, img16.cols, cv.CV_8UC1);
+
+        // 4. 使用LUT应用白平衡和拉伸
+        // 为避免像素遍历，我们使用更高效的方式
+        const rows = img16.rows;
+        const cols = img16.cols;
+        const data8 = img8.data;
+
+        // 确定Bayer模式的位置
+        let rOffsets, gOffsets, bOffsets;
+        switch (bayerPattern) {
+          case 'RGGB':
+            rOffsets = [{ y: 0, x: 0 }];
+            gOffsets = [{ y: 0, x: 1 }, { y: 1, x: 0 }];
+            bOffsets = [{ y: 1, x: 1 }];
+            break;
+          case 'GR':
+            gOffsets = [{ y: 0, x: 0 }, { y: 1, x: 1 }];
+            rOffsets = [{ y: 0, x: 1 }];
+            bOffsets = [{ y: 1, x: 0 }];
+            break;
+          case 'GB':
+            gOffsets = [{ y: 0, x: 0 }, { y: 1, x: 1 }];
+            bOffsets = [{ y: 0, x: 1 }];
+            rOffsets = [{ y: 1, x: 0 }];
+            break;
+          case 'BG':
+            bOffsets = [{ y: 0, x: 0 }];
+            gOffsets = [{ y: 0, x: 1 }, { y: 1, x: 0 }];
+            rOffsets = [{ y: 1, x: 1 }];
+            break;
+          default:
+            rOffsets = [{ y: 0, x: 0 }];
+            gOffsets = [{ y: 0, x: 1 }, { y: 1, x: 0 }];
+            bOffsets = [{ y: 1, x: 1 }];
+        }
+
+        // 使用TypedArray方式处理 - 比逐个像素处理更快
+        const data16U = img16.data16U;
+
+        // 使用Bayer掩码创建转换LUT，批量处理
+        for (let y = 0; y < rows; y += 2) {
+          for (let x = 0; x < cols; x += 2) {
+            // 处理2x2块
+            // R位置
+            for (const pos of rOffsets) {
+              const idx = (y + pos.y) * cols + (x + pos.x);
+              if (idx < data16U.length) {
+                data8[idx] = lutR[data16U[idx]];
+              }
+            }
+
+            // G位置
+            for (const pos of gOffsets) {
+              const idx = (y + pos.y) * cols + (x + pos.x);
+              if (idx < data16U.length) {
+                data8[idx] = lutG[data16U[idx]];
+              }
+            }
+
+            // B位置
+            for (const pos of bOffsets) {
+              const idx = (y + pos.y) * cols + (x + pos.x);
+              if (idx < data16U.length) {
+                data8[idx] = lutB[data16U[idx]];
+              }
+            }
+          }
+        }
+
+        // 5. 将8位单通道转为RGBA
+        const rgbaImg = new cv.Mat();
+        let cvmode;
+        switch (bayerPattern) {
+          case 'RGGB': cvmode = cv.COLOR_BayerRG2RGBA; break;
+          case 'GR': cvmode = cv.COLOR_BayerGR2RGBA; break;
+          case 'GB': cvmode = cv.COLOR_BayerGB2RGBA; break;
+          case 'BG': cvmode = cv.COLOR_BayerBG2RGBA; break;
+          default: cvmode = cv.COLOR_BayerRG2RGBA;
+        }
+
+        cv.cvtColor(img8, rgbaImg, cvmode);
+        img8.delete();
+
+        return rgbaImg;
+      }
+    },
+    /**
+     * 获取或计算LUT表
+     * @param {number} blackLevel - 黑点值
+     * @param {number} whiteLevel - 白点值
+     * @param {number} gainR - 红色增益
+     * @param {number} gainB - 蓝色增益
+     * @returns {Object} 包含LUT表的Object
+     */
+    getLUT(blackLevel, whiteLevel, gainR, gainB) {
+      // 创建当前参数的快照
+      const currentParams = `${blackLevel}_${whiteLevel}_${gainR}_${gainB}`;
+      
+      // 如果参数未变化，直接返回缓存的LUT表
+      if (this.lutCache.lastParams === currentParams && 
+          this.lutCache.lutR && this.lutCache.lutG && this.lutCache.lutB) {
+        return {
+          lutR: this.lutCache.lutR,
+          lutG: this.lutCache.lutG,
+          lutB: this.lutCache.lutB
+        };
+      }
+      
+      // 参数变化，需要重新计算LUT表
+      console.log('重新计算LUT表');
+      
+      // 计算转换比例
+      const scale = 255.0 / (whiteLevel - blackLevel);
+      
+      // 创建LUT表
+      const lutR = this.lutCache.lutR || new Uint8Array(65536);
+      const lutG = this.lutCache.lutG || new Uint8Array(65536);
+      const lutB = this.lutCache.lutB || new Uint8Array(65536);
+      
+      // 计算LUT表
+      for (let i = 0; i < 65536; i++) {
+        lutR[i] = Math.min(255, Math.max(0, Math.round((i * gainR - blackLevel) * scale)));
+        lutG[i] = Math.min(255, Math.max(0, Math.round((i - blackLevel) * scale)));
+        lutB[i] = Math.min(255, Math.max(0, Math.round((i * gainB - blackLevel) * scale)));
+      }
+      
+      // 更新缓存
+      this.lutCache.lastParams = currentParams;
+      this.lutCache.lutR = lutR;
+      this.lutCache.lutG = lutG;
+      this.lutCache.lutB = lutB;
+      
+      return { lutR, lutG, lutB };
+    },
     // checkImageData(img) {
     //   // 检查是否为 cv.Mat 类型
     //   if (!(img instanceof cv.Mat)) {
@@ -2975,215 +3980,253 @@ export default {
     // },
 
 
-    processImage(imgArray) {
-      try {
-        const totalStartTime = new Date(); // 总开始时间
+    // processImage(imgArray) {
+    //   this.progressValue = 0;
+    //   try {
+    //     if (!(imgArray instanceof ArrayBuffer) && !ArrayBuffer.isView(imgArray)) {
+    //       throw new Error("Input must be ArrayBuffer or TypedArray");
+    //     }
+    //     const totalStartTime = new Date(); // 总开始时间
 
-        this.SendConsoleLogMsg('CaptureTestTime | Process image data start.', 'info');
-        const startTime = new Date();
+    //     this.SendConsoleLogMsg('CaptureTestTime | Process image data start.', 'info');
+    //     const startTime = new Date();
+    //     let img_bit = -1;
+    //     let uintArray;
+    //     if (imgArray.byteLength === this.mainCameraSizeX * this.mainCameraSizeY * 2 ){
+    //       uintArray = new Uint16Array(imgArray);
+    //       img_bit = 16;
+    //     }else if(imgArray.byteLength === this.mainCameraSizeX * this.mainCameraSizeY){
+    //       uintArray = new Uint8Array(imgArray);
+    //       img_bit = 8;
+    //     }else{
+    //       this.SendConsoleLogMsg(`Image data is underfind bit`, 'error');
+    //       return;
+    //     }
 
-        const uint16Array = new Uint16Array(imgArray);
+    //     this.SendConsoleLogMsg(`Image data detected as ${img_bit}-bit.`, 'info');
 
-        // 设置画布宽高常量
-        const canvasWidth = parseInt(this.mainCameraSizeX);
-        const canvasHeight = parseInt(this.mainCameraSizeY);
 
-        // 获取原始画布和修改后的画布以及对应上下文
-        const modifiedCanvas = document.getElementById('mainCamera-canvas');
-        const modifiedCtx = modifiedCanvas.getContext('2d');
 
-        modifiedCtx.clearRect(0, 0, modifiedCanvas.width, modifiedCanvas.height);
+    //     // 设置画布宽高常量
+    //     const canvasWidth = parseInt(this.mainCameraSizeX);
+    //     const canvasHeight = parseInt(this.mainCameraSizeY);
 
-        modifiedCanvas.width = canvasWidth;
-        modifiedCanvas.height = canvasHeight;
+    //     // 获取原始画布和修改后的画布以及对应上下文
+    //     const modifiedCanvas = document.getElementById('mainCamera-canvas');
+    //     const modifiedCtx = modifiedCanvas.getContext('2d');
 
-        let mat = new cv.Mat(canvasHeight, canvasWidth, cv.CV_16UC1);
-        mat.data16U.set(uint16Array);
 
-        const matEndTime = new Date(); // mat 结束时间
-        this.SendConsoleLogMsg('CaptureTestTime | Mat creation time: ' + (matEndTime.getTime() - startTime.getTime()) + ' ms', 'info');
 
-        // 用户自定义参数
-        let gainR = this.ImageGainR;
-        let gainB = this.ImageGainB;
-        let offset = this.ImageOffset;
-        let CFA = this.ImageCFA;
-        let mode = 1;
+    //     modifiedCanvas.width = canvasWidth;
+    //     modifiedCanvas.height = canvasHeight;
 
-        // 参数
-        let B = 0;
-        let W = 65535;
-        let cvmode = 0;
+    //     let mat;
+    //     if (img_bit === 16){
+    //       mat = new cv.Mat(canvasHeight, canvasWidth, cv.CV_16UC1);
+    //       mat.data16U.set(uintArray);
+    //     }else{
+    //       mat = new cv.Mat(canvasHeight, canvasWidth, cv.CV_8UC1);
+    //       mat.data.set(uintArray);
+    //     }
+    //     this.progressValue = 10;
 
-        const { blackLevel, whiteLevel } = this.GetAutoStretch(uint16Array, mode);
-        B = blackLevel;
-        W = whiteLevel;
-        const GetAutoStretchEndTime = new Date(); // GetAutoStretch 结束时间
-        this.SendConsoleLogMsg('CaptureTestTime | GetAutoStretch time: ' + (GetAutoStretchEndTime.getTime() - matEndTime.getTime()) + ' ms', 'info');
+    //     const matEndTime = new Date(); // mat 结束时间
+    //     this.SendConsoleLogMsg('CaptureTestTime | Mat creation time: ' + (matEndTime.getTime() - startTime.getTime()) + ' ms', 'info');
 
-        // 根据CFA设置颜色转换模式
-        if (CFA === 'GR') {
-          cvmode = cv.COLOR_BayerGR2RGBA;
-        } else if (CFA === 'GB') {
-          cvmode = cv.COLOR_BayerGB2RGBA;
-        } else if (CFA === 'BG') {
-          cvmode = cv.COLOR_BayerBG2RGBA;
-        } else if (CFA === 'RGGB') {
-          cvmode = cv.COLOR_BayerRG2RGBA;
-        }
+    //     // 用户自定义参数
+    //     let gainR = this.ImageGainR;
+    //     let gainB = this.ImageGainB;
+    //     let offset = this.ImageOffset;
+    //     let CFA = this.ImageCFA;
+    //     let mode = 1;
 
-        // 对目标图像进行颜色转换
-        let dst = new cv.Mat();
-        try {
-          cv.cvtColor(mat, dst, cvmode);
-        } catch (error) {
-          this.handleError('cvtColor 出错', 'cvtColor', error);
-          mat.delete();
-          return;
-        }
+    //     // 参数
+    //     let B = 0;
+    //     let W = 65535;
+    //     let cvmode = 0;
 
-        const cvtColorEndTime = new Date(); // cvtColor 结束时间
-        this.SendConsoleLogMsg('CaptureTestTime | cvtColor time: ' + (cvtColorEndTime.getTime() - GetAutoStretchEndTime.getTime()) + ' ms', 'info');
+    //     const { blackLevel, whiteLevel } = this.GetAutoStretch(uintArray, mode, img_bit);
+    //     B = blackLevel;
+    //     W = whiteLevel;
+    //     this.progressValue = 30;
+    //     const GetAutoStretchEndTime = new Date(); // GetAutoStretch 结束时间
+    //     this.SendConsoleLogMsg('CaptureTestTime | GetAutoStretch time: ' + (GetAutoStretchEndTime.getTime() - matEndTime.getTime()) + ' ms', 'info');
 
-        mat.delete();
+    //     // 根据CFA设置颜色转换模式
+    //     if (CFA === 'GR') {
+    //       cvmode = cv.COLOR_BayerGR2RGBA;
+    //     } else if (CFA === 'GB') {
+    //       cvmode = cv.COLOR_BayerGB2RGBA;
+    //     } else if (CFA === 'BG') {
+    //       cvmode = cv.COLOR_BayerBG2RGBA;
+    //     } else if (CFA === 'RGGB') {
+    //       cvmode = cv.COLOR_BayerRG2RGBA;
+    //     }else{
+    //       cvmode = cv.COLOR_GRAY2RGBA
+    //     }
 
-        // 调整图像大小
-        // cv.resize(dst, resizeImg, new cv.Size(this.CanvasWidth, this.CanvasHeight), 0, 0, cv.INTER_LINEAR);
-        // dst.delete();
+    //     // 对目标图像进行颜色转换
+    //     let dst = new cv.Mat();
 
-        // let originalImg8 = this.Bit16To8_Stretch(resizeImg, B, W);
-        // resizeImg.delete();
+    //     try {
+    //       cv.cvtColor(mat, dst, cvmode);
+    //     } catch (error) {
+    //       this.handleError('cvtColor 出错', 'cvtColor', error);
+    //       mat.delete();
+    //       return;
+    //     }
 
-        let resizeImg = new cv.Mat(); // 用来存储调整后的图像
-        if (this.isPolarAxisMode) {
-          // 调整图像大小
-          cv.resize(dst, resizeImg, new cv.Size(this.CanvasWidth, this.CanvasHeight), 0, 0, cv.INTER_LINEAR);
-          dst.delete();
+    //     this.progressValue = 50;
 
-          let originalImg8 = this.Bit16To8_Stretch(resizeImg, B, W);
-          resizeImg.delete();
+    //     const cvtColorEndTime = new Date(); // cvtColor 结束时间
+    //     this.SendConsoleLogMsg('CaptureTestTime | cvtColor time: ' + (cvtColorEndTime.getTime() - GetAutoStretchEndTime.getTime()) + ' ms', 'info');
 
-          const Bit16To8_StretchEndTime = new Date(); // Bit16To8_Stretch 结束时间
-          this.SendConsoleLogMsg('CaptureTestTime | Bit16To8_Stretch time: ' + (Bit16To8_StretchEndTime.getTime() - GetAutoStretchEndTime.getTime()) + ' ms', 'info');
+    //     mat.delete();
 
-          let targetImg8 = this.ImageSoftAWB(originalImg8, gainR, gainB, offset);
-          this.$bus.$emit('showSolveImage', targetImg8);
+    //     // 调整图像大小
+    //     // cv.resize(dst, resizeImg, new cv.Size(this.CanvasWidth, this.CanvasHeight), 0, 0, cv.INTER_LINEAR);
+    //     // dst.delete();
 
-          const ImageSoftAWBEndTime = new Date(); // ImageSoftAWB 结束时间
-          this.SendConsoleLogMsg('CaptureTestTime | ImageSoftAWB time: ' + (ImageSoftAWBEndTime.getTime() - Bit16To8_StretchEndTime.getTime()) + ' ms', 'info');
-        } else {
-          cv.resize(dst, resizeImg, new cv.Size(this.CanvasWidth, this.CanvasHeight), 0, 0, cv.INTER_LINEAR);
-          console.log('resizeImg.data.length: ', resizeImg.data.length);
-          console.log('resizeImg.cols: ', resizeImg.cols);
-          console.log('resizeImg.rows: ', resizeImg.rows);
-          let originalResizeImg8 = this.Bit16To8_Stretch(resizeImg, B, W);
-          console.log('originalResizeImg8.data.length: ', originalResizeImg8.data.length);
-          console.log('originalResizeImg8.cols: ', originalResizeImg8.cols);
-          console.log('originalResizeImg8.rows: ', originalResizeImg8.rows);
-          this.OriginalImage = new ImageData(new Uint8ClampedArray(originalResizeImg8.data), originalResizeImg8.cols, originalResizeImg8.rows);
-          resizeImg.delete();
-          console.log('dst.data.length: ', dst.data.length);
-          console.log('dst.cols: ', dst.cols);
-          console.log('dst.rows: ', dst.rows);
-          let originalImg8 = this.Bit16To8_Stretch(dst, B, W);
-          dst.delete();
+    //     // let originalImg8 = this.Bit16To8_Stretch(resizeImg, B, W);
+    //     // resizeImg.delete();
 
-          const Bit16To8_StretchEndTime = new Date(); // Bit16To8_Stretch 结束时间
-          this.SendConsoleLogMsg('CaptureTestTime | Bit16To8_Stretch time: ' + (Bit16To8_StretchEndTime.getTime() - GetAutoStretchEndTime.getTime()) + ' ms', 'info');
+    //     let resizeImg = new cv.Mat(); // 用来存储调整后的图像
+    //     if (this.isPolarAxisMode) {
+    //       this.progressValue = 0;
+    //       // 调整图像大小
+    //       cv.resize(dst, resizeImg, new cv.Size(this.CanvasWidth, this.CanvasHeight), 0, 0, cv.INTER_LINEAR);
+    //       dst.delete();
 
-          // let targetImg8 = this.ImageSoftAWB(originalImg8, gainR, gainB, offset);
+    //       let originalImg8;
+    //       if (img_bit === 16){
+    //         originalImg8 = this.Bit16To8_Stretch(resizeImg, B, W);
+    //       }else{
+    //         originalImg8 = resizeImg;
+    //       }
 
-          // const ImageSoftAWBEndTime = new Date(); // ImageSoftAWB 结束时间
-          // this.SendConsoleLogMsg('CaptureTestTime | ImageSoftAWB time: ' + (ImageSoftAWBEndTime.getTime() - Bit16To8_StretchEndTime.getTime()) + ' ms', 'info');
-          
-          // originalImg8.delete();
+    //       resizeImg.delete();
 
-          this.lastImageProcessParams = {
-            gainR: gainR,
-            gainB: gainB,
-            offset: offset,
-            CFA: CFA,
-            mode: mode,
-            B: B,
-            W: W,
-            cvmode: cvmode,
-          };
+    //       const Bit16To8_StretchEndTime = new Date(); // Bit16To8_Stretch 结束时间
+    //       this.SendConsoleLogMsg('CaptureTestTime | Bit16To8_Stretch time: ' + (Bit16To8_StretchEndTime.getTime() - GetAutoStretchEndTime.getTime()) + ' ms', 'info');
 
-          modifiedCanvas.width = this.CanvasWidth;
-          modifiedCanvas.height = this.CanvasHeight;
-          let colorData = new ImageData(new Uint8ClampedArray(originalImg8.data), originalImg8.cols, originalImg8.rows);
-          this.drawImgData = colorData;
-          // 设置缓冲画布宽高
-          this.bufferCanvas.width = colorData.width;
-          this.bufferCanvas.height = colorData.height;
-          // 绘制缓存画布图像
-          this.bufferCtx.putImageData(colorData, 0, 0);
-          // 绘制主画布图像
-          this.drawImageData();
+    //       let targetImg8 = this.ImageSoftAWB(originalImg8, gainR, gainB, offset);
+    //       this.$bus.$emit('showSolveImage', targetImg8);
 
-          const DrawImageDataEndTime = new Date(); // DrawImageData 结束时间
-          this.SendConsoleLogMsg('CaptureTestTime | DrawImageData time: ' + (DrawImageDataEndTime.getTime() - Bit16To8_StretchEndTime.getTime()) + ' ms', 'info');
+    //       const ImageSoftAWBEndTime = new Date(); // ImageSoftAWB 结束时间
+    //       this.SendConsoleLogMsg('CaptureTestTime | ImageSoftAWB time: ' + (ImageSoftAWBEndTime.getTime() - Bit16To8_StretchEndTime.getTime()) + ' ms', 'info');
+    //     } else {
+    //       modifiedCtx.clearRect(0, 0, modifiedCanvas.width, modifiedCanvas.height);
+    //       cv.resize(dst, resizeImg, new cv.Size(this.CanvasWidth, this.CanvasHeight), 0, 0, cv.INTER_LINEAR);
+    //       this.progressValue = 70;
+    //       let originalResizeImg8 = this.Bit16To8_Stretch(resizeImg, B, W);
+    //       this.OriginalImage = new ImageData(new Uint8ClampedArray(originalResizeImg8.data), originalResizeImg8.cols, originalResizeImg8.rows);
+    //       resizeImg.delete();
+    //       originalResizeImg8.delete();
+    //       console.log('dst.data.length: ', dst.data.length);
+    //       console.log('dst.cols: ', dst.cols);
+    //       console.log('dst.rows: ', dst.rows);
+    //       let originalImg8 = this.Bit16To8_Stretch(dst, B, W);
+    //       dst.delete();
+    //       this.progressValue = 80;
 
-          const endTime = new Date();
-          const elapsedTime = endTime.getTime() - startTime.getTime();
-          this.SendConsoleLogMsg('CaptureTestTime | Process image data end:' + elapsedTime + ' milliseconds', 'info');
+    //       const Bit16To8_StretchEndTime = new Date(); // Bit16To8_Stretch 结束时间
+    //       this.SendConsoleLogMsg('CaptureTestTime | Bit16To8_Stretch time: ' + (Bit16To8_StretchEndTime.getTime() - GetAutoStretchEndTime.getTime()) + ' ms', 'info');
 
-          // const totalEndTime = new Date(); // 总结束时间
-          // this.SendConsoleLogMsg('CaptureTestTime | Total process image data time: ' + (totalEndTime.getTime() - totalStartTime.getTime()) + ' ms', 'info');
+    //       // let targetImg8 = this.ImageSoftAWB(originalImg8, gainR, gainB, offset);
 
-          this.$bus.$emit('showCaptureImage');
-          this.MakeHistogram(colorData);
-          this.histogramImage = colorData;
+    //       // const ImageSoftAWBEndTime = new Date(); // ImageSoftAWB 结束时间
+    //       // this.SendConsoleLogMsg('CaptureTestTime | ImageSoftAWB time: ' + (ImageSoftAWBEndTime.getTime() - Bit16To8_StretchEndTime.getTime()) + ' ms', 'info');
 
-          const checkDetectedStarsFinish = () => {
-            if (this.DetectedStarsFinish) {
-              this.detectStarsImg = this.DrawDetectStars(targetImg8, this.DetectedStarsList);
-              targetImg8.delete();
-              clearInterval(intervalId);
-            }
-          };
+    //       // originalImg8.delete();
 
-          const intervalId = setInterval(checkDetectedStarsFinish, 1000);
-        }
+    //       this.lastImageProcessParams = {
+    //         gainR: gainR,
+    //         gainB: gainB,
+    //         offset: offset,
+    //         CFA: CFA,
+    //         mode: mode,
+    //         B: B,
+    //         W: W,
+    //         cvmode: cvmode,
+    //       };
 
-        // if (this.isNotDrawStars) {
-        //   this.drawImageData(this.drawImgData);
-        // } else {
-        //   if (this.detectStarsImg != null) {
-        //     this.drawImageData(this.detectStarsImg);
-        //   } else {
-        //     this.drawImageData(this.drawImgData);
-        //   }
-        // }
+    //       modifiedCanvas.width = this.CanvasWidth;
+    //       modifiedCanvas.height = this.CanvasHeight;
+    //       let colorData = new ImageData(new Uint8ClampedArray(originalImg8.data), originalImg8.cols, originalImg8.rows);
+    //       originalImg8.delete();
+    //       this.drawImgData = colorData;
+    //       this.progressValue = 90;
+    //       // 设置缓冲画布宽高
+    //       this.bufferCanvas.width = colorData.width;
+    //       this.bufferCanvas.height = colorData.height;
+    //       // 绘制缓存画布图像
+    //       this.bufferCtx.putImageData(colorData, 0, 0);
+    //       // 绘制主画布图像
+    //       this.drawImageData();
+    //       this.progressValue = 100;
+    //       const DrawImageDataEndTime = new Date(); // DrawImageData 结束时间
+    //       this.SendConsoleLogMsg('CaptureTestTime | DrawImageData time: ' + (DrawImageDataEndTime.getTime() - Bit16To8_StretchEndTime.getTime()) + ' ms', 'info');
 
-        // const windowWidth = window.innerWidth;
-        // const windowHeight = window.innerHeight;
+    //       const endTime = new Date();
+    //       const elapsedTime = endTime.getTime() - startTime.getTime();
+    //       this.SendConsoleLogMsg('CaptureTestTime | Process image data end:' + elapsedTime + ' milliseconds', 'info');
 
-        // const minTranslateX = this.imageWidth - this.CanvasWidth;
-        // const minTranslateY = this.imageHeight - this.CanvasHeight;
+    //       const totalEndTime = new Date(); // 总结束时间
+    //       this.SendConsoleLogMsg('CaptureTestTime | Total process image data time: ' + (totalEndTime.getTime() - totalStartTime.getTime()) + ' ms', 'info');
 
-        // // 计算初始的 ScaleImageSize_X 和 ScaleImageSize_Y
-        // this.ScaleImageSize_X = Math.floor(minTranslateX / this.CanvasWidth * windowWidth + windowWidth);
-        // this.ScaleImageSize_Y = Math.floor(minTranslateY / this.CanvasHeight * windowHeight + windowHeight);
+    //       this.$bus.$emit('showCaptureImage');
+    //       this.MakeHistogram(colorData);
+    //       this.histogramImage = colorData;
 
-        // this.$bus.$emit('ScaleImageSize', this.ScaleImageSize_X, this.ScaleImageSize_Y);
+    //       const checkDetectedStarsFinish = () => {
+    //         if (this.DetectedStarsFinish) {
+    //           this.detectStarsImg = this.DrawDetectStars(targetImg8, this.DetectedStarsList);
+    //           targetImg8.delete();
+    //           clearInterval(intervalId);
+    //         }
+    //       };
 
-      } catch (error) {
-        this.handleError('Process image data error', 'processImage', error);
-        if (mat) {
-          mat.delete();
-        }
-        if (resizeImg) {
-          resizeImg.delete();
-        }
-        if (originalImg8) {
-          originalImg8.delete();
-        }
-        if (targetImg8) {
-          targetImg8.delete();
-        }
-      }
-    },
+    //       const intervalId = setInterval(checkDetectedStarsFinish, 1000);
+    //     }
+
+    //     // if (this.isNotDrawStars) {
+    //     //   this.drawImageData(this.drawImgData);
+    //     // } else {
+    //     //   if (this.detectStarsImg != null) {
+    //     //     this.drawImageData(this.detectStarsImg);
+    //     //   } else {
+    //     //     this.drawImageData(this.drawImgData);
+    //     //   }
+    //     // }
+
+    //     // const windowWidth = window.innerWidth;
+    //     // const windowHeight = window.innerHeight;
+
+    //     // const minTranslateX = this.imageWidth - this.CanvasWidth;
+    //     // const minTranslateY = this.imageHeight - this.CanvasHeight;
+
+    //     // // 计算初始的 ScaleImageSize_X 和 ScaleImageSize_Y
+    //     // this.ScaleImageSize_X = Math.floor(minTranslateX / this.CanvasWidth * windowWidth + windowWidth);
+    //     // this.ScaleImageSize_Y = Math.floor(minTranslateY / this.CanvasHeight * windowHeight + windowHeight);
+
+    //     // this.$bus.$emit('ScaleImageSize', this.ScaleImageSize_X, this.ScaleImageSize_Y);
+
+    //   } catch (error) {
+    //     this.handleError('Process image data error', 'processImage', error);
+    //     if (mat) {
+    //       mat.delete();
+    //     }
+    //     if (resizeImg) {
+    //       resizeImg.delete();
+    //     }
+    //     if (originalImg8) {
+    //       originalImg8.delete();
+    //     }
+    //     if (targetImg8) {
+    //       targetImg8.delete();
+    //     }
+    //   }
+    // },
 
     // histogramStretch(imageData, min, max) {
     //   const startTime = new Date();
@@ -3244,6 +4287,10 @@ export default {
     // },
 
     histogramStretch(imageData, min, max) {
+      if (max < min) {
+        this.SendConsoleLogMsg('histogramStretch | max < min, return original imageData', 'warning');
+        max = min;
+      }
       const startTime = new Date();
       // Calculate alpha and beta
       let alpha = 255.0 / (max - min);
@@ -3272,6 +4319,7 @@ export default {
     },
     localWhiteBalanceAdjustment(imageData, gainR, gainB, offset) {
       // 分离通道
+      let value;
       for (let i = 0; i < imageData.data.length; i += 4) {
         for (let j = 0; j < 3; j++) { // For each color channel
           if (j == 0) {
@@ -3411,8 +4459,8 @@ export default {
 
     //   Time2 = new Date();
     //   this.SendConsoleLogMsg('drawImageData | 直方图拉伸时间: ' + (Time2.getTime() - Time1.getTime()) + ' ms', 'info');
-      
-      
+
+
     //   // Create a temporary canvas to draw the ImageData
     //   let tempCanvas = document.createElement('canvas');
     //   tempCanvas.width = imageData.width;
@@ -3439,7 +4487,7 @@ export default {
     //   // 发送消息给QT客户端，用于信息图标
     //   this.$bus.$emit('AppSendMessage', 'Vue_Command', 'sendRedBoxState:' + this.RedBoxSideLength + ':' + this.ROI_x + ':' + this.ROI_y);
     //   this.$bus.$emit('AppSendMessage', 'Vue_Command', 'sendVisibleArea:' + this.visibleX + ':' + this.visibleY + ':' + this.scale);
-      
+
     //   // 如果选择了星点，则根据选择位置，在ROI区域中绘制一个圆
     //   if (this.DrawSelectStarX != -1 && this.DrawSelectStarY != -1 && this.showSelectStar) {
     //     let radius, canvasStarX, canvasStarY, color;
@@ -3477,12 +4525,14 @@ export default {
     //   this.SendConsoleLogMsg('drawImageData | 总时间: ' + (Time1.getTime() - startTime.getTime()) + ' ms', 'info');
     // },
 
-    
-   drawImageData() {
+
+    drawImageData() {
       if (this.bufferCanvas == null) {
         this.SendConsoleLogMsg('drawImageData error: bufferCanvas is null or undefined.', 'error');
         return;
       }
+      if (!this.drawImgData) return;
+
       // 可用相关参数
       // window.innerWidth; // 窗口宽度
       // window.innerHeight; // 窗口高度
@@ -3502,8 +4552,6 @@ export default {
 
       // console.log('当前画布参数:\n bufferCanvas.width: ', this.bufferCanvas.width, '\n bufferCanvas.height: ', this.bufferCanvas.height, '\n ImageProportion: ', this.ImageProportion, '\n scale: ', this.scale, '\n visibleX: ', this.visibleX, '\n visibleY: ', this.visibleY, '\n visibleWidth: ', this.visibleWidth, '\n visibleHeight: ', this.visibleHeight, '\n ROI_x: ', this.ROI_x, '\n ROI_y: ', this.ROI_y, '\n ROI_length: ', this.ROI_length);
 
-      let startTime = new Date();
-      let Time1 = new Date();
 
       // 计算可见区域
       const newVisibleWidth = this.bufferCanvas.width * this.scale;
@@ -3549,53 +4597,15 @@ export default {
       // this.SendConsoleLogMsg('ROI 区域在屏幕上的位置: ' + roiScreenX + '*' + roiScreenY + '长度 ' + this.RedBoxSideLength * window.innerWidth / newVisibleWidth + '*' + this.RedBoxSideLength * window.innerHeight / newVisibleHeight, 'info');
       this.$bus.$emit('setRedBoxLength', this.RedBoxSideLength * window.innerWidth / newVisibleWidth, this.RedBoxSideLength * window.innerHeight / newVisibleHeight);
       this.$bus.$emit('setRedBoxPosition', roiScreenX, roiScreenY);
-      // if (isRoiInVisible) {
-      //   console.log('ROI 区域在可见区域内, RedBoxSideLength: ', this.RedBoxSideLength * window.innerWidth / newVisibleWidth, ', ', this.RedBoxSideLength * window.innerHeight / newVisibleHeight);
-      // } else {
-      //   console.log('ROI 区域不在可见区域内, RedBoxSideLength: ', this.RedBoxSideLength * window.innerWidth / newVisibleWidth, ', ', this.RedBoxSideLength * window.innerHeight / newVisibleHeight);
-      // }
 
-      let Time2 = new Date();
-      this.SendConsoleLogMsg('drawImageData | 计算相关参数时间: ' + (Time2.getTime() - Time1.getTime()) + ' ms', 'info');
-      // Draw buffer canvas on main canvas
+
       const canvas = this.$refs.mainCanvas;
       const ctx = canvas.getContext('2d');
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      // 获取绘制的图像数据
-      // let imageData = this.bufferCtx.getImageData(newVisibleX - newVisibleWidth / 2, newVisibleY - newVisibleHeight / 2, newVisibleWidth, newVisibleHeight);
+      canvas.width = this.CanvasWidth;
+      canvas.height = this.CanvasHeight;
 
-      Time1 = new Date();
-      this.SendConsoleLogMsg('drawImageData | 获取绘制的图像数据时间: ' + (Time1.getTime() - Time2.getTime()) + ' ms', 'info');
-      
-      // Create a temporary canvas to draw the ImageData
-      this.tempCtx.clearRect(0, 0, this.tempCanvas.width, this.tempCanvas.height);
-      this.tempCanvas.width = canvas.width;
-      this.tempCanvas.height = canvas.height;
-      this.tempCtx.drawImage(this.bufferCanvas, newVisibleX - newVisibleWidth / 2, newVisibleY - newVisibleHeight / 2, newVisibleWidth, newVisibleHeight, 0, 0, canvas.width, canvas.height);
+      ctx.drawImage(this.bufferCanvas, visibleLeft, visibleTop, newVisibleWidth, newVisibleHeight, 0, 0, canvas.width, canvas.height);
 
-      Time1 = new Date();
-      this.SendConsoleLogMsg('drawImageData | 创建临时画布并绘制时间: ' + (Time1.getTime() - Time2.getTime()) + ' ms', 'info');
-
-      let imageData = this.tempCtx.getImageData(0, 0, this.tempCanvas.width, this.tempCanvas.height);
-
-      if (this.currentHistogramMax != 255 || this.currentHistogramMin != 0) {
-        imageData = this.histogramStretch(imageData, this.currentHistogramMin, this.currentHistogramMax);
-      }
-
-      if (this.ImageGainR != 1 || this.ImageGainB != 1 || this.ImageOffset != 0) {
-        imageData = this.localWhiteBalanceAdjustment(imageData, this.ImageGainR, this.ImageGainB, this.ImageOffset);
-      }
-      this.tempCtx.putImageData(imageData, 0, 0);
-
-      Time2 = new Date();
-      this.SendConsoleLogMsg('drawImageData | 直方图拉伸时间: ' + (Time2.getTime() - Time1.getTime()) + ' ms', 'info');
-      // Draw the ImageData on the main canvas
-      ctx.drawImage(this.tempCanvas, 0, 0, this.tempCanvas.width, this.tempCanvas.height, 0, 0, canvas.width, canvas.height);
-
-      Time1 = new Date();
-      this.SendConsoleLogMsg('drawImageData | 绘制图像时间: ' + (Time1.getTime() - Time2.getTime()) + ' ms', 'info');
-      // ctx.drawImage(this.bufferCanvas, newVisibleX - newVisibleWidth / 2, newVisibleY - newVisibleHeight / 2, newVisibleWidth, newVisibleHeight, 0, 0, canvas.width, canvas.height);
-      // this.SendConsoleLogMsg('绘制图像,可见区域:' + newVisibleX + ',' + newVisibleY + ',' + newVisibleWidth + ',' + newVisibleHeight, 'info');
       this.visibleX = newVisibleX;
       this.visibleY = newVisibleY;
       this.visibleWidth = newVisibleWidth;
@@ -3603,23 +4613,24 @@ export default {
 
       this.$bus.$emit('setCurrentMainCanvasHasImage', true); // 发送给电调，用于判断是否可以进行循环拍摄
       // 发送消息给QT客户端，用于信息图标
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'sendRedBoxState:' + this.RedBoxSideLength + ':' + this.ROI_x + ':' + this.ROI_y);
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'sendRedBoxState:' + this.RedBoxSideLength + ':' + this.ROI_x*this.cameraBin + ':' + this.ROI_y*this.cameraBin);
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'sendVisibleArea:' + this.visibleX + ':' + this.visibleY + ':' + this.scale);
-      
+
       // 如果选择了星点，则根据选择位置，在ROI区域中绘制一个圆
       if (this.DrawSelectStarX != -1 && this.DrawSelectStarY != -1 && this.showSelectStar) {
         let radius, canvasStarX, canvasStarY, color;
         // 如果有星点
         if (this.DrawSelectStarHFR != -1) {
-          radius = this.DrawSelectStarHFR/this.scale*2;
-          canvasStarX = (this.DrawSelectStarX + this.ROI_x - visibleLeft) * ctx.canvas.width / newVisibleWidth;
-          canvasStarY = (this.DrawSelectStarY + this.ROI_y - visibleTop) * ctx.canvas.height / newVisibleHeight;
+          radius = this.DrawSelectStarHFR / this.scale * 2;
+          if (radius <= 1) radius = 5;
+          canvasStarX = (this.DrawSelectStarX / this.cameraBin + this.ROI_x - visibleLeft) * ctx.canvas.width / newVisibleWidth;
+          canvasStarY = (this.DrawSelectStarY / this.cameraBin + this.ROI_y - visibleTop) * ctx.canvas.height / newVisibleHeight;
           color = 'green'; // 有星点，绘制绿色的圆
         } else {
           // 否则，在选择的位置绘制一个圆
-          radius = 10/this.scale; // 你可以根据需要调整这个值
-          canvasStarX = (this.DrawSelectStarX + this.ROI_x - visibleLeft) * ctx.canvas.width / newVisibleWidth;
-          canvasStarY = (this.DrawSelectStarY + this.ROI_y - visibleTop) * ctx.canvas.height / newVisibleHeight;
+          radius = 10 / this.scale; // 你可以根据需要调整这个值
+          canvasStarX = (this.DrawSelectStarX / this.cameraBin + this.ROI_x - visibleLeft) * ctx.canvas.width / newVisibleWidth;
+          canvasStarY = (this.DrawSelectStarY / this.cameraBin + this.ROI_y - visibleTop) * ctx.canvas.height / newVisibleHeight;
           color = 'red'; // 无星点，绘制红色的圆
         }
 
@@ -3637,14 +4648,38 @@ export default {
         ctx.closePath();
       }
 
-      Time2 = new Date();
-      this.SendConsoleLogMsg('drawImageData | 绘制星点时间: ' + (Time2.getTime() - Time1.getTime()) + ' ms', 'info');
+      if (this.focuserROIStarsList && this.focuserROIStarsList.length > 0) {
+        this.bufferCtx.save();
 
-      this.SendConsoleLogMsg('drawImageData | 总时间: ' + (Time2.getTime() - startTime.getTime()) + ' ms', 'info');
+        // 设置裁剪区域为ROI区域
+        this.bufferCtx.beginPath();
+        this.bufferCtx.rect(this.ROI_x, this.ROI_y, this.ROI_width, this.ROI_height);
+        this.bufferCtx.clip();
+
+        this.bufferCtx.fillStyle = 'rgba(0, 255, 0, 0.2)'; // 半透明绿色
+        this.bufferCtx.strokeStyle = 'rgba(0, 255, 0, 0.4)'; // 绿色边框
+        this.bufferCtx.lineWidth = 1;
+
+        for (const star of this.focuserROIStarsList) {
+          const starRadius = star.HFR / this.cameraBin + 2 || 5; // 如果有HFR参数用它，否则默认5个像素
+          const absoluteX = this.ROI_x + star.x / this.cameraBin;
+          const absoluteY = this.ROI_y + star.y / this.cameraBin;
+
+          // 绘制圆圈
+          this.bufferCtx.beginPath();
+          this.bufferCtx.arc(absoluteX, absoluteY, starRadius, 0, Math.PI * 2);
+          this.bufferCtx.fill();
+          this.bufferCtx.stroke();
+
+        }
+        this.focuserROIStarsList = [];
+        this.bufferCtx.restore();
+        // this.SendConsoleLogMsg('标注了' + this.focuserROIStarsList.length + '个星点', 'info');
+      }
     },
 
     addEventListeners() {
- 
+
     },
 
     // 节流函数
@@ -3659,46 +4694,46 @@ export default {
       };
     },
 
-    ImageSoftAWB(img8, gainR, gainB, offset) {
-      // 分离通道
-      let channels = new cv.MatVector();
-      cv.split(img8, channels);
+    // ImageSoftAWB(img8, gainR, gainB, offset) {
+    //   // 分离通道
+    //   let channels = new cv.MatVector();
+    //   cv.split(img8, channels);
 
-      const b = channels.get(0);
-      const g = channels.get(1);
-      const r = channels.get(2);
+    //   const b = channels.get(0);
+    //   const g = channels.get(1);
+    //   const r = channels.get(2);
 
-      // 自适应直方图均衡化
-      const clahe = new cv.CLAHE(2.0, new cv.Size(8, 8));
-      clahe.apply(b, b);
-      clahe.apply(g, g);
-      clahe.apply(r, r);
+    //   // 自适应直方图均衡化
+    //   const clahe = new cv.CLAHE(2.0, new cv.Size(8, 8));
+    //   clahe.apply(b, b);
+    //   clahe.apply(g, g);
+    //   clahe.apply(r, r);
 
-      // 应用增益和偏置
-      r.convertTo(r, -1, gainR, offset);
-      b.convertTo(b, -1, gainB, offset);
-      g.convertTo(g, -1, 1, offset); // 对绿色通道应用偏置但不改变增益
+    //   // 应用增益和偏置
+    //   r.convertTo(r, -1, gainR, offset);
+    //   b.convertTo(b, -1, gainB, offset);
+    //   g.convertTo(g, -1, 1, offset); // 对绿色通道应用偏置但不改变增益
 
-      // 更新 channels 中的通道数据
-      channels.set(0, b);
-      channels.set(1, g);
-      channels.set(2, r);
+    //   // 更新 channels 中的通道数据
+    //   channels.set(0, b);
+    //   channels.set(1, g);
+    //   channels.set(2, r);
 
-      // 合并通道
-      let mergedImg = new cv.Mat();
-      cv.merge(channels, mergedImg);
+    //   // 合并通道
+    //   let mergedImg = new cv.Mat();
+    //   cv.merge(channels, mergedImg);
 
-      // 释放资源
-      b.delete(); // 释放 b
-      g.delete(); // 释放 g
-      r.delete(); // 释放 r
-      channels.delete();
-      clahe.delete(); // 释放 clahe
+    //   // 释放资源
+    //   b.delete(); // 释放 b
+    //   g.delete(); // 释放 g
+    //   r.delete(); // 释放 r
+    //   channels.delete();
+    //   clahe.delete(); // 释放 clahe
 
 
 
-      return mergedImg;
-    },
+    //   return mergedImg;
+    // },
 
     // Bit16To8_Stretch(img16, B, W) {
     //   console.log('Bit16To8_Stretch | B = ' + B + ', W = ' + W);
@@ -3796,125 +4831,120 @@ export default {
       this.$bus.$emit('PHD2MultiStarsPosition', StarStartX, StarStartY);
     },
 
-    GetAutoStretch(imgData, mode) {
-      if (imgData.length === 0) {
-        return { blackLevel: 0, whiteLevel: 65535 };
-      }
 
-      const length = imgData.length;
-      let mean = 0;
-      let M2 = 0;
 
-      for (let i = 0; i < length; i++) {
-        const delta = imgData[i] - mean;
-        mean += delta / (i + 1);
-        M2 += delta * (imgData[i] - mean);
-      }
+    // GetAutoStretch(imgData, mode, bitDepth = 16) {
+    //   if (imgData.length === 0) {
+    //       return { blackLevel: 0, whiteLevel: bitDepth === 8 ? 255 : 65535 };
+    //   }
 
-      const variance = M2 / length;
-      const std = Math.sqrt(variance);
+    //   const length = imgData.length;
+    //   let mean = 0;
+    //   let M2 = 0;
 
-      let a, b;
-      switch (mode) {
-        case 0:
-          a = 3;
-          b = 5;
-          break;
-        case 1:
-          a = 2;
-          b = 5;
-          break;
-        case 2:
-          a = 3;
-          b = 8;
-          break;
-        default:
-          a = 2;
-          b = 8;
-      }
+    //   // 计算均值和方差
+    //   for (let i = 0; i < length; i++) {
+    //       const delta = imgData[i] - mean;
+    //       mean += delta / (i + 1);
+    //       M2 += delta * (imgData[i] - mean);
+    //   }
 
-      let bx = Math.max(0, mean - std * a);
-      let wx = Math.min(65535, mean + std * b);
+    //   const variance = M2 / length;
+    //   const std = Math.sqrt(variance);
 
-      let blackLevel = Math.round(bx);
-      let whiteLevel = Math.round(wx);
+    //   // 根据模式设置标准差倍数
+    //   let a, b;
+    //   switch (mode) {
+    //       case 0: a = 3; b = 5; break;
+    //       case 1: a = 2; b = 5; break;
+    //       case 2: a = 3; b = 8; break;
+    //       default: a = 2; b = 8;
+    //   }
 
-      if (blackLevel >= whiteLevel) {
-        blackLevel = whiteLevel - 1;
-      }
+    //   // 动态适应位深
+    //   const maxValue = bitDepth === 8 ? 255 : 65535;
+    //   let bx = Math.max(0, mean - std * a);
+    //   let wx = Math.min(maxValue, mean + std * b);
 
-      return { blackLevel, whiteLevel };
-    },
+    //   // 确保 blackLevel < whiteLevel
+    //   let blackLevel = Math.round(bx);
+    //   let whiteLevel = Math.round(wx);
+    //   if (blackLevel >= whiteLevel) {
+    //       blackLevel = whiteLevel - 1;
+    //   }
 
-    fetchImage(imagePath) {
-      const url = imagePath;
-      const xhr = new XMLHttpRequest();
+    //   return { blackLevel, whiteLevel };
+    // },
 
-      xhr.responseType = 'blob'; // 设置响应类型为 blob
+    // fetchImage(imagePath) {
+    //   const url = imagePath;
+    //   const xhr = new XMLHttpRequest();
 
-      xhr.onload = () => {
-        if (xhr.status === 200) {
-          const imageUrl = URL.createObjectURL(xhr.response);
-          // 在这里，您可以将 imageUrl 设置到某个 <img> 元素上，或者做其他处理
-          this.$bus.$emit('showCaptureImage');
-          this.displayImageOnCanvas(imageUrl); // 将图像显示在Canvas上
-        } else {
-          console.error('Failed to fetch the image. Status:', xhr.status);
-        }
-      };
+    //   xhr.responseType = 'blob'; // 设置响应类型为 blob
 
-      xhr.onerror = () => {
-        console.error('There was an error fetching the image.');
-      };
+    //   xhr.onload = () => {
+    //     if (xhr.status === 200) {
+    //       const imageUrl = URL.createObjectURL(xhr.response);
+    //       // 在这里，您可以将 imageUrl 设置到某个 <img> 元素上，或者做其他处理
+    //       this.$bus.$emit('showCaptureImage');
+    //       this.displayImageOnCanvas(imageUrl); // 将图像显示在Canvas上
+    //     } else {
+    //       console.error('Failed to fetch the image. Status:', xhr.status);
+    //     }
+    //   };
 
-      xhr.open('GET', url, true);
-      xhr.send();
-    },
+    //   xhr.onerror = () => {
+    //     console.error('There was an error fetching the image.');
+    //   };
 
-    displayImageOnCanvas(imageUrl) {
-      const showcanvas = document.getElementById('mainCamera-canvas');
-      const canvas = document.getElementById('TestCanvas');
-      const showctx = showcanvas.getContext('2d');
-      const ctx = canvas.getContext('2d');
-      showcanvas.width = this.CanvasWidth;
-      showcanvas.height = this.CanvasHeight;
-      console.log('QHYCCD | canvas size:', showcanvas.width, showcanvas.height);
+    //   xhr.open('GET', url, true);
+    //   xhr.send();
+    // },
 
-      const img = new Image();
-      img.setAttribute('crossOrigin', '');
-      img.onload = () => {
-        this.histogramImage = img;
+    // displayImageOnCanvas(imageUrl) {
+    //   const showcanvas = document.getElementById('mainCamera-canvas');
+    //   const canvas = document.getElementById('TestCanvas');
+    //   const showctx = showcanvas.getContext('2d');
+    //   const ctx = canvas.getContext('2d');
+    //   showcanvas.width = this.CanvasWidth;
+    //   showcanvas.height = this.CanvasHeight;
+    //   console.log('QHYCCD | canvas size:', showcanvas.width, showcanvas.height);
 
-        // 计算图像的缩放比例以使其铺满固定大小的 Canvas
-        const scaleWidth = showcanvas.width / img.width;
-        const scaleHeight = showcanvas.height / img.height;
+    //   const img = new Image();
+    //   img.setAttribute('crossOrigin', '');
+    //   img.onload = () => {
+    //     this.histogramImage = img;
 
-        const width = img.width * scaleWidth;
-        const height = img.height * scaleHeight;
+    //     // 计算图像的缩放比例以使其铺满固定大小的 Canvas
+    //     const scaleWidth = showcanvas.width / img.width;
+    //     const scaleHeight = showcanvas.height / img.height;
 
-        // 清空 Canvas
-        showctx.clearRect(0, 0, showcanvas.width, showcanvas.height);
-        ctx.clearRect(0, 0, showcanvas.width, showcanvas.height);
+    //     const width = img.width * scaleWidth;
+    //     const height = img.height * scaleHeight;
 
-        // 在 Canvas 上绘制图像
-        showctx.drawImage(img, 0, 0, width, height);
-        ctx.drawImage(img, 0, 0, width, height);
-        console.log('QHYCCD | crossOrigin:', img.crossOrigin);
-        this.imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        console.log('QHYCCD | imageData:', this.imageData);
-        this.MakeHistogram(this.imageData);
-      };
-      img.src = imageUrl;
-    },
+    //     // 清空 Canvas
+    //     showctx.clearRect(0, 0, showcanvas.width, showcanvas.height);
+    //     ctx.clearRect(0, 0, showcanvas.width, showcanvas.height);
 
-    MakeHistogram(imageData) {
-      console.log('MakeHistogram');
+    //     // 在 Canvas 上绘制图像
+    //     showctx.drawImage(img, 0, 0, width, height);
+    //     ctx.drawImage(img, 0, 0, width, height);
+    //     console.log('QHYCCD | crossOrigin:', img.crossOrigin);
+    //     this.imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    //     console.log('QHYCCD | imageData:', this.imageData);
+    //     this.MakeHistogram(this.imageData);
+    //   };
+    //   img.src = imageUrl;
+    // },
 
-      // 计算三个通道的直方图
-      this.histogramData = this.calculateHistogram(imageData);
+    // MakeHistogram(imageData) {
+    //   console.log('MakeHistogram');
 
-      this.$bus.$emit('showHistogram', this.histogramData);
-    },
+    //   // 计算三个通道的直方图
+    //   this.histogramData = this.calculateHistogram(imageData);
+
+    //   this.$bus.$emit('showHistogram', this.histogramData);
+    // },
 
     calculateHistogram(imageData) {
       console.log('QHYCCD | calculateHistogram');
@@ -3942,23 +4972,17 @@ export default {
     applyHistStretch(Min, Max) {
       this.currentHistogramMin = Min;
       this.currentHistogramMax = Max;
-      this.drawImageData();
+      if (this.ImageArrayBuffer) {
+        this.processImage(this.ImageArrayBuffer, Min, Max, { calculateHistogram: false });
+      }
       this.$bus.$emit('ChangeDialPosition', Min, Max);
     },
 
-    setAutoHistogramNum(min, max) {
-      this.histogram_min = min;
-      this.histogram_max = max;
-      this.currentHistogramMin = min;
-      this.currentHistogramMax = max;
-    },
 
     calcWhiteBalanceGains() {
       // const Gains = this.calculateWhiteBalanceGains(this.histogramData, this.ImageOffset);
-      const startTime = new Date();
-      const Gains = this.calculateWhiteBalanceGains();
-      const endTime = new Date();
-      this.SendConsoleLogMsg('calcWhiteBalanceGains | 总时间: ' + (endTime.getTime() - startTime.getTime()) + ' ms', 'info');
+      this.calculateGain = true;
+      this.processImage(this.ImageArrayBuffer, this.currentHistogramMin, this.currentHistogramMax, { calculateHistogram: false });
 
       this.ImageGainR = Gains.GainR;
       this.ImageGainB = Gains.GainB;
@@ -3979,8 +5003,6 @@ export default {
         console.error('ImageGainB configuration item not found.');
       }
 
-      this.drawImageData();
-      // this.processImage(this.ImageArrayBuffer);
     },
 
     // calculateWhiteBalanceGains(histogram, offset) {
@@ -4029,77 +5051,36 @@ export default {
         throw new Error('Invalid image data');
       }
 
-      let time1 = new Date();
-      // 创建一个新的 cv.Mat 对象
-      let img8 = cv.matFromImageData(this.OriginalImage);
-      let time2 = new Date();
-      this.SendConsoleLogMsg('calcWhiteBalanceGains | 创建 cv.Mat 对象时间: ' + (time2.getTime() - time1.getTime()) + ' ms', 'info');
+      // 创建 cv.Mat 对象
+      const img8 = cv.matFromImageData(this.OriginalImage);
 
-      let gainR = this.ImageGainR;
-      let gainB = this.ImageGainB;
-      let offset = this.ImageOffset;
-
+      // 分割通道
       const channels = new cv.MatVector();
       cv.split(img8, channels);
-      time1 = new Date();
-      this.SendConsoleLogMsg('calcWhiteBalanceGains | 分割通道时间: ' + (time1.getTime() - time2.getTime()) + ' ms', 'info');
 
+      // 获取各通道
       const b = channels.get(0);
       const g = channels.get(1);
       const r = channels.get(2);
-      time2 = new Date();
-      this.SendConsoleLogMsg('calcWhiteBalanceGains | 获取通道时间: ' + (time2.getTime() - time1.getTime()) + ' ms', 'info');
 
-      // 自适应直方图均衡化
-      const clahe = new cv.CLAHE(2.0, new cv.Size(8, 8));
-      clahe.apply(b, b);
-      clahe.apply(g, g);
-      clahe.apply(r, r);
-      time1 = new Date();
-      this.SendConsoleLogMsg('calcWhiteBalanceGains | 自适应直方图均衡化时间: ' + (time1.getTime() - time2.getTime()) + ' ms', 'info');
-
-      // 使用中位数计算增益
+      // 计算中位数
       const medianB = new cv.Mat();
       const medianG = new cv.Mat();
       const medianR = new cv.Mat();
       cv.medianBlur(b, medianB, 5);
       cv.medianBlur(g, medianG, 5);
       cv.medianBlur(r, medianR, 5);
-      time2 = new Date();
-      this.SendConsoleLogMsg('calcWhiteBalanceGains | 中位数计算增益时间: ' + (time2.getTime() - time1.getTime()) + ' ms', 'info');
 
+      // 计算平均亮度
       const avgB = cv.mean(medianB)[0];
       const avgG = cv.mean(medianG)[0];
       const avgR = cv.mean(medianR)[0];
 
-      time1 = new Date();
-      this.SendConsoleLogMsg('calcWhiteBalanceGains | 计算增益时间: ' + (time1.getTime() - time2.getTime()) + ' ms', 'info');
+      // 计算增益
+      const gainR = Math.min(Math.max(avgG / avgR, 0.1), 3);
+      const gainB = Math.min(Math.max(avgG / avgB, 0.1), 3);
 
-      gainR = Math.min(Math.max(avgG / avgR, 0.1), 3);
-      gainB = Math.min(Math.max(avgG / avgB, 0.1), 3);
-
-      // 应用增益和偏置
-      r.convertTo(r, -1, gainR, offset);
-      b.convertTo(b, -1, gainB, offset);
-      g.convertTo(g, -1, 1, offset); // 对绿色通道应用偏置但不改变增益
-
-      time2 = new Date();
-      this.SendConsoleLogMsg('calcWhiteBalanceGains | 应用增益和偏置时间: ' + (time2.getTime() - time1.getTime()) + ' ms', 'info');
-
-      // 更新 channels 中的通道数据
-      channels.set(0, b);
-      channels.set(1, g);
-      channels.set(2, r);
-
-      time1 = new Date();
-      this.SendConsoleLogMsg('calcWhiteBalanceGains | 更新 channels 中的通道数据时间: ' + (time1.getTime() - time2.getTime()) + ' ms', 'info');
-
-      // 合并通道回 img8
-      cv.merge(channels, img8);
-
-      time2 = new Date();
-      this.SendConsoleLogMsg('calcWhiteBalanceGains | 合并通道时间: ' + (time2.getTime() - time1.getTime()) + ' ms', 'info');
-
+      // 释放内存
       b.delete();
       g.delete();
       r.delete();
@@ -4107,26 +5088,8 @@ export default {
       medianG.delete();
       medianR.delete();
       channels.delete();
+      img8.delete();
 
-      time1 = new Date();
-      this.SendConsoleLogMsg('calcWhiteBalanceGains | 删除通道时间: ' + (time1.getTime() - time2.getTime()) + ' ms', 'info');
-
-      // if (this.isPolarAxisMode) {
-      //   this.$bus.$emit('showSolveImage', img8);
-      // }
-      // else {
-      //   // 创建用于绘制的 ImageData 对象，并在修改后的画布上绘制图像
-      //   let colorData = new ImageData(new Uint8ClampedArray(img8.data), img8.cols, img8.rows);
-      //   img8.delete();
-      //   this.drawImgData = colorData;
-      //   this.drawImageData();
-
-      //   this.$bus.$emit('showCaptureImage');
-
-      //   this.MakeHistogram(colorData);
-      //   this.histogramImage = colorData;
-
-      // }
       return { GainR: gainR, GainB: gainB };
     },
 
@@ -4252,6 +5215,7 @@ export default {
       this.canvasZIndexStel = -10;
       this.canvasZIndexMainCamera = 0;
       this.canvasZIndexGuiderCamera = -11;
+
       this.$bus.$emit('setParsingProgress', false);
     },
 
@@ -4421,12 +5385,6 @@ export default {
 
     UpdateMainCameraStatus(status) {
       this.$bus.$emit('MainCameraStatus', status);
-      if (status === 'Exposuring') {
-
-      }
-      else {
-
-      }
     },
 
     UpdateMainCameraTemperature(value) {
@@ -4494,7 +5452,6 @@ export default {
 
       line.update();
       layer.add(line);
-
       return line;
     },
 
@@ -4807,7 +5764,7 @@ export default {
     SolveFovMark(RaDec) {
       console.log('RaDec[4]:', RaDec);
 
-      let rectangle = this.AddMarkRectangle(this.$stel, glLayer, RaDec);
+      // let rectangle = this.AddMarkRectangle(this.$stel, glLayer, RaDec);
 
       this.Circles.push(rectangle);
 
@@ -4915,7 +5872,7 @@ export default {
         this.$bus.$emit('MountConnected', 0);
         this.$bus.$emit('CFWConnected', 0);
         this.$bus.$emit('GuiderConnected', 0);
-        this.claerDeviceList();
+        this.clearDeviceList();
         this.$bus.$emit('deleteDeviceTypeAllocationList', 'all');
         return;
       };
@@ -4958,7 +5915,7 @@ export default {
         this.$bus.$emit('MountConnected', 0);
         this.$bus.$emit('CFWConnected', 0);
         this.$bus.$emit('GuiderConnected', 0);
-        this.claerDeviceList();
+        this.clearDeviceList();
         this.$bus.$emit('deleteDeviceTypeAllocationList', 'all');
         return;
       };
@@ -5095,15 +6052,15 @@ export default {
       const y = event.clientY - rect.top;
       console.log('Mouse clicked at:', x, y);
       if (!this.isFocusLoopShooting) {
-        this.ROI_x = (x / window.innerWidth * this.visibleWidth - this.RedBoxSideLength / 2) + this.visibleX - this.visibleWidth / 2;  // 计算ROI的x坐标
-        this.ROI_y = (y / window.innerHeight * this.visibleHeight - this.RedBoxSideLength / 2) + this.visibleY - this.visibleHeight / 2; // 计算ROI的y坐标
+        this.ROI_x = (x / window.innerWidth * this.visibleWidth - this.RedBoxSideLength / 2 / this.cameraBin) + this.visibleX - this.visibleWidth / 2;  // 计算ROI的x坐标
+        this.ROI_y = (y / window.innerHeight * this.visibleHeight - this.RedBoxSideLength / 2 / this.cameraBin) + this.visibleY - this.visibleHeight / 2; // 计算ROI的y坐标
         // this.$bus.$emit('setRedBoxPosition', x, y, this.ROI_x, this.ROI_y);
       } else {
-        this.selectStarX = (x / window.innerWidth * this.visibleWidth) + this.visibleX - this.visibleWidth / 2 - this.ROI_x; // 计算选择位置的x坐标
-        this.selectStarY = (y / window.innerHeight * this.visibleHeight) + this.visibleY - this.visibleHeight / 2 - this.ROI_y; // 计算选择位置的y坐标
+        this.selectStarX = ((x / window.innerWidth * this.visibleWidth) + this.visibleX - this.visibleWidth / 2 - this.ROI_x)*this.cameraBin; // 计算选择位置的x坐标
+        this.selectStarY = ((y / window.innerHeight * this.visibleHeight) + this.visibleY - this.visibleHeight / 2 - this.ROI_y)*this.cameraBin; // 计算选择位置的y坐标
 
-        if (this.selectStarX >= 0 && this.selectStarX < this.RedBoxSideLength &&
-          this.selectStarY >= 0 && this.selectStarY < this.RedBoxSideLength) {
+        if (this.selectStarX >= 0 && this.selectStarX < this.RedBoxSideLength  &&
+          this.selectStarY >= 0 && this.selectStarY < this.RedBoxSideLength ) {
           this.SendConsoleLogMsg('Select Star is in ROI', 'info');
         } else {
           this.SendConsoleLogMsg('Select Star is not in ROI', 'error');
@@ -5220,15 +6177,15 @@ export default {
       console.log('Touch at:', x, y);
       event.preventDefault();// 阻止默认事件，如页面滚动
       if (!this.isFocusLoopShooting) {
-        this.ROI_x = (x / window.innerWidth * this.visibleWidth - this.RedBoxSideLength / 2) + this.visibleX - this.visibleWidth / 2 - this.ROI_x;  // 计算ROI的x坐标
-        this.ROI_y = (y / window.innerHeight * this.visibleHeight - this.RedBoxSideLength / 2) + this.visibleY - this.visibleHeight / 2 - this.ROI_y; // 计算ROI的y坐标
+        this.ROI_x = (x / window.innerWidth * this.visibleWidth - this.RedBoxSideLength / 2 / this.cameraBin) + this.visibleX - this.visibleWidth / 2 ;  // 计算ROI的x坐标
+        this.ROI_y = (y / window.innerHeight * this.visibleHeight - this.RedBoxSideLength / 2 / this.cameraBin) + this.visibleY - this.visibleHeight / 2 ; // 计算ROI的y坐标
         // this.$bus.$emit('setRedBoxPosition', x, y, this.ROI_x, this.ROI_y);
       } else {
-        this.selectStarX = (x / window.innerWidth * this.visibleWidth) + this.visibleX - this.visibleWidth / 2 - this.ROI_x; // 计算选择位置的x坐标
-        this.selectStarY = (y / window.innerHeight * this.visibleHeight) + this.visibleY - this.visibleHeight / 2 - this.ROI_y; // 计算选择位置的y坐标
+        this.selectStarX = ((x / window.innerWidth * this.visibleWidth) + this.visibleX - this.visibleWidth / 2 - this.ROI_x)*this.cameraBin; // 计算选择位置的x坐标
+        this.selectStarY = ((y / window.innerHeight * this.visibleHeight) + this.visibleY - this.visibleHeight / 2 - this.ROI_y)*this.cameraBin; // 计算选择位置的y坐标
 
-        if (this.selectStarX >= 0 && this.selectStarX < this.RedBoxSideLength &&
-          this.selectStarY >= 0 && this.selectStarY < this.RedBoxSideLength) {
+        if (this.selectStarX >= 0 && this.selectStarX < this.RedBoxSideLength  &&
+          this.selectStarY >= 0 && this.selectStarY < this.RedBoxSideLength ) {
           this.SendConsoleLogMsg('Select Star is in ROI', 'info');
         } else {
           this.SendConsoleLogMsg('Select Star is not in ROI', 'error');
@@ -5276,7 +6233,7 @@ export default {
       } else {
         // this.SendConsoleLogMsg('触发多指触摸事件，获取当前触摸点数量:' + event.touches.length, 'info');
       }
-      
+
     },
 
     handleTouchMove(event) {
@@ -5426,36 +6383,64 @@ export default {
       const fetchController = new AbortController();
       const fetchSignal = fetchController.signal;
 
+      // const startDownloadTime = performance.now();
+
       // 使用 fetch API 获取二进制数据
       fetch(imagePath, { cache: 'no-store', signal: fetchSignal })
         .then(response => response.arrayBuffer())
         .then(buffer => {
-          let src, originalImg8, imgData, awbImg;
+          // const endDownloadTime = performance.now();
+          // const downloadTime = endDownloadTime - startDownloadTime;
+          if (this.isFocusLoopShooting) this.$bus.$emit('AppSendMessage', 'Vue_Command', 'showRoiImageSuccess:true');
+          else this.$bus.$emit('AppSendMessage', 'Vue_Command', 'showRoiImageSuccess:false');
+          let time1 = performance.now();
+          let src, imgData, targetImg8;
           try {
             const uint16Array = new Uint16Array(buffer);
+            let newWidth = parseInt(this.RedBoxSideLength / this.cameraBin);
+            let newHeight = parseInt(this.RedBoxSideLength / this.cameraBin);
+            if (newWidth % 2 != 0 ) {
+              newWidth = newWidth - 1;
+            }
+            if (newHeight % 2 != 0 ) {
+              newHeight = newHeight - 1;
+            }
+            if (uint16Array.length !== newWidth * newHeight) {
+              this.SendConsoleLogMsg('uint16Array.length (' + uint16Array.length + ') !== newWidth * newHeight (' + newWidth * newHeight + ')', 'error');
+              return;
+            }
             // 创建一个空的 Mat 对象
-            src = new cv.Mat(this.RedBoxSideLength, this.RedBoxSideLength, cv.CV_16UC1);
+            src = new cv.Mat(newHeight, newWidth, cv.CV_16UC1);
             src.data16U.set(uint16Array);
-            cv.cvtColor(src, src, this.lastImageProcessParams.cvmode);
-            originalImg8 = this.Bit16To8_Stretch(src, this.lastImageProcessParams.B, this.lastImageProcessParams.W);
-
-            src.delete(); // 释放原始的 Mat 对象
-            src = null; // 添加这行代码，确保 src 对象被清理
-
-            awbImg = this.ImageSoftAWB(originalImg8, this.lastImageProcessParams.gainR, this.lastImageProcessParams.gainB, this.lastImageProcessParams.offset);
-            originalImg8.delete(); // 释放 Mat 对象
-            originalImg8 = null; // 添加这行代码，确保 originalImg8 对象被清理
+            let time2 = performance.now();
+            this.SendConsoleLogMsg('创建mat对象时间: ' + (time2 - time1).toFixed(0) + 'ms', 'info');
+            if (this.lastImageProcessParams.isColorCamera) {
+              targetImg8 = this.applyStretchAndGain(src, this.lastImageProcessParams.analysis, 'bayer', this.lastImageProcessParams.CFA, this.lastImageProcessParams.blackLevel, this.lastImageProcessParams.whiteLevel);
+            } else {
+              targetImg8 = this.applyStretchAndGain(src, this.lastImageProcessParams.analysis, 'gray', this.lastImageProcessParams.CFA, this.lastImageProcessParams.blackLevel, this.lastImageProcessParams.whiteLevel);
+            }
+            time1 = performance.now();
+            this.SendConsoleLogMsg('applyStretchAndGain时间: ' + (time1 - time2).toFixed(0) + 'ms', 'info');
+            src.delete();
+            src = null;
 
             // 将 Mat 对象转换回 ImageData 对象
-            imgData = new ImageData(new Uint8ClampedArray(awbImg.data), awbImg.cols, awbImg.rows);
-            awbImg.delete(); // 释放 Mat 对象
-            awbImg = null; // 添加这行代码，确保 awbImg 对象被清理
+            imgData = new ImageData(new Uint8ClampedArray(targetImg8.data), targetImg8.cols, targetImg8.rows);
+            targetImg8.delete();
+            targetImg8 = null;
             // 在指定位置开始绘制图像
-            this.bufferCtx.clearRect(this.ROI_x, this.ROI_y, this.RedBoxSideLength, this.RedBoxSideLength);
+            this.bufferCtx.clearRect(this.ROI_x, this.ROI_y, newWidth, newHeight);
             this.bufferCtx.putImageData(imgData, this.ROI_x, this.ROI_y);
             // this.SendConsoleLogMsg('绘制一次ROI数据:' + fileName + ':' + this.ROI_x + ':' + this.ROI_y, 'info');
+            // 标注识别到的星点位置
+            // time2 = performance.now();
+            // this.SendConsoleLogMsg('绘制在缓存画布耗时: ' + (time2 - time1).toFixed(0) + 'ms', 'info');
             this.drawImageData();
+            // time1 = performance.now();
+            // this.SendConsoleLogMsg('drawImageData时间: ' + (time1 - time2).toFixed(0) + 'ms', 'info');
             this.focuserPictureFileName = fileName;
+            // const processTime = performance.now() - downloadTime;
+            // this.SendConsoleLogMsg(`ROI的执行时间 下载: ${downloadTime.toFixed(0)}ms, 处理: ${processTime.toFixed(0)}ms`, 'info');
 
           } catch (error) {
             console.error(`处理图像失败: ${imagePath}`, error);
@@ -5465,13 +6450,9 @@ export default {
               src.delete();
               src = null; // 添加这行代码，确保 src 对象被清理
             }
-            if (originalImg8 && !originalImg8.isDeleted()) {
-              originalImg8.delete();
-              originalImg8 = null; // 添加这行代码，确保 originalImg8 对象被清理
-            }
-            if (awbImg && !awbImg.isDeleted()) {
-              awbImg.delete();
-              awbImg = null; // 添加这行代码，确保 awbImg 对象被清理
+            if (targetImg8 && !targetImg8.isDeleted()) {
+              targetImg8.delete();
+              targetImg8 = null; // 添加这行代码，确保 originalImg8 对象被清理
             }
             // 确保 buffer 被清理
             buffer = null;
@@ -5525,6 +6506,52 @@ export default {
       }
       this.confirmConfiguration(this.MainCameraConfigItems);
     },
+    showCanvas(canvas) {
+      if (canvas === 'Stel') {
+        this.currentcanvas = 'Stel';
+        this.showStelCanvas();
+      }
+      else if (canvas === 'MainCamera') {
+
+        this.currentcanvas = 'MainCamera';
+        this.showMainCameraCanvas();
+        this.drawImageData()
+      }
+      else if (canvas === 'GuiderCamera') {
+        this.currentcanvas = 'GuiderCamera';
+        this.showGuiderCameraCanvas();
+      } else {
+        this.SendConsoleLogMsg("unknown canvas: " + canvas, 'error');
+      }
+    },
+    // 现有的加减函数需要修改
+    decrementAndNotify(item) {
+      if (item.value > item.inputMin) {
+        item.value -= item.inputStep;
+        this.handleConfigChange(item.label, item.value);
+      }
+    },
+
+    incrementAndNotify(item) {
+      if (item.value < item.inputMax) {
+        item.value += item.inputStep;
+        this.handleConfigChange(item.label, item.value);
+      }
+    },
+
+    // 通用的配置更改处理函数
+    handleConfigChange(label, value) {
+      console.log(`配置已更改: ${label} = ${value}`);
+      if (value !== '') {
+        // console.log(item.label, item.value);
+        this.SendConsoleLogMsg(label + ':' + value, 'info');
+        this.$bus.$emit(label, label + ':' + value);
+      } else if (value == '' && label === 'Focal Length (mm)') {
+        this.SendConsoleLogMsg(label + 'is NULL', 'info');
+        this.$bus.$emit(item.label, item.label + ':');
+      }
+
+    },
   },
   computed: {
     nav: {
@@ -5549,6 +6576,7 @@ export default {
         return 'rgba(255, 255, 255, 0.5)'; // 默认白色，透明度 0.5
       }
     },
+
 
   },
   watch: {
@@ -5577,6 +6605,19 @@ export default {
     }
   },
   mounted: function () {
+    // // 阻止默认的触摸行为
+    // document.addEventListener('touchstart', this.preventDefault, { passive: false });
+    // document.addEventListener('touchmove', this.preventDefault, { passive: false });
+    // document.addEventListener('touchend', this.preventDefault, { passive: false });
+
+    // // 阻止默认的鼠标行为
+    // document.addEventListener('mousedown', this.preventDefault, { passive: false });
+    // document.addEventListener('mousemove', this.preventDefault, { passive: false });
+    // document.addEventListener('mouseup', this.preventDefault, { passive: false });
+
+    // // 阻止默认的滚轮行为
+    // document.addEventListener('wheel', this.preventDefault, { passive: false });
+
     let that = this
 
     this.getLocationHostName();
@@ -5677,19 +6718,77 @@ export default {
       }
     });
 
-  }
+    window.addEventListener('load', () => {
+      // 页面完全加载
+      this.SendConsoleLogMsg('页面已完全加载', 'info');
+      this.$bus.$emit('AppSendMessage', 'Process_Command_Return','VueClientVersion:'+process.env.VUE_APP_VERSION);
+    })
+
+    document.addEventListener('DOMContentLoaded', () => {
+      // DOM加载完成
+      this.SendConsoleLogMsg('DOM已加载完成', 'info');
+    })
+
+  },
+  // 在组件销毁时移除
+  beforeDestroy() {
+    document.removeEventListener('touchstart', this.preventDefault);
+    document.removeEventListener('touchmove', this.preventDefault);
+    document.removeEventListener('touchend', this.preventDefault);
+
+    document.removeEventListener('mousedown', this.preventDefault);
+    document.removeEventListener('mousemove', this.preventDefault);
+    document.removeEventListener('mouseup', this.preventDefault);
+
+    document.removeEventListener('wheel', this.preventDefault);
+  },
 }
 </script>
 
 <style>
 body {
   background-color: black;
+  /* 禁用文本选择 */
   -webkit-touch-callout: none;
-  /* iOS */
   -webkit-user-select: none;
-  /* 所有WebKit浏览器 */
+  -moz-user-select: none;
+  -ms-user-select: none;
   user-select: none;
+
+  /* 禁用触摸操作 */
+  /* touch-action: none;
+  -ms-touch-action: none; */
+
+  /* 禁用双击缩放 */
+  -webkit-tap-highlight-color: transparent;
+
+  /* 禁用滚动和缩放 */
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
+
+  /* 禁用长按菜单 */
+  -webkit-touch-callout: none;
+
+  /* 禁用图片拖拽 */
+  -webkit-user-drag: none;
+  -khtml-user-drag: none;
+  -moz-user-drag: none;
+  -o-user-drag: none;
 }
+
+/* 确保画布元素也继承这些属性 */
+canvas {
+  /* touch-action: none;
+  -ms-touch-action: none; */
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-drag: none;
+}
+
+/* 禁用所有元素的默认触摸行为 */
+/* * {
+  touch-action: none;
+  -ms-touch-action: none;
+} */
 
 a {
   color: #82b1ff;
@@ -5832,5 +6931,147 @@ body,
 .btn-slider:active {
   transform: scale(0.95);
   background-color: rgba(255, 255, 255, 0.5);
+}
+
+
+/* 配置项样式 */
+.config-item {
+  text-align: center;
+  width: 100%;
+  margin-bottom: 5px;
+}
+
+/* 配置项标题 */
+.config-title {
+  display: inline-block;
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.5);
+  user-select: none;
+  margin-top: 10px;
+  margin-bottom: 5px;
+}
+
+/* 配置输入框 */
+.config-input {
+  width: 150px;
+  display: inline-block;
+  margin: 5px 0;
+}
+
+/* 滑块容器 */
+.slider-container {
+  text-align: left;
+  height: 30px;
+  width: 150px;
+  display: inline-block;
+  margin-bottom: 20px;
+  position: relative;
+}
+
+/* 滑块标签 */
+.slider-label {
+  display: inline-block;
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.5);
+  user-select: none;
+  margin-bottom: 5px;
+}
+
+/* 滑块控制样式 */
+.slider-control {
+  position: absolute;
+  left: 30px;
+  width: calc(100% - 60px);
+}
+
+/* 减少按钮样式 */
+.btn-minus {
+  position: absolute;
+  left: 5px;
+  transform: translateY(5px);
+}
+
+/* 增加按钮样式 */
+.btn-plus {
+  position: absolute;
+  right: 5px;
+  transform: translateY(5px);
+}
+
+/* 按钮内容居中 */
+.btn-content {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+}
+
+/* 按钮图标样式 */
+.btn-icon {
+  min-height: 10px;
+  pointer-events: none;
+}
+
+/* 开关样式 */
+.config-switch {
+  width: 150px;
+  display: inline-block;
+  margin-bottom: 0;
+  margin-top: 0;
+}
+
+/* 自定义滚动条样式 */
+.config-items-container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.config-items-container::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 3px;
+}
+
+.config-items-container::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+}
+
+.config-items-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+/* Firefox滚动条样式 */
+.config-items-container {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.3) rgba(0, 0, 0, 0.1);
+}
+
+/* 参数容器滚动条样式 */
+.params-container {
+  overflow-y: auto;
+  height: 100%;
+}
+
+.params-container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.params-container::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 3px;
+}
+
+.params-container::-webkit-scrollbar-thumb {
+  background: white;
+  border-radius: 3px;
+}
+
+.params-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.8);
+}
+
+/* Firefox滚动条样式 */
+.params-container {
+  scrollbar-width: thin;
+  scrollbar-color: white rgba(0, 0, 0, 0.1);
 }
 </style>

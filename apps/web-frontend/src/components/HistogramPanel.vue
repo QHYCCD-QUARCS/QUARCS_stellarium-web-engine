@@ -4,15 +4,15 @@
     <HistogramChart ref="histogramchart" class="histogram-chart"/>
     <DialKnob class="dial-knob"/>
     <div class="buttons-container">
-      <button  @touchend="calcWhiteBalanceGains" class="get-click btn-Reset">
+      <button @click="calcWhiteBalanceGains"  @touchend="calcWhiteBalanceGains" class="get-click btn-Reset">
         <div style="display: flex; justify-content: center; align-items: center;">
           <img src="@/assets/images/svg/ui/WhiteBalance.svg" height="20px" style="min-height: 20px; pointer-events: none;"></img>
         </div>
       </button>
 
-      <button  @touchend="AutoHistogram" class="get-click btn-Auto"><v-icon>mdi-alpha-a-circle-outline</v-icon></button>
+      <button @click="AutoHistogram"  @touchend="AutoHistogram" class="get-click btn-Auto"><v-icon>mdi-alpha-a-circle-outline</v-icon></button>
 
-      <button  @touchend="ResetHistogram" class="get-click btn-Reset">
+      <button @click="ResetHistogram"  @touchend="ResetHistogram" class="get-click btn-Reset">
         <div style="display: flex; justify-content: center; align-items: center;">
           <img src="@/assets/images/svg/ui/reset.svg" height="25px" style="min-height: 25px; pointer-events: none;"></img>
         </div>
@@ -37,7 +37,7 @@ export default {
       height: 90,
 
       histogram_min: 0,
-      histogram_max: 255,
+      histogram_max: 65535,
     };
   },
   components: {
@@ -66,10 +66,10 @@ export default {
       this.$bus.$emit('updateHistogramWidth', newWidth);
     },
     AutoHistogram() {
-      this.$bus.$emit('HandleHistogramNum', this.histogram_min, this.histogram_max);
+      this.$bus.$emit('HandleHistogramNum', -1, -1);
     },
     ResetHistogram() {
-      this.$bus.$emit('HandleHistogramNum', 0 , 255);
+      this.$bus.$emit('HandleHistogramNum', 0 , 65535);
     },
     setAutoHistogramNum(min, max) {
       this.histogram_min = min;

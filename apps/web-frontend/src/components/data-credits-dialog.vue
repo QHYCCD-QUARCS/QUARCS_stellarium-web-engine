@@ -117,6 +117,21 @@
         <p>All data comes from the IAU Minor Planet Center <a href="https://www.minorplanetcenter.net/data"
             target="_blank" rel="noopener">https://www.minorplanetcenter.net/data</a>. <i>This research has made use of
             data and/or services provided by the International Astronomical Union's Minor Planet Center.</i></p>
+        
+        <h3>Map Data</h3>
+        <p>The offline map data used in this application is based on the <strong>OpenStreetMap</strong> project and follows the Open Database License (ODbL):
+        <ul class="data-credits">
+          <li><strong>OpenStreetMap Contributors</strong>: <i>Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>, licensed under <a href="https://opendatacommons.org/licenses/odbl/1-0/" target="_blank" rel="noopener">Open Database License (ODbL)</a>. OpenStreetMap is a free, editable map of the world created collaboratively by global volunteers.</i></li>
+          <li><strong>Tile Rendering Services</strong>: <i>Map tiles are sourced from OpenStreetMap tile servers (<a href="https://tile.openstreetmap.org" target="_blank" rel="noopener">https://tile.openstreetmap.org</a> and <a href="https://tile.openstreetmap.de" target="_blank" rel="noopener">https://tile.openstreetmap.de</a>) to support offline map functionality.</i></li>
+          <li><strong>Geocoding Services</strong>: <i>Location information is generated using offline coordinate-based regional detection algorithms. No external geocoding services are used, ensuring full offline functionality and privacy protection.</i></li>
+          <li><strong>License Terms</strong>: <i>Under the ODbL license, you are free to use, copy, distribute, and modify the map data, including for commercial purposes. However, you must: (1) maintain attribution notices, (2) share derivative data under the same license, (3) keep data open. For detailed terms, please refer to the <a href="https://opendatacommons.org/licenses/odbl/1-0/" target="_blank" rel="noopener">ODbL License</a>.</i></li>
+          <li><strong>Data Quality Statement</strong>: <i>OpenStreetMap data is maintained by a global community, and data quality varies by region. While we strive to provide accurate map information, we make no warranties regarding the completeness or accuracy of the data. For critical applications, we recommend cross-validation with other map data sources.</i></li>
+        </ul>
+        </p>
+        <p style="font-size: 0.9em; color: #999;">
+          <strong>Special Thanks</strong>: We thank the millions of OpenStreetMap contributors worldwide for their selfless dedication, including data collectors, validators, developers, and maintainers. Their work makes high-quality open map data possible, providing fundamental geographic information support for applications and services around the world.
+        </p>
+
         <h3>Others</h3>
         <p>Landscape images by Fabien Chereau</p>
         <p>Constellation lines by Fabien Chereau</p>

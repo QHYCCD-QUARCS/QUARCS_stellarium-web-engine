@@ -15,10 +15,10 @@ export default {
       containerMaxWidth: 190,
       barData: [],  // 示例数据
       xAxis_min: 0,
-      xAxis_max: 255, 
+      xAxis_max: 65535,
 
       histogram_min: 0,
-      histogram_max: 255,
+      histogram_max: 65535,
     };
   },
   mounted() {
@@ -39,7 +39,13 @@ export default {
     },
 
     renderChart(x_min, x_max) {
-      const yAxisMax = Math.max(...this.barData.map(item => item[1]));  // 获取 y 轴的最大值
+      // 如果没有数据，则退出
+      if (this.barData.length === 0) return;
+      
+      const yAxisMax = Math.max(...this.barData.flatMap(channel => 
+        channel.map(item => item[1])
+      ));  // 获取所有通道中的y轴最大值
+      
       const option = {
         grid: {
           left: '-1%',
@@ -58,46 +64,61 @@ export default {
             }
           },
           axisLabel: null,
-          splitLine: {  // 隐藏 x 轴的网格线
+          splitLine: {
             show: false
           }
         },
         yAxis: {
           type: 'value',
-          max: yAxisMax,  // 使用动态获取的 y 轴最大值
+          max: yAxisMax,
           axisLine: {
             lineStyle: {
               color: 'white'
             }
           },
           axisLabel: null,
-          splitLine: {  // 隐藏 x 轴的网格线
+          splitLine: {
             show: false
           }
         },
         series: []
       };
 
-      // 为每个通道创建对应的 series
-      for (let channel = 0; channel < 3; channel++) {
+      // 根据实际通道数量创建系列
+      const colors = ['rgba(0,120,212,0.7)', 'rgba(51,218,121,0.7)', 'rgba(255,0,0,0.7)'];
+      
+      // 灰度图和彩色图使用不同的颜色方案
+      if (this.barData.length === 1) {
+        // 灰度图只有一个通道，使用白色
         option.series.push({
-          data: this.barData[channel], // 注意这里的数据结构
+          data: this.barData[0],
           type: 'line',
           itemStyle: {
-            color: channel === 0 ? 'rgba(0,120,212,0.7)' : (channel === 1 ? 'rgba(51,218,121,0.7)' : 'rgba(255,0,0,0.7)') // 根据通道选择颜色
+            color: 'rgba(255,255,255,0.7)'
           },
           symbolSize: 0
         });
+      } else {
+        // 彩色图有多个通道，使用标准RGB颜色
+        for (let channel = 0; channel < this.barData.length; channel++) {
+          option.series.push({
+            data: this.barData[channel],
+            type: 'line',
+            itemStyle: {
+              color: colors[channel % colors.length]
+            },
+            symbolSize: 0
+          });
+        }
       }
 
-      // 在这里可以继续添加其他通道的曲线，也可以根据需要修改颜色
-
+      // 添加最小和最大值的垂直线
       option.series.push({
-        data: [[this.histogram_min, 0], [this.histogram_min, yAxisMax]],  // 数据格式为 [x, y]
+        data: [[this.histogram_min, 0], [this.histogram_min, yAxisMax]],
         type: 'line',
         lineStyle: {
-          color: 'blue',  // 设置线的颜色
-          type: 'dashed',  // 设置线的类型，可以为 'solid', 'dashed', 'dotted'
+          color: 'blue',
+          type: 'dashed',
           width: 1
         },
         symbolSize: 0
@@ -116,50 +137,50 @@ export default {
 
       this.myChart.setOption(option);
     },
-    
+
     addDataToChart(histogramData) {
-            this.clearBarData();
-
-      // 初始化最小和最大值的索引
-      let firstNonZeroIndex = -1;
-      let lastNonZeroIndex = -1;
-
-      // 处理三个通道的直方图数据
-      for (let channel = 0; channel < histogramData.length; channel++) {
-        const channelData = histogramData[channel];
-        const channelSeriesData = []; // 存储当前通道的 series 数据
-
-        for (let i = 0; i < channelData.length; i++) {
-          const value = [i, channelData[i]];
-          channelSeriesData.push(value);
-
-          // 更新最小和最大值的索引
-          if (channelData[i] !== 0) {
-            if (firstNonZeroIndex === -1) {
-              // 第一次不等于0的索引
-              firstNonZeroIndex = i;
-            }
-            // 记录每次不等于0的索引，最后一次会覆盖之前记录的值
-            lastNonZeroIndex = i;
+      this.clearBarData();
+      console.log("当前直方图数据长度:", histogramData.length);
+      
+      // 判断是灰度图还是彩色图
+      // 如果是简单数组(长度很大)，则为灰度图
+      // 如果是数组的数组(长度为3)，则为彩色图
+      
+      
+      // 处理灰度图 - 单一数组，长度很大
+      if (!Array.isArray(histogramData[0])) {
+        const formattedData = [];
+        
+        // 转换为[index, value]格式，仅保留非零点和每16个点的采样点
+        for (let i = 0; i < histogramData.length; i++) {
+          if (histogramData[i] > 0 || i % 16 === 0) {
+            formattedData.push([i, histogramData[i]]);
           }
         }
-
-        // 将当前通道的 series 数据存入 barData
-        this.barData.push(channelSeriesData);
+        
+        this.barData.push(formattedData);
+        
+      } else { // 处理彩色图 - 三通道数组
+        // 遍历RGB三个通道
+        for (let channel = 0; channel < histogramData.length; channel++) {
+          const channelData = histogramData[channel];
+          const formattedData = [];
+          
+          // 转换为[index, value]格式，仅保留非零点和每16个点的采样点
+          for (let i = 0; i < channelData.length; i++) {
+            if (channelData[i] > 0 || i % 16 === 0) {
+              formattedData.push([i, channelData[i]]);
+            }
+          }
+          
+          this.barData.push(formattedData);
+        }
       }
-
-      // 发送最小和最大值的索引到其他组件
-      this.histogram_min = firstNonZeroIndex;
-      this.histogram_max = lastNonZeroIndex;
-
-      this.$bus.$emit('AutoHistogramNum', this.histogram_min, this.histogram_max);
-
-      console.log('First Non-Zero Index:', firstNonZeroIndex);
-      this.$bus.$emit('SendConsoleLogMsg', 'First Non-Zero Index:' + firstNonZeroIndex, 'info');
-      console.log('Last Non-Zero Index:', lastNonZeroIndex);
-      this.$bus.$emit('SendConsoleLogMsg', 'Last Non-Zero Index:' + lastNonZeroIndex, 'info');
-
-            this.renderChart(this.xAxis_min, this.xAxis_max);
+      
+      // 发送信息
+      console.log("有效数据范围:", this.histogram_min, "-", this.histogram_max);
+      // this.$bus.$emit('AutoHistogramNum', this.histogram_min, this.histogram_max);
+      this.renderChart(this.xAxis_min, this.xAxis_max);
     },
 
     clearBarData() {
@@ -180,8 +201,3 @@ export default {
   /* border: 1px solid rgba(255, 255, 255, 0.8); */
 }
 </style>
-
-
-
-
-

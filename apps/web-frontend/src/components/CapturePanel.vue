@@ -89,7 +89,7 @@ export default {
       currentCFWIndex: 0,
       cfwButtonsDisabled: false,
 
-      ExpTimes: ['1ms', '10ms', '100ms', '1s', '5s', '10s', '30s', '60s', '120s'],
+      ExpTimes: ['1ms', '10ms', '100ms', '1s', '5s', '10s', '30s', '60s', '120s','300s','600s'],
       // CFWs: ['Null', 'L', 'R', 'G', 'B', 'Ha', 'OIIII', 'SII'],
       CFWs: ['Null'],
 
@@ -107,15 +107,15 @@ export default {
     };
   },
   created() {
-    this.$bus.$on('ExpTime [1]', this.ModifyExpTimeList);
-    this.$bus.$on('ExpTime [2]', this.ModifyExpTimeList);
-    this.$bus.$on('ExpTime [3]', this.ModifyExpTimeList);
-    this.$bus.$on('ExpTime [4]', this.ModifyExpTimeList);
-    this.$bus.$on('ExpTime [5]', this.ModifyExpTimeList);
-    this.$bus.$on('ExpTime [6]', this.ModifyExpTimeList);
-    this.$bus.$on('ExpTime [7]', this.ModifyExpTimeList);
-    this.$bus.$on('ExpTime [8]', this.ModifyExpTimeList);
-    this.$bus.$on('ExpTime [9]', this.ModifyExpTimeList);
+    // this.$bus.$on('ExpTime [1]', this.ModifyExpTimeList);
+    // this.$bus.$on('ExpTime [2]', this.ModifyExpTimeList);
+    // this.$bus.$on('ExpTime [3]', this.ModifyExpTimeList);
+    // this.$bus.$on('ExpTime [4]', this.ModifyExpTimeList);
+    // this.$bus.$on('ExpTime [5]', this.ModifyExpTimeList);
+    // this.$bus.$on('ExpTime [6]', this.ModifyExpTimeList);
+    // this.$bus.$on('ExpTime [7]', this.ModifyExpTimeList);
+    // this.$bus.$on('ExpTime [8]', this.ModifyExpTimeList);
+    // this.$bus.$on('ExpTime [9]', this.ModifyExpTimeList);
 
     // this.$bus.$on('CFW [1]', this.ModifyCFWList);
     // this.$bus.$on('CFW [2]', this.ModifyCFWList);
@@ -149,7 +149,7 @@ export default {
   },
   mounted: function () {
     this.CurrentExpTimeList();
-    this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getExpTimeList');
+    // this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getExpTimeList');
 
   },
   methods: {

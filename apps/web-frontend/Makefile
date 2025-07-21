@@ -55,6 +55,20 @@ lint:
 build:
 	docker run -it $(DOCKER_MOUNTS) stellarium-web-dev yarn run build
 
+build-with-tiles:
+	@echo "检查离线地图瓦片数据..."
+	@if [ ! -d "../../tile-server/tiles" ]; then \
+		echo "错误: 离线地图瓦片数据不存在，请先运行下载脚本"; \
+		echo "cd ../../tile-server && python3 download-tiles.py"; \
+		exit 1; \
+	fi
+	@echo "开始构建包含离线地图的版本..."
+	npm run build
+	@echo "构建完成！瓦片数据已复制到 dist/tiles/"
+	@echo "瓦片文件验证:"
+	@ls -la dist/tiles/0/0/0.png 2>/dev/null && echo "✅ 基础瓦片文件存在" || echo "❌ 基础瓦片文件缺失"
+	@echo "可以运行 'make start' 或 'make start-https' 来启动服务"
+
 start:
 	cd dist && python3 ../server.py 8080
 
