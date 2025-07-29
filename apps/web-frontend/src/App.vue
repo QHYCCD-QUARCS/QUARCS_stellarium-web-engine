@@ -7285,6 +7285,10 @@ export default {
               // Set all default data sources
               const core = that.$stel.core
               core.stars.addDataSource({ url: process.env.BASE_URL + 'skydata/stars' })
+              core.stars.addDataSource({ url: process.env.BASE_URL + 'skydata/stars_base' })
+              core.stars.addDataSource({ url: process.env.BASE_URL + 'skydata/stars_extend' })
+              core.dss.addDataSource({ url: process.env.BASE_URL + 'skydata/dss/v1' })
+              // core.stars.addDataSource({ url: process.env.BASE_URL + 'skydata/stars' })
 
               // Allow to specify a custom path for sky culture data
               if (that.$route.query.sc) {
