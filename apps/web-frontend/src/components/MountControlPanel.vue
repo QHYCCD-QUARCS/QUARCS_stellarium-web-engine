@@ -370,7 +370,7 @@ export default {
     
     updateCurrentLocation(ra, dec) {
       // 处理从App.vue传来的RA和DEC数据
-      console.log('收到望远镜位置数据:', ra, dec);
+      // console.log('收到望远镜位置数据:', ra, dec);
       
       // 现在RA是度数格式，需要转换为小时格式
       const raDegrees = parseFloat(ra);   // 度数格式

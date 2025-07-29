@@ -48,16 +48,16 @@
     </button>
   </transition> -->
 
-    <transition name="RightBtn">
+    <!-- <transition name="RightBtn">
       <button v-show="isPolarAxisMode" @click="RecalibratePolarAxis" class="get-click btn-Recalibrate">
         <div style="display: flex; justify-content: center; align-items: center;">
           <img src="@/assets/images/svg/ui/Reset.svg" height="20px"
             style="min-height: 20px; pointer-events: none;"></img>
         </div>
       </button>
-    </transition>
+    </transition> -->
 
-    <transition name="RightBtn">
+    <!-- <transition name="RightBtn">
       <button v-show="isPolarAxisMode && showSingleSolveBtn" @click="SingleSolveImage" class="get-click btn-SolveImage"
         style=" background-color: rgba(0, 0, 0, 0.1); ">
         <template v-if="!loadingImageSolve">
@@ -72,9 +72,9 @@
           </div>
         </template>
       </button>
-    </transition>
+    </transition> -->
 
-    <transition name="RightBtn">
+    <!-- <transition name="RightBtn">
       <button v-show="isPolarAxisMode && !showSingleSolveBtn" @click="LoopSolveImage" class="get-click btn-SolveImage"
         :style="{ 'background-color': PlateSolveInProgress ? 'rgba(46, 160, 67, 0.3)' : 'rgba(0, 0, 0, 0.1)' }">
         <div style="display: flex; justify-content: center; align-items: center;">
@@ -82,7 +82,7 @@
             style="min-height: 25px; pointer-events: none;"></img>
         </div>
       </button>
-    </transition>
+    </transition> -->
 
     <div>
       <transition name="RightBtn">
@@ -195,13 +195,13 @@
       </div>
     </button>
 
-    <transition name="BottomCanvas">
+    <!-- <transition name="BottomCanvas">
       <div v-show="isPolarAxisMode" class="Canvas-SolveImage">
         <canvas ref="SolveImageCanvas" id="SolveImage-Canvas"></canvas>
       </div>
-    </transition>
+    </transition> -->
 
-    <transition name="BottomCanvas">
+    <!-- <transition name="BottomCanvas">
       <div v-show="isPolarAxisMode" class="Text-SolveImage">
         <span
           style="position: absolute; top: 0px; left: 5%; height: 30%; width: 90%; font-size: 10px; color: rgba(255, 255, 255, 0.3); user-select: none;">
@@ -216,9 +216,9 @@
           Current: {{ CurrentText }}
         </span>
       </div>
-    </transition>
+    </transition> -->
 
-    <button v-show="isPolarAxisMode" @click="switchPolarAxisTips" class="PolarAxisTips">
+    <!-- <button v-show="isPolarAxisMode" @click="switchPolarAxisTips" class="PolarAxisTips">
       <v-stepper v-model="currentPolarAxisStep" class="PolarAxisStepper">
         <v-stepper-header>
           <v-stepper-step step="1" :complete="currentPolarAxisStep > 1"></v-stepper-step>
@@ -234,7 +234,7 @@
       <span class="PolarAxisTipsText">
         {{ currentPolarAxisStepTips }}
       </span>
-    </button>
+    </button> -->
 
 
     <CapturePanel v-show="isCaptureMode" />
@@ -367,12 +367,12 @@
 
 
     <!-- 更新命令显示文本框的命名为解析进度显示 -->
-    <div v-if="showParsingProgress && isPolarAxisMode"
+    <!-- <div v-if="showParsingProgress && isPolarAxisMode"
       style="background-color: rgba(0, 0, 0, 0.7); color: white; padding: 10px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 300px; height: 150px; display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden;">
       <div v-for="(progress, index) in parsingProgressList" :key="index" style="margin-top: 5px;">
         {{ progress }}
       </div>
-    </div>
+    </div> -->
 
     <!-- 更新进度对话框 -->
     <UpdateProgressDialog 
@@ -1191,38 +1191,38 @@ export default {
     },
 
     CalibratePolarAxisMode() {
-      // this.$bus.$emit('showStelCanvas');
-      // this.lastMainPage = this.CurrentMainPage;
-      // this.CurrentMainPage = 'Stel';
-      // this.hideCaptureUI(true);
+      this.lastMainPage = this.CurrentMainPage;
+      this.CurrentMainPage = 'Stel';
+      this.$bus.$emit('showStelCanvas');
+      this.hideCaptureUI(true);
 
       // this.showMountSwitch = true;
       // this.isBottomBarShow = true;
-      // this.isPolarAxisMode = true;
+      this.isPolarAxisMode = true;
       // this.showLocationInputs = true;
       // this.$bus.$emit('PolarAxisMode', this.isPolarAxisMode);
       // this.isRedBoxMode = false;
-      // document.removeEventListener('click', this.handleTouchOrMouseDown);
+      document.removeEventListener('click', this.handleTouchOrMouseDown);
       this.$bus.$emit('showPolarAlignment');           // 显示校准界面
     },
 
     QuitPolarAxisMode() {
-      // this.showCaptureUI();
-      // this.isPolarAxisMode = false;
-      // // this.isCaptureMode = false;
-      // // this.isShowScaleChange = false;
-      // this.showLocationInputs = false;
+      this.showCaptureUI();
+      this.isPolarAxisMode = false;
+      // this.isCaptureMode = false;
+      // this.isShowScaleChange = false;
+      this.showLocationInputs = false;
       
-      // if (this.lastMainPage === 'None') {
-      //   this.CurrentMainPage = 'MainCamera';
-      // } else {
-      //   this.CurrentMainPage = this.lastMainPage;
-      // }
-      // this.$bus.$emit('PolarAxisMode', this.isPolarAxisMode);
-      // this.$bus.$emit('showCanvas',this.CurrentMainPage);
-      // this.lastMainPage = 'None';
-      // this.$bus.$emit('AppSendMessage', 'Vue_Command', 'StopLoopCapture');
-      // this.$bus.$emit('SendConsoleLogMsg', 'Stop Loop Capture', 'info');
+      if (this.lastMainPage === 'None') {
+        this.CurrentMainPage = 'MainCamera';
+      } else {
+        this.CurrentMainPage = this.lastMainPage;
+      }
+      this.$bus.$emit('PolarAxisMode', this.isPolarAxisMode);
+      this.$bus.$emit('showCanvas',this.CurrentMainPage);
+      this.lastMainPage = 'None';
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'StopLoopCapture');
+      this.$bus.$emit('SendConsoleLogMsg', 'Stop Loop Capture', 'info');
       this.$bus.$emit('hidePolarAlignment');           // 隐藏校准界面
     },
 

@@ -798,6 +798,13 @@ export default {
       LastCircle_AzAlt: null,
 
       Circles: [],
+      
+      // 极轴校准相关数组
+      calibrationCircles: [],  // 校准点圆圈数组
+      adjustmentCircles: [],   // 调整点圆圈数组
+      lastPosition: null,      // 上一次位置
+      fieldUpdateTimer: null,  // 视场更新定时器
+      fieldOfViewPolygons: [], // 存储视场多边形对象
 
       drawer_2: null,    // 设置侧边栏的显示与隐藏
 
@@ -955,6 +962,11 @@ export default {
     this.$bus.$on('ScaleChange', this.ScaleChange);
     this.$bus.$on('showCanvas', this.showCanvas);
     
+    // 极轴校准绘制相关监听器
+    this.$bus.$on('DrawCalibrationPointPolygon', this.drawCalibrationPointPolygon);
+    this.$bus.$on('ClearCalibrationPoints', this.clearCalibrationPoints);
+    this.$bus.$on('DrawAdjustmentPointsPolygon', this.drawAdjustmentPointsPolygon);
+    
     this.memoryCheckInterval = setInterval(this.checkMemoryUsage, 30000);
     
 
@@ -966,7 +978,7 @@ export default {
         const used = Math.round(memoryInfo.usedJSHeapSize/1048576);
         const limit = Math.round(memoryInfo.jsHeapSizeLimit/1048576);
         
-        console.log(`内存使用: ${used}MB / ${limit}MB`);
+        // console.log(`内存使用: ${used}MB / ${limit}MB`);
         
         if (memoryInfo.usedJSHeapSize > memoryInfo.jsHeapSizeLimit * 0.7) {
           this.$bus.$emit('showWarning', this.$i18n.locale === 'cn' ? 
@@ -2056,12 +2068,14 @@ export default {
                   const mindec = parseFloat(parts[6]);
                   const targetra = parseFloat(parts[7]);
                   const targetdec = parseFloat(parts[8]);
+                  console.log('自动对焦绘制数据: ', ra, dec, maxra, minra, maxdec, mindec,targetra,targetdec);
                   this.$bus.$emit('FieldDataUpdate', [ra, dec, maxra, minra, maxdec, mindec,targetra,targetdec]);
                   
                   const offsetra = parseFloat(parts[9]);
                   const offsetdec = parseFloat(parts[10]);
                   const adjustmentra = parts[11];
                   const adjustmentdec = parts[12];
+                  console.log('自动对焦显示更新数据: ', ra, dec, targetra, targetdec, offsetra, offsetdec, adjustmentra, adjustmentdec);
                   this.$bus.$emit('updateCardInfo', ra, dec, targetra, targetdec, offsetra, offsetdec, adjustmentra, adjustmentdec);
 
                 }
@@ -5332,22 +5346,66 @@ export default {
       return stel.createLayer({ id: 'testLayerStars', z: 7, visible: true });
     },
 
+    // 坐标验证方法
+    isValidCoordinate: function(coord) {
+      // 如果是字符串，尝试转换为数字
+      if (typeof coord === 'string') {
+        coord = parseFloat(coord);
+      }
+      
+      return typeof coord === 'number' && 
+             !isNaN(coord) && 
+             isFinite(coord) && 
+             coord >= -360 && 
+             coord <= 360;
+    },
+    
     vec3_from_sphe: function (ra_degree, dec_degree, out) {
-      const cp = Math.cos(dec_degree * Math.PI / 180);
-      out[0] = Math.cos(ra_degree * Math.PI / 180) * cp;
-      out[1] = Math.sin(ra_degree * Math.PI / 180) * cp;
-      out[2] = Math.sin(dec_degree * Math.PI / 180);
+      // 确保坐标是数字类型
+      let ra = ra_degree;
+      let dec = dec_degree;
+      
+      if (typeof ra === 'string') {
+        ra = parseFloat(ra);
+      }
+      if (typeof dec === 'string') {
+        dec = parseFloat(dec);
+      }
+      
+      // 添加坐标验证
+      if (!this.isValidCoordinate(ra) || !this.isValidCoordinate(dec)) {
+        console.error('无效的坐标输入:', { ra_degree, dec_degree, converted: { ra, dec } });
+        return;
+      }
+      
+      try {
+        const cp = Math.cos(dec * Math.PI / 180);
+        out[0] = Math.cos(ra * Math.PI / 180) * cp;
+        out[1] = Math.sin(ra * Math.PI / 180) * cp;
+        out[2] = Math.sin(dec * Math.PI / 180);
+      } catch (error) {
+        console.error('坐标转换出错:', error, { ra_degree, dec_degree, converted: { ra, dec } });
+      }
     },
 
     testAddCircle: function (stel, layer) {
       console.log("Add a circle star near polaris");
 
-      let circle = stel.createObj('circle', { id: 'my circle  ', model_data: {} });
+      // 为临时对象创建带有名称的配置
+      const circleConfig = { 
+        id: 'test_circle_' + Date.now(), 
+        model_data: {},
+        names: ['Test Circle'],  // 添加名称
+        types: ['Temporary'],
+        model: 'temporary'
+      };
+      
+      let circle = stel.createObj('circle', circleConfig);
 
       circle.update();
       layer.add(circle);
 
-      // Select
+      // 现在可以安全地选择对象，因为它有名称
       stel.core.selection = circle;
       stel.pointAndLock(circle);
 
@@ -5387,6 +5445,235 @@ export default {
       this.$bus.$emit('MainCameraStatus', status);
     },
 
+    // 绘制视场多边形（基于五个RA/DEC坐标的闭环）
+    AddFieldOfViewPolygon: function (stel, layer, coordinates, color, name) {
+      console.log(`开始创建视场多边形: ${name}`, { coordinates, color });
+      
+      try {
+        // 验证输入参数
+        if (!coordinates || !Array.isArray(coordinates)) {
+          console.error('视场坐标必须是数组');
+          return null;
+        }
+        
+        if (coordinates.length !== 5) {
+          console.error(`视场坐标必须是5个点，当前有${coordinates.length}个点`);
+          return null;
+        }
+        
+        // 验证每个坐标点
+        for (let i = 0; i < coordinates.length; i++) {
+          const coord = coordinates[i];
+          if (!coord || typeof coord.ra === 'undefined' || typeof coord.dec === 'undefined') {
+            console.error(`坐标点${i}格式错误，需要包含ra和dec属性:`, coord);
+            return null;
+          }
+          
+          // 验证坐标值
+          if (!this.isValidCoordinate(coord.ra) || !this.isValidCoordinate(coord.dec)) {
+            console.error(`坐标点${i}的值无效:`, coord);
+            return null;
+          }
+        }
+        
+        // 设置默认颜色
+        const defaultColor = {
+          stroke: "#FFFFFF",
+          strokeOpacity: 1,
+          fill: "#1E90FF", 
+          fillOpacity: 0.25
+        };
+        
+        const finalColor = { ...defaultColor, ...color };
+        console.log('最终颜色配置:', finalColor);
+        
+        // 创建多边形对象
+        const polygonConfig = {
+          id: 'field_of_view_' + Date.now(),
+          model_data: {},
+          names: [name || 'Field of View'],
+          types: ['FieldOfView'],
+          model: 'field_of_view'
+        };
+        
+        console.log('创建GeoJSON多边形对象');
+        let polygon = stel.createObj('geojson', {
+          data: {
+            "type": "FeatureCollection",
+            "features": [
+              {
+                "type": "Feature",
+                "properties": {
+                  "stroke": finalColor.stroke,
+                  "stroke-opacity": finalColor.strokeOpacity,
+                  "fill": finalColor.fill,
+                  "fill-opacity": finalColor.fillOpacity,
+                  "name": name || 'Field of View'
+                },
+                "geometry": {
+                  "type": "Polygon",
+                  "coordinates": [
+                    [
+                      // 五个坐标点，形成闭环
+                      [coordinates[0].ra, coordinates[0].dec],
+                      [coordinates[1].ra, coordinates[1].dec],
+                      [coordinates[2].ra, coordinates[2].dec],
+                      [coordinates[3].ra, coordinates[3].dec],
+                      [coordinates[4].ra, coordinates[4].dec],
+                      [coordinates[0].ra, coordinates[0].dec]  // 闭合多边形
+                    ]
+                  ]
+                }
+              }
+            ]
+          }
+        });
+        
+        if (!polygon) {
+          console.error('GeoJSON多边形对象创建失败');
+          return null;
+        }
+        
+        console.log('多边形对象创建成功，开始更新和添加到图层');
+        
+        // 设置对象属性
+        polygon.update();
+        layer.add(polygon);
+        
+        console.log('多边形已添加到图层');
+        
+        // 添加标签（可选）
+        if (name) {
+          console.log('添加多边形标签');
+          // 计算视场中心点
+          const centerRa = coordinates.reduce((sum, coord) => sum + coord.ra, 0) / coordinates.length;
+          const centerDec = coordinates.reduce((sum, coord) => sum + coord.dec, 0) / coordinates.length;
+          
+          let labelCircle = this.AddMarkCircle(stel, layer, 4, name);
+          if (labelCircle) {
+            let labelMm = labelCircle.pos;
+            this.vec3_from_sphe(centerRa, centerDec + 0.02, labelMm); // 在视场上方显示名称
+            labelCircle.pos = labelMm;
+            labelCircle.color = [1, 1, 1, 0.8];  // 白色，半透明
+            labelCircle.border_color = [0, 0, 0, 0.5];  // 黑色边框，半透明
+            labelCircle.size = [0.01, 0.01];  // 很小的圆圈作为名称标签
+            
+            // 将标签与多边形关联
+            polygon.labelCircle = labelCircle;
+            console.log('标签已添加到多边形');
+          } else {
+            console.warn('标签创建失败');
+          }
+        }
+        
+        console.log(`视场多边形创建完成: ${name || 'Field of View'}`, {
+          coordinates: coordinates,
+          color: finalColor,
+          polygon: polygon
+        });
+        
+        return polygon;
+        
+      } catch (error) {
+        console.error('创建视场多边形时出错:', error);
+        console.error('错误堆栈:', error.stack);
+        return null;
+      }
+    },
+    
+    // 删除指定的视场多边形
+    RemoveFieldOfViewPolygon: function (polygon) {
+      try {
+        if (!polygon) {
+          console.warn('要删除的多边形对象为空');
+          return false;
+        }
+        
+        // 删除关联的标签
+        if (polygon.labelCircle) {
+          glLayer.remove(polygon.labelCircle);
+        }
+        
+        // 删除多边形
+        glLayer.remove(polygon);
+        
+        console.log('视场多边形已删除:', polygon);
+        return true;
+        
+      } catch (error) {
+        console.error('删除视场多边形时出错:', error);
+        return false;
+      }
+    },
+    
+    // 删除所有视场多边形
+    RemoveAllFieldOfViewPolygons: function () {
+      try {
+        // 如果有多边形数组，遍历删除
+        if (this.fieldOfViewPolygons && Array.isArray(this.fieldOfViewPolygons)) {
+          this.fieldOfViewPolygons.forEach(polygon => {
+            this.RemoveFieldOfViewPolygon(polygon);
+          });
+          this.fieldOfViewPolygons = [];
+        }
+        
+        console.log('所有视场多边形已删除');
+        return true;
+        
+      } catch (error) {
+        console.error('删除所有视场多边形时出错:', error);
+        return false;
+      }
+    },
+    
+    // 更新视场多边形的位置
+    UpdateFieldOfViewPolygonPosition: function (polygon, newCoordinates) {
+      try {
+        if (!polygon || !newCoordinates || !Array.isArray(newCoordinates) || newCoordinates.length !== 5) {
+          console.error('更新视场多边形位置时参数无效');
+          return false;
+        }
+        
+        // 验证新坐标
+        for (let i = 0; i < newCoordinates.length; i++) {
+          const coord = newCoordinates[i];
+          if (!this.isValidCoordinate(coord.ra) || !this.isValidCoordinate(coord.dec)) {
+            console.error(`新坐标点${i}的值无效:`, coord);
+            return false;
+          }
+        }
+        
+        // 更新多边形数据
+        polygon.data.features[0].geometry.coordinates[0] = [
+          [newCoordinates[0].ra, newCoordinates[0].dec],
+          [newCoordinates[1].ra, newCoordinates[1].dec],
+          [newCoordinates[2].ra, newCoordinates[2].dec],
+          [newCoordinates[3].ra, newCoordinates[3].dec],
+          [newCoordinates[4].ra, newCoordinates[4].dec],
+          [newCoordinates[0].ra, newCoordinates[0].dec]  // 闭合
+        ];
+        
+        polygon.update();
+        
+        // 更新标签位置（如果存在）
+        if (polygon.labelCircle) {
+          const centerRa = newCoordinates.reduce((sum, coord) => sum + coord.ra, 0) / newCoordinates.length;
+          const centerDec = newCoordinates.reduce((sum, coord) => sum + coord.dec, 0) / newCoordinates.length;
+          
+          let labelMm = polygon.labelCircle.pos;
+          this.vec3_from_sphe(centerRa, centerDec + 0.02, labelMm);
+          polygon.labelCircle.pos = labelMm;
+        }
+        
+        console.log('视场多边形位置已更新:', newCoordinates);
+        return true;
+        
+      } catch (error) {
+        console.error('更新视场多边形位置时出错:', error);
+        return false;
+      }
+    },
+
     UpdateMainCameraTemperature(value) {
       // console.log('Main Camera Temperature:', value + '°');
       this.$bus.$emit('MainCameraTemperature', value);
@@ -5399,26 +5686,55 @@ export default {
     },
 
     AddMarkCircle: function (stel, layer, frame, label) {
-      let circle = stel.createObj('circle', { id: 'my circle  ', model_data: {} });
+      console.log(`开始创建标记圆圈: ${label}`);
+      
+      try {
+        // 为临时对象创建带有名称的配置
+        const circleConfig = { 
+          id: 'temp_circle_' + Date.now(), 
+          model_data: {},
+          names: [label || 'Temporary Marker'],  // 添加名称
+          types: ['Temporary'],
+          model: 'temporary'
+        };
+        
+        console.log('创建圆形对象');
+        let circle = stel.createObj('circle', circleConfig);
 
-      circle.update();
-      layer.add(circle);
+        if (!circle) {
+          console.error('圆形对象创建失败');
+          return null;
+        }
 
-      // Select
-      stel.core.selection = circle;
-      stel.pointAndLock(circle);
+        console.log('圆形对象创建成功，开始设置属性');
+        circle.update();
+        layer.add(circle);
 
-      // Circle Property
-      let mm = circle.pos;
-      this.vec3_from_sphe(2.52971, 89.2641, mm);
-      circle.pos = mm;
-      circle.label = label;
-      circle.frame = frame;
-      circle.size = [0.04, 0.04];
-      circle.color = [1, 1, 1, 0.5];
-      circle.border_color = [1, 1, 1, 1];
+        // 设置默认位置（北极星附近）
+        let mm = circle.pos;
+        this.vec3_from_sphe(2.52971, 89.2641, mm);
+        circle.pos = mm;
+        
+        // 设置圆形属性
+        circle.label = label;
+        circle.frame = frame;
+        circle.size = [0.04, 0.04];
+        circle.color = [1, 1, 1, 0.5];
+        circle.border_color = [1, 1, 1, 1];
 
-      return circle;
+        console.log(`标记圆圈创建完成: ${label}`, {
+          pos: mm,
+          size: circle.size,
+          color: circle.color,
+          border_color: circle.border_color
+        });
+
+        return circle;
+      } catch (error) {
+        console.error('创建标记圆圈时出错:', error);
+        console.error('错误堆栈:', error.stack);
+        return null;
+      }
     },
 
     AddMarkRectangle: function (stel, layer, RaDec) {
@@ -5453,6 +5769,101 @@ export default {
       line.update();
       layer.add(line);
       return line;
+    },
+    
+
+    
+    // 辅助方法：将十六进制颜色转换为RGB
+    hexToRgb: function(hex) {
+      // 移除#号
+      hex = hex.replace('#', '');
+      
+      // 解析RGB值
+      const r = parseInt(hex.substr(0, 2), 16);
+      const g = parseInt(hex.substr(2, 2), 16);
+      const b = parseInt(hex.substr(4, 2), 16);
+      
+      return { r, g, b };
+    },
+    
+    // 更新视场方法
+    updateFieldOfView: function(field) {
+      if (!field || !field.fieldInfo) return;
+      
+      const info = field.fieldInfo;
+      
+      // 计算视场的四个角点
+      const corners = [
+        { Ra: info.maxRa, Dec: info.maxDec },
+        { Ra: info.minRa, Dec: info.maxDec },
+        { Ra: info.minRa, Dec: info.minDec },
+        { Ra: info.maxRa, Dec: info.minDec },
+        { Ra: info.maxRa, Dec: info.maxDec }  // 闭合多边形
+      ];
+      
+      // 更新GeoJSON数据
+      field.data = {
+        "type": "FeatureCollection",
+        "features": [
+          {
+            "type": "Feature",
+            "properties": {
+              "stroke": info.color,
+              "strokeOpacity": 0.8,
+              "fill": info.color,
+              "fillOpacity": 0.2
+            },
+            "geometry": {
+              "type": "Polygon",
+              "coordinates": 
+                [
+                  [parseFloat(corners[0].Ra), parseFloat(corners[0].Dec)],
+                  [parseFloat(corners[1].Ra), parseFloat(corners[1].Dec)],
+                  [parseFloat(corners[2].Ra), parseFloat(corners[2].Dec)],
+                  [parseFloat(corners[3].Ra), parseFloat(corners[3].Dec)],
+                  [parseFloat(corners[4].Ra), parseFloat(corners[4].Dec)]
+                ]
+            }
+          }
+        ]
+      };
+      
+      field.update();
+    },
+    
+    // 启动视场更新定时器
+    startFieldUpdateTimer: function() {
+      if (this.fieldUpdateTimer) {
+        clearInterval(this.fieldUpdateTimer);
+      }
+      
+      this.fieldUpdateTimer = setInterval(() => {
+        // 更新校准点视场
+        if (this.calibrationCircles) {
+          this.calibrationCircles.forEach(field => {
+            if (field.fieldInfo) {
+              this.updateFieldOfView(field);
+            }
+          });
+        }
+        
+        // 更新调整点视场
+        if (this.adjustmentCircles) {
+          this.adjustmentCircles.forEach(field => {
+            if (field.fieldInfo) {
+              this.updateFieldOfView(field);
+            }
+          });
+        }
+      }, 3000); // 每3秒更新一次
+    },
+    
+    // 停止视场更新定时器
+    stopFieldUpdateTimer: function() {
+      if (this.fieldUpdateTimer) {
+        clearInterval(this.fieldUpdateTimer);
+        this.fieldUpdateTimer = null;
+      }
     },
 
     getCiecleAzAlt(Circle) {
@@ -5782,6 +6193,197 @@ export default {
       this.MarkCircleNum = 0;
       this.RemoveAllCircles();
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'ClearSloveResultList');
+    },
+    
+
+    
+    // 使用新的多边形方式绘制校准点
+    drawCalibrationPointPolygon(coordinates, color, name) {
+      console.log(`绘制校准点多边形: ${name}`, coordinates);
+      
+      try {
+        // 验证输入参数
+        if (!coordinates || !Array.isArray(coordinates)) {
+          console.error('校准点坐标必须是数组');
+          return;
+        }
+        
+        if (coordinates.length !== 5) {
+          console.error(`校准点坐标必须是5个点，当前有${coordinates.length}个点`);
+          return;
+        }
+        
+        // 验证每个坐标点
+        for (let i = 0; i < coordinates.length; i++) {
+          const coord = coordinates[i];
+          if (!coord || typeof coord.ra === 'undefined' || typeof coord.dec === 'undefined') {
+            console.error(`校准点坐标${i}格式错误：`, coord);
+            return;
+          }
+          
+          if (!this.isValidCoordinate(coord.ra) || !this.isValidCoordinate(coord.dec)) {
+            console.error(`校准点坐标${i}值无效：`, coord);
+            return;
+          }
+        }
+        
+        // 使用新的多边形绘制方法
+        let calibrationPolygon = this.AddFieldOfViewPolygon(
+          this.$stel, 
+          glLayer, 
+          coordinates, 
+          color, 
+          name
+        );
+        
+        if (calibrationPolygon) {
+          // 添加到校准点数组
+          if (!this.calibrationCircles) {
+            this.calibrationCircles = [];
+          }
+          this.calibrationCircles.push(calibrationPolygon);
+          
+          console.log(`校准点多边形创建成功: ${name}`, calibrationPolygon);
+        } else {
+          console.error(`校准点多边形创建失败: ${name}`);
+        }
+        
+      } catch (error) {
+        console.error('绘制校准点多边形时出错:', error);
+      }
+    },
+    
+    // 清除所有校准点
+    clearCalibrationPoints() {
+      console.log('清除所有校准点');
+      if (this.calibrationCircles) {
+        this.calibrationCircles.forEach(circle => {
+          glLayer.remove(circle);
+        });
+        this.calibrationCircles = [];
+      }
+      // 同时清除上一次位置
+      this.lastPosition = null;
+    },
+
+    
+    // 使用新的多边形方式绘制调整点
+    drawAdjustmentPointsPolygon(currentCoordinates, targetCoordinates, currentColor, targetColor, isTimerUpdate = false) {
+      console.log('绘制调整点多边形', { currentCoordinates, targetCoordinates });
+      
+      try {
+        // 清除之前的调整点
+        if (this.adjustmentCircles) {
+          this.adjustmentCircles.forEach(circle => {
+            try {
+              glLayer.remove(circle);
+            } catch (error) {
+              console.warn('清除调整点时出错:', error);
+            }
+          });
+        }
+        this.adjustmentCircles = [];
+        
+        // 绘制当前位置视场多边形
+        if (currentCoordinates && Array.isArray(currentCoordinates) && currentCoordinates.length === 5) {
+          console.log('绘制当前位置多边形');
+          let currentPolygon = this.AddFieldOfViewPolygon(
+            this.$stel, 
+            glLayer, 
+            currentCoordinates, 
+            currentColor, 
+            'Current'
+          );
+          
+          if (currentPolygon) {
+            this.adjustmentCircles.push(currentPolygon);
+            console.log('当前位置多边形创建成功');
+          } else {
+            console.error('当前位置多边形创建失败');
+          }
+        } else {
+          console.warn('当前位置坐标无效，跳过绘制');
+        }
+        
+        // 绘制目标位置（使用圆形）
+        if (targetCoordinates && Array.isArray(targetCoordinates) && targetCoordinates.length === 5) {
+          console.log('绘制目标位置圆形');
+          
+          // 计算目标位置中心点
+          const centerRa = targetCoordinates.reduce((sum, coord) => sum + coord.ra, 0) / targetCoordinates.length;
+          const centerDec = targetCoordinates.reduce((sum, coord) => sum + coord.dec, 0) / targetCoordinates.length;
+          
+          console.log(`目标位置中心点: RA=${centerRa}, DEC=${centerDec}`);
+          
+          let targetCircle = this.AddMarkCircle(this.$stel, glLayer, 4, 'Target');
+          if (targetCircle) {
+            let targetMm = targetCircle.pos;
+            this.vec3_from_sphe(centerRa, centerDec, targetMm);
+            targetCircle.pos = targetMm;
+            targetCircle.color = [1, 0.5, 0, 0.25];  // 橙色，半透明
+            targetCircle.border_color = [1, 0.5, 0, 1];  // 橙色边框
+            
+            // 计算目标点大小
+            const targetSize = 0.03; // 固定小尺寸
+            targetCircle.size = [targetSize, targetSize];
+            
+            this.adjustmentCircles.push(targetCircle);
+            console.log('目标位置圆形创建成功', targetCircle);
+          } else {
+            console.error('目标位置圆形创建失败');
+          }
+        } else {
+          console.warn('目标位置坐标无效，跳过绘制');
+        }
+        
+        // 视角转向控制：只在非定时器更新时转向
+        if (!isTimerUpdate && targetCoordinates && Array.isArray(targetCoordinates) && targetCoordinates.length === 5) {
+          try {
+            // 计算目标位置中心点
+            const centerRa = targetCoordinates.reduce((sum, coord) => sum + coord.ra, 0) / targetCoordinates.length;
+            const centerDec = targetCoordinates.reduce((sum, coord) => sum + coord.dec, 0) / targetCoordinates.length;
+            
+            console.log(`视角转向目标: RA=${centerRa}, DEC=${centerDec}`);
+            
+            // 创建临时对象指向目标位置
+            const targetObjConfig = { 
+              id: 'temp_target_' + Date.now(), 
+              model_data: {},
+              names: ['Target Position'],
+              types: ['Temporary'],
+              model: 'temporary'
+            };
+            const targetObj = this.$stel.createObj('circle', targetObjConfig);
+            
+            // 设置目标对象的位置
+            let targetMm = targetObj.pos;
+            this.vec3_from_sphe(centerRa, centerDec, targetMm);
+            targetObj.pos = targetMm;
+            targetObj.update();
+            
+            // 指向并锁定目标
+            this.$stel.pointAndLock(targetObj, 1.0);
+            console.log('视角转向完成');
+            
+            // 清理临时对象
+            setTimeout(() => {
+              try {
+                if (targetObj && targetObj.layer) {
+                  targetObj.layer.remove(targetObj);
+                }
+              } catch (cleanupError) {
+                console.warn('清理临时目标对象时出错:', cleanupError);
+              }
+            }, 2000); // 2秒后清理
+            
+          } catch (error) {
+            console.error('视角转向出错:', error);
+          }
+        }
+        
+      } catch (error) {
+        console.error('绘制调整点多边形时出错:', error);
+      }
     },
 
     ShowConfirmDialog(Title, Text, ToDo) {
@@ -6550,8 +7152,7 @@ export default {
         this.SendConsoleLogMsg(label + 'is NULL', 'info');
         this.$bus.$emit(item.label, item.label + ':');
       }
-
-    },
+    }
   },
   computed: {
     nav: {
@@ -6741,6 +7342,28 @@ export default {
     document.removeEventListener('mouseup', this.preventDefault);
 
     document.removeEventListener('wheel', this.preventDefault);
+    
+    // 清理极轴校准相关的圆圈
+    if (this.calibrationCircles) {
+      this.calibrationCircles.forEach(circle => {
+        if (glLayer && circle) {
+          glLayer.remove(circle);
+        }
+      });
+      this.calibrationCircles = [];
+    }
+    
+    if (this.adjustmentCircles) {
+      this.adjustmentCircles.forEach(circle => {
+        if (glLayer && circle) {
+          glLayer.remove(circle);
+        }
+      });
+      this.adjustmentCircles = [];
+    }
+    
+    // 停止视场更新定时器
+    this.stopFieldUpdateTimer();
   },
 }
 </script>
