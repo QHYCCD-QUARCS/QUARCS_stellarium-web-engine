@@ -337,6 +337,13 @@
   "No activity logs": "No activity logs",
   "Polar Alignment": "Polar Alignment",
   "Polar Alignment Calibration": "Polar Alignment Calibration",
-  "Restore": "Restore"
+  "Restore": "Restore",
+  "Focuser Travel Calibration": "Focuser Travel Calibration",
+  "Step": "Step",
+  "Preparing to start focuser travel calibration...": "Preparing to start focuser travel calibration...",
+  "Please observe if the focuser has moved to the minimum position. If it has reached the position, click the calibration button to set the minimum position": "Please observe if the focuser has moved to the minimum position. If it has reached the position, click the calibration button to set the minimum position",
+  "Please observe if the focuser has moved to the maximum position. If it has reached the position, click the calibration button to set the maximum position": "Please observe if the focuser has moved to the maximum position. If it has reached the position, click the calibration button to set the maximum position",
+  "Calibration completed! Focuser travel range has been set. Click the button to end calibration": "Calibration completed! Focuser travel range has been set. Click the button to end calibration",
+  "Do you want to perform focuser travel calibration? Calibration will set the maximum and minimum positions of the focuser.": "Do you want to perform focuser travel calibration? Calibration will set the maximum and minimum positions of the focuser."
 
 }

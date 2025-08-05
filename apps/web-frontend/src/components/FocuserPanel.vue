@@ -7,6 +7,18 @@
 
       <div class="buttons-container">
 
+        <button @click="startCalibration" :class="{'btn-calibration': true, 'active-calibration': isCalibrating, 'complete-calibration': calibrationState === 'complete', 'error-calibration': calibrationState === 'error'}" class="get-click">
+          <div style="display: flex; justify-content: center; align-items: center;">
+            <img v-if="calibrationState === 'complete'" src="@/assets/images/svg/ui/CalibrationComplete.svg" height="25px"
+              style="min-height: 25px; pointer-events: none;"></img>
+            <img v-else-if="isCalibrating" src="@/assets/images/svg/ui/StopCalibration.svg" height="25px"
+              :class="{'pulse-animation': calibrationState === 'running'}"
+              style="min-height: 25px; pointer-events: none;"></img>
+            <img v-else src="@/assets/images/svg/ui/Calibration.svg" height="25px"
+              style="min-height: 25px; pointer-events: none;"></img>
+          </div>
+        </button>
+
         <button @click="toggleLoopShooting" :class="{'btn-loop-shooting': true, 'active-loop': isLoopActive}" class="get-click">
           <div style="display: flex; justify-content: center; align-items: center;">
             <img :src="require(isLoopActive ? '@/assets/images/svg/ui/ROI-Capturing.svg' : '@/assets/images/svg/ui/ROI-Capture.svg')" height="25px"
@@ -160,6 +172,8 @@
         {{ this.MoveSteps }}
       </div>
 
+
+
     </div>
   </transition>
 </template>
@@ -200,6 +214,12 @@ export default {
 
       moveStartTime: 0,  // 电调移动按下时间记录
 
+      // 校准相关数据
+      isCalibrating: false, // 是否正在校准
+      calibrationStep: 0, // 校准步骤 (1-3)
+      calibrationMessage: '', // 校准提示信息
+      calibrationState: 'idle', // 校准状态: 'idle', 'running', 'complete'
+
     };
   },
   components: {
@@ -230,6 +250,9 @@ export default {
     this.$bus.$on('FocuserConnected', this.setFocuserIsConnected);
     this.$bus.$on('setRedBoxSideLength', this.setRedBoxSideLength);
     this.$bus.$on('syncROI_length', this.syncROI_length);
+    this.$bus.$on('StartCalibration', this.startCalibrationProcess);
+    this.$bus.$on('focusSetTravelRangeSuccess', this.focusSetTravelRangeSuccess);
+    this.$bus.$on('focusMoveFailed', this.focusMoveFailed);
   },
   methods: {
     updatePosition() {
@@ -501,7 +524,123 @@ export default {
       } else {
         this.FocuserIsConnected = false;
       }
-    } 
+    },
+
+    // 校准相关方法
+    startCalibration() {
+      try {
+        if (!this.FocuserIsConnected) {
+          this.$bus.$emit('showMsgBox', 'Focuser is not connected!', 'warning');
+          return;
+        }
+        
+        if (this.calibrationState === 'complete') {
+          // 如果校准完成，点击按钮结束校准
+          this.endCalibration();
+        } else if (this.isCalibrating) {
+          // 如果正在校准，点击按钮进入下一步
+          this.nextCalibrationStep();
+        } else {
+                  // 开始校准，显示确认对话框
+        this.$bus.$emit('ShowConfirmDialog', 'Calibration', this.$t('Do you want to perform focuser travel calibration? Calibration will set the maximum and minimum positions of the focuser.'), 'StartCalibration');
+        }
+      } catch (error) {
+        console.error('Error in startCalibration:', error);
+      }
+    },
+
+    nextCalibrationStep() {
+      this.calibrationStep++;
+      console.log('Calibration step:', this.calibrationStep, 'State:', this.calibrationState);
+      
+      if (this.calibrationStep === 1) {
+        // 第一步：移动到最小位置并设置最小位置
+        this.calibrationMessage = this.$t('Please observe if the focuser has moved to the minimum position. If it has reached the position, click the calibration button to set the minimum position');
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'focusMoveToMin');
+        this.$bus.$emit('SendConsoleLogMsg', 'Calibration Step 1: Moving to minimum position', 'info');
+        // 通知App.vue更新校准信息
+        this.$bus.$emit('UpdateCalibrationInfo', this.calibrationStep, this.calibrationMessage);
+      } else if (this.calibrationStep === 2) {
+        // 第二步：移动到最大位置并设置最大位置
+        this.calibrationMessage = this.$t('Please observe if the focuser has moved to the maximum position. If it has reached the position, click the calibration button to set the maximum position');
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'focusMoveToMax');
+        this.$bus.$emit('SendConsoleLogMsg', 'Calibration Step 2: Moving to maximum position', 'info');
+        // 通知App.vue更新校准信息
+        this.$bus.$emit('UpdateCalibrationInfo', this.calibrationStep, this.calibrationMessage);
+      } else if (this.calibrationStep === 3) {
+        // 第三步：校准完成，设置行程范围
+        this.calibrationState = 'complete';
+        this.calibrationMessage = this.$t('Calibration completed! Focuser travel range has been set. Click the button to end calibration');
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'focusSetTravelRange');
+        this.$bus.$emit('SendConsoleLogMsg', 'Calibration Step 3: Travel range set successfully', 'success');
+        // 通知App.vue更新校准信息
+        this.$bus.$emit('UpdateCalibrationInfo', this.calibrationStep, this.calibrationMessage, 'complete');
+      }
+    },
+
+    startCalibrationProcess() {
+      this.isCalibrating = true;
+      this.calibrationState = 'running';
+      this.calibrationStep = 0;
+      this.calibrationMessage = this.$t('Preparing to start focuser travel calibration...');
+      console.log('Calibration started:', this.isCalibrating, this.calibrationState);
+      this.$bus.$emit('SendConsoleLogMsg', 'Starting focuser travel range calibration', 'info');
+      
+      // 通知App.vue更新校准信息
+      this.$bus.$emit('UpdateCalibrationInfo', 0, 'Preparing to start focuser travel calibration...', 'running');
+      
+      // 延迟开始第一步
+      const self = this;
+      setTimeout(() => {
+        self.nextCalibrationStep();
+      }, 1000);
+    },
+
+
+
+    endCalibration() {
+      try {
+        console.log('Ending calibration, current state:', this.calibrationState);
+        this.isCalibrating = false;
+        this.calibrationState = 'idle';
+        this.calibrationStep = 0;
+        this.calibrationMessage = '';
+        this.$bus.$emit('SendConsoleLogMsg', 'Focuser travel range calibration ended', 'info');
+        // 通知App.vue结束校准
+        this.$bus.$emit('EndCalibration');
+      } catch (error) {
+        console.error('Error in endCalibration:', error);
+      }
+    },
+
+    // 处理电调移动失败
+    focusMoveFailed(errorMessage) {
+      console.log('Focus move failed:', errorMessage);
+
+      // 重置校准状态
+      this.isCalibrating = false;
+      this.calibrationState = 'error';
+      this.calibrationStep = 0;
+      this.calibrationMessage = '';
+      // 通知App.vue结束校准
+      this.$bus.$emit('EndCalibration');
+    },
+
+    // 处理设置行程范围成功
+    focusSetTravelRangeSuccess() {
+      console.log('Focus set travel range success');
+      this.$bus.$emit('SendConsoleLogMsg', 'Focuser travel range set successfully', 'success');
+      // 校准完成，重置状态
+      this.isCalibrating = false;
+      this.calibrationState = 'complete';
+      this.calibrationStep = 3;
+      this.calibrationMessage = this.$t('Calibration completed! Focuser travel range has been set. Click the button to end calibration');
+      // 通知App.vue更新校准信息
+      this.$bus.$emit('UpdateCalibrationInfo', this.calibrationStep, this.calibrationMessage, 'complete');
+      setTimeout(() => {
+        this.$bus.$emit('EndCalibration');
+      }, 1000);
+    }
   }
 }
 </script>
@@ -748,6 +887,33 @@ export default {
   background-color: rgba(0, 0, 0, 0.0);
 }
 
+.btn-calibration {
+  width: 30px;
+  height: 30px;
+
+  user-select: none;
+  background-color: rgba(64, 64, 64, 0.5);
+  backdrop-filter: blur(5px);
+  border: none;
+  border-radius: 50%;
+  box-sizing: border-box;
+}
+
+.active-calibration {
+  background-color: orange;
+  /* 校准时的背景色 */
+}
+
+.complete-calibration {
+  background-color: green;
+  /* 校准完成时的背景色 */
+}
+
+.error-calibration {
+  background-color: red;
+  /* 校准错误时的背景色 */
+}
+
 .btn-loop-shooting {
   background-color: rgba(64, 64, 64, 0.5);
   /* 默认背景色 */
@@ -775,4 +941,19 @@ export default {
     transform: rotate(360deg);
   }
 }
+
+.pulse-animation {
+  animation: pulse 1.5s ease-in-out infinite alternate;
+}
+
+@keyframes pulse {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.1);
+  }
+}
+
+
 </style>

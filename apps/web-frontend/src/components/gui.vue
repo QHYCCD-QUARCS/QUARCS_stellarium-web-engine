@@ -1326,6 +1326,8 @@ export default {
       } else if (this.ConfirmToDo.startsWith('updateCurrentClient')) {
         this.$bus.$emit('AppSendMessage', 'Process_Command_Return', this.ConfirmToDo);
         this.showUpdateDialog = true;
+      } else if (this.ConfirmToDo === 'StartCalibration') {
+        this.$bus.$emit('StartCalibration');
       }
     },
 

@@ -141,7 +141,7 @@ export default {
 
       isIDLE: true,
 
-      FocalLength: 510,
+      FocalLength: 0,
       // CameraSizeWidth: 24.9,
       // CameraSizeHeight: 16.6,
 
@@ -292,7 +292,7 @@ export default {
       console.log('QHYCCD | SolveSYNC');
       this.isSolveProcessing = true;
       this.$bus.$emit('SendConsoleLogMsg', 'Mount Solve SYNC', 'info');
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'SolveSYNC:' + this.FocalLength);
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'SolveSYNC');
       // 处理状态将由MountOperationComplete信号结束
     },
     getTargetRaDec(value) {
