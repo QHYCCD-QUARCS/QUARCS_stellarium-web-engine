@@ -11,6 +11,8 @@
 <template>
 
 
+
+
   <v-app>
     <v-navigation-drawer v-model="drawer_2" ref="Drawer_2" app absolute temporary :width="DeviceIsConnected ? 200 : 200"
       style="left: 170px; backdrop-filter: blur(5px); background-color: rgba(0, 0, 0, 0.1);">
