@@ -141,6 +141,11 @@
                 @input="handleConfigChange(item.label, item.value)" class="config-input">
               </v-text-field>
 
+              <!-- 数字输入类型 -->
+              <v-text-field v-if="item.inputType === 'number'" v-model="item.value" :label="item.label"
+                type="number" @input="handleConfigChange(item.label, item.value)" class="config-input">
+              </v-text-field>
+
               <!-- 滑动条类型 -->
               <div v-if="item.inputType === 'slider'" class="slider-container">
                 <span class="slider-label">
@@ -587,6 +592,15 @@
       </v-card>
     </v-dialog>
 
+    <!-- 校准信息显示框 -->
+    <div v-if="calibrationInfo.isCalibrating || calibrationInfo.calibrationState === 'complete'" class="calibration-info-box">
+      <div class="calibration-content">
+        <div class="calibration-title">{{ $t('Focuser Travel Calibration') }}</div>
+        <div class="calibration-message">{{ calibrationInfo.calibrationMessage }}</div>
+        <div class="calibration-progress">{{ $t('Step') }} {{ calibrationInfo.calibrationStep }}/3</div>
+      </div>
+    </div>
+
   </v-app>
 
 </template>
@@ -639,6 +653,14 @@ export default {
 
       QTClientVersion: 'Not connected',
       VueClientVersion: process.env.VUE_APP_VERSION,
+
+      // 校准信息对象
+      calibrationInfo: {
+        isCalibrating: false,
+        calibrationState: 'idle',
+        calibrationStep: 0,
+        calibrationMessage: ''
+      },
 
       // isMessageBoxShow: false,
 
@@ -708,10 +730,9 @@ export default {
       ],
 
       FocuserConfigItems: [
-        // { driverType: 'Focuser', num: 1, label: 'RedBox Side Length (px)', value: '', inputType: 'text'},
-        { driverType: 'Focuser', num: 2, label: 'Min Step', value: '', inputType: 'text' },
         { driverType: 'Focuser', num: 2, label: 'Sync Focuser Step', value: '', inputType: 'text' },
-
+        { driverType: 'Focuser', num: 2, label: 'Min Limit', value: '', inputType: 'number' },
+        { driverType: 'Focuser', num: 2, label: 'Max Limit', value: '', inputType: 'number' },
       ],
 
       PoleCameraConfigItems: [
@@ -966,6 +987,11 @@ export default {
     this.$bus.$on('DrawCalibrationPointPolygon', this.drawCalibrationPointPolygon);
     this.$bus.$on('ClearCalibrationPoints', this.clearCalibrationPoints);
     this.$bus.$on('DrawAdjustmentPointsPolygon', this.drawAdjustmentPointsPolygon);
+    
+    // 校准相关事件监听器
+    this.$bus.$on('StartCalibration', this.startCalibrationProcess);
+    this.$bus.$on('UpdateCalibrationInfo', this.updateCalibrationInfo);
+    this.$bus.$on('EndCalibration', this.endCalibration);
     
     this.memoryCheckInterval = setInterval(this.checkMemoryUsage, 30000);
     
@@ -2075,11 +2101,28 @@ export default {
                   const offsetdec = parseFloat(parts[10]);
                   const adjustmentra = parts[11];
                   const adjustmentdec = parts[12];
-                  console.log('自动对焦显示更新数据: ', ra, dec, targetra, targetdec, offsetra, offsetdec, adjustmentra, adjustmentdec);
-                  this.$bus.$emit('updateCardInfo', ra, dec, targetra, targetdec, offsetra, offsetdec, adjustmentra, adjustmentdec);
-
+                  console.log('自动对焦显示更新数据: ', offsetra, offsetdec, adjustmentra, adjustmentdec);  
+                  this.$bus.$emit('focusSetTravelRangeSuccess', offsetra, offsetdec, adjustmentra, adjustmentdec);
+                  this.$bus.$emit('updateCardInfo', ra, dec, targetra, targetdec);
+                  this.$bus.$emit('focusMoveFailed', 'focusMoveFailed');
                 }
                 break;
+
+              case 'focusMoveFailed':
+                if (parts.length === 2) {
+                  const message = parts[1];
+                  this.callShowMessageBox(message, 'error');
+                  this.$bus.$emit('focusMoveFailed', message);
+                }
+
+              case 'focusMoveFailed':
+                if (parts.length === 2) {
+                  const message = parts[1];
+                  this.callShowMessageBox(message, 'error');
+                  this.$bus.$emit('focusMoveFailed', message);
+                }
+                break;
+
 
               default:
                 console.warn('未处理命令: ', data.message);
@@ -7152,7 +7195,44 @@ export default {
         this.SendConsoleLogMsg(label + 'is NULL', 'info');
         this.$bus.$emit(item.label, item.label + ':');
       }
+    },
+      // 校准相关方法
+  startCalibrationProcess() {
+    this.calibrationInfo.isCalibrating = true;
+    this.calibrationInfo.calibrationState = 'running';
+    this.calibrationInfo.calibrationStep = 0;
+    this.calibrationInfo.calibrationMessage = this.$t('Preparing to start focuser travel calibration...');
+    console.log('App: Calibration started:', this.calibrationInfo);
+  },
+
+  updateCalibrationInfo(step, message, state) {
+    try {
+      this.calibrationInfo.calibrationStep = step;
+      // 如果消息是国际化键，则翻译它
+      if (message && typeof message === 'string') {
+        this.calibrationInfo.calibrationMessage = this.$t(message);
+      } else {
+        this.calibrationInfo.calibrationMessage = message;
+      }
+      if (state) {
+        this.calibrationInfo.calibrationState = state;
+      }
+      if (step === 0) {
+        this.calibrationInfo.isCalibrating = true;
+      }
+      console.log('App: Calibration info updated:', this.calibrationInfo);
+    } catch (error) {
+      console.error('Error in updateCalibrationInfo:', error);
     }
+  },
+
+  endCalibration() {
+    this.calibrationInfo.isCalibrating = false;
+    this.calibrationInfo.calibrationState = 'idle';
+    this.calibrationInfo.calibrationStep = 0;
+    this.calibrationInfo.calibrationMessage = '';
+    console.log('App: Calibration ended');
+  },
   },
   computed: {
     nav: {
@@ -7369,6 +7449,8 @@ export default {
     // 停止视场更新定时器
     this.stopFieldUpdateTimer();
   },
+
+
 }
 </script>
 
@@ -7700,5 +7782,50 @@ body,
 .params-container {
   scrollbar-width: thin;
   scrollbar-color: white rgba(0, 0, 0, 0.1);
+}
+
+/* 校准信息显示框样式 */
+.calibration-info-box {
+  position: fixed;
+  top: 50vh;
+  left: 50vw;
+  transform: translate(-50%, -50%);
+  background-color: rgba(0, 0, 0, 0.9);
+  backdrop-filter: blur(15px);
+  border: 2px solid rgba(255, 165, 0, 0.8);
+  border-radius: 15px;
+  padding: 25px;
+  z-index: 10001;
+  min-width: 350px;
+  max-width: 450px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.calibration-content {
+  text-align: center;
+  color: white;
+}
+
+.calibration-title {
+  font-size: 20px;
+  font-weight: bold;
+  margin-bottom: 20px;
+  color: #FFA500;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.calibration-message {
+  font-size: 16px;
+  line-height: 1.6;
+  margin-bottom: 20px;
+  color: #FFFFFF;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.calibration-progress {
+  font-size: 14px;
+  color: #FFA500;
+  font-weight: bold;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 </style>
