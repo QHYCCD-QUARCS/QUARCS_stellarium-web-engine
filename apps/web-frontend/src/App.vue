@@ -7,6 +7,7 @@
 // repository.
 
 <template>
+  
 
   <v-app>
     <v-navigation-drawer v-model="drawer_2" ref="Drawer_2" app absolute temporary :width="DeviceIsConnected ? 200 : 200"
