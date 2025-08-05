@@ -6,7 +6,12 @@
 // The terms of the AGPL v3 license can be found in the main directory of this
 // repository.
 
+
+
 <template>
+
+
+
 
   <v-app>
     <v-navigation-drawer v-model="drawer_2" ref="Drawer_2" app absolute temporary :width="DeviceIsConnected ? 200 : 200"
