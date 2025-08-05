@@ -1,0 +1,8 @@
+/home/quarcs/workspace/QUARCS/QUARCS_stellarium-web-engine/build/CMakeFiles/client.dir
+/home/quarcs/workspace/QUARCS/QUARCS_stellarium-web-engine/build/CMakeFiles/edit_cache.dir
+/home/quarcs/workspace/QUARCS/QUARCS_stellarium-web-engine/build/CMakeFiles/rebuild_cache.dir
+/home/quarcs/workspace/QUARCS/QUARCS_stellarium-web-engine/build/CMakeFiles/list_install_components.dir
+/home/quarcs/workspace/QUARCS/QUARCS_stellarium-web-engine/build/CMakeFiles/install.dir
+/home/quarcs/workspace/QUARCS/QUARCS_stellarium-web-engine/build/CMakeFiles/install/local.dir
+/home/quarcs/workspace/QUARCS/QUARCS_stellarium-web-engine/build/CMakeFiles/install/strip.dir
+/home/quarcs/workspace/QUARCS/QUARCS_stellarium-web-engine/build/CMakeFiles/client_autogen.dir
