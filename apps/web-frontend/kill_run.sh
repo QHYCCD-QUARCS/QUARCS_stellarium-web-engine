@@ -20,7 +20,7 @@ fi
 sed -i '/VUE_APP_VERSION/d' .env
 echo "VUE_APP_VERSION=$(date +%Y%m%d)" >> .env
 make update-engine
-make build-with-tiles
+make build
 # make build
 
 # 创建 update_pak 文件夹
