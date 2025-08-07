@@ -14,6 +14,7 @@ if [ ! -z "$pid" ]; then
     kill -9 $pid
 fi
 
+
 # 删除 update_pack 文件夹
 # rm -rf dist/update_pack
 
