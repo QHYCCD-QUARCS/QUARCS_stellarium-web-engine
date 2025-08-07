@@ -705,7 +705,7 @@ export default {
         // vue处理参数
         { driverType: 'MainCamera', label: 'ImageCFA', value: '', inputType: 'select', selectValue: ['GR', 'GB', 'BG', 'RGGB', 'null'] },
         // 硬件处理参数
-        { driverType: 'MainCamera', label: 'Binning', value: '', inputType: 'slider', inputMin: 1, inputMax: 4, inputStep: 1 },
+        { driverType: 'MainCamera', label: 'Binning', value: '', inputType: 'slider', inputMin: 1, inputMax: 16, inputStep: 1 },
         { driverType: 'MainCamera', label: 'Temperature', value: '', inputType: 'select',selectValue : [5,0,-5,-10,-15,-20,-25] },
         { driverType: 'MainCamera', label: 'Gain', value: '', inputType: 'slider', inputMin: 0, inputMax: 0, inputStep: 1 },
         { driverType: 'MainCamera', label: 'Offset', value: '', inputType: 'slider', inputMin: 0, inputMax: 0, inputStep: 1 },
@@ -2328,7 +2328,7 @@ export default {
       this.sendMessage('Vue_Command', 'getStagingSolveResult'); // 获取定标结果
       this.sendMessage('Vue_Command', 'getGPIOsStatus'); // 获取GPIO状态
       // this.sendMessage('Vue_Command', 'getStagingImage'); // 获取最后拍摄的图像
-
+      
       this.disconnectTimeoutTriggered = false;
     },
 
