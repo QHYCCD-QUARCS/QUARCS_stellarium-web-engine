@@ -1568,6 +1568,12 @@ export default {
                 }
                 break;
 
+              case 'SolveImageSucceeded':                           
+                  console.log('解析同步成功');
+                  this.$bus.$emit("handleOperationComplete","solve");
+                  this.$bus.$emit('showMsgBox', 'Solve image succeed!', 'success');
+                break;
+
               case 'SolveImagefailed':
                 this.callShowMessageBox('Solve image faild...', 'error');
                 this.$bus.$emit("ImageSolveFinished", false);
@@ -2121,6 +2127,8 @@ export default {
                   this.$bus.$emit('focusMoveFailed', message);
                 }
                 break;
+              
+
 
 
               default:

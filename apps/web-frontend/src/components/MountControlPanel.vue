@@ -205,7 +205,7 @@ export default {
     this.$bus.$on('updateMountPierSide', this.updateMountPierSide);
     this.$bus.$on('MountConnected', this.updateMountConnection);
     this.$bus.$on('MountOperationComplete', this.handleOperationComplete);
-    
+    this.$bus.$on('handleOperationComplete', this.handleOperationComplete);
     // 新增经纬度监听
     this.$bus.$on('updateCurrentLocation', this.updateCurrentLocation);
     
@@ -450,18 +450,23 @@ export default {
       switch(operation) {
         case 'park':
           this.isParkProcessing = false;
+          // this.$bus.$emit('showMsgBox', this.$t('park complete !'), 'success');
           break;
         case 'track':
           this.isTrackProcessing = false;
+          // this.$bus.$emit('showMsgBox', this.$t('track complete !'), 'success');
           break;
         case 'home':
           this.isHomeProcessing = false;
+          // this.$bus.$emit('showMsgBox', this.$t('home complete !'), 'success');
           break;
         case 'sync':
           this.isSyncProcessing = false;
+          // this.$bus.$emit('showMsgBox', this.$t('sync complete !'), 'success');
           break;
         case 'solve':
           this.isSolveProcessing = false;
+         // this.$bus.$emit('showMsgBox', this.$t('solve complete !'), 'success');
           break;
       }
     },
