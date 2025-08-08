@@ -343,6 +343,7 @@
   "Please observe if the focuser has moved to the minimum position. If it has reached the position, click the calibration button to set the minimum position": "请观察电调是否移动到最小位置，如果已到达，请点击校准按钮设置最小位置",
   "Please observe if the focuser has moved to the maximum position. If it has reached the position, click the calibration button to set the maximum position": "请观察电调是否移动到最大位置，如果已到达，请点击校准按钮设置最大位置",
   "Calibration completed! Focuser travel range has been set. Click the button to end calibration": "校准完成！电调行程范围已设置，点击按钮结束校准",
-  "Do you want to perform focuser travel calibration? Calibration will set the maximum and minimum positions of the focuser.": "是否进行电调行程校准？校准将设置电调的最大和最小位置。"
-
+  "Do you want to perform focuser travel calibration? Calibration will set the maximum and minimum positions of the focuser.": "是否进行电调行程校准？校准将设置电调的最大和最小位置。",
+  "solve complete !": "解析完成!",
+  "Solve image succeed!": "解析同步成功!"
 }
