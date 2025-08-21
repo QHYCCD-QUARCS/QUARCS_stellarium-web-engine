@@ -2107,9 +2107,9 @@ export default {
                   const adjustmentra = parts[11];
                   const adjustmentdec = parts[12];
                   console.log('自动对焦显示更新数据: ', offsetra, offsetdec, adjustmentra, adjustmentdec);  
-                  this.$bus.$emit('focusSetTravelRangeSuccess', offsetra, offsetdec, adjustmentra, adjustmentdec);
-                  this.$bus.$emit('updateCardInfo', ra, dec, targetra, targetdec);
-                  this.$bus.$emit('focusMoveFailed', 'focusMoveFailed');
+                  // this.$bus.$emit('', offsetra, offsetdec, adjustmentra, adjustmentdec);
+                  this.$bus.$emit('updateCardInfo', ra, dec, targetra, targetdec,offsetra,offsetdec,adjustmentra,adjustmentdec);
+                  // this.$bus.$emit('focusMoveFailed', 'focusMoveFailed');
                 }
                 break;
 
@@ -2330,6 +2330,7 @@ export default {
       this.sendMessage('Vue_Command', 'getStagingSolveResult'); // 获取定标结果
       this.sendMessage('Vue_Command', 'getGPIOsStatus'); // 获取GPIO状态
       // this.sendMessage('Vue_Command', 'getStagingImage'); // 获取最后拍摄的图像
+      this.sendMessage('Vue_Command', 'getPolarAlignmentState'); // 获取极轴对齐状态
       
       this.disconnectTimeoutTriggered = false;
     },
@@ -4269,7 +4270,7 @@ export default {
     //     // const minTranslateX = this.imageWidth - this.CanvasWidth;
     //     // const minTranslateY = this.imageHeight - this.CanvasHeight;
 
-    //     // // 计算初始的 ScaleImageSize_X 和 ScaleImageSize_Y
+    //     // 计算初始的 ScaleImageSize_X 和 ScaleImageSize_Y
     //     // this.ScaleImageSize_X = Math.floor(minTranslateX / this.CanvasWidth * windowWidth + windowWidth);
     //     // this.ScaleImageSize_Y = Math.floor(minTranslateY / this.CanvasHeight * windowHeight + windowHeight);
 
@@ -6308,10 +6309,27 @@ export default {
       console.log('清除所有校准点');
       if (this.calibrationCircles) {
         this.calibrationCircles.forEach(circle => {
-          glLayer.remove(circle);
+          try {
+            glLayer.remove(circle);
+          } catch (error) {
+            console.warn('清除校准点时出错:', error);
+          }
         });
         this.calibrationCircles = [];
       }
+      
+      // 同时清除调整点
+      if (this.adjustmentCircles) {
+        this.adjustmentCircles.forEach(circle => {
+          try {
+            glLayer.remove(circle);
+          } catch (error) {
+            console.warn('清除调整点时出错:', error);
+          }
+        });
+        this.adjustmentCircles = [];
+      }
+      
       // 同时清除上一次位置
       this.lastPosition = null;
     },
