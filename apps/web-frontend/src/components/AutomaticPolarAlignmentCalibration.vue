@@ -8,7 +8,7 @@
         <span class="minimized-title">{{ $t('Polar Alignment') }}</span>
       </div>
       <div class="minimized-controls">
-        <button class="minimized-btn" @click="toggleMinimize" title="展开">
+        <button class="minimized-btn" @click="toggleMinimize" :title="$t('Expand')">
           <v-icon>mdi-chevron-up</v-icon>
         </button>
       </div>
@@ -37,10 +37,10 @@
       </div>
       
       <div class="header-controls">
-        <button class="header-btn" @click="toggleCollapse" :title="isCollapsed ? '展开' : '收缩'">
+        <button class="header-btn" @click="toggleCollapse" :title="isCollapsed ? $t('Expand') : $t('Collapse')">
           <v-icon>{{ isCollapsed ? 'mdi-chevron-down' : 'mdi-chevron-up' }}</v-icon>
         </button>
-        <button class="header-btn" @click="toggleMinimize" title="最小化">
+        <button class="header-btn" @click="toggleMinimize" :title="$t('Minimize')">
           <v-icon>mdi-minus</v-icon>
         </button>
       </div>
@@ -224,10 +224,7 @@
               <span>{{ isCalibrationRunning ? $t('Stop Calibration') : $t('Start Auto Calibration') }}</span>
             </button>
 
-            <button class="action-btn restore" @click="restoreCalibration" :disabled="!canRestore">
-              <v-icon>mdi-restore</v-icon>
-              <span>{{ $t('Restore') }}</span>
-            </button>
+
           </div>
         </div>
       </div>
@@ -264,16 +261,19 @@
           ra: '00h 00m 00s',
           dec: '+00° 00\' 00"'
         },
+        previousPosition: {
+          ra: '00h 00m 00s',
+          dec: '+00° 00\' 00"'
+        },
         
         // 校准数据
-        calibrationPoints: [],
         isCalibrationComplete: false,
         isPolarAligned: false,
         
         // 调整信息
         adjustment: {
-          azimuth: 0,
-          altitude: 0
+          azimuth: 0.0,
+          altitude: 0.0
         },
         
         // 日志系统
@@ -300,8 +300,7 @@
         isMinimized: false,
         isCollapsed: false,
         
-        // 是否可以恢复校准
-        canRestore: false,
+
         
         // 极轴偏移量
         polarAxisOffset: {
@@ -313,8 +312,10 @@
         calibrationLoopCount: 0,
         lastCalibrationProgress: 0,
         
-        // 状态持久化相关
-        statePersistenceInterval: null
+        // 校准阶段状态
+        calibrationPhase: 'initial', // 'initial', 'collecting', 'adjusting', 'verifying'
+        calibrationPoints: [], // 存储三个校准点的坐标
+        targetPoint: null, // 存储目标点坐标
       }
     },
     
@@ -338,12 +339,16 @@
       
       // 是否需要方位角调整
       needsAzimuthAdjustment() {
-        return Math.abs(this.adjustment.azimuth) > 0.5
+        const value = this.adjustment.azimuth
+        if (value === null || value === undefined || isNaN(value)) return false
+        return Math.abs(value) > 0.5
       },
       
       // 是否需要高度角调整
       needsAltitudeAdjustment() {
-        return Math.abs(this.adjustment.altitude) > 0.5
+        const value = this.adjustment.altitude
+        if (value === null || value === undefined || isNaN(value)) return false
+        return Math.abs(value) > 0.5
       }
     },
     
@@ -359,9 +364,6 @@
       // 实现组件初始化逻辑
       this.initialize()
       
-      // 增强初始化（包括状态恢复）
-      this.enhancedInitialize()
-
       // 监听信号总线事件
       this.$bus.$on('showPolarAlignment', this.showInterface)
       this.$bus.$on('hidePolarAlignment', this.hideInterface)
@@ -377,13 +379,6 @@
 
       // 监听卡片信息更新
       this.$bus.$on('updateCardInfo', this.updateCardInfo)
-      
-      // 监听页面可见性变化
-      document.addEventListener('visibilitychange', this.handleVisibilityChange)
-      
-      // 监听网络状态变化
-      window.addEventListener('online', this.handleOnlineStatusChange)
-      window.addEventListener('offline', this.handleOnlineStatusChange)
     },
     
     beforeDestroy() {
@@ -398,17 +393,6 @@
       // 清理拖动事件监听
       document.removeEventListener('mousemove', this.onDrag)
       document.removeEventListener('mouseup', this.stopDrag)
-      
-      // 移除页面可见性和网络状态监听
-      document.removeEventListener('visibilitychange', this.handleVisibilityChange)
-      window.removeEventListener('online', this.handleOnlineStatusChange)
-      window.removeEventListener('offline', this.handleOnlineStatusChange)
-      
-      // 停止状态持久化
-      this.stopStatePersistence()
-      
-      // 保存最终状态
-      this.saveStateToStorage()
       
       // 实现组件销毁逻辑
       this.cleanup()
@@ -433,24 +417,11 @@
       // === 初始化和清理 ===
       initialize() {
         this.addLog(this.$t('Polar Alignment Component Initialized'), 'info')
-        
-        // 初始化时检查是否需要状态恢复
-        this.checkInitialState()
-      },
-      
-      checkInitialState() {
-        // 检查初始状态，如果进度不为0，说明可能需要状态恢复
-        if (this.currentProgress > 0) {
-          console.log(`初始状态恢复检查: 进度 ${this.currentProgress}%`)
-          this.restoreCalibrationState(this.currentProgress)
-        }
       },
       
       cleanup() {
         this.addLog(this.$t('Polar Alignment Component Cleaned'), 'info')
       },
-      
-
       
       // === 拖动控制方法 ===
       startDrag(event) {
@@ -524,16 +495,10 @@
         this.addLog(this.isMinimized ? this.$t('Interface Minimized') : this.$t('Interface Expanded'), 'info')
       },
       
-
-      
       toggleCollapse() {
         this.isCollapsed = !this.isCollapsed
         this.addLog(this.isCollapsed ? this.$t('Interface Collapsed') : this.$t('Interface Expanded'), 'info')
       },
-      
-
-      
-
       
       resetCalibration() {
         this.calibrationPoints = []
@@ -542,8 +507,12 @@
         this.fieldData = null
         this.calibrationLoopCount = 0
         this.lastCalibrationProgress = 0
+        this.calibrationPhase = 'initial'
+        this.targetPoint = null
         this.addLog(this.$t('Calibration Data Reset'), 'info')
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'ResetAutoPolarAlignment')
+        this.$bus.$emit('ClearCalibrationPoints')
+        this.$bus.$emit('ClearStatusTextFromStarMap')
       },
       
       restoreCalibration() {
@@ -571,9 +540,6 @@
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'StopAutoPolarAlignment')
       },
       
-      // === 卡片信息更新方法 ===
-      // 原始方法已被增强版本替换，见文件末尾的增强版本
-      
       // === 视场数据处理方法 ===
       updateFieldData(data) {
         if (data && Array.isArray(data) && data.length >= 8) {
@@ -594,13 +560,55 @@
             targetdec: data[7]
           }
           
+          // 保存上一次位置（在更新当前位置之前）
+          if (this.currentPosition.ra !== '00h 00m 00s') {
+            this.previousPosition = { ...this.currentPosition }
+          }
+          
+          // 更新当前位置
+          this.currentPosition = {
+            ra: this.formatCoordinate(data[0], 'ra'),
+            dec: this.formatCoordinate(data[1], 'dec')
+          }
+          
           if (data[6] === -1 && data[7] === -1) {
-            this.drawCalibrationPointPolygon(data[0], data[1], this.calibrationPoints.length + 1, this.fieldData)
-            this.addLog(this.$t('Calibration Point', [this.calibrationPoints.length + 1, data[0].toFixed(4), data[1].toFixed(4)]), 'info')
+            // 校准点收集阶段
+            this.calibrationPhase = 'collecting'
+            const pointNumber = this.calibrationPoints.length + 1
+            
+            try {
+              this.drawCalibrationPointPolygon(data[0], data[1], pointNumber, this.fieldData)
+              this.addLog(this.$t('Calibration Point', [pointNumber, data[0].toFixed(4), data[1].toFixed(4)]), 'info')
+              
+              // 保存校准点
+              this.calibrationPoints.push({
+                ra: data[0],
+                dec: data[1],
+                index: pointNumber
+              })
+              
+              // 如果收集了3个点，进入调整阶段
+              if (this.calibrationPoints.length === 3) {
+                this.calibrationPhase = 'adjusting'
+                this.addLog(this.$t('Three calibration points collected, entering adjustment phase'), 'success')
+              }
+            } catch (error) {
+              this.addLog(this.$t('Error processing calibration point', [error.message]), 'error')
+              console.error('处理校准点错误：', error)
+            }
           } else if (data[6] !== -1 && data[7] !== -1) {
-            this.clearCalibrationPoints()
-            this.drawAdjustmentPoints(data[0], data[1], data[6], data[7], this.fieldData, false)
-            // this.addLog(`调整模式：当前位置(${data[0].toFixed(4)}, ${data[1].toFixed(4)}) 目标位置(${data[6].toFixed(4)}, ${data[7].toFixed(4)})`, 'info')
+            // 调整阶段：显示目标位置
+            this.calibrationPhase = 'adjusting'
+            this.targetPoint = { ra: data[6], dec: data[7] }
+            
+            try {
+              // 不清除校准点，保持校准点显示，同时显示调整信息
+              this.drawAdjustmentPoints(data[0], data[1], data[6], data[7], this.fieldData, false)
+              this.addLog(`调整模式：当前位置(${data[0].toFixed(4)}, ${data[1].toFixed(4)}) 目标位置(${data[6].toFixed(4)}, ${data[7].toFixed(4)})`, 'info')
+            } catch (error) {
+              this.addLog(this.$t('Error processing adjustment data', [error.message]), 'error')
+              console.error('处理调整数据错误：', error)
+            }
           }
         } else {
           this.addLog(this.$t('Error: Invalid Field Data Format'), 'error')
@@ -637,8 +645,12 @@
             fillOpacity: 0.2
           }
           
+          // 添加文本标签
+          const label = `校准点${pointNumber}`
+          const labelColor = "#FFFFFF"
+          
           this.addLog(this.$t('Sending Draw Calibration Event', [pointNumber]), 'info')
-          this.$bus.$emit('DrawCalibrationPointPolygon', coordinates, color, `Calibration_${pointNumber}`)
+          this.$bus.$emit('DrawCalibrationPointPolygon', coordinates, color, `Calibration_${pointNumber}`, label, labelColor)
           
         } catch (error) {
           this.addLog(this.$t('Error Drawing Calibration Point', [error.message]), 'error')
@@ -650,6 +662,7 @@
       clearCalibrationPoints() {
         this.addLog(this.$t('Clearing All Calibration Points'), 'info')
         this.$bus.$emit('ClearCalibrationPoints')
+        this.$bus.$emit('ClearStatusTextFromStarMap')
       },
       
       // 绘制调整点
@@ -687,22 +700,66 @@
             return
           }
           
+          // 定义颜色方案
           const currentColor = {
-            stroke: "#00BFFF",
+            stroke: "#00BFFF",        // 蓝色：当前位置
             strokeOpacity: 1,
             fill: "#00BFFF", 
             fillOpacity: 0.3
           }
           
           const targetColor = {
-            stroke: "#FF8C00",
+            stroke: "#FF8C00",        // 橙色：目标位置
             strokeOpacity: 1,
             fill: "#FF8C00", 
             fillOpacity: 0.3
           }
           
-          this.addLog(this.$t('Sending Draw Adjustment Points Event'), 'info')
-          this.$bus.$emit('DrawAdjustmentPointsPolygon', currentCoordinates, targetCoordinates, currentColor, targetColor, isTimerUpdate)
+          const previousColor = {
+            stroke: "#FFD700",        // 黄色：上一次位置
+            strokeOpacity: 1,
+            fill: "#FFD700", 
+            fillOpacity: 0.2
+          }
+          
+          // 如果有上一次位置，绘制完整的调整视图
+          if (this.previousPosition.ra !== '00h 00m 00s' && this.calibrationPoints.length === 3) {
+            // 绘制三个校准点（白色）
+            this.calibrationPoints.forEach((point, index) => {
+              const pointCoordinates = this.calculateFieldCorners(point.ra, point.dec, fieldData)
+              const whiteColor = {
+                stroke: "#FFFFFF",
+                strokeOpacity: 1,
+                fill: "#FFFFFF", 
+                fillOpacity: 0.2
+              }
+              this.$bus.$emit('DrawCalibrationPointPolygon', pointCoordinates, whiteColor, 
+                             `Calibration_${index + 1}`, `校准点${index + 1}`, "#FFFFFF")
+            })
+            
+            // 绘制目标点（橙色）
+            this.$bus.$emit('DrawCalibrationPointPolygon', targetCoordinates, targetColor, 
+                           'Target_Point', '目标点', "#FF8C00")
+            
+            // 绘制当前位置（蓝色）
+            this.$bus.$emit('DrawCalibrationPointPolygon', currentCoordinates, currentColor, 
+                           'Current_Position', '当前位置', "#00BFFF")
+            
+            // 绘制上一次位置（黄色）
+            const previousRa = this.parseCoordinate(this.previousPosition.ra, 'ra')
+            const previousDec = this.parseCoordinate(this.previousPosition.dec, 'dec')
+            if (previousRa !== null && previousDec !== null) {
+              const previousCoordinates = this.calculateFieldCorners(previousRa, previousDec, fieldData)
+              this.$bus.$emit('DrawCalibrationPointPolygon', previousCoordinates, previousColor, 
+                             'Previous_Position', '上一次位置', "#FFD700")
+            }
+            
+            // 添加状态文本提示
+            this.addStatusTextToStarMap()
+          } else {
+            // 标准调整模式
+            this.$bus.$emit('DrawAdjustmentPointsPolygon', currentCoordinates, targetCoordinates, currentColor, targetColor, isTimerUpdate)
+          }
           
         } catch (error) {
           this.addLog(this.$t('Error Drawing Adjustment Points', [error.message]), 'error')
@@ -758,10 +815,74 @@
       },
       
       formatAdjustmentValue(value) {
+        if (value === null || value === undefined || isNaN(value)) return '0.0\''
         return Math.abs(value).toFixed(1) + "'"
       },
       
+      // 格式化坐标显示
+      formatCoordinate(value, type) {
+        if (value === null || value === undefined || isNaN(value)) {
+          return type === 'ra' ? '00h 00m 00s' : '+00° 00\' 00"'
+        }
+        
+        if (type === 'ra') {
+          // 格式化RA为时分秒格式
+          const hours = Math.floor(value / 15)
+          const minutes = Math.floor((value % 15) * 4)
+          const seconds = Math.floor(((value % 15) * 4 - minutes) * 60)
+          return `${hours.toString().padStart(2, '0')}h ${minutes.toString().padStart(2, '0')}m ${seconds.toString().padStart(2, '0')}s`
+        } else {
+          // 格式化DEC为度分秒格式
+          const sign = value >= 0 ? '+' : '-'
+          const absValue = Math.abs(value)
+          const degrees = Math.floor(absValue)
+          const minutes = Math.floor((absValue - degrees) * 60)
+          const seconds = Math.floor(((absValue - degrees) * 60 - minutes) * 60)
+          return `${sign}${degrees.toString().padStart(2, '0')}° ${minutes.toString().padStart(2, '0')}' ${seconds.toString().padStart(2, '0')}"`
+        }
+      },
+      
       // === 辅助方法 ===
+      parseCoordinate(value, type) {
+        if (typeof value === 'string') {
+          if (type === 'ra') {
+            // 解析时分秒格式 "00h 00m 00s"
+            const match = value.match(/(\d+)h\s*(\d+)m\s*(\d+)s/)
+            if (match) {
+              const hours = parseInt(match[1])
+              const minutes = parseInt(match[2])
+              const seconds = parseInt(match[3])
+              return hours + minutes / 60 + seconds / 3600
+            }
+          } else {
+            // 解析度分秒格式 "+00° 00' 00""
+            const match = value.match(/([+-]?)(\d+)°\s*(\d+)'\s*(\d+)"/)
+            if (match) {
+              const sign = match[1] === '-' ? -1 : 1
+              const degrees = parseInt(match[2])
+              const minutes = parseInt(match[3])
+              const seconds = parseInt(match[4])
+              return sign * (degrees + minutes / 60 + seconds / 3600)
+            }
+          }
+        }
+        return null
+      },
+      
+      addStatusTextToStarMap() {
+        // 添加状态文本到星图
+        const statusText = {
+          text: `极轴校准调整中 - 校准点: ${this.calibrationPoints.length}/3`,
+          position: { ra: this.currentPosition.ra, dec: this.currentPosition.dec },
+          color: "#FFFFFF",
+          fontSize: 14,
+          backgroundColor: "rgba(0, 0, 0, 0.7)"
+        }
+        
+        // 发送状态文本到星图
+        // this.$bus.$emit('AddStatusTextToStarMap', statusText)
+      },
+      
       getStepClass(index) {
         // 根据进度百分比确定节点状态
         const progress = this.progressPercentage
@@ -793,14 +914,16 @@
       },
       
       getAzimuthAction(azimuth) {
-        if (azimuth > 0.5) return this.$t('Turn Right') || '向右转'
-        if (azimuth < -0.5) return this.$t('Turn Left') || '向左转'
+        if (azimuth === null || azimuth === undefined || isNaN(azimuth)) return ''
+        if (azimuth > 0.5) return this.$t('Turn Right')
+        if (azimuth < -0.5) return this.$t('Turn Left')
         return ''
       },
       
       getAltitudeAction(altitude) {
-        if (altitude > 0.5) return this.$t('Raise Up') || '抬高'
-        if (altitude < -0.5) return this.$t('Lower Down') || '降低'
+        if (altitude === null || altitude === undefined || isNaN(altitude)) return ''
+        if (altitude > 0.5) return this.$t('Raise Up')
+        if (altitude < -0.5) return this.$t('Lower Down')
         return ''
       },
       
@@ -848,9 +971,6 @@
         }
         
         if (progress !== undefined && progress !== null) {
-          // 检查是否需要状态恢复
-          this.checkAndRestoreState(progress)
-          
           this.currentProgress = progress
           
           if (progress >= 0 && progress <= 100) {
@@ -921,261 +1041,58 @@
         }
       },
       
-      // === 状态恢复方法 ===
-      checkAndRestoreState(newProgress) {
-        // 如果进度发生显著变化，说明可能是页面刷新后的状态恢复
-        const progressDiff = Math.abs(newProgress - this.currentProgress)
-        
-        if (progressDiff > 5) { // 进度差异超过5%时触发状态恢复
-          console.log(`状态恢复检测: 当前进度 ${this.currentProgress} -> 新进度 ${newProgress}`)
-          this.restoreCalibrationState(newProgress)
-        }
-      },
-      
-      restoreCalibrationState(targetProgress) {
-        // 根据目标进度恢复校准状态
-        console.log(`恢复校准状态: 目标进度 ${targetProgress}%`)
-        
-        // 重置状态
-        this.calibrationPoints = []
-        this.isCalibrationComplete = false
-        this.isPolarAligned = false
-        this.calibrationLoopCount = 0
-        this.lastCalibrationProgress = 0
-        
-        // 根据进度恢复相应的校准点
-        if (targetProgress >= 15) {
-          this.calibrationPoints.push({
-            x: 150 + Math.random() * 20 - 10,
-            y: 150 + Math.random() * 20 - 10,
-            index: 0
-          })
-        }
-        
-        if (targetProgress >= 25) {
-          this.calibrationPoints.push({
-            x: 150 + Math.random() * 20 - 10,
-            y: 150 + Math.random() * 20 - 10,
-            index: 1
-          })
-        }
-        
-        if (targetProgress >= 50) {
-          this.calibrationPoints.push({
-            x: 150 + Math.random() * 20 - 10,
-            y: 150 + Math.random() * 20 - 10,
-            index: 2
-          })
-        }
-        
-        // 恢复校准完成状态
-        if (targetProgress >= 75) {
-          this.isCalibrationComplete = true
-          this.calculatePolarAxisOffset()
-          
-          // 估算校准循环次数（基于进度）
-          if (targetProgress >= 85) {
-            this.calibrationLoopCount = Math.floor((targetProgress - 75) / 5) + 1
-          }
-        }
-        
-        // 恢复极轴对齐状态
-        if (targetProgress >= 95) {
-          this.isPolarAligned = Math.abs(this.adjustment.azimuth) < 1.0 && Math.abs(this.adjustment.altitude) < 1.0
-        }
-        
-        // 更新校准运行状态
-        this.updateCalibrationRunningState(targetProgress)
-        
-        console.log(`校准状态已恢复: 进度 ${targetProgress}%, 校准点 ${this.calibrationPoints.length}, 完成状态 ${this.isCalibrationComplete}`)
-      },
-      
-      updateCalibrationRunningState(progress) {
-        // 根据进度判断校准是否正在运行
-        if (progress > 0 && progress < 100) {
-          this.isCalibrationRunning = true
-          console.log('检测到校准运行状态')
-        } else if (progress >= 100) {
-          this.isCalibrationRunning = false
-          console.log('检测到校准完成状态')
-        } else {
-          this.isCalibrationRunning = false
-          console.log('检测到校准停止状态')
-        }
-      },
+
       
       // === 增强的卡片信息更新方法 ===
       updateCardInfo(currentRa, currentDec, targetRa, targetDec, azimuthDegrees, altitudeDegrees, raAdjustment, decAdjustment) {
-        // 检查数据是否有显著变化
-        const hasSignificantChange = this.checkSignificantDataChange(
-          currentRa, currentDec, targetRa, targetDec, 
-          azimuthDegrees, altitudeDegrees
-        )
-        
-        if (hasSignificantChange) {
-          console.log('检测到显著数据变化')
+        // 数据类型转换和有效性检查
+        const parseValue = (value) => {
+          if (value === null || value === undefined || value === '') return 0
+          const num = parseFloat(value)
+          return isNaN(num) ? 0 : num
         }
         
-        this.currentPosition.ra = currentRa
-        this.currentPosition.dec = currentDec
-        this.targetPosition.ra = targetRa
-        this.targetPosition.dec = targetDec
-        this.adjustment.azimuth = azimuthDegrees
-        this.adjustment.altitude = altitudeDegrees
+        // 转换并验证所有数值
+        const currentRaNum = parseValue(currentRa)
+        const currentDecNum = parseValue(currentDec)
+        const targetRaNum = parseValue(targetRa)
+        const targetDecNum = parseValue(targetDec)
+        const azimuthNum = parseValue(azimuthDegrees)
+        const altitudeNum = parseValue(altitudeDegrees)
+        
+        // 检查数据有效性
+        if (isNaN(currentRaNum) || isNaN(currentDecNum) || isNaN(targetRaNum) || isNaN(targetDecNum) || 
+            isNaN(azimuthNum) || isNaN(altitudeNum)) {
+          console.warn('PolarAlignment: 接收到无效的数值数据:', {
+            currentRa, currentDec, targetRa, targetDec, azimuthDegrees, altitudeDegrees
+          })
+          return
+        }
+        
+        // 更新位置信息
+        this.currentPosition.ra = this.formatCoordinate(currentRaNum, 'ra')
+        this.currentPosition.dec = this.formatCoordinate(currentDecNum, 'dec')
+        // 注意：这里的targetRa和targetDec是应该移动到的目标位置，不是真极轴位置
+        this.targetPosition.ra = this.formatCoordinate(targetRaNum, 'ra')
+        this.targetPosition.dec = this.formatCoordinate(targetDecNum, 'dec')
+        
+        // 更新调整信息
+        this.adjustment.azimuth = azimuthNum
+        this.adjustment.altitude = altitudeNum
         
         // 更新极轴对齐状态
-        this.isPolarAligned = Math.abs(azimuthDegrees) < 1.0 && Math.abs(altitudeDegrees) < 1.0
+        this.isPolarAligned = Math.abs(azimuthNum) < 1.0 && Math.abs(altitudeNum) < 1.0
         
-        // 如果检测到显著变化，可能需要状态恢复
-        if (hasSignificantChange) {
-          this.checkAndRestoreState(this.currentProgress)
-        }
-      },
-      
-      checkSignificantDataChange(currentRa, currentDec, targetRa, targetDec, azimuthDegrees, altitudeDegrees) {
-        // 检查位置数据是否有显著变化
-        const raDiff = Math.abs(this.currentPosition.ra - currentRa)
-        const decDiff = Math.abs(this.currentPosition.dec - currentDec)
-        const azimuthDiff = Math.abs(this.adjustment.azimuth - azimuthDegrees)
-        const altitudeDiff = Math.abs(this.adjustment.altitude - altitudeDegrees)
+        // 添加调试日志
+        console.log('PolarAlignment: 更新卡片信息成功:', {
+          currentPosition: { ra: this.currentPosition.ra, dec: this.currentPosition.dec },
+          targetPosition: { ra: this.targetPosition.ra, dec: this.targetPosition.dec },
+          adjustment: { azimuth: this.adjustment.azimuth, altitude: this.adjustment.altitude },
+          isPolarAligned: this.isPolarAligned
+        })
         
-        // 如果任何数据变化超过阈值，认为是显著变化
-        return raDiff > 0.1 || decDiff > 0.1 || azimuthDiff > 1.0 || altitudeDiff > 1.0
       },
       
-      // === 状态持久化方法 ===
-      saveStateToStorage() {
-        try {
-          const state = {
-            currentProgress: this.currentProgress,
-            isCalibrationRunning: this.isCalibrationRunning,
-            isCalibrationComplete: this.isCalibrationComplete,
-            isPolarAligned: this.isPolarAligned,
-            calibrationPoints: this.calibrationPoints,
-            calibrationLoopCount: this.calibrationLoopCount,
-            adjustment: this.adjustment,
-            currentPosition: this.currentPosition,
-            targetPosition: this.targetPosition,
-            timestamp: Date.now()
-          }
-          
-          localStorage.setItem('polarAlignmentState', JSON.stringify(state))
-          console.log('状态已保存到存储')
-        } catch (error) {
-          console.error('保存状态时出错:', error.message)
-        }
-      },
-      
-      loadStateFromStorage() {
-        try {
-          const savedState = localStorage.getItem('polarAlignmentState')
-          if (savedState) {
-            const state = JSON.parse(savedState)
-            const timeDiff = Date.now() - state.timestamp
-            
-            // 如果状态保存时间超过30分钟，认为过期
-            if (timeDiff > 30 * 60 * 1000) {
-              console.log('保存的状态已过期')
-              localStorage.removeItem('polarAlignmentState')
-              return false
-            }
-            
-            // 恢复状态
-            this.currentProgress = state.currentProgress || 0
-            this.isCalibrationRunning = state.isCalibrationRunning || false
-            this.isCalibrationComplete = state.isCalibrationComplete || false
-            this.isPolarAligned = state.isPolarAligned || false
-            this.calibrationPoints = state.calibrationPoints || []
-            this.calibrationLoopCount = state.calibrationLoopCount || 0
-            this.adjustment = state.adjustment || { azimuth: 0, altitude: 0 }
-            this.currentPosition = state.currentPosition || { ra: '00h 00m 00s', dec: '+00° 00\' 00"' }
-            this.targetPosition = state.targetPosition || { ra: '00h 00m 00s', dec: '+00° 00\' 00"' }
-            
-            console.log(`从存储加载状态: 进度 ${this.currentProgress}%`)
-            return true
-          }
-        } catch (error) {
-          console.error('加载状态时出错:', error.message)
-        }
-        return false
-      },
-      
-      // === 增强的初始化方法 ===
-      enhancedInitialize() {
-        // 尝试从存储中加载状态
-        const stateLoaded = this.loadStateFromStorage()
-        
-        if (stateLoaded) {
-          // 如果加载了状态，检查是否需要进一步恢复
-          this.checkAndRestoreState(this.currentProgress)
-        }
-        
-        // 设置定期保存状态
-        this.startStatePersistence()
-        console.log('增强初始化完成')
-      },
-      
-      startStatePersistence() {
-        // 每30秒保存一次状态
-        this.statePersistenceInterval = setInterval(() => {
-          if (this.isCalibrationRunning || this.currentProgress > 0) {
-            this.saveStateToStorage()
-          }
-        }, 30000)
-      },
-      
-      stopStatePersistence() {
-        if (this.statePersistenceInterval) {
-          clearInterval(this.statePersistenceInterval)
-          this.statePersistenceInterval = null
-        }
-      },
-      
-      // === 页面可见性变化处理 ===
-      handleVisibilityChange() {
-        if (document.visibilityState === 'visible') {
-          // 页面变为可见时，检查是否需要状态恢复
-          console.log('页面变为可见')
-          this.checkAndRestoreState(this.currentProgress)
-        } else {
-          // 页面变为隐藏时，保存当前状态
-          console.log('页面变为隐藏')
-          this.saveStateToStorage()
-        }
-      },
-      
-      // === 网络状态变化处理 ===
-      handleOnlineStatusChange() {
-        if (navigator.onLine) {
-          console.log('网络连接已恢复')
-          // 网络恢复时，检查状态是否需要同步
-          this.checkAndRestoreState(this.currentProgress)
-        } else {
-          console.log('网络连接已断开')
-        }
-      },
-      
-      // === 自动状态恢复方法 ===
-      autoRestoreCalibrationState() {
-        // 如果当前有进度但校准未运行，尝试恢复状态
-        if (this.currentProgress > 0 && !this.isCalibrationRunning) {
-          console.log('自动恢复校准状态')
-          
-          // 根据进度判断是否需要重新启动校准
-          if (this.currentProgress < 100) {
-            console.log('校准可能需要重新启动')
-            // 可以在这里添加自动重启校准的逻辑
-            // this.startAutoCalibration()
-          }
-        }
-      },
-      
-      // === 状态同步方法 ===
-      syncStateWithBackend() {
-        // 向后端请求当前状态
-        console.log('向后端请求状态')
-        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'GetPolarAlignmentState')
-      }
     }
   }
   </script>
@@ -2211,22 +2128,6 @@
       padding: 1px 3px;
     }
   }
-  
-
-
-
-
-
-
-
-
-
-
-
-
-
-  
-
   
   /* 面板标题 */
   .panel-header {
