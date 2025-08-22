@@ -1,6 +1,7 @@
 <template>
   <!-- 最小化状态 -->
   <div v-if="visible && isMinimized" class="polar-alignment-minimized" 
+       :class="{ 'dragging': isDraggingState }"
        :style="{ left: position.x + 'px', top: position.y + 'px' }">
     <div class="minimized-header">
       <div class="minimized-drag-area" @mousedown="startDrag" @touchstart="startDrag">
@@ -21,7 +22,7 @@
 
   <!-- 完整界面 -->
   <div v-else-if="visible" class="polar-alignment-widget" 
-       :class="{ 'collapsed': isCollapsed }"
+       :class="{ 'collapsed': isCollapsed, 'dragging': isDraggingState }"
        :style="{ left: position.x + 'px', top: position.y + 'px' }">
     
     <!-- 拖动手柄 -->
@@ -47,7 +48,7 @@
     </div>
 
     <!-- 收缩状态内容 -->
-    <div v-if="isCollapsed" class="widget-content collapsed">
+    <div v-if="isCollapsed" class="widget-content collapsed" :class="{ 'dragging': isDraggingState }">
       <div class="collapsed-info">
         <div class="collapsed-progress">
           <div class="progress-circle" :style="{ '--progress': progressPercentage + '%' }">
@@ -72,7 +73,7 @@
     </div>
 
     <!-- 展开状态内容 -->
-    <div v-else class="widget-content expanded">
+    <div v-else class="widget-content expanded" :class="{ 'dragging': isDraggingState }">
       <div class="content-sections">
         <!-- 校准步骤进度条 -->
         <div class="calibration-progress">
@@ -300,7 +301,14 @@
         isMinimized: false,
         isCollapsed: false,
         
-
+        // === 新增：性能优化 ===
+        // 缓存尺寸计算结果
+        cachedDimensions: {
+          width: 350,
+          height: 400
+        },
+        // 拖动状态标记
+        isDraggingState: false,
         
         // 极轴偏移量
         polarAxisOffset: {
@@ -363,6 +371,9 @@
     mounted() {
       // 实现组件初始化逻辑
       this.initialize()
+      
+      // 初始化缓存的尺寸信息
+      this.updateCachedDimensions()
       
       // 监听信号总线事件
       this.$bus.$on('showPolarAlignment', this.showInterface)
@@ -430,6 +441,11 @@
         }
         
         this.isDragging = true
+        this.isDraggingState = true
+        
+        // 添加dragging类，移除过渡动画
+        this.$el.classList.add('dragging')
+        
         const rect = event.currentTarget.getBoundingClientRect()
         const clientX = event.clientX || event.touches?.[0]?.clientX || 0
         const clientY = event.clientY || event.touches?.[0]?.clientY || 0
@@ -439,42 +455,80 @@
           y: clientY - rect.top
         }
         
-        document.addEventListener('mousemove', this.onDrag)
-        document.addEventListener('mouseup', this.stopDrag)
-        document.addEventListener('touchmove', this.onDrag, { passive: false })
-        document.addEventListener('touchend', this.stopDrag, { passive: false })
+        // 预计算并缓存尺寸，避免拖动时重复计算
+        this.updateCachedDimensions()
+        
+        // 优化触摸事件处理
+        if (event.type === 'touchstart') {
+          document.addEventListener('touchmove', this.onDrag, { passive: false })
+          document.addEventListener('touchend', this.stopDrag, { passive: false })
+        } else {
+          document.addEventListener('mousemove', this.onDrag)
+          document.addEventListener('mouseup', this.stopDrag)
+        }
       },
       
       onDrag(event) {
         if (!this.isDragging) return
         
-        const clientX = event.clientX || event.touches?.[0]?.clientX || 0
-        const clientY = event.clientY || event.touches?.[0]?.clientY || 0
-        
-        const newX = clientX - this.dragOffset.x
-        const newY = clientY - this.dragOffset.y
-        
-        const componentWidth = this.isCollapsed ? 300 : 350
-        const componentHeight = this.getComponentHeight()
-        const maxX = window.innerWidth - componentWidth
-        const maxY = window.innerHeight - componentHeight
-        
-        this.position = {
-          x: Math.max(0, Math.min(newX, maxX)),
-          y: Math.max(0, Math.min(newY, maxY))
+        // 阻止默认行为，提高触摸响应性
+        if (event.type === 'touchmove') {
+          event.preventDefault()
         }
+        
+        // 使用requestAnimationFrame优化拖动性能
+        requestAnimationFrame(() => {
+          const clientX = event.clientX || event.touches?.[0]?.clientX || 0
+          const clientY = event.clientY || event.touches?.[0]?.clientY || 0
+          
+          const newX = clientX - this.dragOffset.x
+          const newY = clientY - this.dragOffset.y
+          
+          // 使用缓存的尺寸，避免重复计算
+          const maxX = window.innerWidth - this.cachedDimensions.width
+          const maxY = window.innerHeight - this.cachedDimensions.height
+          
+          this.position = {
+            x: Math.max(0, Math.min(newX, maxX)),
+            y: Math.max(0, Math.min(newY, maxY))
+          }
+        })
       },
       
       stopDrag() {
         this.isDragging = false
+        this.isDraggingState = false
+        
+        // 移除dragging类，恢复过渡动画
+        this.$el.classList.remove('dragging')
+        
+        // 清理所有事件监听器
         document.removeEventListener('mousemove', this.onDrag)
         document.removeEventListener('mouseup', this.stopDrag)
         document.removeEventListener('touchmove', this.onDrag)
         document.removeEventListener('touchend', this.stopDrag)
       },
       
-      // 获取组件高度
+      // 新增：更新缓存的尺寸信息
+      updateCachedDimensions() {
+        if (this.isMinimized) {
+          this.cachedDimensions = { width: 250, height: 80 }
+        } else if (this.isCollapsed) {
+          this.cachedDimensions = { width: 300, height: 120 }
+        } else {
+          // 展开状态，使用基础尺寸
+          this.cachedDimensions = { width: 350, height: 400 }
+        }
+      },
+      
+      // 获取组件高度（优化版本）
       getComponentHeight() {
+        // 如果正在拖动，使用缓存的尺寸
+        if (this.isDraggingState) {
+          return this.cachedDimensions.height
+        }
+        
+        // 正常状态下的计算
         if (this.isMinimized) {
           return 80 // 最小化状态高度
         } else if (this.isCollapsed) {
@@ -492,11 +546,15 @@
       toggleMinimize() {
         this.isMinimized = !this.isMinimized
         this.isCollapsed = false
+        // 更新缓存的尺寸信息
+        this.updateCachedDimensions()
         this.addLog(this.isMinimized ? this.$t('Interface Minimized') : this.$t('Interface Expanded'), 'info')
       },
       
       toggleCollapse() {
         this.isCollapsed = !this.isCollapsed
+        // 更新缓存的尺寸信息
+        this.updateCachedDimensions()
         this.addLog(this.isCollapsed ? this.$t('Interface Collapsed') : this.$t('Interface Expanded'), 'info')
       },
       
@@ -1151,11 +1209,29 @@
     /* 添加背景隔离，防止操作映射到背景 */
     isolation: isolate;
     /* 移除contain属性，它可能阻止拖动事件 */
+    touch-action: none;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+  }
+  
+  /* 拖动状态：移除过渡动画和复杂效果 */
+  .polar-alignment-minimized.dragging {
+    transition: none !important;
+    backdrop-filter: none !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+    touch-action: manipulation;
   }
   
   .polar-alignment-minimized:hover {
     box-shadow: 0 6px 25px rgba(0, 0, 0, 0.4);
-    transform: translateY(-2px);
+  }
+  
+  .polar-alignment-minimized.dragging:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
   }
   
   .minimized-header {
@@ -1178,6 +1254,8 @@
     -webkit-user-select: none;
     -moz-user-select: none;
     -ms-user-select: none;
+    touch-action: none;
+    -webkit-tap-highlight-color: transparent;
   }
   
   .minimized-icon {
@@ -1276,10 +1354,29 @@
     /* 添加背景隔离，防止操作映射到背景 */
     isolation: isolate;
     /* 移除contain属性，它可能阻止拖动事件 */
+    touch-action: none;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+  }
+  
+  /* 拖动状态：移除过渡动画和复杂效果 */
+  .polar-alignment-widget.dragging {
+    transition: none !important;
+    backdrop-filter: none !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+    touch-action: manipulation;
   }
   
   .polar-alignment-widget:hover {
     box-shadow: 0 6px 25px rgba(0, 0, 0, 0.4);
+  }
+  
+  .polar-alignment-widget.dragging:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
   }
   
   .polar-alignment-widget.collapsed {
@@ -1311,6 +1408,8 @@
     transition: background-color 0.2s ease;
     /* 确保拖动区域有正确的指针事件 */
     pointer-events: auto;
+    touch-action: none;
+    -webkit-tap-highlight-color: transparent;
   }
   
   .widget-header:hover {
@@ -1406,6 +1505,11 @@
     z-index: 1;
     /* 确保内容区域不会阻止拖动事件 */
     pointer-events: auto;
+  }
+  
+  /* 拖动状态：移除过渡动画 */
+  .widget-content.dragging {
+    transition: none !important;
   }
   
   .widget-content.collapsed {
@@ -2517,5 +2621,46 @@
       padding-bottom: 6px;
     }
     
+  }
+  
+  /* === 触摸优化 === */
+  .polar-alignment-widget,
+  .polar-alignment-minimized {
+    /* 触摸优化 */
+    touch-action: none;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+  }
+  
+  .header-drag-area,
+  .minimized-drag-area {
+    /* 触摸优化 */
+    touch-action: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  /* 拖动状态：移除触摸优化，允许正常触摸 */
+  .polar-alignment-widget.dragging,
+  .polar-alignment-minimized.dragging {
+    touch-action: manipulation;
+  }
+  
+  /* === 性能优化 === */
+  /* 拖动时禁用不必要的动画和效果 */
+  .dragging * {
+    animation: none !important;
+    transition: none !important;
+  }
+  
+  /* 拖动时简化阴影和模糊效果 */
+  .dragging .progress-circle::before,
+  .dragging .node-circle,
+  .dragging .status-indicator {
+    box-shadow: none !important;
+    filter: none !important;
   }
   </style>

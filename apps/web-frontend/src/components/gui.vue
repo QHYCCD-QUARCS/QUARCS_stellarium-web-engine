@@ -144,115 +144,56 @@
 
     <FocuserPanel v-show="showFocuserPanel" class="get-click" />
 
-    <!-- <button v-show="isCaptureMode" @click="hideCaptureUI" class="get-click btn-UISwitch"> <v-icon> mdi-flip-to-back </v-icon> </button> -->
-    <!-- <button v-show="isCaptureMode" @click="hideCaptureUI" class="get-click btn-UISwitch">
-    <div style="display: flex; justify-content: center; align-items: center;">
-      <img src="@/assets/images/svg/ui/UI_Hide.svg" height="20px" style="min-height: 20px; pointer-events: none;"></img>
-    </div>
-  </button> -->
-
-    <!-- <button v-show="isRedBoxMode" @click="showCaptureUI" class="get-click btn-ShowUISwitch"> <v-icon> mdi-flip-to-front </v-icon> </button> -->
-    <!-- <button v-show="isRedBoxMode" @click="showCaptureUI" class="get-click btn-ShowUISwitch">
-    <div style="display: flex; justify-content: center; align-items: center;">
-      <img src="@/assets/images/svg/ui/UI_Show.svg" height="20px" style="min-height: 20px; pointer-events: none;">
-    </div>
-  </button> -->
-
-    <!-- <button v-show="isCaptureMode" @click="hideCaptureUI" class="get-click btn-UISwitch"> <v-icon> mdi-flip-to-back </v-icon> </button> -->
-    <button v-show="isShowImage && isShowHideUi" @click="hideCaptureUI" class="get-click btn-UISwitch">
-      <div style="display: flex; justify-content: center; align-items: center;">
-        <img src="@/assets/images/svg/ui/UI_Hide.svg" height="20px"
-          style="min-height: 20px; pointer-events: none;"></img>
-      </div>
-    </button>
-
-    <!-- <button v-show="isRedBoxMode" @click="showCaptureUI" class="get-click btn-ShowUISwitch"> <v-icon> mdi-flip-to-front </v-icon> </button> -->
-    <button v-show="!isShowImage && isShowHideUi" @click="showCaptureUI" class="get-click btn-ShowUISwitch">
-      <div style="display: flex; justify-content: center; align-items: center;">
-        <img src="@/assets/images/svg/ui/UI_Show.svg" height="20px" style="min-height: 20px; pointer-events: none;">
-      </div>
-    </button>
-
-    <button v-show="isShowScaleChange" @click="ScaleChange('+')" class="get-click btn-ScaleAdd">
-      <div style="display: flex; justify-content: center; align-items: center;">
-        <img src="@/assets/images/svg/ui/ScaleAdd.svg" height="20px"
-          style="min-height: 20px; pointer-events: none;"></img>
-      </div>
-    </button>
-
-    <button v-show="isShowScaleChange" @click="ScaleChange('-')" class="get-click btn-ScaleSub">
-      <div style="display: flex; justify-content: center; align-items: center;">
-        <img src="@/assets/images/svg/ui/ScaleSub.svg" height="20px"
-          style="min-height: 20px; pointer-events: none;"></img>
-      </div>
-    </button>
-
-
-
-    <button v-show="isPolarAxisMode" @click="QuitPolarAxisMode" class="get-click btn-QuitPolarAxis">
-      <div style="display: flex; justify-content: center; align-items: center;">
-        <img src="@/assets/images/svg/ui/Back.svg" height="35px" style="min-height: 35px; pointer-events: none;">
-      </div>
-    </button>
-
-    <!-- <transition name="BottomCanvas">
-      <div v-show="isPolarAxisMode" class="Canvas-SolveImage">
-        <canvas ref="SolveImageCanvas" id="SolveImage-Canvas"></canvas>
-      </div>
-    </transition> -->
-
-    <!-- <transition name="BottomCanvas">
-      <div v-show="isPolarAxisMode" class="Text-SolveImage">
-        <span
-          style="position: absolute; top: 0px; left: 5%; height: 30%; width: 90%; font-size: 10px; color: rgba(255, 255, 255, 0.3); user-select: none;">
-          Difference: {{ DifferenceText }}
-        </span>
-        <span
-          style="position: absolute; top: 35%; left: 5%; height: 30%; width: 90%; font-size: 10px; color: rgba(255, 255, 255, 0.3); user-select: none;">
-          Target: {{ TargetText }}
-        </span>
-        <span
-          style="position: absolute; top: 70%; left: 5%; height: 30%; width: 90%; font-size: 10px; color: rgba(255, 255, 255, 0.3); user-select: none;">
-          Current: {{ CurrentText }}
-        </span>
-      </div>
-    </transition> -->
-
-    <!-- <button v-show="isPolarAxisMode" @click="switchPolarAxisTips" class="PolarAxisTips">
-      <v-stepper v-model="currentPolarAxisStep" class="PolarAxisStepper">
-        <v-stepper-header>
-          <v-stepper-step step="1" :complete="currentPolarAxisStep > 1"></v-stepper-step>
-          <v-divider></v-divider>
-          <v-stepper-step step="2" :complete="currentPolarAxisStep > 2"></v-stepper-step>
-          <v-divider></v-divider>
-          <v-stepper-step step="3" :complete="currentPolarAxisStep > 3"></v-stepper-step>
-          <v-divider></v-divider>
-          <v-stepper-step step="4"></v-stepper-step>
-        </v-stepper-header>
-      </v-stepper>
-
-      <span class="PolarAxisTipsText">
-        {{ currentPolarAxisStepTips }}
-      </span>
-    </button> -->
-
-
-    <CapturePanel v-show="isCaptureMode" />
-
-    <button :disabled="loadingOriginalImage" v-show="isCaptureMode" @click="getOriginalImage"
-      class="get-click btn-OriginalImage">
-      <template v-if="!loadingOriginalImage">
+    <!-- 使用CSS Grid布局的按钮容器 -->
+    <div class="left-button-container">
+      <button v-show="isPolarAxisMode" @click="QuitPolarAxisMode" class="get-click btn-QuitPolarAxis">
         <div style="display: flex; justify-content: center; align-items: center;">
-          <img src="@/assets/images/svg/ui/OriginalImage.svg" height="20px"
+          <img src="@/assets/images/svg/ui/Back.svg" height="35px" style="min-height: 35px; pointer-events: none;">
+        </div>
+      </button>
+
+      <button v-show="isShowImage && isShowHideUi" @click="hideCaptureUI" class="get-click btn-UISwitch">
+        <div style="display: flex; justify-content: center; align-items: center;">
+          <img src="@/assets/images/svg/ui/UI_Hide.svg" height="20px"
             style="min-height: 20px; pointer-events: none;"></img>
         </div>
-      </template>
-      <template v-else>
-        <div class="progress-spinner">
-          <v-progress-circular indeterminate color="white" size="20"></v-progress-circular>
+      </button>
+
+      <button v-show="!isShowImage && isShowHideUi" @click="showCaptureUI" class="get-click btn-ShowUISwitch">
+        <div style="display: flex; justify-content: center; align-items: center;">
+          <img src="@/assets/images/svg/ui/UI_Show.svg" height="20px" style="min-height: 20px; pointer-events: none;">
         </div>
-      </template>
-    </button>
+      </button>
+
+      <button :disabled="loadingOriginalImage" v-show="isCaptureMode" @click="getOriginalImage"
+        class="get-click btn-OriginalImage">
+        <template v-if="!loadingOriginalImage">
+          <div style="display: flex; justify-content: center; align-items: center;">
+            <img src="@/assets/images/svg/ui/OriginalImage.svg" height="20px"
+              style="min-height: 20px; pointer-events: none;"></img>
+          </div>
+        </template>
+        <template v-else>
+          <div class="progress-spinner">
+            <v-progress-circular indeterminate color="white" size="20"></v-progress-circular>
+          </div>
+        </template>
+      </button>
+
+      <button v-show="isShowScaleChange" @click="ScaleChange('+')" class="get-click btn-ScaleAdd">
+        <div style="display: flex; justify-content: center; align-items: center;">
+          <img src="@/assets/images/svg/ui/ScaleAdd.svg" height="20px"
+            style="min-height: 20px; pointer-events: none;"></img>
+        </div>
+      </button>
+
+      <button v-show="isShowScaleChange" @click="ScaleChange('-')" class="get-click btn-ScaleSub">
+        <div style="display: flex; justify-content: center; align-items: center;">
+          <img src="@/assets/images/svg/ui/ScaleSub.svg" height="20px"
+            style="min-height: 20px; pointer-events: none;"></img>
+        </div>
+      </button>
+    </div>
 
     <transition name="ToolBar">
       <div v-show="isCaptureMode" class="TopLeft-Info">
@@ -391,6 +332,7 @@
       :auto-start="false"
     />
 
+    <CapturePanel v-show="isCaptureMode" />
   </div>
 
 </template>
@@ -1196,14 +1138,28 @@ export default {
       this.$bus.$emit('showStelCanvas');
       this.hideCaptureUI(true);
 
-      // this.showMountSwitch = true;
-      // this.isBottomBarShow = true;
       this.isPolarAxisMode = true;
-      // this.showLocationInputs = true;
-      // this.$bus.$emit('PolarAxisMode', this.isPolarAxisMode);
-      // this.isRedBoxMode = false;
+      this.isBottomBarShow = true;
+      this.isExpTimeBarShow = false;
+      this.isCFWSelectBarShow = false;
+
+      this.isStellariumMode = true;
+      this.isCaptureMode = false;
+      this.isGuiderMode = false;
+      this.isShowScaleChange = false;
+      this.showMountSwitch = true;
+
+      this.showChartsPanel = false;
+      this.showHistogramPanel = false;
+      this.showFocuserPanel = false;
+      this.showRedBox = false;
+      this.showPHD2BoxAndCross = false;
+      this.isShowHideUi = false;
+
+      // this.$bus.$emit('ShowTargetSearch');
       document.removeEventListener('click', this.handleTouchOrMouseDown);
       this.$bus.$emit('showPolarAlignment');           // 显示校准界面
+      console.log('********* isShowHideUi **********: ', this.isShowHideUi);
     },
 
     QuitPolarAxisMode() {
@@ -1670,32 +1626,7 @@ export default {
   /* border: 1px solid rgba(255, 255, 255, 0.8); */
 }
 
-.btn-UISwitch {
-  position: absolute;
-  width: 35px;
-  height: 35px;
-  top: 65px;
-  left: 20px;
-
-  user-select: none;
-  backdrop-filter: blur(5px);
-  background-color: rgba(0, 0, 0, 0.1);
-  border-radius: 50%;
-  /* border: 1px solid rgba(255, 255, 255, 0.8); */
-}
-
-.btn-OriginalImage {
-  position: absolute;
-  width: 35px;
-  height: 35px;
-  top: 105px;
-  left: 20px;
-
-  user-select: none;
-  backdrop-filter: blur(5px);
-  background-color: rgba(0, 0, 0, 0.1);
-  border-radius: 50%;
-}
+/* 删除不再需要的按钮样式，现在统一在left-button-container中管理 */
 
 .TopLeft-Info {
   position: absolute;
@@ -1760,68 +1691,13 @@ export default {
   box-sizing: border-box;
 }
 
-.btn-ShowUISwitch {
-  position: absolute;
-  width: 35px;
-  height: 35px;
-  top: 65px;
-  left: 20px;
-
-  user-select: none;
-  backdrop-filter: blur(5px);
-  background-color: rgba(0, 0, 0, 0.1);
-  border-radius: 50%;
-  /* border: 1px solid rgba(255, 255, 255, 0.8); */
-}
-
-.btn-ScaleAdd {
-  position: absolute;
-  width: 35px;
-  height: 35px;
-  top: 145px;
-  left: 20px;
-
-  user-select: none;
-  backdrop-filter: blur(5px);
-  background-color: rgba(0, 0, 0, 0.1);
-  border-radius: 50%;
-}
-
-.btn-ScaleSub {
-  position: absolute;
-  width: 35px;
-  height: 35px;
-  top: 185px;
-  left: 20px;
-
-  user-select: none;
-  backdrop-filter: blur(5px);
-  background-color: rgba(0, 0, 0, 0.1);
-  border-radius: 50%;
-}
-
-.btn-QuitPolarAxis {
-  position: absolute;
-  width: 35px;
-  height: 35px;
-  top: 20px;
-  left: 20px;
-
-  user-select: none;
-  backdrop-filter: blur(5px);
-  background-color: rgba(0, 0, 0, 0.1);
-  border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.8);
-}
+/* 删除不再需要的按钮样式，现在统一在left-button-container中管理 */
 
 
 .btn-ImageManagerPanelSwitch:active,
 .btn-MountPanelSwitch:active,
 .btn-ChartsSwitch:active,
-.btn-UISwitch:active,
 .btn-MainPageSwitch:active,
-.btn-ShowUISwitch:active,
-.btn-OriginalImage:active,
 .btn-WhiteBalance:active {
   transform: scale(0.95);
   /* 点击时缩小按钮 */
@@ -2114,5 +1990,42 @@ export default {
   border-top-right-radius: 0;
   border-bottom-left-radius: 10px;
   border-bottom-right-radius: 10px;
+}
+
+.left-button-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: absolute;
+  top: 65px;
+  left: 20px;
+  z-index: 10;
+}
+
+.left-button-container button {
+  width: 35px;
+  height: 35px;
+  user-select: none;
+  backdrop-filter: blur(5px);
+  background-color: rgba(0, 0, 0, 0.1);
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.left-button-container button:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+  transform: scale(1.05);
+}
+
+.left-button-container button:active {
+  transform: scale(0.95);
+  background-color: rgba(255, 255, 255, 0.7);
+}
+
+.left-button-container button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 </style>
