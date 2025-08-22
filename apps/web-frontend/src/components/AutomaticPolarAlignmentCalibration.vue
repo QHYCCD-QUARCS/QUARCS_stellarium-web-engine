@@ -576,6 +576,9 @@
             this.calibrationPhase = 'collecting'
             const pointNumber = this.calibrationPoints.length + 1
             
+            // 添加调试信息
+            this.addLog(`准备收集校准点${pointNumber}，当前已有${this.calibrationPoints.length}个点`, 'info')
+            
             try {
               this.drawCalibrationPointPolygon(data[0], data[1], pointNumber, this.fieldData)
               this.addLog(this.$t('Calibration Point', [pointNumber, data[0].toFixed(4), data[1].toFixed(4)]), 'info')
@@ -586,6 +589,8 @@
                 dec: data[1],
                 index: pointNumber
               })
+              
+              this.addLog(`校准点${pointNumber}已添加，现在总共有${this.calibrationPoints.length}个点`, 'info')
               
               // 如果收集了3个点，进入调整阶段
               if (this.calibrationPoints.length === 3) {
@@ -665,113 +670,155 @@
         this.$bus.$emit('ClearStatusTextFromStarMap')
       },
       
-      // 绘制调整点
+      /**
+       * 绘制极轴校准调整点
+       * 在星图上绘制当前位置、目标位置、校准点等关键位置标记
+       * @param {number} currentRa - 当前赤经位置
+       * @param {number} currentDec - 当前赤纬位置  
+       * @param {number} targetRa - 目标赤经位置
+       * @param {number} targetDec - 目标赤纬位置
+       * @param {object} fieldData - 视场数据（包含视场边界信息）
+       * @param {boolean} isTimerUpdate - 是否为定时器更新（用于区分手动更新和自动更新）
+       */
       drawAdjustmentPoints(currentRa, currentDec, targetRa, targetDec, fieldData, isTimerUpdate = false) {
+        // 记录开始绘制调整点的日志
         this.addLog(this.$t('Starting Draw Adjustment Points', [currentRa, currentDec, targetRa, targetDec]), 'info')
         
         try {
-          const currentCoordinates = this.calculateFieldCorners(currentRa, currentDec, fieldData)
-          const targetCoordinates = this.calculateFieldCorners(targetRa, targetDec, fieldData)
+          // 计算当前位置和目标位置的视场角点坐标
+          // 当前位置使用真实视场大小，目标点不需要视场（将绘制为圆）
+          const currentCoordinates = this.calculateFieldCorners(currentRa, currentDec, fieldData, false)
+          // 目标点不需要计算视场角点，将直接绘制为圆
           
+          // 记录计算得到的坐标信息到日志
           this.addLog(this.$t('Current Position Field Corners', [JSON.stringify(currentCoordinates)]), 'info')
-          this.addLog(this.$t('Target Position Field Corners', [JSON.stringify(targetCoordinates)]), 'info')
+          this.addLog(`目标点坐标: RA=${targetRa}, DEC=${targetDec}`, 'info')
           
-          // 验证坐标有效性
+          // 验证当前位置坐标的有效性
+          // 检查每个坐标点是否包含有效的RA和DEC数值
           const currentValid = currentCoordinates.every((coord, index) => {
             const isValid = coord && typeof coord.ra === 'number' && typeof coord.dec === 'number' &&
                           !isNaN(coord.ra) && !isNaN(coord.dec) && isFinite(coord.ra) && isFinite(coord.dec)
             if (!isValid) {
+              // 如果发现无效坐标，记录警告日志
               this.addLog(this.$t('Warning: Invalid Current Position Coordinate', [index, JSON.stringify(coord)]), 'warning')
             }
             return isValid
           })
           
-          const targetValid = targetCoordinates.every((coord, index) => {
-            const isValid = coord && typeof coord.ra === 'number' && typeof coord.dec === 'number' &&
-                          !isNaN(coord.ra) && !isNaN(coord.dec) && isFinite(coord.ra) && isFinite(coord.dec)
-            if (!isValid) {
-              this.addLog(this.$t('Warning: Invalid Target Position Coordinate', [index, JSON.stringify(coord)]), 'warning')
-            }
-            return isValid
-          })
+          // 验证目标位置坐标的有效性（目标点只需要验证中心坐标）
+          const targetValid = typeof targetRa === 'number' && typeof targetDec === 'number' &&
+                            !isNaN(targetRa) && !isNaN(targetDec) && isFinite(targetRa) && isFinite(targetDec)
           
+          if (!targetValid) {
+            this.addLog(this.$t('Warning: Invalid Target Position Coordinate', [targetRa, targetDec]), 'warning')
+          }
+          
+          // 如果任一位置的坐标无效，则终止绘制
           if (!currentValid || !targetValid) {
             this.addLog(this.$t('Error: Invalid Adjustment Point Coordinates'), 'error')
             return
           }
           
-          // 定义颜色方案
+          // 定义不同位置点的颜色方案
+          // 使用不同颜色来区分各种位置，提高可视化效果
           const currentColor = {
-            stroke: "#00BFFF",        // 蓝色：当前位置
-            strokeOpacity: 1,
-            fill: "#00BFFF", 
-            fillOpacity: 0.3
+            stroke: "#00BFFF",        // 蓝色边框：当前位置
+            strokeOpacity: 1,         // 边框不透明度
+            fill: "#00BFFF",          // 蓝色填充：当前位置
+            fillOpacity: 0.3          // 填充不透明度（半透明）
           }
           
           const targetColor = {
-            stroke: "#FF8C00",        // 橙色：目标位置
-            strokeOpacity: 1,
-            fill: "#FF8C00", 
-            fillOpacity: 0.3
+            stroke: "#FF8C00",        // 橙色边框：目标位置
+            strokeOpacity: 1,         // 边框不透明度
+            fill: "#FF8C00",          // 橙色填充：目标位置
+            fillOpacity: 0.3          // 填充不透明度（半透明）
           }
           
           const previousColor = {
-            stroke: "#FFD700",        // 黄色：上一次位置
-            strokeOpacity: 1,
-            fill: "#FFD700", 
-            fillOpacity: 0.2
+            stroke: "#FFD700",        // 黄色边框：上一次位置
+            strokeOpacity: 1,         // 边框不透明度
+            fill: "#FFD700",          // 黄色填充：上一次位置
+            fillOpacity: 0.2          // 填充不透明度（更透明）
           }
           
-          // 如果有上一次位置，绘制完整的调整视图
-          if (this.previousPosition.ra !== '00h 00m 00s' && this.calibrationPoints.length === 3) {
-            // 绘制三个校准点（白色）
+          // 判断是否绘制完整的调整视图
+          // 条件：已收集到3个校准点（放宽previousPosition的要求）
+          if (this.calibrationPoints.length === 3) {
+            // 在绘制新元素前，先清除所有之前的元素
+            this.addLog('准备清除之前的校准元素', 'info')
+            this.$bus.$emit('ClearCalibrationPoints')
+            this.addLog('清除命令已发送', 'info')
+            
+            // 绘制完整的校准调整视图，包含所有关键位置点
+            
+            // 1. 绘制三个校准点（白色多边形）
+            // 这些点代表校准过程中收集的参考位置
             this.calibrationPoints.forEach((point, index) => {
-              const pointCoordinates = this.calculateFieldCorners(point.ra, point.dec, fieldData)
+              // 计算每个校准点的视场角点坐标，使用真实视场大小
+              const pointCoordinates = this.calculateFieldCorners(point.ra, point.dec, fieldData, false)
+              // 定义校准点的颜色（白色）
               const whiteColor = {
-                stroke: "#FFFFFF",
-                strokeOpacity: 1,
-                fill: "#FFFFFF", 
-                fillOpacity: 0.2
+                stroke: "#FFFFFF",        // 白色边框
+                strokeOpacity: 1,         // 边框不透明度
+                fill: "#FFFFFF",          // 白色填充
+                fillOpacity: 0.2          // 填充不透明度（较透明）
               }
+              // 发送绘制校准点多边形的事件
               this.$bus.$emit('DrawCalibrationPointPolygon', pointCoordinates, whiteColor, 
                              `Calibration_${index + 1}`, `校准点${index + 1}`, "#FFFFFF")
             })
             
-            // 绘制目标点（橙色）
-            this.$bus.$emit('DrawCalibrationPointPolygon', targetCoordinates, targetColor, 
-                           'Target_Point', '目标点', "#FF8C00")
+            // 2. 绘制目标点（橙色圆形）
+            // 这是望远镜应该移动到的目标位置
+            // 目标点使用圆形绘制，不需要视场多边形
+            this.$bus.$emit('DrawTargetPointCircle', targetRa, targetDec, targetColor)
             
-            // 绘制当前位置（蓝色）
+            // 3. 绘制当前位置（蓝色多边形）
+            // 这是望远镜当前指向的位置
             this.$bus.$emit('DrawCalibrationPointPolygon', currentCoordinates, currentColor, 
                            'Current_Position', '当前位置', "#00BFFF")
             
-            // 绘制上一次位置（黄色）
-            const previousRa = this.parseCoordinate(this.previousPosition.ra, 'ra')
-            const previousDec = this.parseCoordinate(this.previousPosition.dec, 'dec')
-            if (previousRa !== null && previousDec !== null) {
-              const previousCoordinates = this.calculateFieldCorners(previousRa, previousDec, fieldData)
-              this.$bus.$emit('DrawCalibrationPointPolygon', previousCoordinates, previousColor, 
-                             'Previous_Position', '上一次位置', "#FFD700")
-            }
+            // 4. 上一次位置点已移除，不再绘制
             
-            // 添加状态文本提示
+            // 5. 在星图上添加状态文本提示
+            // 显示当前校准状态和进度信息
             this.addStatusTextToStarMap()
+            
           } else {
-            // 标准调整模式
-            this.$bus.$emit('DrawAdjustmentPointsPolygon', currentCoordinates, targetCoordinates, currentColor, targetColor, isTimerUpdate)
+            // 标准调整模式：只绘制当前位置和目标位置
+            // 这种情况通常发生在校准初期或数据不完整时
+            // 在绘制前先清除所有之前的元素
+            this.addLog('标准模式：准备清除之前的校准元素', 'info')
+            this.$bus.$emit('ClearCalibrationPoints')
+            this.addLog('标准模式：清除命令已发送', 'info')
+            
+            // 目标点使用圆形绘制，当前位置使用多边形
+            this.$bus.$emit('DrawAdjustmentPointsPolygon', currentCoordinates, null, currentColor, targetColor, isTimerUpdate)
+            this.$bus.$emit('DrawTargetPointCircle', targetRa, targetDec, targetColor)
           }
           
         } catch (error) {
+          // 捕获并记录绘制过程中的任何错误
           this.addLog(this.$t('Error Drawing Adjustment Points', [error.message]), 'error')
           console.error('绘制调整点错误：', error)
         }
       },
       
-      // 计算视场的五个角点坐标
-      calculateFieldCorners(centerRa, centerDec, fieldData) {
+      /**
+       * 计算视场的五个角点坐标
+       * @param {number} centerRa - 视场中心的赤经坐标
+       * @param {number} centerDec - 视场中心的赤纬坐标
+       * @param {object} fieldData - 视场数据（包含视场边界信息）
+       * @param {boolean} useDefaultSize - 是否使用默认视场大小（用于目标点等固定位置）
+       * @returns {Array} 包含5个角点坐标的数组，用于绘制多边形
+       */
+      calculateFieldCorners(centerRa, centerDec, fieldData, useDefaultSize = false) {
         this.addLog(this.$t('Calculating Field Corners', [centerRa, centerDec]), 'info')
         
-        if (!fieldData) {
+        // 如果指定使用默认大小或者没有视场数据，使用默认的0.5度视场大小
+        if (useDefaultSize || !fieldData) {
           this.addLog(this.$t('Using Default Field Size: 0.5 Degrees'), 'info')
           const fieldSize = 0.5
           const coordinates = [
@@ -785,17 +832,24 @@
           return coordinates
         }
         
+        // 如果有视场数据且不强制使用默认大小，基于传入的中心点坐标计算视场角点
+        // 这种情况主要用于当前位置的显示，需要反映实际的视场大小
         const { maxra, minra, maxdec, mindec } = fieldData
-        this.addLog(this.$t('Using Field Data', [maxra, minra, maxdec, mindec]), 'info')
         
+        // 计算视场的实际大小（RA和DEC方向的跨度）
+        const raSpan = maxra - minra
+        const decSpan = maxdec - mindec
+        
+        // 基于传入的中心点坐标，计算视场的五个角点
         const coordinates = [
-          { ra: maxra, dec: maxdec },
-          { ra: minra, dec: maxdec },
-          { ra: minra, dec: mindec },
-          { ra: maxra, dec: mindec },
-          { ra: maxra, dec: maxdec }
+          { ra: centerRa + raSpan/2, dec: centerDec + decSpan/2 },     // 右上角
+          { ra: centerRa - raSpan/2, dec: centerDec + decSpan/2 },     // 左上角
+          { ra: centerRa - raSpan/2, dec: centerDec - decSpan/2 },     // 左下角
+          { ra: centerRa + raSpan/2, dec: centerDec - decSpan/2 },     // 右下角
+          { ra: centerRa + raSpan/2, dec: centerDec + decSpan/2 }      // 回到右上角（闭合多边形）
         ]
         
+        this.addLog(this.$t('Using Field Data', [raSpan, decSpan]), 'info')
         this.addLog(this.$t('Field Corner Calculation Result', [JSON.stringify(coordinates)]), 'info')
         return coordinates
       },
@@ -981,32 +1035,14 @@
               this.isCalibrationComplete = false
               this.isPolarAligned = false
             } else if (progress >= 15 && progress < 25) {
-              // 第一次校准阶段
-              if (this.calibrationPoints.length === 0) {
-                this.calibrationPoints.push({
-                  x: 150 + Math.random() * 20 - 10,
-                  y: 150 + Math.random() * 20 - 10,
-                  index: 0
-                })
-              }
+              // 第一次校准阶段 - 移除模拟数据添加，实际校准点由updateFieldData处理
+              // 这里只更新状态，不添加模拟校准点
             } else if (progress >= 25 && progress < 50) {
-              // 第二次校准阶段
-              if (this.calibrationPoints.length === 1) {
-                this.calibrationPoints.push({
-                  x: 150 + Math.random() * 20 - 10,
-                  y: 150 + Math.random() * 20 - 10,
-                  index: 1
-                })
-              }
+              // 第二次校准阶段 - 移除模拟数据添加，实际校准点由updateFieldData处理
+              // 这里只更新状态，不添加模拟校准点
             } else if (progress >= 50 && progress < 75) {
-              // 第三次校准阶段
-              if (this.calibrationPoints.length === 2) {
-                this.calibrationPoints.push({
-                  x: 150 + Math.random() * 20 - 10,
-                  y: 150 + Math.random() * 20 - 10,
-                  index: 2
-                })
-              }
+              // 第三次校准阶段 - 移除模拟数据添加，实际校准点由updateFieldData处理
+              // 这里只更新状态，不添加模拟校准点
             } else if (progress >= 75 && progress < 95) {
               // 循环校准调整阶段
               this.isCalibrationComplete = true

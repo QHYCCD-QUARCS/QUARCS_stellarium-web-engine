@@ -822,6 +822,7 @@ export default {
       // 极轴校准相关数组
       calibrationCircles: [],  // 校准点圆圈数组
       adjustmentCircles: [],   // 调整点圆圈数组
+      targetPointCircle: null, // 目标点圆形对象
       lastPosition: null,      // 上一次位置
       fieldUpdateTimer: null,  // 视场更新定时器
       fieldOfViewPolygons: [], // 存储视场多边形对象
@@ -986,6 +987,7 @@ export default {
     this.$bus.$on('DrawCalibrationPointPolygon', this.drawCalibrationPointPolygon);
     this.$bus.$on('ClearCalibrationPoints', this.clearCalibrationPoints);
     this.$bus.$on('DrawAdjustmentPointsPolygon', this.drawAdjustmentPointsPolygon);
+    this.$bus.$on('DrawTargetPointCircle', this.drawTargetPointCircle);
     
     // 校准相关事件监听器
     this.$bus.$on('StartCalibration', this.startCalibrationProcess);
@@ -6307,31 +6309,64 @@ export default {
     // 清除所有校准点
     clearCalibrationPoints() {
       console.log('清除所有校准点');
-      if (this.calibrationCircles) {
-        this.calibrationCircles.forEach(circle => {
+      
+      // 确保数组存在
+      if (!this.calibrationCircles) {
+        this.calibrationCircles = [];
+      }
+      if (!this.adjustmentCircles) {
+        this.adjustmentCircles = [];
+      }
+      
+      // 清除校准点
+      if (this.calibrationCircles.length > 0) {
+        console.log(`清除 ${this.calibrationCircles.length} 个校准点`);
+        this.calibrationCircles.forEach((circle, index) => {
           try {
-            glLayer.remove(circle);
+            if (circle && glLayer) {
+              glLayer.remove(circle);
+              console.log(`成功清除校准点 ${index + 1}`);
+            }
           } catch (error) {
-            console.warn('清除校准点时出错:', error);
+            console.warn(`清除校准点 ${index + 1} 时出错:`, error);
           }
         });
         this.calibrationCircles = [];
       }
       
-      // 同时清除调整点
-      if (this.adjustmentCircles) {
-        this.adjustmentCircles.forEach(circle => {
+      // 清除调整点
+      if (this.adjustmentCircles.length > 0) {
+        console.log(`清除 ${this.adjustmentCircles.length} 个调整点`);
+        this.adjustmentCircles.forEach((circle, index) => {
           try {
-            glLayer.remove(circle);
+            if (circle && glLayer) {
+              glLayer.remove(circle);
+              console.log(`成功清除调整点 ${index + 1}`);
+            }
           } catch (error) {
-            console.warn('清除调整点时出错:', error);
+            console.warn(`清除调整点 ${index + 1} 时出错:`, error);
           }
         });
         this.adjustmentCircles = [];
       }
       
-      // 同时清除上一次位置
+      // 清除上一次位置
       this.lastPosition = null;
+      
+      // 清除目标点
+      if (this.targetPointCircle) {
+        try {
+          if (glLayer) {
+            glLayer.remove(this.targetPointCircle);
+            console.log('成功清除目标点');
+          }
+          this.targetPointCircle = null;
+        } catch (error) {
+          console.warn('清除目标点时出错:', error);
+        }
+      }
+      
+      console.log('所有校准相关元素清除完成');
     },
 
     
@@ -6449,10 +6484,73 @@ export default {
           }
         }
         
-      } catch (error) {
-        console.error('绘制调整点多边形时出错:', error);
-      }
-    },
+              } catch (error) {
+          console.error('绘制调整点多边形时出错:', error);
+        }
+      },
+      
+      // 绘制目标点圆形
+      drawTargetPointCircle(targetRa, targetDec, color) {
+        console.log('绘制目标点圆形', { targetRa, targetDec, color });
+        
+        try {
+          // 验证输入参数
+          if (!this.isValidCoordinate(targetRa) || !this.isValidCoordinate(targetDec)) {
+            console.error('目标点坐标无效:', { targetRa, targetDec });
+            return;
+          }
+          
+          // 清除之前的目标点
+          if (this.targetPointCircle) {
+            try {
+              if (glLayer) {
+                glLayer.remove(this.targetPointCircle);
+                console.log('成功清除之前的目标点');
+              }
+            } catch (error) {
+              console.warn('清除之前的目标点时出错:', error);
+            }
+          }
+          
+          // 创建目标点圆形
+          let targetCircle = this.AddMarkCircle(this.$stel, glLayer, 4, 'Target_Point');
+          if (targetCircle) {
+            // 设置目标点位置
+            let targetMm = targetCircle.pos;
+            this.vec3_from_sphe(targetRa, targetDec, targetMm);
+            targetCircle.pos = targetMm;
+            
+            // 设置目标点颜色和样式
+            if (color) {
+              // 将十六进制颜色转换为RGB数组
+              const rgb = this.hexToRgb(color.stroke || color.fill || '#FF8C00');
+              const alpha = (color.fillOpacity || 0.3);
+              const borderAlpha = (color.strokeOpacity || 1.0);
+              
+              targetCircle.color = [rgb.r/255, rgb.g/255, rgb.b/255, alpha];
+              targetCircle.border_color = [rgb.r/255, rgb.g/255, rgb.b/255, borderAlpha];
+            } else {
+              // 默认橙色
+              targetCircle.color = [1, 0.55, 0, 0.3];  // 橙色，半透明
+              targetCircle.border_color = [1, 0.55, 0, 1];  // 橙色边框
+            }
+            
+            // 设置目标点大小
+            const targetSize = 0.02; // 固定小尺寸
+            targetCircle.size = [targetSize, targetSize];
+            
+            // 保存目标点引用，用于后续清除
+            this.targetPointCircle = targetCircle;
+            
+            console.log('目标点圆形创建成功', targetCircle);
+          } else {
+            console.error('目标点圆形创建失败');
+          }
+          
+        } catch (error) {
+          console.error('绘制目标点圆形时出错:', error);
+        }
+      },
 
     ShowConfirmDialog(Title, Text, ToDo) {
       // window.location.reload();
