@@ -22,46 +22,6 @@
           style="position: absolute; top: 50px; max-height: calc(100% - 95px); overflow-y: auto;"
           class="params-container">
 
-          <!-- <div v-show="!DeviceIsConnected" style="text-align: center;">
-            <span style="display: inline-block; font-size: 15px; color: rgba(255, 255, 255, 0.5); user-select: none;">
-              {{ $t('Device Connection') }}
-            </span>
-            <v-select :label="$t('Select Driver')" :items="drivers" item-text="label" item-value="value"
-              v-model="selectedDriver" style="width: 150px; display: inline-block;"></v-select>
-
-            <v-select v-if="CurrentDriverType === 'Mount' || CurrentDriverType === 'Focuser'" :label="$t('Baud Rate')"
-              :items="BaudRateItems" item-text="label" item-value="value" v-model="BaudRateSelected"
-              style="width: 150px; display: inline-block;">
-            </v-select>
-
-            <v-row no-gutters>
-              <v-col cols="4">
-                <button @click="clearDriver" class="btn-confirm" style="display: inline-block;">
-                  <div style="display: flex; justify-content: center; align-items: center;">
-                    <img src="@/assets/images/svg/ui/delete.svg" height="20px"
-                      style="min-height: 20px; pointer-events: none;"></img>
-                  </div>
-                </button>
-              </v-col>
-              <v-col cols="4">
-                <button v-if="!isConnecting" @click="connectDriver(selectedDriver)" class="btn-confirm"
-                  style="display: inline-block; background-color: green;">
-                  <div style="display: flex; justify-content: center; align-items: center;">
-                    <v-icon color="white">mdi-link</v-icon>
-                  </div>
-                </button>
-                <v-progress-circular v-else indeterminate color="green" size="24"></v-progress-circular>
-              </v-col>
-              <v-col cols="4">
-                <button @click="confirmDriver" class="btn-confirm" style="display: inline-block;">
-                  <template>
-                    <v-icon color="rgba(255, 255, 255)">mdi-check-bold</v-icon>
-                  </template>
-</button>
-</v-col>
-</v-row>
-</div> -->
-
           <div v-show="!DeviceIsConnected" style="text-align: center;">
             <span style="display: inline-block; font-size: 15px; color: rgba(255, 255, 255, 0.5); user-select: none;">
               {{ $t('Device Connection') }}
@@ -98,33 +58,6 @@
               </v-col>
             </v-row>
           </div>
-
-          <!-- <div v-show="!DeviceIsConnected" style="text-align: center;">
-            <span style="display: inline-block; font-size: 15px; color: rgba(255, 255, 255, 0.5); user-select: none;">
-              {{ $t('Device Connection') }}
-            </span>
-            <v-select :label="$t('Select Driver')" :items="drivers" item-text="label" item-value="value"
-              v-model="selectedDriver" style="width: 150px; display: inline-block;"></v-select>
-            <v-row no-gutters>
-              <v-col cols="6">
-                <button @click="clearDriver" class="btn-confirm" style="display: inline-block;">
-                  <div style="display: flex; justify-content: center; align-items: center;">
-                    <img src="@/assets/images/svg/ui/delete.svg" height="20px"
-                      style="min-height: 20px; pointer-events: none;"></img>
-                  </div>
-                </button>
-              </v-col>
-              <v-col cols="6">
-                <button @click="confirmDriver" class="btn-confirm" style="display: inline-block;">
-                  <template>
-                    <v-icon color="rgba(255, 255, 255)">mdi-check-bold</v-icon>
-                  </template>
-                </button>
-              </v-col>
-            </v-row>
-
-          </div> -->
-
 
           <div v-show="DeviceIsConnected" v-for="(item, index) in CurrentConfigItems()" :key="index"
             class="config-item">
@@ -703,25 +636,10 @@ export default {
         { driverType: 'MainCamera', label: 'Temperature', value: '', inputType: 'select',selectValue : [5,0,-5,-10,-15,-20,-25] },
         { driverType: 'MainCamera', label: 'Gain', value: '', inputType: 'slider', inputMin: 0, inputMax: 0, inputStep: 1 },
         { driverType: 'MainCamera', label: 'Offset', value: '', inputType: 'slider', inputMin: 0, inputMax: 0, inputStep: 1 },
-        // vue处理参数
-        // { driverType: 'MainCamera', label: 'ImageGainR', value: '1', inputType: 'slider', inputMin: 0, inputMax: 3, inputStep: 0.01 },
-        // { driverType: 'MainCamera', label: 'ImageGainB', value: '1', inputType: 'slider', inputMin: 0, inputMax: 3, inputStep: 0.01 },
-        // { driverType: 'MainCamera', label: 'ImageOffset', value: '', inputType: 'slider', inputMin: 0, inputMax: 255, inputStep: 0.1 },
-        // { driverType: 'MainCamera', label: 'RedBox Side Length (px)', value: '', inputType: 'text' },
-        // { driverType: 'MainCamera', label: 'ExpTime [1]', value: '', inputType: 'text' },
-        // { driverType: 'MainCamera', label: 'ExpTime [2]', value: '', inputType: 'text' },
-        // { driverType: 'MainCamera', label: 'ExpTime [3]', value: '', inputType: 'text' },
-        // { driverType: 'MainCamera', label: 'ExpTime [4]', value: '', inputType: 'text' },
-        // { driverType: 'MainCamera', label: 'ExpTime [5]', value: '', inputType: 'text' },
-        // { driverType: 'MainCamera', label: 'ExpTime [6]', value: '', inputType: 'text' },
-        // { driverType: 'MainCamera', label: 'ExpTime [7]', value: '', inputType: 'text' },
-        // { driverType: 'MainCamera', label: 'ExpTime [8]', value: '', inputType: 'text' },
-        // { driverType: 'MainCamera', label: 'ExpTime [9]', value: '', inputType: 'text' },
-        // 在这里添加更多的配置项
       ],
 
       MountConfigItems: [
-
+        { driverType: 'Mount', label: 'GotoThenSolve', value: false, inputType: 'switch' },
       ],
 
       TelescopesConfigItems: [
@@ -960,6 +878,7 @@ export default {
     this.$bus.$on('Ra Aggression', this.RaAggressionSet);
     this.$bus.$on('Dec Aggression', this.DecAggressionSet);
     this.$bus.$on('Sync Focuser Step', this.SyncFocuserStep);
+    this.$bus.$on('GotoThenSolve', this.GotoThenSolve);
     this.$bus.$on('ImageProportion', this.setImageProportion);
     this.$bus.$on('MountGoto', this.lookatcircle);
     this.$bus.$on('SwitchImageToShow', this.SwitchImageToShow);
@@ -3025,6 +2944,13 @@ export default {
       const IntValue = parseInt(value);
       this.SendConsoleLogMsg('Sync Focuser Step:' + IntValue, 'info');
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'SyncFocuserStep:' + IntValue);
+    },
+
+    GotoThenSolve(payload) {
+      const [signal, value] = payload.split(':'); // 拆分信号和值
+      const BooleanValue = Boolean(value);
+      this.SendConsoleLogMsg('Goto Then Solve:' + BooleanValue, 'info');
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'GotoThenSolve:' + BooleanValue);
     },
 
     async readBinFile(fileName, retryCount = 1) {
