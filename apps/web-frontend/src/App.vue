@@ -5410,7 +5410,7 @@ export default {
 
     UpdateTelescopeStatus(status) {
       this.$bus.$emit('MountStatus', status);
-      if (status === 'Slewing') {
+      if (status === 'true') {
         glTestCircle.color = [1, 0, 0, 0.25];
         glTestCircle.border_color = [1, 0, 0, 1];
       }

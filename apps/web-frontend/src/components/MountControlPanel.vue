@@ -304,7 +304,7 @@ export default {
     },
 
     MountStatus(status) {
-      if (status === 'Slewing') {
+      if (status === 'true') {
         this.isIDLE = false;
       }
       else {
