@@ -5310,6 +5310,7 @@ export default {
       let mm = glTestCircle.pos;
       this.vec3_from_sphe(Ra_degree, Dec_degree, mm);
       glTestCircle.pos = mm;
+      console.log("赤道仪位置更新为:"+Ra_degree+"+"+Dec_degree);
     },
 
     UpdateTelescopeStatus(status) {
