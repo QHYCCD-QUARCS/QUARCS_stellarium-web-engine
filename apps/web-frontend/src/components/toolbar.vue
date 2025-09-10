@@ -340,7 +340,7 @@ export default {
     // },
     
     MountStatus(status) {
-      if(status === 'true') {
+      if(status === 'Moving') {
         this.MountInProgress = true;
       } 
       else {
