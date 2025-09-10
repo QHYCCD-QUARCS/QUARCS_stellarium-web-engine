@@ -225,10 +225,6 @@
               <span>{{ isCalibrationRunning ? $t('Stop Calibration') : $t('Start Auto Calibration') }}</span>
             </button>
 
-            <button class="action-btn primary" @click="startTestCalibration">
-              <v-icon>mdi-test-tube</v-icon>
-              <span>{{ $t('Start Test Calibration') }}</span>
-            </button>
 
 
           </div>
@@ -617,68 +613,6 @@ export default {
       this.isCalibrationRunning = false
       this.addLog(this.$t('Auto Calibration Stopped'), 'warning')
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'StopAutoPolarAlignment')
-    },
-    startTestCalibration() {
-      console.log('测试模式');
-      // 绘制目标点（绿色圆形）
-      const targetColor = {
-        stroke: "#4CAF50",        // 绿色边框：目标点
-        strokeOpacity: 1,         // 边框不透明度
-        fill: "#4CAF50",          // 绿色填充：目标点
-        fillOpacity: 0.3          // 填充不透明度（半透明）
-      }
-      let timeUTC = Date.now();
-      const { az, alt } = this.equatorialToHorizontal(0, 0, timeUTC, this.$store.state.currentLocation.lat, this.$store.state.currentLocation.lng)
-      console.log('赤道坐标(0,0)对应的地平坐标', az, alt, '使用时间和地点', timeUTC, this.$store.state.currentLocation.lat, this.$store.state.currentLocation.lng);
-      this.$bus.$emit('DrawTargetPointCircle',
-        az,
-        alt,
-        targetColor,
-        'Target_Point1',
-        '目标点1',
-        false
-      )
-      timeUTC = Date.now();
-      const { az: az1, alt: alt1 } = this.equatorialToHorizontal(90, 0, timeUTC, this.$store.state.currentLocation.lat, this.$store.state.currentLocation.lng)
-      console.log('赤道坐标(90,0)对应的地平坐标', az1, alt1, '使用时间和地点', timeUTC, this.$store.state.currentLocation.lat, this.$store.state.currentLocation.lng);
-      this.$bus.$emit('DrawTargetPointCircle',
-        az1,
-        alt1,
-        targetColor,
-        'Target_Point2',
-        '目标点2',
-        false
-      )
-      timeUTC = Date.now();
-      const { az: az2, alt: alt2 } = this.equatorialToHorizontal(180, 0, timeUTC, this.$store.state.currentLocation.lat, this.$store.state.currentLocation.lng)
-      console.log('赤道坐标(180,0)对应的地平坐标', az2, alt2, '使用时间和地点', timeUTC, this.$store.state.currentLocation.lat, this.$store.state.currentLocation.lng);
-      this.$bus.$emit('DrawTargetPointCircle',
-        az2,
-        alt2,
-        targetColor,
-        'Target_Point3',
-        '目标点3',
-        false
-      )
-      timeUTC = Date.now();
-      const { az: az3, alt: alt3 } = this.equatorialToHorizontal(270, 0, timeUTC, this.$store.state.currentLocation.lat, this.$store.state.currentLocation.lng)
-      console.log('赤道坐标(270,0)对应的地平坐标', az3, alt3, '使用时间和地点', timeUTC, this.$store.state.currentLocation.lat, this.$store.state.currentLocation.lng);
-      this.$bus.$emit('DrawTargetPointCircle',
-        az3,
-        alt3,
-        targetColor,
-        'Target_Point4',
-        '目标点4',
-        false
-      )
-      const lat = 39.805, lon = 116.208;
-      const when = new Date('2025-09-09T06:29:05Z'); // 14:29:05 +08 同一时刻
-      console.log('RA=0,Dec=0 =>', this.equatorialToHorizontal(0, 0, when, lat, lon));
-      console.log('RA=90,Dec=0 =>', this.equatorialToHorizontal(90, 0, when, lat, lon));
-      console.log('RA=180,Dec=0 =>', this.equatorialToHorizontal(180, 0, when, lat, lon));
-      console.log('RA=270,Dec=0 =>', this.equatorialToHorizontal(270, 0, when, lat, lon));
-
-      return
     },
     // === 视场数据处理方法 ===
     updateFieldData(data) {
