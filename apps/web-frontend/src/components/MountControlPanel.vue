@@ -15,29 +15,29 @@
       </div>
 
       <div class="Direction-Btn">
-        <button class="ra-plus no-select" @touchstart="handleMouseDownRA('plus')" @touchend="stop"
-          @mousedown="handleMouseDownRA('plus')" @mouseup="stop">
+        <button class="ra-plus no-select" @touchstart="handleMouseDownRA('plus')" @touchend="stopRA('plus')"
+          @mousedown="handleMouseDownRA('plus')" @mouseup="stopRA('plus')">
           <div style="display: flex; justify-content: center; align-items: center;">
             <img src="@/assets/images/svg/ui/RA+.svg" height="40px"
               style="min-height: 40px; pointer-events: none;"></img>
           </div>
         </button>
-        <button class="ra-minus no-select" @touchstart="handleMouseDownRA('minus')" @touchend="stop"
-          @mousedown="handleMouseDownRA('minus')" @mouseup="stop">
+        <button class="ra-minus no-select" @touchstart="handleMouseDownRA('minus')" @touchend="stopRA('minus')"
+          @mousedown="handleMouseDownRA('minus')" @mouseup="stopRA('minus')">
           <div style="display: flex; justify-content: center; align-items: center;">
             <img src="@/assets/images/svg/ui/RA-.svg" height="40px"
               style="min-height: 40px; pointer-events: none;"></img>
           </div>
         </button>
-        <button class="dec-plus no-select" @touchstart="handleMouseDownDEC('plus')" @touchend="stop"
-          @mousedown="handleMouseDownDEC('plus')" @mouseup="stop">
+        <button class="dec-plus no-select" @touchstart="handleMouseDownDEC('plus')" @touchend="stopDEC('plus')"
+          @mousedown="handleMouseDownDEC('plus')" @mouseup="stopDEC('plus')">
           <div style="display: flex; justify-content: center; align-items: center;">
             <img src="@/assets/images/svg/ui/DEC+.svg" height="40px"
               style="min-height: 40px; pointer-events: none;"></img>
           </div>
         </button>
-        <button class="dec-minus no-select" @touchstart="handleMouseDownDEC('minus')" @touchend="stop"
-          @mousedown="handleMouseDownDEC('minus')" @mouseup="stop">
+        <button class="dec-minus no-select" @touchstart="handleMouseDownDEC('minus')" @touchend="stopDEC('minus')"
+          @mousedown="handleMouseDownDEC('minus')" @mouseup="stopDEC('minus')">
           <div style="display: flex; justify-content: center; align-items: center;">
             <img src="@/assets/images/svg/ui/DEC-.svg" height="40px"
               style="min-height: 40px; pointer-events: none;"></img>
@@ -254,6 +254,24 @@ export default {
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'MountMoveAbort');
     },
 
+    stopRA(direction) {
+      if (!this.isMountConnected) {
+        this.$bus.$emit('showMsgBox', '赤道仪未连接，无法执行操作', 'error');
+        return;
+      }
+      this.$bus.$emit('SendConsoleLogMsg', `Mount Stop RA ${direction}`, 'info');
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'MountMoveRAStop:' + direction);
+    },
+
+    stopDEC(direction) {
+      if (!this.isMountConnected) {
+        this.$bus.$emit('showMsgBox', '赤道仪未连接，无法执行操作', 'error');
+        return;
+      }
+      this.$bus.$emit('SendConsoleLogMsg', `Mount Stop DEC ${direction}`, 'info');
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'MountMoveDECStop:' + direction);
+    },
+
     MountPark() {
       console.log('QHYCCD | Park');
       this.isParkProcessing = true;
@@ -304,7 +322,7 @@ export default {
     },
 
     MountStatus(status) {
-      if (status === 'true') {
+      if (status === 'Moving') {
         this.isIDLE = false;
       }
       else {

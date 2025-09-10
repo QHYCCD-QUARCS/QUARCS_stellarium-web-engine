@@ -741,6 +741,7 @@ export default {
       calibrationCircles: [],  // 校准点圆圈数组
       adjustmentCircles: [],   // 调整点圆圈数组
       targetPointCircle: null, // 目标点圆形对象
+      fakePolarAxisCircle : null, // 假极点圆形对象
       lastPosition: null,      // 上一次位置
       fieldUpdateTimer: null,  // 视场更新定时器
       fieldOfViewPolygons: [], // 存储视场多边形对象
@@ -907,6 +908,7 @@ export default {
     this.$bus.$on('ClearCalibrationPoints', this.clearCalibrationPoints);
     this.$bus.$on('DrawAdjustmentPointsPolygon', this.drawAdjustmentPointsPolygon);
     this.$bus.$on('DrawTargetPointCircle', this.drawTargetPointCircle);
+    this.$bus.$on('DrawFakePolarAxisCircle',this.DrawFakePolarAxisCircle)
     
     // 校准相关事件监听器
     this.$bus.$on('StartCalibration', this.startCalibrationProcess);
@@ -2011,7 +2013,7 @@ export default {
                 }
                 break;
               case 'PolarAlignmentAdjustmentGuideData':
-                if (parts.length === 13) {
+                if (parts.length === 17) {
                   const ra = parseFloat(parts[1]);
                   const dec = parseFloat(parts[2]);
                   const maxra = parseFloat(parts[3]);
@@ -2020,8 +2022,12 @@ export default {
                   const mindec = parseFloat(parts[6]);
                   const targetra = parseFloat(parts[7]);
                   const targetdec = parseFloat(parts[8]);
-                  console.log('自动对焦绘制数据: ', ra, dec, maxra, minra, maxdec, mindec,targetra,targetdec);
-                  this.$bus.$emit('FieldDataUpdate', [ra, dec, maxra, minra, maxdec, mindec,targetra,targetdec]);
+                  const fakePolarRA = parseFloat(parts[13]);
+                  const fakePolarDEC = parseFloat(parts[14]);
+                  const realPolarRA = parseFloat(parts[15]);
+                  const realPolarDEC = parseFloat(parts[16]);
+                  console.log('自动对焦绘制数据: ', ra, dec, maxra, minra, maxdec, mindec,targetra,targetdec,fakePolarRA,fakePolarDEC,realPolarRA,realPolarDEC);
+                  this.$bus.$emit('FieldDataUpdate', [ra, dec, maxra, minra, maxdec, mindec,targetra,targetdec,fakePolarRA,fakePolarDEC,realPolarRA,realPolarDEC]);
                   
                   const offsetra = parseFloat(parts[9]);
                   const offsetdec = parseFloat(parts[10]);
@@ -2491,61 +2497,6 @@ export default {
       this.loadingConnectAllDevice = true;
     },
 
-    // connectAllDevice() {
-    //   console.log("QHYCCD | connectAllDevice.");
-    //   this.SendConsoleLogMsg('Connect All Device', 'info');
-    //   this.sendMessage('Vue_Command', 'connectAllDevice');
-    //   this.loadingConnectAllDevice = true;
-    // },
-
-    // autoConnectAllDevice() {
-    //   console.log("QHYCCD | autoConnectAllDevice.");
-    //   this.SendConsoleLogMsg('Auto Connect All Device', 'info');
-    //   this.sendMessage('Vue_Command', 'autoConnectAllDevice');
-    //   this.loadingConnectAllDevice = true;
-    // },
-
-    // startConnectBtnPress() {
-    //   this.isConnectBtnLongPress = false; // 重置长按标记
-    //   this.ConnectBtnPressTimer = setTimeout(() => {
-    //     this.isConnectBtnLongPress = true; // 标记为长按
-    //     this.handleConnectBtnLongPress();
-    //   }, this.ConnectBtnlongPressThreshold);
-    // },
-    // endConnectBtnPress() {
-    //   clearTimeout(this.ConnectBtnPressTimer); // 清除定时器
-    //   if (!this.isConnectBtnLongPress) {
-    //     this.handleConnectBtnClick(); // 如果不是长按，则触发点击事件
-    //   }
-    //   this.ConnectBtnPressTimer = null; // 重置定时器
-    // },
-    // handleConnectBtnClick() {
-    //   if (this.haveDeviceConnect) {
-    //     this.callShowMessageBox('Please disconnect all devices first.', 'error');
-    //     return;
-    //   }
-    //   if (!this.ConnectBtnCanClick) return; // 如果不可点击，直接返回
-    //   this.ConnectBtnCanClick = false; // 设置为不可点击
-    //   console.log("Connect Button clicked");
-
-    //   this.connectAllDevice();
-
-    //   // 恢复点击权限
-    //   setTimeout(() => {
-    //     this.ConnectBtnCanClick = true;
-    //   }, 1000); // 1秒后恢复
-    // },
-    // handleConnectBtnLongPress() {
-    //   if (this.haveDeviceConnect) {
-    //     this.callShowMessageBox('Please disconnect all devices first.', 'error');
-    //     return;
-    //   }
-    //   // 长按事件的处理
-    //   console.log("Connect Button long pressed");
-
-    //   this.autoConnectAllDevice();
-    // },
-
     disconnectAllDevice(confirm) {
       // 检查是否有设备的 isConnected 属性为 true
       // const hasConnectedDevices = this.devices.some(device => device.isConnected);
@@ -2574,19 +2525,6 @@ export default {
       }
       this.selectedDriver = '';
     },
-
-    // clearDeviceList() {
-    //   this.devices.forEach(device => {
-    //     device.isConnected = false;
-    //     device.isget = false;
-    //     device.device = ''; 
-    //     device.driverName = '';
-    //   });
-    //   this.ToBeConnectDevice = [];
-    //   this.devicesList = [];
-    //   this.drivers = [];
-    //   this.$bus.$emit('clearDeviceAllocationList');
-    // },
 
     clearDeviceList() {
       this.devices.forEach(device => {
@@ -2697,32 +2635,6 @@ export default {
       }
     },
 
-    // confirmConfiguration(item) {
-    //   console.log(`QHYCCD | confirmConfiguration: ${item.value}`);
-    //   switch (item.driverType) {
-    //     case 'Guider':
-
-    //     case 'MainCamera':
-    //       this.$bus.$emit(item.label, item.label + ':' + item.value);
-    //     case 'Mount':
-
-    //     case 'Telescope':
-
-    //     case 'Focuser':
-    //         this.$bus.$emit(item.label, item.value);  //RedBox Side Length (px)
-
-    //     case 'PoleCamera':
-
-    //     case 'CFW':
-    //       if (item.label.startsWith('CFW [')) {
-    //         this.$bus.$emit('CFWvalue', item.label+':'+item.value);
-    //       }
-    //       else {
-    //         this.$bus.$emit(item.label, item.label+':'+item.value);
-    //       }
-    //   }
-    // },
-
     confirmConfiguration(List) {
       List.forEach(item => {
         if (item.value !== '') {
@@ -2778,14 +2690,6 @@ export default {
         this.sendMessage('Vue_Command', 'ImageGainB:' + doubleValue);
       }
     },
-
-    // CameraOffsetSet(payload) {
-    //   const [signal, value] = payload.split(':'); // 拆分信号和值
-    //   const doubleValue = parseFloat(value); // 将值转换为 double 类型
-
-    //   console.log('CameraOffset is set to:', doubleValue);
-    //   this.SendConsoleLogMsg('CameraOffset is set to:' + doubleValue, 'info');
-    // },
 
     ImageOffsetSet(payload) {
       const [signal, value] = payload.split(':'); // 拆分信号和值
@@ -5410,7 +5314,7 @@ export default {
 
     UpdateTelescopeStatus(status) {
       this.$bus.$emit('MountStatus', status);
-      if (status === 'true') {
+      if (status === 'Moving') {
         glTestCircle.color = [1, 0, 0, 0.25];
         glTestCircle.border_color = [1, 0, 0, 1];
       }
@@ -6297,149 +6201,163 @@ export default {
 
     
     // 使用新的多边形方式绘制调整点
-    drawAdjustmentPointsPolygon(currentCoordinates, targetCoordinates, currentColor, targetColor, isTimerUpdate = false) {
-      console.log('绘制调整点多边形', { currentCoordinates, targetCoordinates });
-      
+    // 使用新的多边形方式绘制调整点（不在此处画圆）
+drawAdjustmentPointsPolygon(currentCoordinates, targetCoordinates, currentColor, targetColor, isTimerUpdate) {
+  if (isTimerUpdate === undefined) isTimerUpdate = false;
+  console.log('绘制调整点多边形', { currentCoordinates, targetCoordinates });
+
+  try {
+    // 1) 清除之前的调整点
+    if (this.adjustmentCircles) {
+      this.adjustmentCircles.forEach(obj => {
+        try { glLayer.remove(obj); } catch (e) { console.warn('清除调整点时出错:', e); }
+      });
+    }
+    this.adjustmentCircles = [];
+
+    // 2) 绘制当前位置视场多边形
+    if (currentCoordinates && Array.isArray(currentCoordinates) && currentCoordinates.length === 5) {
+      console.log('绘制当前位置多边形');
+      const currentPolygon = this.AddFieldOfViewPolygon(
+        this.$stel,
+        glLayer,
+        currentCoordinates,
+        currentColor,
+        'Current'
+      );
+      if (currentPolygon) {
+        this.adjustmentCircles.push(currentPolygon);
+        console.log('当前位置多边形创建成功');
+      } else {
+        console.error('当前位置多边形创建失败');
+      }
+    } else {
+      console.warn('当前位置坐标无效，跳过绘制');
+    }
+
+    // 3) 视角转向（可选；不创建圆）
+    if (!isTimerUpdate && targetCoordinates && Array.isArray(targetCoordinates) && targetCoordinates.length === 5) {
       try {
-        // 清除之前的调整点
-        if (this.adjustmentCircles) {
-          this.adjustmentCircles.forEach(circle => {
-            try {
-              glLayer.remove(circle);
-            } catch (error) {
-              console.warn('清除调整点时出错:', error);
-            }
-          });
-        }
-        this.adjustmentCircles = [];
-        
-        // 绘制当前位置视场多边形
-        if (currentCoordinates && Array.isArray(currentCoordinates) && currentCoordinates.length === 5) {
-          console.log('绘制当前位置多边形');
-          let currentPolygon = this.AddFieldOfViewPolygon(
-            this.$stel, 
-            glLayer, 
-            currentCoordinates, 
-            currentColor, 
-            'Current'
-          );
-          
-          if (currentPolygon) {
-            this.adjustmentCircles.push(currentPolygon);
-            console.log('当前位置多边形创建成功');
-          } else {
-            console.error('当前位置多边形创建失败');
-          }
-        } else {
-          console.warn('当前位置坐标无效，跳过绘制');
-        }
-        
-        // 绘制目标位置（使用圆形）
-        if (targetCoordinates && Array.isArray(targetCoordinates) && targetCoordinates.length === 5) {
-          console.log('绘制目标位置圆形');
-          
-          // 计算目标位置中心点
-          const centerRa = targetCoordinates.reduce((sum, coord) => sum + coord.ra, 0) / targetCoordinates.length;
-          const centerDec = targetCoordinates.reduce((sum, coord) => sum + coord.dec, 0) / targetCoordinates.length;
-          
-          console.log(`目标位置中心点: RA=${centerRa}, DEC=${centerDec}`);
-          
-          let targetCircle = this.AddMarkCircle(this.$stel, glLayer, 4, 'Target');
-          if (targetCircle) {
-            let targetMm = targetCircle.pos;
-            this.vec3_from_sphe(centerRa, centerDec, targetMm);
-            targetCircle.pos = targetMm;
-            targetCircle.color = [1, 0.5, 0, 0.25];  // 橙色，半透明
-            targetCircle.border_color = [1, 0.5, 0, 1];  // 橙色边框
-            
-            // 计算目标点大小
-            const targetSize = 0.03; // 固定小尺寸
-            targetCircle.size = [targetSize, targetSize];
-            
-            this.adjustmentCircles.push(targetCircle);
-            console.log('目标位置圆形创建成功', targetCircle);
-          } else {
-            console.error('目标位置圆形创建失败');
-          }
-        } else {
-          console.warn('目标位置坐标无效，跳过绘制');
-        }
-        
-        // 视角转向控制：只在非定时器更新时转向
-        if (!isTimerUpdate && targetCoordinates && Array.isArray(targetCoordinates) && targetCoordinates.length === 5) {
-          try {
-            // 计算目标位置中心点
-            const centerRa = targetCoordinates.reduce((sum, coord) => sum + coord.ra, 0) / targetCoordinates.length;
-            const centerDec = targetCoordinates.reduce((sum, coord) => sum + coord.dec, 0) / targetCoordinates.length;
-            
-            console.log(`视角转向目标: RA=${centerRa}, DEC=${centerDec}`);
-            
-            // 创建临时对象指向目标位置
-            const targetObjConfig = { 
-              id: 'temp_target_' + Date.now(), 
-              model_data: {},
-              names: ['Target Position'],
-              types: ['Temporary'],
-              model: 'temporary'
-            };
-            const targetObj = this.$stel.createObj('circle', targetObjConfig);
-            
-            // 设置目标对象的位置
-            let targetMm = targetObj.pos;
-            this.vec3_from_sphe(centerRa, centerDec, targetMm);
-            targetObj.pos = targetMm;
-            targetObj.update();
-            
-            // 指向并锁定目标
-            this.$stel.pointAndLock(targetObj, 1.0);
-            console.log('视角转向完成');
-            
-            // 清理临时对象
-            setTimeout(() => {
-              try {
-                if (targetObj && targetObj.layer) {
-                  targetObj.layer.remove(targetObj);
-                }
-              } catch (cleanupError) {
-                console.warn('清理临时目标对象时出错:', cleanupError);
-              }
-            }, 2000); // 2秒后清理
-            
-          } catch (error) {
-            console.error('视角转向出错:', error);
-          }
-        }
-        
-              } catch (error) {
-          console.error('绘制调整点多边形时出错:', error);
-        }
-      },
+        const centerRa  = targetCoordinates.reduce((s, c) => s + c.ra, 0)  / targetCoordinates.length;
+        const centerDec = targetCoordinates.reduce((s, c) => s + c.dec, 0) / targetCoordinates.length;
+        console.log(`视角转向目标: RA=${centerRa}, DEC=${centerDec}`);
+
+        // 用临时对象只做指向，不加入 layer
+        const targetObjConfig = {
+          id: 'temp_target_' + Date.now(),
+          model_data: {},
+          names: ['Target Position'],
+          types: ['Temporary'],
+          model: 'temporary'
+        };
+        const targetObj = this.$stel.createObj('circle', targetObjConfig);
+        let mm = targetObj.pos;
+        this.vec3_from_sphe(centerRa, centerDec, mm);
+        targetObj.pos = mm;
+        if (typeof targetObj.update === 'function') targetObj.update();
+
+        this.$stel.pointAndLock(targetObj, 1.0);
+        console.log('视角转向完成');
+
+        // 清理临时对象（未加入 layer，无需 remove）
+        setTimeout(() => { try { /* no-op */ } catch (_) {} }, 0);
+      } catch (error) {
+        console.error('视角转向出错:', error);
+      }
+    }
+
+  } catch (error) {
+    console.error('绘制调整点多边形时出错:', error);
+  }
+},
+
       
-      // 绘制目标点圆形
-      drawTargetPointCircle(targetRa, targetDec, color) {
+     // 绘制目标点圆形（坐标：RA/Dec，单位：度）
+drawTargetPointCircle(targetRa, targetDec, color, name, text, clearlast) {
+  if (clearlast === undefined) clearlast = true; // 内部设置默认值
+  console.log('绘制目标点圆形', { targetRa, targetDec, color });
+
+  try {
+    // 1) 校验
+    if (!this.isValidCoordinate(targetRa) || !this.isValidCoordinate(targetDec)) {
+      console.error(text + '坐标无效:', { targetRa, targetDec });
+      return;
+    }
+
+    // 2) 清除之前的目标点
+    if (this.targetPointCircle && clearlast) {
+      try {
+        if (glLayer) {
+          glLayer.remove(this.targetPointCircle);
+          console.log('成功清除之前的' + name);
+        }
+      } catch (error) {
+        console.warn('清除之前的' + text + '时出错:', error);
+      }
+    }
+
+    // 3) 创建圆对象
+    const circle = this.AddMarkCircle(this.$stel, glLayer, 4, name); // frame=4：赤道系
+    if (!circle) {
+      console.error(text + '圆形创建失败');
+      return;
+    }
+
+    // 4) 位置（RA/Dec 度 → 3D 单位向量）
+    const mm = circle.pos;
+    this.vec3_from_sphe(targetRa, targetDec, mm);
+    circle.pos = mm;
+
+    // 5) 样式
+    if (color) {
+      const rgb = this.hexToRgb(color.stroke || color.fill || '#FF8C00');
+      const alpha = (color.fillOpacity || 0.3);
+      const borderAlpha = (color.strokeOpacity || 1.0);
+      circle.color = [rgb.r/255, rgb.g/255, rgb.b/255, alpha];
+      circle.border_color = [rgb.r/255, rgb.g/255, rgb.b/255, borderAlpha];
+    } else {
+      circle.color = [1, 0.55, 0, 0.3];
+      circle.border_color = [1, 0.55, 0, 1];
+    }
+    const size = 0.02;
+    circle.size = [size, size];
+
+    // 6) 更新 & 保存引用
+    if (typeof circle.update === 'function') circle.update();
+    this.targetPointCircle = circle;
+
+    console.log(text + '圆形创建成功', circle);
+  } catch (error) {
+    console.error('绘制' + text + '圆形时出错:', error);
+  }
+},
+
+
+    // 绘制假极轴圆形
+    DrawFakePolarAxisCircle(targetRa, targetDec, color, name, text) {
         console.log('绘制目标点圆形', { targetRa, targetDec, color });
         
         try {
           // 验证输入参数
           if (!this.isValidCoordinate(targetRa) || !this.isValidCoordinate(targetDec)) {
-            console.error('目标点坐标无效:', { targetRa, targetDec });
+            console.error(text + '坐标无效:', { targetRa, targetDec });
             return;
           }
           
           // 清除之前的目标点
-          if (this.targetPointCircle) {
+          if (this.fakePolarAxisCircle) {
             try {
               if (glLayer) {
-                glLayer.remove(this.targetPointCircle);
-                console.log('成功清除之前的目标点');
+                glLayer.remove(this.fakePolarAxisCircle);
+                console.log('成功清除之前的'+ name);
               }
             } catch (error) {
-              console.warn('清除之前的目标点时出错:', error);
+              console.warn('清除之前的'+text+'时出错:', error);
             }
           }
           
           // 创建目标点圆形
-          let targetCircle = this.AddMarkCircle(this.$stel, glLayer, 4, 'Target_Point');
+          let targetCircle = this.AddMarkCircle(this.$stel, glLayer, 4, name);
           if (targetCircle) {
             // 设置目标点位置
             let targetMm = targetCircle.pos;
@@ -6466,15 +6384,15 @@ export default {
             targetCircle.size = [targetSize, targetSize];
             
             // 保存目标点引用，用于后续清除
-            this.targetPointCircle = targetCircle;
+            this.fakePolarAxisCircle = targetCircle;
             
-            console.log('目标点圆形创建成功', targetCircle);
+            console.log(text + '圆形创建成功', targetCircle);
           } else {
-            console.error('目标点圆形创建失败');
+            console.error(text + '圆形创建失败');
           }
           
         } catch (error) {
-          console.error('绘制目标点圆形时出错:', error);
+          console.error('绘制'+text+'圆形时出错:', error);
         }
       },
 
