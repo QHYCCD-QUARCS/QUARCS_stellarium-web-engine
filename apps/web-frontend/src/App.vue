@@ -75,8 +75,11 @@
 
               <!-- 数字输入类型 -->
               <v-text-field v-if="item.inputType === 'number'" v-model="item.value" :label="item.label"
-                type="number" @input="handleConfigChange(item.label, item.value)" class="config-input">
-              </v-text-field>
+                :type="isDesktop ? 'number' : 'text'" :min="item.min" :max="item.max"
+                :step="item.step !== undefined && item.step !== null ? item.step : 1" :rules="numberRules(item)"
+                :inputmode="isMobile ? getInputMode(item) : ''" :pattern="isMobile ? getPattern(item) : ''"
+                enterkeyhint="done" @blur="onNumberCommit(item)" @keydown.enter.prevent="onNumberCommit(item)"
+                class="config-input" />
 
               <!-- 滑动条类型 -->
               <div v-if="item.inputType === 'slider'" class="slider-container">
@@ -115,130 +118,126 @@
               <v-switch v-if="item.inputType === 'switch'" v-model="item.value" :label="item.label"
                 @change="handleConfigChange(item.label, item.value)" class="config-switch">
               </v-switch>
+
+              <!-- 提示信息类型（只读） -->
+              <div v-if="item.inputType === 'tip'" class="tip-field">
+                <div class="tip-label">{{ item.label }}</div>
+                <div class="tip-value" :title="formatTipTitle(item)">
+                  {{ formatTipValue(item) }}
+                </div>
+              </div>
             </v-card-text>
+          </div>
+
+          <div v-show="DeviceIsConnected"
+            style="text-align: center; position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px;">
+            <button @click="disconnectDriver" class="btn-confirm" style="display: inline-block; background-color: red;">
+              <div style="display: flex; justify-content: center; align-items: center;">
+                <v-icon color="white">mdi-link-off</v-icon>
+              </div>
+            </button>
           </div>
 
         </div>
 
-        <div v-show="DeviceIsConnected"
-          style="text-align: center; position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px;">
-          <!-- <button @click="confirmConfiguration(CurrentConfigItems())" class="btn-confirm"
-            style="display: inline-block; user-select: none;">
-            <v-icon color="rgba(255, 255, 255)">mdi-check-bold</v-icon>
-          </button> -->
-          <button @click="disconnectDriver" class="btn-confirm" style="display: inline-block; background-color: red;">
-            <div style="display: flex; justify-content: center; align-items: center;">
-              <v-icon color="white">mdi-link-off</v-icon>
-            </div>
-          </button>
-        </div>
+        <div v-show="isOpenPowerPage">
+          <span
+            style="position: absolute; top: 0px; left: 50%; transform: translateX(-50%); font-size: 26px; color: rgba(255, 255, 255, 0.5); user-select: none; white-space: nowrap; ">
+            {{ $t('Power Management') }}
+            <v-divider></v-divider>
+          </span>
 
-        <!-- <div v-show="DeviceIsConnected"
-          style="text-align: center; position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); display: flex; justify-content: center; width: 100%;">
-          <button @click="confirmConfiguration(CurrentConfigItems())" class="btn-confirm"
-            style="display: inline-block; user-select: none;">
-            <v-icon color="rgba(255, 255, 255)">mdi-check-bold</v-icon>
-          </button>
-        </div> -->
+          <div style="position: absolute; top: 50px; max-height: calc(100% - 50px); width: 200px; overflow-y: auto;">
+            <v-list dense>
 
-      </div>
+              <v-list-item @click.stop="SwitchOutPutPower(1, OutPutPower_1_ON)"
+                :style="{ height: '36px', marginBottom: '10px' }">
+                <v-list-item-icon style="margin-right: 10px;">
+                  <div style="display: flex; justify-content: center; align-items: center;">
+                    <img src="@/assets/images/svg/ui/OutPutPower.svg" height="30px"
+                      style="min-height: 30px; pointer-events: none;"></img>
+                  </div>
+                </v-list-item-icon>
+                <v-list-item-content>
+                  <v-list-item-title>
+                    <span>
+                      <div :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('OutPut Power 1') }}
+                      </div>
+                      <div :style="{ fontSize: '7px' }" :class="{ 'connected-device': OutPutPower_1_ON }">{{
+                        OutPutPower_1_ON ?
+                          '[ON]' : '[OFF]' }}</div>
+                    </span>
+                  </v-list-item-title>
 
-      <div v-show="isOpenPowerPage">
-        <span
-          style="position: absolute; top: 0px; left: 50%; transform: translateX(-50%); font-size: 26px; color: rgba(255, 255, 255, 0.5); user-select: none; white-space: nowrap; ">
-          {{ $t('Power Management') }}
-          <v-divider></v-divider>
-        </span>
+                </v-list-item-content>
+              </v-list-item>
 
-        <div style="position: absolute; top: 50px; max-height: calc(100% - 50px); width: 200px; overflow-y: auto;">
-          <v-list dense>
+              <v-list-item @click.stop="SwitchOutPutPower(2, OutPutPower_2_ON)"
+                :style="{ height: '36px', marginBottom: '10px' }">
+                <v-list-item-icon style="margin-right: 10px;">
+                  <div style="display: flex; justify-content: center; align-items: center;">
+                    <img src="@/assets/images/svg/ui/OutPutPower.svg" height="30px"
+                      style="min-height: 30px; pointer-events: none;"></img>
+                  </div>
+                </v-list-item-icon>
+                <v-list-item-content>
+                  <v-list-item-title>
+                    <span>
+                      <div :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('OutPut Power 2') }}
+                      </div>
+                      <div :style="{ fontSize: '7px' }" :class="{ 'connected-device': OutPutPower_2_ON }">{{
+                        OutPutPower_2_ON ?
+                          '[ON]' : '[OFF]' }}</div>
+                    </span>
+                  </v-list-item-title>
 
-            <v-list-item @click.stop="SwitchOutPutPower(1, OutPutPower_1_ON)"
-              :style="{ height: '36px', marginBottom: '10px' }">
-              <v-list-item-icon style="margin-right: 10px;">
-                <div style="display: flex; justify-content: center; align-items: center;">
-                  <img src="@/assets/images/svg/ui/OutPutPower.svg" height="30px"
-                    style="min-height: 30px; pointer-events: none;"></img>
-                </div>
-              </v-list-item-icon>
-              <v-list-item-content>
-                <v-list-item-title>
-                  <span>
-                    <div :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('OutPut Power 1') }}
-                    </div>
-                    <div :style="{ fontSize: '7px' }" :class="{ 'connected-device': OutPutPower_1_ON }">{{
-                      OutPutPower_1_ON ?
-                        '[ON]' : '[OFF]' }}</div>
-                  </span>
-                </v-list-item-title>
+                </v-list-item-content>
+              </v-list-item>
 
-              </v-list-item-content>
-            </v-list-item>
+              <v-divider :style="{ marginBottom: '10px' }"></v-divider>
 
-            <v-list-item @click.stop="SwitchOutPutPower(2, OutPutPower_2_ON)"
-              :style="{ height: '36px', marginBottom: '10px' }">
-              <v-list-item-icon style="margin-right: 10px;">
-                <div style="display: flex; justify-content: center; align-items: center;">
-                  <img src="@/assets/images/svg/ui/OutPutPower.svg" height="30px"
-                    style="min-height: 30px; pointer-events: none;"></img>
-                </div>
-              </v-list-item-icon>
-              <v-list-item-content>
-                <v-list-item-title>
-                  <span>
-                    <div :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('OutPut Power 2') }}
-                    </div>
-                    <div :style="{ fontSize: '7px' }" :class="{ 'connected-device': OutPutPower_2_ON }">{{
-                      OutPutPower_2_ON ?
-                        '[ON]' : '[OFF]' }}</div>
-                  </span>
-                </v-list-item-title>
-
-              </v-list-item-content>
-            </v-list-item>
-
-            <v-divider :style="{ marginBottom: '10px' }"></v-divider>
-
-            <v-list-item @click.stop="RestartRaspberryPi()" :style="{ height: '36px', marginBottom: '10px' }">
-              <v-list-item-icon style="margin-right: 10px;">
-                <div style="display: flex; justify-content: center; align-items: center;">
-                  <img src="@/assets/images/svg/ui/Reboot.svg" height="30px"
-                    style="min-height: 30px; pointer-events: none;"></img>
-                </div>
-              </v-list-item-icon>
-              <v-list-item-content>
-                <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Restart')
+              <v-list-item @click.stop="RestartRaspberryPi()" :style="{ height: '36px', marginBottom: '10px' }">
+                <v-list-item-icon style="margin-right: 10px;">
+                  <div style="display: flex; justify-content: center; align-items: center;">
+                    <img src="@/assets/images/svg/ui/Reboot.svg" height="30px"
+                      style="min-height: 30px; pointer-events: none;"></img>
+                  </div>
+                </v-list-item-icon>
+                <v-list-item-content>
+                  <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Restart')
                   }}</v-list-item-title>
-              </v-list-item-content>
-            </v-list-item>
+                </v-list-item-content>
+              </v-list-item>
 
-            <v-list-item @click.stop="ShutdownRaspberryPi()" :style="{ height: '36px', marginBottom: '10px' }">
-              <v-list-item-icon style="margin-right: 10px;">
-                <div style="display: flex; justify-content: center; align-items: center;">
-                  <img src="@/assets/images/svg/ui/PowerOFF.svg" height="30px"
-                    style="min-height: 30px; pointer-events: none;"></img>
-                </div>
-              </v-list-item-icon>
-              <v-list-item-content>
-                <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Shut Down')
+              <v-list-item @click.stop="ShutdownRaspberryPi()" :style="{ height: '36px', marginBottom: '10px' }">
+                <v-list-item-icon style="margin-right: 10px;">
+                  <div style="display: flex; justify-content: center; align-items: center;">
+                    <img src="@/assets/images/svg/ui/PowerOFF.svg" height="30px"
+                      style="min-height: 30px; pointer-events: none;"></img>
+                  </div>
+                </v-list-item-icon>
+                <v-list-item-content>
+                  <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Shut Down')
                   }}</v-list-item-title>
-              </v-list-item-content>
-            </v-list-item>
-            <!-- 强制更新 -->
-            <v-list-item @click.stop="ForceUpdate()" :style="{ height: '36px', marginBottom: '10px' }">
-              <v-list-item-icon style="margin-right: 10px;">
-                <div style="display: flex; justify-content: center; align-items: center;">
-                  <img src="@/assets/images/svg/ui/PowerOFF.svg" height="30px"
-                    style="min-height: 30px; pointer-events: none;"></img>
-                </div>
-              </v-list-item-icon>
-              <v-list-item-content>
-                <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Force Update')
+                </v-list-item-content>
+              </v-list-item>
+              <!-- 强制更新 -->
+              <v-list-item @click.stop="ForceUpdate()" :style="{ height: '36px', marginBottom: '10px' }">
+                <v-list-item-icon style="margin-right: 10px;">
+                  <div style="display: flex; justify-content: center; align-items: center;">
+                    <img src="@/assets/images/svg/ui/PowerOFF.svg" height="30px"
+                      style="min-height: 30px; pointer-events: none;"></img>
+                  </div>
+                </v-list-item-icon>
+                <v-list-item-content>
+                  <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Force Update')
                   }}</v-list-item-title>
-              </v-list-item-content>
-            </v-list-item>
+                </v-list-item-content>
+              </v-list-item>
 
-          </v-list>
+            </v-list>
+          </div>
+
         </div>
 
       </div>
@@ -525,7 +524,8 @@
     </v-dialog>
 
     <!-- 校准信息显示框 -->
-    <div v-if="calibrationInfo.isCalibrating || calibrationInfo.calibrationState === 'complete'" class="calibration-info-box">
+    <div v-if="calibrationInfo.isCalibrating || calibrationInfo.calibrationState === 'complete'"
+      class="calibration-info-box">
       <div class="calibration-content">
         <div class="calibration-title">{{ $t('Focuser Travel Calibration') }}</div>
         <div class="calibration-message">{{ calibrationInfo.calibrationMessage }}</div>
@@ -633,17 +633,20 @@ export default {
         { driverType: 'MainCamera', label: 'ImageCFA', value: '', inputType: 'select', selectValue: ['GR', 'GB', 'BG', 'RGGB', 'null'] },
         // 硬件处理参数
         { driverType: 'MainCamera', label: 'Binning', value: '', inputType: 'slider', inputMin: 1, inputMax: 16, inputStep: 1 },
-        { driverType: 'MainCamera', label: 'Temperature', value: '', inputType: 'select',selectValue : [5,0,-5,-10,-15,-20,-25] },
+        { driverType: 'MainCamera', label: 'Temperature', value: '', inputType: 'select', selectValue: [5, 0, -5, -10, -15, -20, -25] },
         { driverType: 'MainCamera', label: 'Gain', value: '', inputType: 'slider', inputMin: 0, inputMax: 0, inputStep: 1 },
         { driverType: 'MainCamera', label: 'Offset', value: '', inputType: 'slider', inputMin: 0, inputMax: 0, inputStep: 1 },
       ],
 
       MountConfigItems: [
+        { driverType: 'Mount', label: 'Flip ETA', value: '00:00:00', displayValue: '00:00:00', inputType: 'tip' },
         { driverType: 'Mount', label: 'GotoThenSolve', value: false, inputType: 'switch' },
+
+        // { driverType: 'Mount', label: 'isAutoFlip', value: false, inputType: 'switch' },
       ],
 
       TelescopesConfigItems: [
-        { driverType: 'Telescopes', num: 1, label: 'Focal Length (mm)', value: '', inputType: 'text' },
+        { driverType: 'Telescopes', num: 1, label: 'Focal Length (mm)', value: '', inputType: 'number' },
       ],
 
       FocuserConfigItems: [
@@ -736,12 +739,12 @@ export default {
       LastCircle_AzAlt: null,
 
       Circles: [],
-      
+
       // 极轴校准相关数组
       calibrationCircles: [],  // 校准点圆圈数组
       adjustmentCircles: [],   // 调整点圆圈数组
       targetPointCircle: null, // 目标点圆形对象
-      fakePolarAxisCircle : null, // 假极点圆形对象
+      fakePolarAxisCircle: null, // 假极点圆形对象
       lastPosition: null,      // 上一次位置
       fieldUpdateTimer: null,  // 视场更新定时器
       fieldOfViewPolygons: [], // 存储视场多边形对象
@@ -842,7 +845,7 @@ export default {
       progressDescription: '', // 控制进度条显示内容
 
       calculateGain: true, // 控制是否计算白平衡增益
-      lutCache : {
+      lutCache: {
         lastParams: null, // 用于存储上次的参数
         lutR: null,
         lutG: null,
@@ -880,6 +883,9 @@ export default {
     this.$bus.$on('Dec Aggression', this.DecAggressionSet);
     this.$bus.$on('Sync Focuser Step', this.SyncFocuserStep);
     this.$bus.$on('GotoThenSolve', this.GotoThenSolve);
+    this.$bus.$on('AutoFlip', this.AutoFlipSet);
+    this.$bus.$on('WestMinutesPastMeridian', this.WestMinutesPastMeridianSet);
+    this.$bus.$on('EastMinutesPastMeridian', this.EastMinutesPastMeridianSet);
     this.$bus.$on('ImageProportion', this.setImageProportion);
     this.$bus.$on('MountGoto', this.lookatcircle);
     this.$bus.$on('SwitchImageToShow', this.SwitchImageToShow);
@@ -902,45 +908,127 @@ export default {
     this.$bus.$on('setShowSelectStar', this.setShowSelectStar);  // 设置是否显示选择星点
     this.$bus.$on('ScaleChange', this.ScaleChange);
     this.$bus.$on('showCanvas', this.showCanvas);
-    
+
     // 极轴校准绘制相关监听器
     this.$bus.$on('DrawCalibrationPointPolygon', this.drawCalibrationPointPolygon);
     this.$bus.$on('ClearCalibrationPoints', this.clearCalibrationPoints);
     this.$bus.$on('DrawAdjustmentPointsPolygon', this.drawAdjustmentPointsPolygon);
     this.$bus.$on('DrawTargetPointCircle', this.drawTargetPointCircle);
-    this.$bus.$on('DrawFakePolarAxisCircle',this.DrawFakePolarAxisCircle)
-    
+    this.$bus.$on('DrawFakePolarAxisCircle', this.DrawFakePolarAxisCircle)
+
     // 校准相关事件监听器
     this.$bus.$on('StartCalibration', this.startCalibrationProcess);
     this.$bus.$on('UpdateCalibrationInfo', this.updateCalibrationInfo);
     this.$bus.$on('EndCalibration', this.endCalibration);
-    
+
     this.memoryCheckInterval = setInterval(this.checkMemoryUsage, 30000);
-    
+
 
   },
   methods: {
+    // 是否允许小数：step 不是整数，或显式允许
+    allowsDecimal(item) {
+      const step = item.step ?? 1;
+      return item.allowDecimal === true || !Number.isInteger(step) || String(step).includes('.');
+    },
+    // 是否允许负数：根据配置或 min<0 猜测
+    allowsNegative(item) {
+      return item.allowNegative === true || (typeof item.min === 'number' && item.min < 0);
+    },
+    // 移动端键盘类型
+    getInputMode(item) {
+      // 仅移动端生效；桌面忽略
+      if (!this.isMobile) return undefined;
+      // 需要小数或负数，用 decimal（更容易出现小数点/负号）
+      return this.allowsDecimal(item) || this.allowsNegative(item) ? 'decimal' : 'numeric';
+    },
+    // 配合 iOS：pattern 可影响弹出键盘与校验
+    getPattern(item) {
+      const neg = this.allowsNegative(item);
+      if (this.allowsDecimal(item)) {
+        // 允许 . 或 , 作为小数点，便于不同语言键盘
+        return neg ? '^[-]?[0-9]*([.,][0-9]*)?$' : '^[0-9]*([.,][0-9]*)?$';
+      }
+      // 整数
+      return neg ? '^[-]?[0-9]*$' : '^[0-9]*$';
+    },
+
+    numberRules(item) {
+      return [
+        v => v === '' || v === null || !isNaN(this._toNumber(v)) || '请输入数字',
+        v => item.min === undefined || this._toNumber(v) >= item.min || `最小值 ${item.min}`,
+        v => item.max === undefined || this._toNumber(v) <= item.max || `最大值 ${item.max}`,
+      ];
+    },
+
+    // 统一把逗号小数转为点，去掉多余空白
+    _toNumber(v) {
+      if (v === '' || v === null || v === undefined) return NaN;
+      if (typeof v === 'number') return v;
+      const s = String(v).trim().replace(',', '.');
+      return Number(s);
+    },
+
+    onNumberCommit(item) {
+      let v = this._toNumber(item.value);
+      if (!Number.isFinite(v)) return;
+
+      // 1) 夹取到 min/max
+      if (item.min !== undefined && v < item.min) v = item.min;
+      if (item.max !== undefined && v > item.max) v = item.max;
+
+      // 2) 按 step 对齐（以 min 或 0 为基准）
+      const step = item.step ?? 1;
+      if (step > 0) {
+        const base = (item.min !== undefined ? item.min : 0);
+        v = base + Math.round((v - base) / step) * step;
+        if (item.min !== undefined && v < item.min) v = item.min;
+        if (item.max !== undefined && v > item.max) v = item.max;
+        v = Number(v.toFixed(12)); // 去浮点误差
+      }
+
+      // 回写并通知
+      item.value = v;
+      this.handleConfigChange(item.label, v);
+    },
     checkMemoryUsage() {
       if (window.performance && window.performance.memory) {
         const memoryInfo = window.performance.memory;
-        const used = Math.round(memoryInfo.usedJSHeapSize/1048576);
-        const limit = Math.round(memoryInfo.jsHeapSizeLimit/1048576);
-        
+        const used = Math.round(memoryInfo.usedJSHeapSize / 1048576);
+        const limit = Math.round(memoryInfo.jsHeapSizeLimit / 1048576);
+
         // console.log(`内存使用: ${used}MB / ${limit}MB`);
-        
+
         if (memoryInfo.usedJSHeapSize > memoryInfo.jsHeapSizeLimit * 0.7) {
-          this.$bus.$emit('showWarning', this.$i18n.locale === 'cn' ? 
-            '内存使用接近限制，请保存工作后刷新页面' : 
+          this.$bus.$emit('showWarning', this.$i18n.locale === 'cn' ?
+            '内存使用接近限制，请保存工作后刷新页面' :
             'Memory usage is approaching limit. Please save your work and refresh the page.');
-            
+
           // 可选：尝试手动触发垃圾回收
           if (window.gc) {
-            try { window.gc(); } catch (e) {}
+            try { window.gc(); } catch (e) { }
           }
         }
       }
     },
-    
+
+    formatTipValue(item) {
+      return (item && item.displayValue != null)
+        ? String(item.displayValue)
+        : (item && item.value != null ? String(item.value) : '-');
+    },
+    formatTipTitle(item) {
+      if (item && item.tooltip != null) return String(item.tooltip);
+      if (item && item.value != null) return String(item.value);
+      return '';
+    },
+    copyTip(item) {
+      const text = (item && item.value != null) ? String(item.value) : '';
+      if (!text) return;
+      if (navigator && navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text);
+      }
+    },
 
     preventDefault(event) {
       event.preventDefault();
@@ -1156,7 +1244,7 @@ export default {
                 if (parts.length === 3) {
                   const col = parts[1];
                   const row = parts[2];
-                  this.$bus.$emit("GuideSize",col,row);
+                  this.$bus.$emit("GuideSize", col, row);
                 }
 
               case 'AddScatterChartData':
@@ -1380,7 +1468,7 @@ export default {
               case 'TelescopeRADEC':
                 if (parts.length === 3) {
                   this.UpdateCirclePos(parts[1], parts[2]);
-                  this.$bus.$emit('updateCurrentLocation',parts[1], parts[2]);
+                  this.$bus.$emit('updateCurrentLocation', parts[1], parts[2]);
                 }
                 break;
 
@@ -1491,10 +1579,10 @@ export default {
                 }
                 break;
 
-              case 'SolveImageSucceeded':                           
-                  console.log('解析同步成功');
-                  this.$bus.$emit("handleOperationComplete","solve");
-                  this.$bus.$emit('showMsgBox', 'Solve image succeed!', 'success');
+              case 'SolveImageSucceeded':
+                console.log('解析同步成功');
+                this.$bus.$emit("handleOperationComplete", "solve");
+                this.$bus.$emit('showMsgBox', 'Solve image succeed!', 'success');
                 break;
 
               case 'SolveImagefailed':
@@ -2013,30 +2101,40 @@ export default {
                 }
                 break;
               case 'PolarAlignmentAdjustmentGuideData':
-                if (parts.length === 17) {
+                if (parts.length === 21) {  // 从17改为21
                   const ra = parseFloat(parts[1]);
                   const dec = parseFloat(parts[2]);
-                  const maxra = parseFloat(parts[3]);
-                  const minra = parseFloat(parts[4]);
-                  const maxdec = parseFloat(parts[5]);
-                  const mindec = parseFloat(parts[6]);
-                  const targetra = parseFloat(parts[7]);
-                  const targetdec = parseFloat(parts[8]);
-                  const fakePolarRA = parseFloat(parts[13]);
-                  const fakePolarDEC = parseFloat(parts[14]);
-                  const realPolarRA = parseFloat(parts[15]);
-                  const realPolarDEC = parseFloat(parts[16]);
-                  console.log('自动对焦绘制数据: ', ra, dec, maxra, minra, maxdec, mindec,targetra,targetdec,fakePolarRA,fakePolarDEC,realPolarRA,realPolarDEC);
-                  this.$bus.$emit('FieldDataUpdate', [ra, dec, maxra, minra, maxdec, mindec,targetra,targetdec,fakePolarRA,fakePolarDEC,realPolarRA,realPolarDEC]);
-                  
-                  const offsetra = parseFloat(parts[9]);
-                  const offsetdec = parseFloat(parts[10]);
-                  const adjustmentra = parts[11];
-                  const adjustmentdec = parts[12];
-                  console.log('自动对焦显示更新数据: ', offsetra, offsetdec, adjustmentra, adjustmentdec);  
-                  // this.$bus.$emit('', offsetra, offsetdec, adjustmentra, adjustmentdec);
-                  this.$bus.$emit('updateCardInfo', ra, dec, targetra, targetdec,offsetra,offsetdec,adjustmentra,adjustmentdec);
-                  // this.$bus.$emit('focusMoveFailed', 'focusMoveFailed');
+                  // 新增：四个角点
+                  const ra0 = parseFloat(parts[3]);
+                  const dec0 = parseFloat(parts[4]);
+                  const ra1 = parseFloat(parts[5]);
+                  const dec1 = parseFloat(parts[6]);
+                  const ra2 = parseFloat(parts[7]);
+                  const dec2 = parseFloat(parts[8]);
+                  const ra3 = parseFloat(parts[9]);
+                  const dec3 = parseFloat(parts[10]);
+
+                  const targetra = parseFloat(parts[11]);
+                  const targetdec = parseFloat(parts[12]);
+                  const offsetra = parseFloat(parts[13]);
+                  const offsetdec = parseFloat(parts[14]);
+                  const adjustmentra = parts[15];
+                  const adjustmentdec = parts[16];
+                  const fakePolarRA = parseFloat(parts[17]);
+                  const fakePolarDEC = parseFloat(parts[18]);
+                  const realPolarRA = parseFloat(parts[19]);
+                  const realPolarDEC = parseFloat(parts[20]);
+
+
+                  // console.log('自动对焦绘制数据: ', ra, dec, targetra, targetdec, fakePolarRA, fakePolarDEC, realPolarRA, realPolarDEC);
+                  console.log('四角点数据: ', ra0, dec0, ra1, dec1, ra2, dec2, ra3, dec3);
+
+                  // 现有事件保持不变（使用计算的max/min值兼容）
+                  this.$bus.$emit('FieldDataUpdate', [ra, dec, ra0, dec0, ra1, dec1, ra2, dec2, ra3, dec3, targetra, targetdec, fakePolarRA, fakePolarDEC, realPolarRA, realPolarDEC]);
+
+                  // console.log('自动对焦显示更新数据: ', offsetra, offsetdec, adjustmentra, adjustmentdec);
+                  this.$bus.$emit('updateCardInfo', ra, dec, targetra, targetdec, offsetra, offsetdec, adjustmentra, adjustmentdec, "deg");
+
                 }
                 break;
 
@@ -2054,9 +2152,87 @@ export default {
                   this.$bus.$emit('focusMoveFailed', message);
                 }
                 break;
-              
 
+              case 'MeridianETA_hms': {
+                if (parts.length >= 4) {
+                  const h = parts[1];
+                  const m = parts[2];
+                  const s = parts[3];
 
+                  const hms = `${h}:${m}:${s}`;
+                  const item = this.MountConfigItems.find(i => i.label === 'Flip ETA');
+                  if (item) {
+                    item.value = hms;
+                    item.displayValue = hms;
+                  }
+                }
+                break;
+              }
+
+              case 'AutoFlip':
+                if (parts.length >= 2) {
+                  const isAutoFlip = parts[1];
+                  // 查找是否已存在 "AutoFlip" 项
+                  let item = this.MountConfigItems.find(i => i.label === 'AutoFlip');
+                  if (item) {
+                    // 已存在 → 更新
+                    item.value = isAutoFlip == 'true';
+                  } else {
+                    // 不存在 → 新增
+                    this.MountConfigItems.push({ driverType: 'Mount', label: 'AutoFlip', value: isAutoFlip == 'true', inputType: 'switch' },);
+                  }
+                }
+                break;
+
+              // case 'MinutesPastMeridian':
+              //   if (parts.length >= 3) {
+              //     const EastMinutesPastMeridian = parts[1];
+              //     const WestMinutesPastMeridian = parts[2];
+              //     let item = this.MountConfigItems.find(i => i.label === 'EastMinutesPastMeridian');
+              //     if (item) {
+              //       item.value = EastMinutesPastMeridian;
+              //     } else {
+              //       this.MountConfigItems.push({ driverType: 'Mount', label: 'EastMinutesPastMeridian', value: EastMinutesPastMeridian,min:-180,max:180, inputType: 'number' },);
+              //     }
+              //     item = this.MountConfigItems.find(i => i.label === 'WestMinutesPastMeridian');
+              //     if (item) {
+              //       item.value = WestMinutesPastMeridian;
+              //     } else {
+              //       this.MountConfigItems.push({ driverType: 'Mount', label: 'WestMinutesPastMeridian', value: WestMinutesPastMeridian,min:-180,max:180, inputType: 'number' },);
+              //     }
+              //   }
+              //   break;
+              case 'EastMinutesPastMeridian':
+                if (parts.length === 2) {
+                  const EastMinutesPastMeridian = parts[1];
+                  let item = this.MountConfigItems.find(i => i.label === 'EastMinutesPastMeridian');
+                  if (item) {
+                    item.value = EastMinutesPastMeridian;
+                  } else {
+                    this.MountConfigItems.push({ driverType: 'Mount', label: 'EastMinutesPastMeridian', value: EastMinutesPastMeridian, min: -180, max: 180, inputType: 'number' },);
+                  }
+                }
+                break;
+              case 'WestMinutesPastMeridian':
+                if (parts.length === 2) {
+                  const WestMinutesPastMeridian = parts[1];
+                  let item = this.MountConfigItems.find(i => i.label === 'WestMinutesPastMeridian');
+                  if (item) {
+                    item.value = WestMinutesPastMeridian;
+                  } else {
+                    this.MountConfigItems.push({ driverType: 'Mount', label: 'WestMinutesPastMeridian', value: WestMinutesPastMeridian, min: -180, max: 180, inputType: 'number' },);
+                  }
+                }
+                break;
+              case 'GotoThenSolve':
+                if (parts.length === 2) {
+                  const GotoThenSolve = parts[1];
+                  let item = this.MountConfigItems.find(i => i.label === 'GotoThenSolve');
+                  if (item) {
+                    item.value = GotoThenSolve;
+                  }
+                }
+                break;
 
               default:
                 console.warn('未处理命令: ', data.message);
@@ -2080,22 +2256,22 @@ export default {
             if (parts.length === 2) {
               const version = parts[1];
               this.SendConsoleLogMsg('获取到更新包版本: ' + version, 'info');
-              
-              this.ShowConfirmDialog('ForceUpdate', this.$t('checkHasNewUpdatePack') + ': ' + version + '，' + this.$t('updateConfirm'), 'updateCurrentClient:'+version);
+
+              this.ShowConfirmDialog('ForceUpdate', this.$t('checkHasNewUpdatePack') + ': ' + version + '，' + this.$t('updateConfirm'), 'updateCurrentClient:' + version);
             }
           }
           else if (parts[0] === 'No_update_pack_found') {
             this.callShowMessageBox(this.$t('No_update_pack_found'), 'error');
-          }else if (parts[0] === 'update_progress') {
+          } else if (parts[0] === 'update_progress') {
             this.$bus.$emit('update_progress', data.message);
-          }else if (parts[0] === 'update_error') {
+          } else if (parts[0] === 'update_error') {
             this.$bus.$emit('update_error', data.message);
-          }else if (parts[0] === 'update_success') {
+          } else if (parts[0] === 'update_success') {
             this.$bus.$emit('update_success', data.message);
-          }else if (parts[0] === 'testQtServerProcess') {
-            
+          } else if (parts[0] === 'testQtServerProcess') {
+
           }
-          else{
+          else {
             console.warn('未处理命令: ', data.message);
           }
         }
@@ -2250,6 +2426,7 @@ export default {
       this.sendMessage('Vue_Command', 'localMessage'); // 获取位置信息
       this.sendMessage('Vue_Command', 'getLastSelectDevice'); // 获取上一次选择的设备
       this.sendMessage('Vue_Command', 'getMainCameraParameters'); // 获取主相机参数
+      this.sendMessage('Vue_Command', 'getMountParameters'); // 获取赤道仪UI信息
       this.RecalibratePolarAxis(); // 重新校准极轴
       this.sendMessage('Vue_Command', 'getStagingSolveResult'); // 获取定标结果
       this.sendMessage('Vue_Command', 'getFocuserLoopingState'); // 获取焦距器循环状态
@@ -2258,7 +2435,8 @@ export default {
       this.sendMessage('Vue_Command', 'getGPIOsStatus'); // 获取GPIO状态
       // this.sendMessage('Vue_Command', 'getStagingImage'); // 获取最后拍摄的图像
       this.sendMessage('Vue_Command', 'getPolarAlignmentState'); // 获取极轴对齐状态
-      
+
+
       this.disconnectTimeoutTriggered = false;
     },
 
@@ -2444,7 +2622,7 @@ export default {
         // if (!this.isConnectBtnLongPress) {
         //   this.handleConnectBtnClick(); // 如果不是长按，则触发点击事件
         // }
-        this.handleConnectBtnClick(); 
+        this.handleConnectBtnClick();
         this.ConnectBtnPressTimer = null; // 重置定时器
         this.isTouching = false; // 重置触摸标记
       }
@@ -2454,7 +2632,7 @@ export default {
         // if (!this.isConnectBtnLongPress) {
         //   this.handleConnectBtnClick(); // 如果不是长按，则触发点击事件
         // }
-        this.handleConnectBtnClick(); 
+        this.handleConnectBtnClick();
         this.ConnectBtnPressTimer = null; // 重置定时器
       }
     },
@@ -2615,15 +2793,15 @@ export default {
       this.nav = false;
     },
 
-    CurrentExpTimeList(index, value) {
-      const expTimeIndex = this.MainCameraConfigItems.findIndex(item => item.label === 'ExpTime [' + (index + 1) + ']');
-      if (expTimeIndex !== -1) { // 确保找到了对应的配置项
-        // 更新 ExpTime1 配置项的值
-        this.MainCameraConfigItems[expTimeIndex].value = value;
-      } else {
-        console.error('ExpTime [' + index + '] configuration item not found.');
-      }
-    },
+    // CurrentExpTimeList(index, value) {
+    //   const expTimeIndex = this.MainCameraConfigItems.findIndex(item => item.label === 'ExpTime [' + (index + 1) + ']');
+    //   if (expTimeIndex !== -1) { // 确保找到了对应的配置项
+    //     // 更新 ExpTime1 配置项的值
+    //     this.MainCameraConfigItems[expTimeIndex].value = value;
+    //   } else {
+    //     console.error('ExpTime [' + index + '] configuration item not found.');
+    //   }
+    // },
 
     CurrentCFWList(index, value) {
       const expTimeIndex = this.CFWConfigItems.findIndex(item => item.label === 'CFW [' + (index + 1) + ']');
@@ -2855,6 +3033,27 @@ export default {
       const BooleanValue = Boolean(value);
       this.SendConsoleLogMsg('Goto Then Solve:' + BooleanValue, 'info');
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'GotoThenSolve:' + BooleanValue);
+    },
+
+    AutoFlipSet(payload) {
+      const [signal, value] = payload.split(':'); // 拆分信号和值
+      const BooleanValue = Boolean(value);
+      this.SendConsoleLogMsg('Auto Flip:' + BooleanValue, 'info');
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'AutoFlip:' + BooleanValue);
+    },
+
+    WestMinutesPastMeridianSet(payload) {
+      const [signal, value] = payload.split(':'); // 拆分信号和值
+      const WestMinutesPastMeridian = parseFloat(value);
+      this.SendConsoleLogMsg('Minutes Past Meridian:' + WestMinutesPastMeridian, 'info');
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'WestMinutesPastMeridian:' + WestMinutesPastMeridian);
+    },
+
+    EastMinutesPastMeridianSet(payload) {
+      const [signal, value] = payload.split(':'); // 拆分信号和值
+      const EastMinutesPastMeridian = parseFloat(value);
+      this.SendConsoleLogMsg('Minutes Past Meridian:' + EastMinutesPastMeridian, 'info');
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'EastMinutesPastMeridian:' + EastMinutesPastMeridian);
     },
 
     async readBinFile(fileName, retryCount = 1) {
@@ -3284,7 +3483,7 @@ export default {
         this.checkMemoryUsage();
         // 在处理完大量数据后手动请求垃圾回收
         if (window.gc) {
-          try { window.gc(); } catch (e) {}
+          try { window.gc(); } catch (e) { }
         }
       }
     },
@@ -3513,11 +3712,11 @@ export default {
           const histDataR = Array(65536).fill(0);
           const histDataG = Array(65536).fill(0);
           const histDataB = Array(65536).fill(0);
-          
+
           // 确保安全访问
           const maxRows = rows - 1;
           const maxCols = cols - 1;
-          
+
           for (let i = 0; i < maxRows; i += 2) {
             for (let j = 0; j < maxCols; j += 2) {
               try {
@@ -3585,7 +3784,7 @@ export default {
           console.error("释放资源错误", e);
         }
       }
-      
+
       return result;
     },
 
@@ -3596,13 +3795,13 @@ export default {
      * @param {number} upperPercent - 上截断百分比，默认5%
      * @returns {number} 截断均值
      */
-     truncatedMean(arr, lowerPercent = 5, upperPercent = 5) {
+    truncatedMean(arr, lowerPercent = 5, upperPercent = 5) {
       if (arr.length === 0) return 0;
-      
+
       // 过滤极端黑点和过饱和点
       const filtered = arr.filter(v => v > 100 && v < 65000);
       if (filtered.length === 0) return arr.length > 0 ? arr[0] : 0;
-      
+
       // 对于特别大的数组，采样处理
       let workingArray = filtered;
       if (filtered.length > 10000) {
@@ -3612,20 +3811,20 @@ export default {
           workingArray.push(filtered[i]);
         }
       }
-      
+
       // 排序数组
       workingArray.sort((a, b) => a - b);
-      
+
       // 计算截断点
       const lowerCutoff = Math.floor(workingArray.length * (lowerPercent / 100));
       const upperCutoff = Math.floor(workingArray.length * (1 - upperPercent / 100));
-      
+
       // 获取截断后的子数组
       const truncated = workingArray.slice(lowerCutoff, upperCutoff);
-      
+
       // 计算平均值
       if (truncated.length === 0) return workingArray[Math.floor(workingArray.length / 2)];
-      
+
       const sum = truncated.reduce((acc, val) => acc + val, 0);
       return sum / truncated.length;
     },
@@ -3791,41 +3990,41 @@ export default {
     getLUT(blackLevel, whiteLevel, gainR, gainB) {
       // 创建当前参数的快照
       const currentParams = `${blackLevel}_${whiteLevel}_${gainR}_${gainB}`;
-      
+
       // 如果参数未变化，直接返回缓存的LUT表
-      if (this.lutCache.lastParams === currentParams && 
-          this.lutCache.lutR && this.lutCache.lutG && this.lutCache.lutB) {
+      if (this.lutCache.lastParams === currentParams &&
+        this.lutCache.lutR && this.lutCache.lutG && this.lutCache.lutB) {
         return {
           lutR: this.lutCache.lutR,
           lutG: this.lutCache.lutG,
           lutB: this.lutCache.lutB
         };
       }
-      
+
       // 参数变化，需要重新计算LUT表
       console.log('重新计算LUT表');
-      
+
       // 计算转换比例
       const scale = 255.0 / (whiteLevel - blackLevel);
-      
+
       // 创建LUT表
       const lutR = this.lutCache.lutR || new Uint8Array(65536);
       const lutG = this.lutCache.lutG || new Uint8Array(65536);
       const lutB = this.lutCache.lutB || new Uint8Array(65536);
-      
+
       // 计算LUT表
       for (let i = 0; i < 65536; i++) {
         lutR[i] = Math.min(255, Math.max(0, Math.round((i * gainR - blackLevel) * scale)));
         lutG[i] = Math.min(255, Math.max(0, Math.round((i - blackLevel) * scale)));
         lutB[i] = Math.min(255, Math.max(0, Math.round((i * gainB - blackLevel) * scale)));
       }
-      
+
       // 更新缓存
       this.lutCache.lastParams = currentParams;
       this.lutCache.lutR = lutR;
       this.lutCache.lutG = lutG;
       this.lutCache.lutB = lutB;
-      
+
       return { lutR, lutG, lutB };
     },
     // checkImageData(img) {
@@ -4261,166 +4460,6 @@ export default {
       }
     },
 
-    // drawImageData() {
-    //   if (this.bufferCanvas == null) {
-    //     this.SendConsoleLogMsg('drawImageData error: bufferCanvas is null or undefined.', 'error');
-    //     return;
-    //   }
-    //   // 可用相关参数
-    //   // window.innerWidth; // 窗口宽度
-    //   // window.innerHeight; // 窗口高度
-    //   // this.scale 缩放比例
-    //   // this.translateX 平移x坐标
-    //   // this.translateY 平移y坐标
-    //   // this.CanvasWidth 主画布宽度 1920
-    //   // this.CanvasHeight 主画布高度 1080
-    //   // this.mainCameraSizeX 原始图像宽度
-    //   // this.mainCameraSizeY 原始图像高度
-    //   // this.bufferCanvas.width 缓冲画布宽度
-    //   // this.bufferCanvas.height 缓冲画布高度
-    //   // this.ImageProportion 图像比例
-    //   // this.ROI_x ROI的x坐标
-    //   // this.ROI_y ROI的y坐标
-    //   // this.ROI_length ROI的长度
-
-    //   // console.log('当前画布参数:\n bufferCanvas.width: ', this.bufferCanvas.width, '\n bufferCanvas.height: ', this.bufferCanvas.height, '\n ImageProportion: ', this.ImageProportion, '\n scale: ', this.scale, '\n visibleX: ', this.visibleX, '\n visibleY: ', this.visibleY, '\n visibleWidth: ', this.visibleWidth, '\n visibleHeight: ', this.visibleHeight, '\n ROI_x: ', this.ROI_x, '\n ROI_y: ', this.ROI_y, '\n ROI_length: ', this.ROI_length);
-
-    //   let startTime = new Date();
-    //   let Time1 = new Date();
-
-    //   // 计算可见区域
-    //   const newVisibleWidth = this.bufferCanvas.width * this.scale;
-    //   const newVisibleHeight = newVisibleWidth / this.ImageProportion;
-
-    //   // 计算可见区域x坐标
-    //   let newVisibleX = this.visibleX;
-    //   // 计算可见区域y坐标
-    //   let newVisibleY = this.visibleY;
-
-    //   // 避免图像越界
-    //   if (newVisibleX - newVisibleWidth / 2 < 0) {
-    //     newVisibleX = newVisibleWidth / 2;
-    //   } else if (newVisibleX + newVisibleWidth / 2 > this.bufferCanvas.width) {
-    //     newVisibleX = this.bufferCanvas.width - newVisibleWidth / 2;
-    //   }
-
-    //   if (newVisibleY - newVisibleHeight / 2 < 0) {
-    //     newVisibleY = newVisibleHeight / 2;
-    //   } else if (newVisibleY + newVisibleHeight / 2 > this.bufferCanvas.height) {
-    //     newVisibleY = this.bufferCanvas.height - newVisibleHeight / 2;
-    //   }
-
-    //   // 更新ROI区域
-    //   // 计算可见区域的边界
-    //   const visibleLeft = newVisibleX - newVisibleWidth / 2;
-    //   const visibleRight = newVisibleX + newVisibleWidth / 2;
-    //   const visibleTop = newVisibleY - newVisibleHeight / 2;
-    //   const visibleBottom = newVisibleY + newVisibleHeight / 2;
-
-    //   // 计算 ROI 区域的边界
-    //   const roiLeft = this.ROI_x;
-    //   const roiRight = this.ROI_x + this.ROI_length;
-    //   const roiTop = this.ROI_y;
-    //   const roiBottom = this.ROI_y + this.ROI_length;
-
-    //   // 判断 ROI 区域是否在可见区域内
-    //   const isRoiInVisible = roiRight >= visibleLeft && roiLeft <= visibleRight && roiBottom >= visibleTop && roiTop <= visibleBottom;
-
-    //   // 计算 ROI 区域在屏幕上的位置，中心点坐标
-    //   const roiScreenX = (this.ROI_x - visibleLeft) * (window.innerWidth / newVisibleWidth) + this.RedBoxSideLength * window.innerWidth / newVisibleWidth / 2;
-    //   const roiScreenY = (this.ROI_y - visibleTop) * (window.innerHeight / newVisibleHeight) + this.RedBoxSideLength * window.innerHeight / newVisibleHeight / 2;
-    //   // this.SendConsoleLogMsg('ROI 区域在屏幕上的位置: ' + roiScreenX + '*' + roiScreenY + '长度 ' + this.RedBoxSideLength * window.innerWidth / newVisibleWidth + '*' + this.RedBoxSideLength * window.innerHeight / newVisibleHeight, 'info');
-    //   this.$bus.$emit('setRedBoxLength', this.RedBoxSideLength * window.innerWidth / newVisibleWidth, this.RedBoxSideLength * window.innerHeight / newVisibleHeight);
-    //   this.$bus.$emit('setRedBoxPosition', roiScreenX, roiScreenY);
-    //   // if (isRoiInVisible) {
-    //   //   console.log('ROI 区域在可见区域内, RedBoxSideLength: ', this.RedBoxSideLength * window.innerWidth / newVisibleWidth, ', ', this.RedBoxSideLength * window.innerHeight / newVisibleHeight);
-    //   // } else {
-    //   //   console.log('ROI 区域不在可见区域内, RedBoxSideLength: ', this.RedBoxSideLength * window.innerWidth / newVisibleWidth, ', ', this.RedBoxSideLength * window.innerHeight / newVisibleHeight);
-    //   // }
-
-    //   let Time2 = new Date();
-    //   this.SendConsoleLogMsg('drawImageData | 计算相关参数时间: ' + (Time2.getTime() - Time1.getTime()) + ' ms', 'info');
-    //   // Draw buffer canvas on main canvas
-    //   const canvas = this.$refs.mainCanvas;
-    //   const ctx = canvas.getContext('2d');
-    //   ctx.clearRect(0, 0, canvas.width, canvas.height);
-    //   // 获取绘制的图像数据
-    //   let imageData = this.bufferCtx.getImageData(newVisibleX - newVisibleWidth / 2, newVisibleY - newVisibleHeight / 2, newVisibleWidth, newVisibleHeight);
-
-    //   Time1 = new Date();
-    //   this.SendConsoleLogMsg('drawImageData | 获取绘制的图像数据时间: ' + (Time1.getTime() - Time2.getTime()) + ' ms', 'info');
-
-    //   // if (this.currentHistogramMax != 255 || this.currentHistogramMin != 0) {
-    //   //   imageData = this.histogramStretch(imageData, this.currentHistogramMin, this.currentHistogramMax);
-    //   // }
-
-    //   Time2 = new Date();
-    //   this.SendConsoleLogMsg('drawImageData | 直方图拉伸时间: ' + (Time2.getTime() - Time1.getTime()) + ' ms', 'info');
-
-
-    //   // Create a temporary canvas to draw the ImageData
-    //   let tempCanvas = document.createElement('canvas');
-    //   tempCanvas.width = imageData.width;
-    //   tempCanvas.height = imageData.height;
-    //   let tempCtx = tempCanvas.getContext('2d');
-    //   tempCtx.putImageData(imageData, 0, 0);
-
-    //   Time1 = new Date();
-    //   this.SendConsoleLogMsg('drawImageData | 创建临时画布并绘制时间: ' + (Time1.getTime() - Time2.getTime()) + ' ms', 'info');
-
-    //   // Draw the ImageData on the main canvas
-    //   ctx.drawImage(tempCanvas, 0, 0, tempCanvas.width, tempCanvas.height, 0, 0, canvas.width, canvas.height);
-
-    //   Time2 = new Date();
-    //   this.SendConsoleLogMsg('drawImageData | 绘制图像时间: ' + (Time2.getTime() - Time1.getTime()) + ' ms', 'info');
-    //   // ctx.drawImage(this.bufferCanvas, newVisibleX - newVisibleWidth / 2, newVisibleY - newVisibleHeight / 2, newVisibleWidth, newVisibleHeight, 0, 0, canvas.width, canvas.height);
-    //   // this.SendConsoleLogMsg('绘制图像,可见区域:' + newVisibleX + ',' + newVisibleY + ',' + newVisibleWidth + ',' + newVisibleHeight, 'info');
-    //   this.visibleX = newVisibleX;
-    //   this.visibleY = newVisibleY;
-    //   this.visibleWidth = newVisibleWidth;
-    //   this.visibleHeight = newVisibleHeight;
-
-    //   this.$bus.$emit('setCurrentMainCanvasHasImage', true); // 发送给电调，用于判断是否可以进行循环拍摄
-    //   // 发送消息给QT客户端，用于信息图标
-    //   this.$bus.$emit('AppSendMessage', 'Vue_Command', 'sendRedBoxState:' + this.RedBoxSideLength + ':' + this.ROI_x + ':' + this.ROI_y);
-    //   this.$bus.$emit('AppSendMessage', 'Vue_Command', 'sendVisibleArea:' + this.visibleX + ':' + this.visibleY + ':' + this.scale);
-
-    //   // 如果选择了星点，则根据选择位置，在ROI区域中绘制一个圆
-    //   if (this.DrawSelectStarX != -1 && this.DrawSelectStarY != -1 && this.showSelectStar) {
-    //     let radius, canvasStarX, canvasStarY, color;
-    //     // 如果有星点
-    //     if (this.DrawSelectStarHFR != -1) {
-    //       radius = this.DrawSelectStarHFR/this.scale*2;
-    //       canvasStarX = (this.DrawSelectStarX + this.ROI_x - visibleLeft) * ctx.canvas.width / newVisibleWidth;
-    //       canvasStarY = (this.DrawSelectStarY + this.ROI_y - visibleTop) * ctx.canvas.height / newVisibleHeight;
-    //       color = 'green'; // 有星点，绘制绿色的圆
-    //     } else {
-    //       // 否则，在选择的位置绘制一个圆
-    //       radius = 10/this.scale; // 你可以根据需要调整这个值
-    //       canvasStarX = (this.DrawSelectStarX + this.ROI_x - visibleLeft) * ctx.canvas.width / newVisibleWidth;
-    //       canvasStarY = (this.DrawSelectStarY + this.ROI_y - visibleTop) * ctx.canvas.height / newVisibleHeight;
-    //       color = 'red'; // 无星点，绘制红色的圆
-    //     }
-
-    //     // 获取绘制圆的位置的图像数据
-    //     const imageData = ctx.getImageData(canvasStarX - radius, canvasStarY - radius, 2 * radius, 2 * radius);
-    //     // 发送图像数据给显示框
-    //     this.$bus.$emit('selectStarImage', imageData);
-
-    //     // 在指定位置开始绘制圆
-    //     ctx.beginPath();
-    //     ctx.arc(canvasStarX, canvasStarY, radius, 0, 2 * Math.PI);
-    //     ctx.strokeStyle = color;
-    //     ctx.lineWidth = 3;
-    //     ctx.stroke();
-    //     ctx.closePath();
-    //   }
-
-    //   Time1 = new Date();
-    //   this.SendConsoleLogMsg('drawImageData | 绘制星点时间: ' + (Time1.getTime() - Time2.getTime()) + ' ms', 'info');
-
-    //   this.SendConsoleLogMsg('drawImageData | 总时间: ' + (Time1.getTime() - startTime.getTime()) + ' ms', 'info');
-    // },
 
 
     drawImageData() {
@@ -4510,7 +4549,7 @@ export default {
 
       this.$bus.$emit('setCurrentMainCanvasHasImage', true); // 发送给电调，用于判断是否可以进行循环拍摄
       // 发送消息给QT客户端，用于信息图标
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'sendRedBoxState:' + this.RedBoxSideLength + ':' + this.ROI_x*this.cameraBin + ':' + this.ROI_y*this.cameraBin);
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'sendRedBoxState:' + this.RedBoxSideLength + ':' + this.ROI_x * this.cameraBin + ':' + this.ROI_y * this.cameraBin);
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'sendVisibleArea:' + this.visibleX + ':' + this.visibleY + ':' + this.scale);
 
       // 如果选择了星点，则根据选择位置，在ROI区域中绘制一个圆
@@ -4591,58 +4630,6 @@ export default {
       };
     },
 
-    // ImageSoftAWB(img8, gainR, gainB, offset) {
-    //   // 分离通道
-    //   let channels = new cv.MatVector();
-    //   cv.split(img8, channels);
-
-    //   const b = channels.get(0);
-    //   const g = channels.get(1);
-    //   const r = channels.get(2);
-
-    //   // 自适应直方图均衡化
-    //   const clahe = new cv.CLAHE(2.0, new cv.Size(8, 8));
-    //   clahe.apply(b, b);
-    //   clahe.apply(g, g);
-    //   clahe.apply(r, r);
-
-    //   // 应用增益和偏置
-    //   r.convertTo(r, -1, gainR, offset);
-    //   b.convertTo(b, -1, gainB, offset);
-    //   g.convertTo(g, -1, 1, offset); // 对绿色通道应用偏置但不改变增益
-
-    //   // 更新 channels 中的通道数据
-    //   channels.set(0, b);
-    //   channels.set(1, g);
-    //   channels.set(2, r);
-
-    //   // 合并通道
-    //   let mergedImg = new cv.Mat();
-    //   cv.merge(channels, mergedImg);
-
-    //   // 释放资源
-    //   b.delete(); // 释放 b
-    //   g.delete(); // 释放 g
-    //   r.delete(); // 释放 r
-    //   channels.delete();
-    //   clahe.delete(); // 释放 clahe
-
-
-
-    //   return mergedImg;
-    // },
-
-    // Bit16To8_Stretch(img16, B, W) {
-    //   console.log('Bit16To8_Stretch | B = ' + B + ', W = ' + W);
-    //   let img8 = new cv.Mat();
-    //   img8.create(img16.rows, img16.cols, cv.CV_8UC4);
-    //   img16.convertTo(img8, cv.CV_8U, 255.0 / (W - B), -B * 255.0 / (W - B));
-
-    //   const result = img8.clone(); // 克隆 img8 以返回结果
-    //   img8.delete(); // 释放 img8
-
-    //   return result;
-    // },
     Bit16To8_Stretch(img16, B, W) {
       console.log('Bit16To8_Stretch | B = ' + B + ', W = ' + W);
       let img8 = new cv.Mat(img16.rows, img16.cols, cv.CV_8UC4);
@@ -4728,121 +4715,6 @@ export default {
       this.$bus.$emit('PHD2MultiStarsPosition', StarStartX, StarStartY);
     },
 
-
-
-    // GetAutoStretch(imgData, mode, bitDepth = 16) {
-    //   if (imgData.length === 0) {
-    //       return { blackLevel: 0, whiteLevel: bitDepth === 8 ? 255 : 65535 };
-    //   }
-
-    //   const length = imgData.length;
-    //   let mean = 0;
-    //   let M2 = 0;
-
-    //   // 计算均值和方差
-    //   for (let i = 0; i < length; i++) {
-    //       const delta = imgData[i] - mean;
-    //       mean += delta / (i + 1);
-    //       M2 += delta * (imgData[i] - mean);
-    //   }
-
-    //   const variance = M2 / length;
-    //   const std = Math.sqrt(variance);
-
-    //   // 根据模式设置标准差倍数
-    //   let a, b;
-    //   switch (mode) {
-    //       case 0: a = 3; b = 5; break;
-    //       case 1: a = 2; b = 5; break;
-    //       case 2: a = 3; b = 8; break;
-    //       default: a = 2; b = 8;
-    //   }
-
-    //   // 动态适应位深
-    //   const maxValue = bitDepth === 8 ? 255 : 65535;
-    //   let bx = Math.max(0, mean - std * a);
-    //   let wx = Math.min(maxValue, mean + std * b);
-
-    //   // 确保 blackLevel < whiteLevel
-    //   let blackLevel = Math.round(bx);
-    //   let whiteLevel = Math.round(wx);
-    //   if (blackLevel >= whiteLevel) {
-    //       blackLevel = whiteLevel - 1;
-    //   }
-
-    //   return { blackLevel, whiteLevel };
-    // },
-
-    // fetchImage(imagePath) {
-    //   const url = imagePath;
-    //   const xhr = new XMLHttpRequest();
-
-    //   xhr.responseType = 'blob'; // 设置响应类型为 blob
-
-    //   xhr.onload = () => {
-    //     if (xhr.status === 200) {
-    //       const imageUrl = URL.createObjectURL(xhr.response);
-    //       // 在这里，您可以将 imageUrl 设置到某个 <img> 元素上，或者做其他处理
-    //       this.$bus.$emit('showCaptureImage');
-    //       this.displayImageOnCanvas(imageUrl); // 将图像显示在Canvas上
-    //     } else {
-    //       console.error('Failed to fetch the image. Status:', xhr.status);
-    //     }
-    //   };
-
-    //   xhr.onerror = () => {
-    //     console.error('There was an error fetching the image.');
-    //   };
-
-    //   xhr.open('GET', url, true);
-    //   xhr.send();
-    // },
-
-    // displayImageOnCanvas(imageUrl) {
-    //   const showcanvas = document.getElementById('mainCamera-canvas');
-    //   const canvas = document.getElementById('TestCanvas');
-    //   const showctx = showcanvas.getContext('2d');
-    //   const ctx = canvas.getContext('2d');
-    //   showcanvas.width = this.CanvasWidth;
-    //   showcanvas.height = this.CanvasHeight;
-    //   console.log('QHYCCD | canvas size:', showcanvas.width, showcanvas.height);
-
-    //   const img = new Image();
-    //   img.setAttribute('crossOrigin', '');
-    //   img.onload = () => {
-    //     this.histogramImage = img;
-
-    //     // 计算图像的缩放比例以使其铺满固定大小的 Canvas
-    //     const scaleWidth = showcanvas.width / img.width;
-    //     const scaleHeight = showcanvas.height / img.height;
-
-    //     const width = img.width * scaleWidth;
-    //     const height = img.height * scaleHeight;
-
-    //     // 清空 Canvas
-    //     showctx.clearRect(0, 0, showcanvas.width, showcanvas.height);
-    //     ctx.clearRect(0, 0, showcanvas.width, showcanvas.height);
-
-    //     // 在 Canvas 上绘制图像
-    //     showctx.drawImage(img, 0, 0, width, height);
-    //     ctx.drawImage(img, 0, 0, width, height);
-    //     console.log('QHYCCD | crossOrigin:', img.crossOrigin);
-    //     this.imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    //     console.log('QHYCCD | imageData:', this.imageData);
-    //     this.MakeHistogram(this.imageData);
-    //   };
-    //   img.src = imageUrl;
-    // },
-
-    // MakeHistogram(imageData) {
-    //   console.log('MakeHistogram');
-
-    //   // 计算三个通道的直方图
-    //   this.histogramData = this.calculateHistogram(imageData);
-
-    //   this.$bus.$emit('showHistogram', this.histogramData);
-    // },
-
     calculateHistogram(imageData) {
       console.log('QHYCCD | calculateHistogram');
       const histogram = [
@@ -4902,46 +4774,6 @@ export default {
 
     },
 
-    // calculateWhiteBalanceGains(histogram, offset) {
-    //   let sumR = 0, sumG = 0, sumB = 0;
-    //   let countR = 0, countG = 0, countB = 0;
-
-    //   // for (let i = 0; i < 256; i++) {
-    //   //   sumR += histogram[2][i] * i;
-    //   //   sumG += histogram[1][i] * i;
-    //   //   sumB += histogram[0][i] * i;
-
-    //   //   countR += histogram[2][i];
-    //   //   countG += histogram[1][i];
-    //   //   countB += histogram[0][i];
-    //   // }
-
-    //   for (let i = 0; i < 256; i++) {
-    //     // Subtract offset from pixel value
-    //     const adjustedR = Math.max(i - offset, 0);
-    //     const adjustedG = Math.max(i - offset, 0);
-    //     const adjustedB = Math.max(i - offset, 0);
-
-    //     sumR += histogram[2][i] * adjustedR;
-    //     sumG += histogram[1][i] * adjustedG;
-    //     sumB += histogram[0][i] * adjustedB;
-
-    //     countR += histogram[2][i];
-    //     countG += histogram[1][i];
-    //     countB += histogram[0][i];
-    //   }
-
-    //   const meanR = sumR / countR;
-    //   const meanG = sumG / countG;
-    //   const meanB = sumB / countB;
-
-    //   // Calculate gains
-    //   const GainR = meanG / meanR;
-    //   const GainB = meanG / meanB;
-
-    //   console.log(`GainR: ${GainR}, GainB: ${GainB}`);
-    //   return { GainR, GainB };
-    // },
 
     calculateWhiteBalanceGains() {
       if (!(this.OriginalImage instanceof ImageData)) {
@@ -5011,28 +4843,6 @@ export default {
       });
     },
 
-    // loadOpenCv() {
-    //   return new Promise((resolve, reject) => {
-    //     if (typeof cv === 'undefined') {
-    //       const script = document.createElement('script');
-    //       script.src = 'https://docs.opencv.org/4.5.5/opencv.js';
-    //       script.async = true;
-    //       script.onload = () => {
-    //         if (typeof cv !== 'undefined') {
-    //           resolve();
-    //         } else {
-    //           reject(new Error('Failed to load OpenCV.js'));
-    //         }
-    //       }
-    //       script.onerror = (error) => {
-    //         reject(error);
-    //       }
-    //       document.head.appendChild(script);
-    //     } else {
-    //       resolve();
-    //     }
-    //   });
-    // },
 
     onCvReady() {
 
@@ -5230,37 +5040,37 @@ export default {
     },
 
     // 坐标验证方法
-    isValidCoordinate: function(coord) {
+    isValidCoordinate: function (coord) {
       // 如果是字符串，尝试转换为数字
       if (typeof coord === 'string') {
         coord = parseFloat(coord);
       }
-      
-      return typeof coord === 'number' && 
-             !isNaN(coord) && 
-             isFinite(coord) && 
-             coord >= -360 && 
-             coord <= 360;
+
+      return typeof coord === 'number' &&
+        !isNaN(coord) &&
+        isFinite(coord) &&
+        coord >= -360 &&
+        coord <= 360;
     },
-    
+
     vec3_from_sphe: function (ra_degree, dec_degree, out) {
       // 确保坐标是数字类型
       let ra = ra_degree;
       let dec = dec_degree;
-      
+
       if (typeof ra === 'string') {
         ra = parseFloat(ra);
       }
       if (typeof dec === 'string') {
         dec = parseFloat(dec);
       }
-      
+
       // 添加坐标验证
       if (!this.isValidCoordinate(ra) || !this.isValidCoordinate(dec)) {
         console.error('无效的坐标输入:', { ra_degree, dec_degree, converted: { ra, dec } });
         return;
       }
-      
+
       try {
         const cp = Math.cos(dec * Math.PI / 180);
         out[0] = Math.cos(ra * Math.PI / 180) * cp;
@@ -5275,14 +5085,14 @@ export default {
       console.log("Add a circle star near polaris");
 
       // 为临时对象创建带有名称的配置
-      const circleConfig = { 
-        id: 'test_circle_' + Date.now(), 
+      const circleConfig = {
+        id: 'test_circle_' + Date.now(),
         model_data: {},
         names: ['Test Circle'],  // 添加名称
         types: ['Temporary'],
         model: 'temporary'
       };
-      
+
       let circle = stel.createObj('circle', circleConfig);
 
       circle.update();
@@ -5307,19 +5117,31 @@ export default {
     },
 
     UpdateCirclePos(Ra_degree, Dec_degree) {
+      // 添加安全检查
+      if (!glTestCircle || !glTestCircle.pos) {
+        console.warn('glTestCircle 未初始化，跳过位置更新');
+        return;
+      }
+      
       let mm = glTestCircle.pos;
       this.vec3_from_sphe(Ra_degree, Dec_degree, mm);
       glTestCircle.pos = mm;
-      console.log("赤道仪位置更新为:"+Ra_degree+"+"+Dec_degree);
+      // console.log("赤道仪位置更新为:"+Ra_degree+"+"+Dec_degree);
     },
 
     UpdateTelescopeStatus(status) {
       this.$bus.$emit('MountStatus', status);
+      
+      // 添加安全检查
+      if (!glTestCircle) {
+        console.warn('glTestCircle 未初始化，跳过状态更新');
+        return;
+      }
+      
       if (status === 'Moving') {
         glTestCircle.color = [1, 0, 0, 0.25];
         glTestCircle.border_color = [1, 0, 0, 1];
-      }
-      else {
+      } else {
         glTestCircle.color = [0, 1, 0, 0.25];
         glTestCircle.border_color = [0, 1, 0, 1];
       }
@@ -5332,19 +5154,19 @@ export default {
     // 绘制视场多边形（基于五个RA/DEC坐标的闭环）
     AddFieldOfViewPolygon: function (stel, layer, coordinates, color, name) {
       console.log(`开始创建视场多边形: ${name}`, { coordinates, color });
-      
+
       try {
         // 验证输入参数
         if (!coordinates || !Array.isArray(coordinates)) {
           console.error('视场坐标必须是数组');
           return null;
         }
-        
+
         if (coordinates.length !== 5) {
           console.error(`视场坐标必须是5个点，当前有${coordinates.length}个点`);
           return null;
         }
-        
+
         // 验证每个坐标点
         for (let i = 0; i < coordinates.length; i++) {
           const coord = coordinates[i];
@@ -5352,25 +5174,25 @@ export default {
             console.error(`坐标点${i}格式错误，需要包含ra和dec属性:`, coord);
             return null;
           }
-          
+
           // 验证坐标值
           if (!this.isValidCoordinate(coord.ra) || !this.isValidCoordinate(coord.dec)) {
             console.error(`坐标点${i}的值无效:`, coord);
             return null;
           }
         }
-        
+
         // 设置默认颜色
         const defaultColor = {
           stroke: "#FFFFFF",
           strokeOpacity: 1,
-          fill: "#1E90FF", 
+          fill: "#1E90FF",
           fillOpacity: 0.25
         };
-        
+
         const finalColor = { ...defaultColor, ...color };
         console.log('最终颜色配置:', finalColor);
-        
+
         // 创建多边形对象
         const polygonConfig = {
           id: 'field_of_view_' + Date.now(),
@@ -5379,7 +5201,7 @@ export default {
           types: ['FieldOfView'],
           model: 'field_of_view'
         };
-        
+
         console.log('创建GeoJSON多边形对象');
         let polygon = stel.createObj('geojson', {
           data: {
@@ -5403,7 +5225,6 @@ export default {
                       [coordinates[1].ra, coordinates[1].dec],
                       [coordinates[2].ra, coordinates[2].dec],
                       [coordinates[3].ra, coordinates[3].dec],
-                      [coordinates[4].ra, coordinates[4].dec],
                       [coordinates[0].ra, coordinates[0].dec]  // 闭合多边形
                     ]
                   ]
@@ -5412,59 +5233,59 @@ export default {
             ]
           }
         });
-        
+
         if (!polygon) {
           console.error('GeoJSON多边形对象创建失败');
           return null;
         }
-        
+
         console.log('多边形对象创建成功，开始更新和添加到图层');
-        
+
         // 设置对象属性
         polygon.update();
         layer.add(polygon);
-        
+
         console.log('多边形已添加到图层');
-        
-        // 添加标签（可选）
-        if (name) {
-          console.log('添加多边形标签');
-          // 计算视场中心点
-          const centerRa = coordinates.reduce((sum, coord) => sum + coord.ra, 0) / coordinates.length;
-          const centerDec = coordinates.reduce((sum, coord) => sum + coord.dec, 0) / coordinates.length;
-          
-          let labelCircle = this.AddMarkCircle(stel, layer, 4, name);
-          if (labelCircle) {
-            let labelMm = labelCircle.pos;
-            this.vec3_from_sphe(centerRa, centerDec + 0.02, labelMm); // 在视场上方显示名称
-            labelCircle.pos = labelMm;
-            labelCircle.color = [1, 1, 1, 0.8];  // 白色，半透明
-            labelCircle.border_color = [0, 0, 0, 0.5];  // 黑色边框，半透明
-            labelCircle.size = [0.01, 0.01];  // 很小的圆圈作为名称标签
-            
-            // 将标签与多边形关联
-            polygon.labelCircle = labelCircle;
-            console.log('标签已添加到多边形');
-          } else {
-            console.warn('标签创建失败');
-          }
-        }
-        
+
+        // // 添加标签（可选）
+        // if (name) {
+        //   console.log('添加多边形标签');
+        //   // 计算视场中心点
+        //   const centerRa = coordinates.reduce((sum, coord) => sum + coord.ra, 0) / coordinates.length;
+        //   const centerDec = coordinates.reduce((sum, coord) => sum + coord.dec, 0) / coordinates.length;
+
+        //   let labelCircle = this.AddMarkCircle(stel, layer, 4, name);
+        //   if (labelCircle) {
+        //     let labelMm = labelCircle.pos;
+        //     this.vec3_from_sphe(centerRa, centerDec + 0.02, labelMm); // 在视场上方显示名称
+        //     labelCircle.pos = labelMm;
+        //     labelCircle.color = [1, 1, 1, 0.8];  // 白色，半透明
+        //     labelCircle.border_color = [0, 0, 0, 0.5];  // 黑色边框，半透明
+        //     labelCircle.size = [0.01, 0.01];  // 很小的圆圈作为名称标签
+
+        //     // 将标签与多边形关联
+        //     polygon.labelCircle = labelCircle;
+        //     console.log('标签已添加到多边形');
+        //   } else {
+        //     console.warn('标签创建失败');
+        //   }
+        // }
+
         console.log(`视场多边形创建完成: ${name || 'Field of View'}`, {
           coordinates: coordinates,
           color: finalColor,
           polygon: polygon
         });
-        
+
         return polygon;
-        
+
       } catch (error) {
         console.error('创建视场多边形时出错:', error);
         console.error('错误堆栈:', error.stack);
         return null;
       }
     },
-    
+
     // 删除指定的视场多边形
     RemoveFieldOfViewPolygon: function (polygon) {
       try {
@@ -5472,24 +5293,24 @@ export default {
           console.warn('要删除的多边形对象为空');
           return false;
         }
-        
+
         // 删除关联的标签
         if (polygon.labelCircle) {
           glLayer.remove(polygon.labelCircle);
         }
-        
+
         // 删除多边形
         glLayer.remove(polygon);
-        
+
         console.log('视场多边形已删除:', polygon);
         return true;
-        
+
       } catch (error) {
         console.error('删除视场多边形时出错:', error);
         return false;
       }
     },
-    
+
     // 删除所有视场多边形
     RemoveAllFieldOfViewPolygons: function () {
       try {
@@ -5500,16 +5321,16 @@ export default {
           });
           this.fieldOfViewPolygons = [];
         }
-        
+
         console.log('所有视场多边形已删除');
         return true;
-        
+
       } catch (error) {
         console.error('删除所有视场多边形时出错:', error);
         return false;
       }
     },
-    
+
     // 更新视场多边形的位置
     UpdateFieldOfViewPolygonPosition: function (polygon, newCoordinates) {
       try {
@@ -5517,7 +5338,7 @@ export default {
           console.error('更新视场多边形位置时参数无效');
           return false;
         }
-        
+
         // 验证新坐标
         for (let i = 0; i < newCoordinates.length; i++) {
           const coord = newCoordinates[i];
@@ -5526,7 +5347,7 @@ export default {
             return false;
           }
         }
-        
+
         // 更新多边形数据
         polygon.data.features[0].geometry.coordinates[0] = [
           [newCoordinates[0].ra, newCoordinates[0].dec],
@@ -5536,22 +5357,22 @@ export default {
           [newCoordinates[4].ra, newCoordinates[4].dec],
           [newCoordinates[0].ra, newCoordinates[0].dec]  // 闭合
         ];
-        
+
         polygon.update();
-        
+
         // 更新标签位置（如果存在）
         if (polygon.labelCircle) {
           const centerRa = newCoordinates.reduce((sum, coord) => sum + coord.ra, 0) / newCoordinates.length;
           const centerDec = newCoordinates.reduce((sum, coord) => sum + coord.dec, 0) / newCoordinates.length;
-          
+
           let labelMm = polygon.labelCircle.pos;
           this.vec3_from_sphe(centerRa, centerDec + 0.02, labelMm);
           polygon.labelCircle.pos = labelMm;
         }
-        
+
         console.log('视场多边形位置已更新:', newCoordinates);
         return true;
-        
+
       } catch (error) {
         console.error('更新视场多边形位置时出错:', error);
         return false;
@@ -5571,17 +5392,17 @@ export default {
 
     AddMarkCircle: function (stel, layer, frame, label) {
       console.log(`开始创建标记圆圈: ${label}`);
-      
+
       try {
         // 为临时对象创建带有名称的配置
-        const circleConfig = { 
-          id: 'temp_circle_' + Date.now(), 
+        const circleConfig = {
+          id: 'temp_circle_' + Date.now(),
           model_data: {},
           names: [label || 'Temporary Marker'],  // 添加名称
           types: ['Temporary'],
           model: 'temporary'
         };
-        
+
         console.log('创建圆形对象');
         let circle = stel.createObj('circle', circleConfig);
 
@@ -5598,7 +5419,7 @@ export default {
         let mm = circle.pos;
         this.vec3_from_sphe(2.52971, 89.2641, mm);
         circle.pos = mm;
-        
+
         // 设置圆形属性
         circle.label = label;
         circle.frame = frame;
@@ -5654,28 +5475,28 @@ export default {
       layer.add(line);
       return line;
     },
-    
 
-    
+
+
     // 辅助方法：将十六进制颜色转换为RGB
-    hexToRgb: function(hex) {
+    hexToRgb: function (hex) {
       // 移除#号
       hex = hex.replace('#', '');
-      
+
       // 解析RGB值
       const r = parseInt(hex.substr(0, 2), 16);
       const g = parseInt(hex.substr(2, 2), 16);
       const b = parseInt(hex.substr(4, 2), 16);
-      
+
       return { r, g, b };
     },
-    
+
     // 更新视场方法
-    updateFieldOfView: function(field) {
+    updateFieldOfView: function (field) {
       if (!field || !field.fieldInfo) return;
-      
+
       const info = field.fieldInfo;
-      
+
       // 计算视场的四个角点
       const corners = [
         { Ra: info.maxRa, Dec: info.maxDec },
@@ -5684,7 +5505,7 @@ export default {
         { Ra: info.maxRa, Dec: info.minDec },
         { Ra: info.maxRa, Dec: info.maxDec }  // 闭合多边形
       ];
-      
+
       // 更新GeoJSON数据
       field.data = {
         "type": "FeatureCollection",
@@ -5699,7 +5520,7 @@ export default {
             },
             "geometry": {
               "type": "Polygon",
-              "coordinates": 
+              "coordinates":
                 [
                   [parseFloat(corners[0].Ra), parseFloat(corners[0].Dec)],
                   [parseFloat(corners[1].Ra), parseFloat(corners[1].Dec)],
@@ -5711,16 +5532,16 @@ export default {
           }
         ]
       };
-      
+
       field.update();
     },
-    
+
     // 启动视场更新定时器
-    startFieldUpdateTimer: function() {
+    startFieldUpdateTimer: function () {
       if (this.fieldUpdateTimer) {
         clearInterval(this.fieldUpdateTimer);
       }
-      
+
       this.fieldUpdateTimer = setInterval(() => {
         // 更新校准点视场
         if (this.calibrationCircles) {
@@ -5730,7 +5551,7 @@ export default {
             }
           });
         }
-        
+
         // 更新调整点视场
         if (this.adjustmentCircles) {
           this.adjustmentCircles.forEach(field => {
@@ -5741,9 +5562,9 @@ export default {
         }
       }, 3000); // 每3秒更新一次
     },
-    
+
     // 停止视场更新定时器
-    stopFieldUpdateTimer: function() {
+    stopFieldUpdateTimer: function () {
       if (this.fieldUpdateTimer) {
         clearInterval(this.fieldUpdateTimer);
         this.fieldUpdateTimer = null;
@@ -6078,25 +5899,25 @@ export default {
       this.RemoveAllCircles();
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'ClearSloveResultList');
     },
-    
 
-    
+
+
     // 使用新的多边形方式绘制校准点
     drawCalibrationPointPolygon(coordinates, color, name) {
       console.log(`绘制校准点多边形: ${name}`, coordinates);
-      
+
       try {
         // 验证输入参数
         if (!coordinates || !Array.isArray(coordinates)) {
           console.error('校准点坐标必须是数组');
           return;
         }
-        
+
         if (coordinates.length !== 5) {
           console.error(`校准点坐标必须是5个点，当前有${coordinates.length}个点`);
           return;
         }
-        
+
         // 验证每个坐标点
         for (let i = 0; i < coordinates.length; i++) {
           const coord = coordinates[i];
@@ -6104,43 +5925,43 @@ export default {
             console.error(`校准点坐标${i}格式错误：`, coord);
             return;
           }
-          
+
           if (!this.isValidCoordinate(coord.ra) || !this.isValidCoordinate(coord.dec)) {
             console.error(`校准点坐标${i}值无效：`, coord);
             return;
           }
         }
-        
+
         // 使用新的多边形绘制方法
         let calibrationPolygon = this.AddFieldOfViewPolygon(
-          this.$stel, 
-          glLayer, 
-          coordinates, 
-          color, 
+          this.$stel,
+          glLayer,
+          coordinates,
+          color,
           name
         );
-        
+
         if (calibrationPolygon) {
           // 添加到校准点数组
           if (!this.calibrationCircles) {
             this.calibrationCircles = [];
           }
           this.calibrationCircles.push(calibrationPolygon);
-          
+
           console.log(`校准点多边形创建成功: ${name}`, calibrationPolygon);
         } else {
           console.error(`校准点多边形创建失败: ${name}`);
         }
-        
+
       } catch (error) {
         console.error('绘制校准点多边形时出错:', error);
       }
     },
-    
+
     // 清除所有校准点
     clearCalibrationPoints() {
       console.log('清除所有校准点');
-      
+
       // 确保数组存在
       if (!this.calibrationCircles) {
         this.calibrationCircles = [];
@@ -6148,7 +5969,7 @@ export default {
       if (!this.adjustmentCircles) {
         this.adjustmentCircles = [];
       }
-      
+
       // 清除校准点
       if (this.calibrationCircles.length > 0) {
         console.log(`清除 ${this.calibrationCircles.length} 个校准点`);
@@ -6164,7 +5985,7 @@ export default {
         });
         this.calibrationCircles = [];
       }
-      
+
       // 清除调整点
       if (this.adjustmentCircles.length > 0) {
         console.log(`清除 ${this.adjustmentCircles.length} 个调整点`);
@@ -6180,10 +6001,10 @@ export default {
         });
         this.adjustmentCircles = [];
       }
-      
+
       // 清除上一次位置
       this.lastPosition = null;
-      
+
       // 清除目标点
       if (this.targetPointCircle) {
         try {
@@ -6196,206 +6017,206 @@ export default {
           console.warn('清除目标点时出错:', error);
         }
       }
-      
+
       console.log('所有校准相关元素清除完成');
     },
 
-    
+
     // 使用新的多边形方式绘制调整点
     // 使用新的多边形方式绘制调整点（不在此处画圆）
-drawAdjustmentPointsPolygon(currentCoordinates, targetCoordinates, currentColor, targetColor, isTimerUpdate) {
-  if (isTimerUpdate === undefined) isTimerUpdate = false;
-  console.log('绘制调整点多边形', { currentCoordinates, targetCoordinates });
+    drawAdjustmentPointsPolygon(currentCoordinates, targetCoordinates, currentColor, targetColor, isTimerUpdate) {
+      if (isTimerUpdate === undefined) isTimerUpdate = false;
+      console.log('绘制调整点多边形', { currentCoordinates, targetCoordinates });
 
-  try {
-    // 1) 清除之前的调整点
-    if (this.adjustmentCircles) {
-      this.adjustmentCircles.forEach(obj => {
-        try { glLayer.remove(obj); } catch (e) { console.warn('清除调整点时出错:', e); }
-      });
-    }
-    this.adjustmentCircles = [];
-
-    // 2) 绘制当前位置视场多边形
-    if (currentCoordinates && Array.isArray(currentCoordinates) && currentCoordinates.length === 5) {
-      console.log('绘制当前位置多边形');
-      const currentPolygon = this.AddFieldOfViewPolygon(
-        this.$stel,
-        glLayer,
-        currentCoordinates,
-        currentColor,
-        'Current'
-      );
-      if (currentPolygon) {
-        this.adjustmentCircles.push(currentPolygon);
-        console.log('当前位置多边形创建成功');
-      } else {
-        console.error('当前位置多边形创建失败');
-      }
-    } else {
-      console.warn('当前位置坐标无效，跳过绘制');
-    }
-
-    // 3) 视角转向（可选；不创建圆）
-    if (!isTimerUpdate && targetCoordinates && Array.isArray(targetCoordinates) && targetCoordinates.length === 5) {
       try {
-        const centerRa  = targetCoordinates.reduce((s, c) => s + c.ra, 0)  / targetCoordinates.length;
-        const centerDec = targetCoordinates.reduce((s, c) => s + c.dec, 0) / targetCoordinates.length;
-        console.log(`视角转向目标: RA=${centerRa}, DEC=${centerDec}`);
-
-        // 用临时对象只做指向，不加入 layer
-        const targetObjConfig = {
-          id: 'temp_target_' + Date.now(),
-          model_data: {},
-          names: ['Target Position'],
-          types: ['Temporary'],
-          model: 'temporary'
-        };
-        const targetObj = this.$stel.createObj('circle', targetObjConfig);
-        let mm = targetObj.pos;
-        this.vec3_from_sphe(centerRa, centerDec, mm);
-        targetObj.pos = mm;
-        if (typeof targetObj.update === 'function') targetObj.update();
-
-        this.$stel.pointAndLock(targetObj, 1.0);
-        console.log('视角转向完成');
-
-        // 清理临时对象（未加入 layer，无需 remove）
-        setTimeout(() => { try { /* no-op */ } catch (_) {} }, 0);
-      } catch (error) {
-        console.error('视角转向出错:', error);
-      }
-    }
-
-  } catch (error) {
-    console.error('绘制调整点多边形时出错:', error);
-  }
-},
-
-      
-     // 绘制目标点圆形（坐标：RA/Dec，单位：度）
-drawTargetPointCircle(targetRa, targetDec, color, name, text, clearlast) {
-  if (clearlast === undefined) clearlast = true; // 内部设置默认值
-  console.log('绘制目标点圆形', { targetRa, targetDec, color });
-
-  try {
-    // 1) 校验
-    if (!this.isValidCoordinate(targetRa) || !this.isValidCoordinate(targetDec)) {
-      console.error(text + '坐标无效:', { targetRa, targetDec });
-      return;
-    }
-
-    // 2) 清除之前的目标点
-    if (this.targetPointCircle && clearlast) {
-      try {
-        if (glLayer) {
-          glLayer.remove(this.targetPointCircle);
-          console.log('成功清除之前的' + name);
+        // 1) 清除之前的调整点
+        if (this.adjustmentCircles) {
+          this.adjustmentCircles.forEach(obj => {
+            try { glLayer.remove(obj); } catch (e) { console.warn('清除调整点时出错:', e); }
+          });
         }
+        this.adjustmentCircles = [];
+
+        // 2) 绘制当前位置视场多边形
+        if (currentCoordinates && Array.isArray(currentCoordinates) && currentCoordinates.length === 5) {
+          console.log('绘制当前位置多边形');
+          const currentPolygon = this.AddFieldOfViewPolygon(
+            this.$stel,
+            glLayer,
+            currentCoordinates,
+            currentColor,
+            'Current'
+          );
+          if (currentPolygon) {
+            this.adjustmentCircles.push(currentPolygon);
+            console.log('当前位置多边形创建成功');
+          } else {
+            console.error('当前位置多边形创建失败');
+          }
+        } else {
+          console.warn('当前位置坐标无效，跳过绘制');
+        }
+
+        // 3) 视角转向（可选；不创建圆）
+        if (!isTimerUpdate && targetCoordinates && Array.isArray(targetCoordinates) && targetCoordinates.length === 5) {
+          try {
+            const centerRa = targetCoordinates.reduce((s, c) => s + c.ra, 0) / targetCoordinates.length;
+            const centerDec = targetCoordinates.reduce((s, c) => s + c.dec, 0) / targetCoordinates.length;
+            console.log(`视角转向目标: RA=${centerRa}, DEC=${centerDec}`);
+
+            // 用临时对象只做指向，不加入 layer
+            const targetObjConfig = {
+              id: 'temp_target_' + Date.now(),
+              model_data: {},
+              names: ['Target Position'],
+              types: ['Temporary'],
+              model: 'temporary'
+            };
+            const targetObj = this.$stel.createObj('circle', targetObjConfig);
+            let mm = targetObj.pos;
+            this.vec3_from_sphe(centerRa, centerDec, mm);
+            targetObj.pos = mm;
+            if (typeof targetObj.update === 'function') targetObj.update();
+
+            this.$stel.pointAndLock(targetObj, 1.0);
+            console.log('视角转向完成');
+
+            // 清理临时对象（未加入 layer，无需 remove）
+            setTimeout(() => { try { /* no-op */ } catch (_) { } }, 0);
+          } catch (error) {
+            console.error('视角转向出错:', error);
+          }
+        }
+
       } catch (error) {
-        console.warn('清除之前的' + text + '时出错:', error);
+        console.error('绘制调整点多边形时出错:', error);
       }
-    }
+    },
 
-    // 3) 创建圆对象
-    const circle = this.AddMarkCircle(this.$stel, glLayer, 4, name); // frame=4：赤道系
-    if (!circle) {
-      console.error(text + '圆形创建失败');
-      return;
-    }
 
-    // 4) 位置（RA/Dec 度 → 3D 单位向量）
-    const mm = circle.pos;
-    this.vec3_from_sphe(targetRa, targetDec, mm);
-    circle.pos = mm;
+    // 绘制目标点圆形（坐标：RA/Dec，单位：度）
+    drawTargetPointCircle(targetRa, targetDec, color, name, text, clearlast) {
+      if (clearlast === undefined) clearlast = true; // 内部设置默认值
+      console.log('绘制目标点圆形', { targetRa, targetDec, color });
 
-    // 5) 样式
-    if (color) {
-      const rgb = this.hexToRgb(color.stroke || color.fill || '#FF8C00');
-      const alpha = (color.fillOpacity || 0.3);
-      const borderAlpha = (color.strokeOpacity || 1.0);
-      circle.color = [rgb.r/255, rgb.g/255, rgb.b/255, alpha];
-      circle.border_color = [rgb.r/255, rgb.g/255, rgb.b/255, borderAlpha];
-    } else {
-      circle.color = [1, 0.55, 0, 0.3];
-      circle.border_color = [1, 0.55, 0, 1];
-    }
-    const size = 0.02;
-    circle.size = [size, size];
+      try {
+        // 1) 校验
+        if (!this.isValidCoordinate(targetRa) || !this.isValidCoordinate(targetDec)) {
+          console.error(text + '坐标无效:', { targetRa, targetDec });
+          return;
+        }
 
-    // 6) 更新 & 保存引用
-    if (typeof circle.update === 'function') circle.update();
-    this.targetPointCircle = circle;
+        // 2) 清除之前的目标点
+        if (this.targetPointCircle && clearlast) {
+          try {
+            if (glLayer) {
+              glLayer.remove(this.targetPointCircle);
+              console.log('成功清除之前的' + name);
+            }
+          } catch (error) {
+            console.warn('清除之前的' + text + '时出错:', error);
+          }
+        }
 
-    console.log(text + '圆形创建成功', circle);
-  } catch (error) {
-    console.error('绘制' + text + '圆形时出错:', error);
-  }
-},
+        // 3) 创建圆对象
+        const circle = this.AddMarkCircle(this.$stel, glLayer, 4, name); // frame=4：赤道系
+        if (!circle) {
+          console.error(text + '圆形创建失败');
+          return;
+        }
+
+        // 4) 位置（RA/Dec 度 → 3D 单位向量）
+        const mm = circle.pos;
+        this.vec3_from_sphe(targetRa, targetDec, mm);
+        circle.pos = mm;
+
+        // 5) 样式
+        if (color) {
+          const rgb = this.hexToRgb(color.stroke || color.fill || '#FF8C00');
+          const alpha = (color.fillOpacity || 0.3);
+          const borderAlpha = (color.strokeOpacity || 1.0);
+          circle.color = [rgb.r / 255, rgb.g / 255, rgb.b / 255, alpha];
+          circle.border_color = [rgb.r / 255, rgb.g / 255, rgb.b / 255, borderAlpha];
+        } else {
+          circle.color = [1, 0.55, 0, 0.3];
+          circle.border_color = [1, 0.55, 0, 1];
+        }
+        const size = 0.02;
+        circle.size = [size, size];
+
+        // 6) 更新 & 保存引用
+        if (typeof circle.update === 'function') circle.update();
+        this.targetPointCircle = circle;
+
+        console.log(text + '圆形创建成功', circle);
+      } catch (error) {
+        console.error('绘制' + text + '圆形时出错:', error);
+      }
+    },
 
 
     // 绘制假极轴圆形
     DrawFakePolarAxisCircle(targetRa, targetDec, color, name, text) {
-        console.log('绘制目标点圆形', { targetRa, targetDec, color });
-        
-        try {
-          // 验证输入参数
-          if (!this.isValidCoordinate(targetRa) || !this.isValidCoordinate(targetDec)) {
-            console.error(text + '坐标无效:', { targetRa, targetDec });
-            return;
-          }
-          
-          // 清除之前的目标点
-          if (this.fakePolarAxisCircle) {
-            try {
-              if (glLayer) {
-                glLayer.remove(this.fakePolarAxisCircle);
-                console.log('成功清除之前的'+ name);
-              }
-            } catch (error) {
-              console.warn('清除之前的'+text+'时出错:', error);
-            }
-          }
-          
-          // 创建目标点圆形
-          let targetCircle = this.AddMarkCircle(this.$stel, glLayer, 4, name);
-          if (targetCircle) {
-            // 设置目标点位置
-            let targetMm = targetCircle.pos;
-            this.vec3_from_sphe(targetRa, targetDec, targetMm);
-            targetCircle.pos = targetMm;
-            
-            // 设置目标点颜色和样式
-            if (color) {
-              // 将十六进制颜色转换为RGB数组
-              const rgb = this.hexToRgb(color.stroke || color.fill || '#FF8C00');
-              const alpha = (color.fillOpacity || 0.3);
-              const borderAlpha = (color.strokeOpacity || 1.0);
-              
-              targetCircle.color = [rgb.r/255, rgb.g/255, rgb.b/255, alpha];
-              targetCircle.border_color = [rgb.r/255, rgb.g/255, rgb.b/255, borderAlpha];
-            } else {
-              // 默认橙色
-              targetCircle.color = [1, 0.55, 0, 0.3];  // 橙色，半透明
-              targetCircle.border_color = [1, 0.55, 0, 1];  // 橙色边框
-            }
-            
-            // 设置目标点大小
-            const targetSize = 0.02; // 固定小尺寸
-            targetCircle.size = [targetSize, targetSize];
-            
-            // 保存目标点引用，用于后续清除
-            this.fakePolarAxisCircle = targetCircle;
-            
-            console.log(text + '圆形创建成功', targetCircle);
-          } else {
-            console.error(text + '圆形创建失败');
-          }
-          
-        } catch (error) {
-          console.error('绘制'+text+'圆形时出错:', error);
+      console.log('绘制目标点圆形', { targetRa, targetDec, color });
+
+      try {
+        // 验证输入参数
+        if (!this.isValidCoordinate(targetRa) || !this.isValidCoordinate(targetDec)) {
+          console.error(text + '坐标无效:', { targetRa, targetDec });
+          return;
         }
-      },
+
+        // 清除之前的目标点
+        if (this.fakePolarAxisCircle) {
+          try {
+            if (glLayer) {
+              glLayer.remove(this.fakePolarAxisCircle);
+              console.log('成功清除之前的' + name);
+            }
+          } catch (error) {
+            console.warn('清除之前的' + text + '时出错:', error);
+          }
+        }
+
+        // 创建目标点圆形
+        let targetCircle = this.AddMarkCircle(this.$stel, glLayer, 4, name);
+        if (targetCircle) {
+          // 设置目标点位置
+          let targetMm = targetCircle.pos;
+          this.vec3_from_sphe(targetRa, targetDec, targetMm);
+          targetCircle.pos = targetMm;
+
+          // 设置目标点颜色和样式
+          if (color) {
+            // 将十六进制颜色转换为RGB数组
+            const rgb = this.hexToRgb(color.stroke || color.fill || '#FF8C00');
+            const alpha = (color.fillOpacity || 0.3);
+            const borderAlpha = (color.strokeOpacity || 1.0);
+
+            targetCircle.color = [rgb.r / 255, rgb.g / 255, rgb.b / 255, alpha];
+            targetCircle.border_color = [rgb.r / 255, rgb.g / 255, rgb.b / 255, borderAlpha];
+          } else {
+            // 默认橙色
+            targetCircle.color = [1, 0.55, 0, 0.3];  // 橙色，半透明
+            targetCircle.border_color = [1, 0.55, 0, 1];  // 橙色边框
+          }
+
+          // 设置目标点大小
+          const targetSize = 0.02; // 固定小尺寸
+          targetCircle.size = [targetSize, targetSize];
+
+          // 保存目标点引用，用于后续清除
+          this.fakePolarAxisCircle = targetCircle;
+
+          console.log(text + '圆形创建成功', targetCircle);
+        } else {
+          console.error(text + '圆形创建失败');
+        }
+
+      } catch (error) {
+        console.error('绘制' + text + '圆形时出错:', error);
+      }
+    },
 
     ShowConfirmDialog(Title, Text, ToDo) {
       // window.location.reload();
@@ -6669,11 +6490,11 @@ drawTargetPointCircle(targetRa, targetDec, color, name, text, clearlast) {
         this.ROI_y = (y / window.innerHeight * this.visibleHeight - this.RedBoxSideLength / 2 / this.cameraBin) + this.visibleY - this.visibleHeight / 2; // 计算ROI的y坐标
         // this.$bus.$emit('setRedBoxPosition', x, y, this.ROI_x, this.ROI_y);
       } else {
-        this.selectStarX = ((x / window.innerWidth * this.visibleWidth) + this.visibleX - this.visibleWidth / 2 - this.ROI_x)*this.cameraBin; // 计算选择位置的x坐标
-        this.selectStarY = ((y / window.innerHeight * this.visibleHeight) + this.visibleY - this.visibleHeight / 2 - this.ROI_y)*this.cameraBin; // 计算选择位置的y坐标
+        this.selectStarX = ((x / window.innerWidth * this.visibleWidth) + this.visibleX - this.visibleWidth / 2 - this.ROI_x) * this.cameraBin; // 计算选择位置的x坐标
+        this.selectStarY = ((y / window.innerHeight * this.visibleHeight) + this.visibleY - this.visibleHeight / 2 - this.ROI_y) * this.cameraBin; // 计算选择位置的y坐标
 
-        if (this.selectStarX >= 0 && this.selectStarX < this.RedBoxSideLength  &&
-          this.selectStarY >= 0 && this.selectStarY < this.RedBoxSideLength ) {
+        if (this.selectStarX >= 0 && this.selectStarX < this.RedBoxSideLength &&
+          this.selectStarY >= 0 && this.selectStarY < this.RedBoxSideLength) {
           this.SendConsoleLogMsg('Select Star is in ROI', 'info');
         } else {
           this.SendConsoleLogMsg('Select Star is not in ROI', 'error');
@@ -6790,15 +6611,15 @@ drawTargetPointCircle(targetRa, targetDec, color, name, text, clearlast) {
       console.log('Touch at:', x, y);
       event.preventDefault();// 阻止默认事件，如页面滚动
       if (!this.isFocusLoopShooting) {
-        this.ROI_x = (x / window.innerWidth * this.visibleWidth - this.RedBoxSideLength / 2 / this.cameraBin) + this.visibleX - this.visibleWidth / 2 ;  // 计算ROI的x坐标
-        this.ROI_y = (y / window.innerHeight * this.visibleHeight - this.RedBoxSideLength / 2 / this.cameraBin) + this.visibleY - this.visibleHeight / 2 ; // 计算ROI的y坐标
+        this.ROI_x = (x / window.innerWidth * this.visibleWidth - this.RedBoxSideLength / 2 / this.cameraBin) + this.visibleX - this.visibleWidth / 2;  // 计算ROI的x坐标
+        this.ROI_y = (y / window.innerHeight * this.visibleHeight - this.RedBoxSideLength / 2 / this.cameraBin) + this.visibleY - this.visibleHeight / 2; // 计算ROI的y坐标
         // this.$bus.$emit('setRedBoxPosition', x, y, this.ROI_x, this.ROI_y);
       } else {
-        this.selectStarX = ((x / window.innerWidth * this.visibleWidth) + this.visibleX - this.visibleWidth / 2 - this.ROI_x)*this.cameraBin; // 计算选择位置的x坐标
-        this.selectStarY = ((y / window.innerHeight * this.visibleHeight) + this.visibleY - this.visibleHeight / 2 - this.ROI_y)*this.cameraBin; // 计算选择位置的y坐标
+        this.selectStarX = ((x / window.innerWidth * this.visibleWidth) + this.visibleX - this.visibleWidth / 2 - this.ROI_x) * this.cameraBin; // 计算选择位置的x坐标
+        this.selectStarY = ((y / window.innerHeight * this.visibleHeight) + this.visibleY - this.visibleHeight / 2 - this.ROI_y) * this.cameraBin; // 计算选择位置的y坐标
 
-        if (this.selectStarX >= 0 && this.selectStarX < this.RedBoxSideLength  &&
-          this.selectStarY >= 0 && this.selectStarY < this.RedBoxSideLength ) {
+        if (this.selectStarX >= 0 && this.selectStarX < this.RedBoxSideLength &&
+          this.selectStarY >= 0 && this.selectStarY < this.RedBoxSideLength) {
           this.SendConsoleLogMsg('Select Star is in ROI', 'info');
         } else {
           this.SendConsoleLogMsg('Select Star is not in ROI', 'error');
@@ -7012,10 +6833,10 @@ drawTargetPointCircle(targetRa, targetDec, color, name, text, clearlast) {
             const uint16Array = new Uint16Array(buffer);
             let newWidth = parseInt(this.RedBoxSideLength / this.cameraBin);
             let newHeight = parseInt(this.RedBoxSideLength / this.cameraBin);
-            if (newWidth % 2 != 0 ) {
+            if (newWidth % 2 != 0) {
               newWidth = newWidth - 1;
             }
-            if (newHeight % 2 != 0 ) {
+            if (newHeight % 2 != 0) {
               newHeight = newHeight - 1;
             }
             if (uint16Array.length !== newWidth * newHeight) {
@@ -7164,43 +6985,43 @@ drawTargetPointCircle(targetRa, targetDec, color, name, text, clearlast) {
         this.$bus.$emit(item.label, item.label + ':');
       }
     },
-      // 校准相关方法
-  startCalibrationProcess() {
-    this.calibrationInfo.isCalibrating = true;
-    this.calibrationInfo.calibrationState = 'running';
-    this.calibrationInfo.calibrationStep = 0;
-    this.calibrationInfo.calibrationMessage = this.$t('Preparing to start focuser travel calibration...');
-    console.log('App: Calibration started:', this.calibrationInfo);
-  },
+    // 校准相关方法
+    startCalibrationProcess() {
+      this.calibrationInfo.isCalibrating = true;
+      this.calibrationInfo.calibrationState = 'running';
+      this.calibrationInfo.calibrationStep = 0;
+      this.calibrationInfo.calibrationMessage = this.$t('Preparing to start focuser travel calibration...');
+      console.log('App: Calibration started:', this.calibrationInfo);
+    },
 
-  updateCalibrationInfo(step, message, state) {
-    try {
-      this.calibrationInfo.calibrationStep = step;
-      // 如果消息是国际化键，则翻译它
-      if (message && typeof message === 'string') {
-        this.calibrationInfo.calibrationMessage = this.$t(message);
-      } else {
-        this.calibrationInfo.calibrationMessage = message;
+    updateCalibrationInfo(step, message, state) {
+      try {
+        this.calibrationInfo.calibrationStep = step;
+        // 如果消息是国际化键，则翻译它
+        if (message && typeof message === 'string') {
+          this.calibrationInfo.calibrationMessage = this.$t(message);
+        } else {
+          this.calibrationInfo.calibrationMessage = message;
+        }
+        if (state) {
+          this.calibrationInfo.calibrationState = state;
+        }
+        if (step === 0) {
+          this.calibrationInfo.isCalibrating = true;
+        }
+        console.log('App: Calibration info updated:', this.calibrationInfo);
+      } catch (error) {
+        console.error('Error in updateCalibrationInfo:', error);
       }
-      if (state) {
-        this.calibrationInfo.calibrationState = state;
-      }
-      if (step === 0) {
-        this.calibrationInfo.isCalibrating = true;
-      }
-      console.log('App: Calibration info updated:', this.calibrationInfo);
-    } catch (error) {
-      console.error('Error in updateCalibrationInfo:', error);
-    }
-  },
+    },
 
-  endCalibration() {
-    this.calibrationInfo.isCalibrating = false;
-    this.calibrationInfo.calibrationState = 'idle';
-    this.calibrationInfo.calibrationStep = 0;
-    this.calibrationInfo.calibrationMessage = '';
-    console.log('App: Calibration ended');
-  },
+    endCalibration() {
+      this.calibrationInfo.isCalibrating = false;
+      this.calibrationInfo.calibrationState = 'idle';
+      this.calibrationInfo.calibrationStep = 0;
+      this.calibrationInfo.calibrationMessage = '';
+      console.log('App: Calibration ended');
+    },
   },
   computed: {
     nav: {
@@ -7225,8 +7046,20 @@ drawTargetPointCircle(targetRa, targetDec, color, name, text, clearlast) {
         return 'rgba(255, 255, 255, 0.5)'; // 默认白色，透明度 0.5
       }
     },
-
-
+    isMobile() {
+      var ua = navigator.userAgent || '';
+      var touch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+      var uaDataMobile = null;
+      // 兼容老浏览器：避免可选链
+      if (navigator.userAgentData && typeof navigator.userAgentData.mobile !== 'undefined') {
+        uaDataMobile = navigator.userAgentData.mobile;
+      }
+      var mobileLike = /Android|iPhone|iPad|iPod|Mobile|Tablet/i.test(ua);
+      return (uaDataMobile !== null ? uaDataMobile : mobileLike) && !!touch;
+    },
+    isDesktop() {
+      return !this.isMobile;
+    },
   },
   watch: {
     storeCurrentLocation: function (loc) {
@@ -7374,7 +7207,7 @@ drawTargetPointCircle(targetRa, targetDec, color, name, text, clearlast) {
     window.addEventListener('load', () => {
       // 页面完全加载
       this.SendConsoleLogMsg('页面已完全加载', 'info');
-      this.$bus.$emit('AppSendMessage', 'Process_Command_Return','VueClientVersion:'+process.env.VUE_APP_VERSION);
+      this.$bus.$emit('AppSendMessage', 'Process_Command_Return', 'VueClientVersion:' + process.env.VUE_APP_VERSION);
     })
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -7394,7 +7227,7 @@ drawTargetPointCircle(targetRa, targetDec, color, name, text, clearlast) {
     document.removeEventListener('mouseup', this.preventDefault);
 
     document.removeEventListener('wheel', this.preventDefault);
-    
+
     // 清理极轴校准相关的圆圈
     if (this.calibrationCircles) {
       this.calibrationCircles.forEach(circle => {
@@ -7404,7 +7237,7 @@ drawTargetPointCircle(targetRa, targetDec, color, name, text, clearlast) {
       });
       this.calibrationCircles = [];
     }
-    
+
     if (this.adjustmentCircles) {
       this.adjustmentCircles.forEach(circle => {
         if (glLayer && circle) {
@@ -7413,7 +7246,7 @@ drawTargetPointCircle(targetRa, targetDec, color, name, text, clearlast) {
       });
       this.adjustmentCircles = [];
     }
-    
+
     // 停止视场更新定时器
     this.stopFieldUpdateTimer();
   },
@@ -7659,6 +7492,38 @@ body,
   position: absolute;
   left: 30px;
   width: calc(100% - 60px);
+}
+
+/* 提示控制样式 */
+.tip-field {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  /* 左标签 | 中值 | 右复制 */
+  align-items: center;
+  gap: 8px;
+  padding: 8px 4px 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  /* 与其他输入项的下划线保持一致 */
+}
+
+.tip-label {
+  color: var(--v-theme-primary, #42a5f5);
+  font-size: 0.9rem;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.tip-value {
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  user-select: text;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+}
+
+.tip-copy {
+  margin-left: 4px;
+  opacity: 0.9;
 }
 
 /* 减少按钮样式 */

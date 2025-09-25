@@ -235,6 +235,43 @@
 </template>
 
 <script>
+// 常量定义
+const COLORS = {
+  PRIMARY: '#64b5f6',
+  SUCCESS: '#4caf50',
+  WARNING: '#ff9800',
+  ERROR: '#f44336',
+  INFO: '#2196f3',
+  WHITE: '#ffffff',
+  BACKGROUND: 'rgba(35, 35, 45, 0.95)',
+  SURFACE: 'rgba(60, 60, 70, 0.9)'
+}
+
+const CALIBRATION_PHASES = {
+  INITIAL: 'initial',
+  COLLECTING: 'collecting',
+  ADJUSTING: 'adjusting',
+  VERIFYING: 'verifying'
+}
+
+const PROGRESS_THRESHOLDS = {
+  INITIALIZATION: 15,
+  FIRST_CALIBRATION: 25,
+  SECOND_CALIBRATION: 50,
+  THIRD_CALIBRATION: 75,
+  CALIBRATION_LOOP: 95,
+  COMPLETION: 100
+}
+
+const DIMENSIONS = {
+  MINIMIZED: { width: 250, height: 80 },
+  COLLAPSED: { width: 300, height: 120 },
+  EXPANDED: { width: 350, height: 400 }
+}
+
+const LOG_LIMIT = 100
+const DISPLAY_LOG_LIMIT = 10
+
 export default {
   name: 'AutomaticPolarAlignmentCalibration',
 
@@ -246,7 +283,15 @@ export default {
     autoStart: {
       type: Boolean,
       default: false
-    }
+    },
+    // 新增：传入调整数据的单位（'deg' | 'arcmin' | 'arcsec'）
+    adjustmentUnit: { type: String, default: 'arcmin' },
+
+    // 新增：用户站位视角（'north' | 'south'），用于左右映射
+    facingPole: { type: String, default: 'north' },
+
+    // 新增：动作死区（以角分定义，UI判定是否需要动作）
+    deadbandArcmin: { type: Number, default: 0.5 }
   },
 
   data() {
@@ -278,8 +323,10 @@ export default {
         altitude: 0.0
       },
 
-      // 日志系统
+      // 日志系统 - 使用循环数组优化内存
       logs: [],
+      logIndex: 0,
+      logCapacity: LOG_LIMIT,
 
       // 校准运行状态
       isCalibrationRunning: false,
@@ -311,6 +358,18 @@ export default {
       // 拖动状态标记
       isDraggingState: false,
 
+      // 内存清理定时器
+      memoryCleanupTimer: null,
+
+      // 计算缓存
+      cachedAzimuthArcmin: null,
+      cachedAltitudeArcmin: null,
+      lastAzimuthValue: null,
+      lastAltitudeValue: null,
+
+      // 拖动性能优化
+      lastDragTime: 0,
+
       // 极轴偏移量
       polarAxisOffset: {
         azimuth: 0,
@@ -324,6 +383,7 @@ export default {
       // 校准阶段状态
       calibrationPhase: 'initial', // 'initial', 'collecting', 'adjusting', 'verifying'
       calibrationPoints: [], // 存储三个校准点的坐标
+      maxCalibrationPoints: 3, // 最大校准点数量
       targetPoint: null, // 存储目标点坐标
 
       // 移除假极轴相关数据
@@ -336,10 +396,14 @@ export default {
   },
 
   computed: {
-    // 显示的日志
+    // 显示的日志 - 使用缓存优化
     displayLogs() {
       // 返回最近的10条日志，按时间倒序（用于显示最新一条）
-      return this.logs.slice(-10).reverse()
+      const logs = this.logs
+      if (logs.length <= DISPLAY_LOG_LIMIT) {
+        return logs.slice().reverse()
+      }
+      return logs.slice(-DISPLAY_LOG_LIMIT).reverse()
     },
 
     // 校准进度百分比
@@ -353,18 +417,24 @@ export default {
       return this.isConnected
     },
 
-    // 是否需要方位角调整
+    // 是否需要方位角调整 - 使用缓存避免重复计算
     needsAzimuthAdjustment() {
-      const value = this.adjustment.azimuth
-      if (value === null || value === undefined || isNaN(value)) return false
-      return Math.abs(value) > 0.5
+      const v = this.adjustment?.azimuth
+      if (!Number.isFinite(v)) return false
+      // 使用缓存的值，避免重复计算
+      return this.cachedAzimuthArcmin !== null ? 
+        Math.abs(this.cachedAzimuthArcmin) > this.deadbandArcmin : 
+        Math.abs(this.unitToArcmin(v, this.adjustmentUnit)) > this.deadbandArcmin
     },
 
-    // 是否需要高度角调整
+    // 是否需要高度角调整 - 使用缓存避免重复计算
     needsAltitudeAdjustment() {
-      const value = this.adjustment.altitude
-      if (value === null || value === undefined || isNaN(value)) return false
-      return Math.abs(value) > 0.5
+      const v = this.adjustment?.altitude
+      if (!Number.isFinite(v)) return false
+      // 使用缓存的值，避免重复计算
+      return this.cachedAltitudeArcmin !== null ? 
+        Math.abs(this.cachedAltitudeArcmin) > this.deadbandArcmin : 
+        Math.abs(this.unitToArcmin(v, this.adjustmentUnit)) > this.deadbandArcmin
     }
   },
 
@@ -373,119 +443,306 @@ export default {
       if (newVal && this.autoStart) {
         this.startAutoCalibration()
       }
+    },
+    
+    // 监听当前坐标变化，自动更新朝向极点
+    '$store.state.currentLocation.lat': {
+      handler(newLat, oldLat) {
+        if (newLat !== oldLat && newLat !== undefined) {
+          const facingPole = this.calculateFacingPole()
+          this.addLog(this.$t('Location Changed', [facingPole, newLat]), 'info')
+          
+          // 如果正在调整阶段，重新计算调整建议
+          if (this.calibrationPhase === 'adjusting') {
+            this.addLog(this.$t('Recalculating Adjustment Directions'), 'info')
+          }
+        }
+      },
+      immediate: false
+    },
+
+    // 监听调整值变化，更新缓存 - 使用防抖避免频繁更新
+    'adjustment.azimuth': {
+      handler: function(newVal) {
+        if (Number.isFinite(newVal)) {
+          // 清除之前的定时器
+          if (this._azimuthUpdateTimer) {
+            clearTimeout(this._azimuthUpdateTimer)
+          }
+          // 使用防抖，延迟100ms更新
+          this._azimuthUpdateTimer = setTimeout(() => {
+            this.cachedAzimuthArcmin = this.unitToArcmin(newVal, this.adjustmentUnit)
+            this.lastAzimuthValue = newVal
+          }, 100)
+        }
+      },
+      immediate: true
+    },
+
+    'adjustment.altitude': {
+      handler: function(newVal) {
+        if (Number.isFinite(newVal)) {
+          // 清除之前的定时器
+          if (this._altitudeUpdateTimer) {
+            clearTimeout(this._altitudeUpdateTimer)
+          }
+          // 使用防抖，延迟100ms更新
+          this._altitudeUpdateTimer = setTimeout(() => {
+            this.cachedAltitudeArcmin = this.unitToArcmin(newVal, this.adjustmentUnit)
+            this.lastAltitudeValue = newVal
+          }, 100)
+        }
+      },
+      immediate: true
     }
   },
 
-  mounted() {
-    // 实现组件初始化逻辑
-    this.initialize()
+    mounted() {
+      // 实现组件初始化逻辑
+      this.initialize()
 
-    // 初始化缓存的尺寸信息
-    this.updateCachedDimensions()
-
-    // 监听信号总线事件
-    this.$bus.$on('showPolarAlignment', this.showInterface)
-    this.$bus.$on('hidePolarAlignment', this.hideInterface)
-
-    // 监听赤道仪连接状态
-    this.$bus.$on('MountConnected', this.updateMountConnection)
-
-    // 接收状态更新
-    this.$bus.$on('PolarAlignmentState', this.updatePolarAlignmentState)
-
-    // 监听视场数据更新
-    this.$bus.$on('FieldDataUpdate', this.updateFieldData)
-
-    // 监听卡片信息更新
-    this.$bus.$on('updateCardInfo', this.updateCardInfo)
-  },
-
-  beforeDestroy() {
-    // 移除信号总线监听
-    this.$bus.$off('showPolarAlignment', this.showInterface)
-    this.$bus.$off('hidePolarAlignment', this.hideInterface)
-    this.$bus.$off('MountConnected', this.updateMountConnection)
-    this.$bus.$off('PolarAlignmentState', this.updatePolarAlignmentState)
-    this.$bus.$off('FieldDataUpdate', this.updateFieldData)
-    this.$bus.$off('updateCardInfo', this.updateCardInfo)
-
-    // 清理拖动事件监听
-    document.removeEventListener('mousemove', this.onDrag)
-    document.removeEventListener('mouseup', this.stopDrag)
-
-    // 实现组件销毁逻辑
-    this.cleanup()
-  },
-
-  methods: {
-    // === 信号总线事件处理 ===
-    showInterface() {
-      this.$emit('update:visible', true)
-    },
-
-    hideInterface() {
-      this.$emit('update:visible', false)
-    },
-
-    updateMountConnection(status) {
-      this.isConnected = status === 1
-      const statusText = this.isConnected ? this.$t('Connected') : this.$t('Disconnected')
-      this.addLog(this.$t('Mount Connection Status', [statusText]), this.isConnected ? 'success' : 'warning')
-    },
-
-    // === 初始化和清理 ===
-    initialize() {
-      this.addLog(this.$t('Polar Alignment Component Initialized'), 'info')
-    },
-
-    cleanup() {
-      this.addLog(this.$t('Polar Alignment Component Cleaned'), 'info')
-    },
-
-    // === 拖动控制方法 ===
-    startDrag(event) {
-      if (event.target.closest('.header-controls, .minimized-controls, .header-btn, .minimized-btn')) {
-        return
-      }
-
-      this.isDragging = true
-      this.isDraggingState = true
-
-      // 添加dragging类，移除过渡动画
-      this.$el.classList.add('dragging')
-
-      const rect = event.currentTarget.getBoundingClientRect()
-      const clientX = event.clientX || event.touches?.[0]?.clientX || 0
-      const clientY = event.clientY || event.touches?.[0]?.clientY || 0
-
-      this.dragOffset = {
-        x: clientX - rect.left,
-        y: clientY - rect.top
-      }
-
-      // 预计算并缓存尺寸，避免拖动时重复计算
+      // 初始化缓存的尺寸信息
       this.updateCachedDimensions()
 
-      // 优化触摸事件处理
-      if (event.type === 'touchstart') {
-        document.addEventListener('touchmove', this.onDrag, { passive: false })
-        document.addEventListener('touchend', this.stopDrag, { passive: false })
-      } else {
-        document.addEventListener('mousemove', this.onDrag)
-        document.addEventListener('mouseup', this.stopDrag)
-      }
+      // 监听信号总线事件
+      this.$bus.$on('showPolarAlignment', this.showInterface)
+      this.$bus.$on('hidePolarAlignment', this.hideInterface)
+
+      // 监听赤道仪连接状态
+      this.$bus.$on('MountConnected', this.updateMountConnection)
+
+      // 接收状态更新
+      this.$bus.$on('PolarAlignmentState', this.updatePolarAlignmentState)
+
+      // 监听视场数据更新
+      this.$bus.$on('FieldDataUpdate', this.updateFieldData)
+
+      // 监听卡片信息更新
+      this.$bus.$on('updateCardInfo', this.updateCardInfo)
+
+      // 启动定期内存清理（每5分钟清理一次）
+      this.startMemoryCleanup()
     },
 
-    onDrag(event) {
-      if (!this.isDragging) return
+    beforeDestroy() {
+      // 移除信号总线监听
+      this.$bus.$off('showPolarAlignment', this.showInterface)
+      this.$bus.$off('hidePolarAlignment', this.hideInterface)
+      this.$bus.$off('MountConnected', this.updateMountConnection)
+      this.$bus.$off('PolarAlignmentState', this.updatePolarAlignmentState)
+      this.$bus.$off('FieldDataUpdate', this.updateFieldData)
+      this.$bus.$off('updateCardInfo', this.updateCardInfo)
 
-      // 阻止默认行为，提高触摸响应性
-      if (event.type === 'touchmove') {
-        event.preventDefault()
-      }
+      // 清理拖动事件监听
+      this.cleanupDragListeners()
 
-      // 使用requestAnimationFrame优化拖动性能
-      requestAnimationFrame(() => {
+      // 清理缓存数据
+      this.clearCachedData()
+
+      // 停止内存清理定时器
+      this.stopMemoryCleanup()
+
+      // 清理防抖定时器
+      this.clearDebounceTimers()
+
+      // 实现组件销毁逻辑
+      this.cleanup()
+    },
+
+    methods: {
+      // ========================================
+      // 信号总线事件处理
+      // ========================================
+      showInterface() {
+        this.$emit('update:visible', true)
+      },
+
+      hideInterface() {
+        this.$emit('update:visible', false)
+      },
+
+      updateMountConnection(status) {
+        this.isConnected = status === 1
+        const statusText = this.isConnected ? this.$t('Connected') : this.$t('Disconnected')
+        this.addLog(this.$t('Mount Connection Status', [statusText]), this.isConnected ? 'success' : 'warning')
+      },
+
+      // ========================================
+      // 初始化和清理
+      // ========================================
+      initialize() {
+        this.addLog(this.$t('Polar Alignment Component Initialized'), 'info')
+        
+        // 记录当前朝向极点
+        const facingPole = this.calculateFacingPole()
+        const lat = this.$store?.state?.currentLocation?.lat || 'unknown'
+        this.addLog(this.$t('Facing Pole', [facingPole, lat]), 'info')
+      },
+
+      cleanup() {
+        this.addLog(this.$t('Polar Alignment Component Cleaned'), 'info')
+      },
+
+      // 内存使用监控（仅在开发环境）
+      getMemoryUsage() {
+        if (process.env.NODE_ENV === 'development' && performance.memory) {
+          return {
+            usedJSHeapSize: Math.round(performance.memory.usedJSHeapSize / 1024 / 1024) + 'MB',
+            totalJSHeapSize: Math.round(performance.memory.totalJSHeapSize / 1024 / 1024) + 'MB',
+            jsHeapSizeLimit: Math.round(performance.memory.jsHeapSizeLimit / 1024 / 1024) + 'MB',
+            logsCount: this.logs.length,
+            calibrationPointsCount: this.calibrationPoints.length
+          }
+        }
+        return null
+      },
+
+      // 启动定期内存清理
+      startMemoryCleanup() {
+        this.memoryCleanupTimer = setInterval(() => {
+          this.performMemoryCleanup()
+        }, 5 * 60 * 1000) // 每5分钟清理一次
+      },
+
+      // 停止内存清理定时器
+      stopMemoryCleanup() {
+        if (this.memoryCleanupTimer) {
+          clearInterval(this.memoryCleanupTimer)
+          this.memoryCleanupTimer = null
+        }
+      },
+
+      // 执行内存清理
+      performMemoryCleanup() {
+        // 清理过期的日志（保留最近50条）
+        if (this.logs.length > 50) {
+          this.logs = this.logs.slice(-50)
+          this.logIndex = Math.min(this.logIndex, 50)
+        }
+
+        // 清理过期的校准点（如果超过最大数量）
+        if (this.calibrationPoints.length > this.maxCalibrationPoints) {
+          this.calibrationPoints = this.calibrationPoints.slice(-this.maxCalibrationPoints)
+        }
+
+        // 强制垃圾回收（如果可用）
+        if (window.gc && typeof window.gc === 'function') {
+          window.gc()
+        }
+
+        // 在开发环境输出内存使用情况
+        if (process.env.NODE_ENV === 'development') {
+          const memoryInfo = this.getMemoryUsage()
+          if (memoryInfo) {
+            console.log('Memory cleanup performed:', memoryInfo)
+          }
+        }
+      },
+
+      // 清理拖动事件监听器
+      cleanupDragListeners() {
+        document.removeEventListener('mousemove', this.onDrag)
+        document.removeEventListener('mouseup', this.stopDrag)
+        document.removeEventListener('touchmove', this.onDrag)
+        document.removeEventListener('touchend', this.stopDrag)
+      },
+
+      // 清理防抖定时器
+      clearDebounceTimers() {
+        if (this._azimuthUpdateTimer) {
+          clearTimeout(this._azimuthUpdateTimer)
+          this._azimuthUpdateTimer = null
+        }
+        if (this._altitudeUpdateTimer) {
+          clearTimeout(this._altitudeUpdateTimer)
+          this._altitudeUpdateTimer = null
+        }
+      },
+
+      // 清理缓存数据
+      clearCachedData() {
+        // 清理计算缓存
+        this.cachedAzimuthArcmin = null
+        this.cachedAltitudeArcmin = null
+        this.lastAzimuthValue = null
+        this.lastAltitudeValue = null
+        this.lastDragTime = 0
+        
+        // 清理日志数据
+        this.logs = []
+        this.logIndex = 0
+        
+        // 清理校准数据
+        this.calibrationPoints = []
+        this.targetPoint = null
+        this.fieldData = null
+        
+        // 清理位置数据
+        this.currentPosition = { ra: '00h 00m 00s', dec: '+00° 00\' 00"' }
+        this.targetPosition = { ra: '00h 00m 00s', dec: '+00° 00\' 00"' }
+        this.previousPosition = { ra: '00h 00m 00s', dec: '+00° 00\' 00"' }
+        
+        // 清理调整数据
+        this.adjustment = { azimuth: 0.0, altitude: 0.0 }
+        this.polarAxisOffset = { azimuth: 0, altitude: 0 }
+        
+        // 重置状态
+        this.isCalibrationComplete = false
+        this.isPolarAligned = false
+        this.calibrationLoopCount = 0
+        this.lastCalibrationProgress = 0
+        this.calibrationPhase = 'initial'
+      },
+
+      // ========================================
+      // 拖动控制方法
+      // ========================================
+      startDrag(event) {
+        if (event.target.closest('.header-controls, .minimized-controls, .header-btn, .minimized-btn')) {
+          return
+        }
+
+        this.isDragging = true
+        this.isDraggingState = true
+
+        // 添加dragging类，移除过渡动画
+        this.$el.classList.add('dragging')
+
+        const rect = event.currentTarget.getBoundingClientRect()
+        const clientX = event.clientX || event.touches?.[0]?.clientX || 0
+        const clientY = event.clientY || event.touches?.[0]?.clientY || 0
+
+        this.dragOffset = {
+          x: clientX - rect.left,
+          y: clientY - rect.top
+        }
+
+        // 预计算并缓存尺寸，避免拖动时重复计算
+        this.updateCachedDimensions()
+
+        // 优化触摸事件处理
+        if (event.type === 'touchstart') {
+          document.addEventListener('touchmove', this.onDrag, { passive: false })
+          document.addEventListener('touchend', this.stopDrag, { passive: false })
+        } else {
+          document.addEventListener('mousemove', this.onDrag)
+          document.addEventListener('mouseup', this.stopDrag)
+        }
+      },
+
+      onDrag(event) {
+        if (!this.isDragging) return
+
+        // 阻止默认行为，提高触摸响应性
+        if (event.type === 'touchmove') {
+          event.preventDefault()
+        }
+
+        // 使用更高效的节流机制
+        const now = Date.now()
+        if (this.lastDragTime && now - this.lastDragTime < 16) return // 60fps限制
+        this.lastDragTime = now
+        
         const clientX = event.clientX || event.touches?.[0]?.clientX || 0
         const clientY = event.clientY || event.touches?.[0]?.clientY || 0
 
@@ -500,214 +757,331 @@ export default {
           x: Math.max(0, Math.min(newX, maxX)),
           y: Math.max(0, Math.min(newY, maxY))
         }
-      })
-    },
+      },
 
-    stopDrag() {
-      this.isDragging = false
-      this.isDraggingState = false
+      stopDrag() {
+        this.isDragging = false
+        this.isDraggingState = false
 
-      // 移除dragging类，恢复过渡动画
-      this.$el.classList.remove('dragging')
+        // 移除dragging类，恢复过渡动画
+        this.$el.classList.remove('dragging')
 
-      // 清理所有事件监听器
-      document.removeEventListener('mousemove', this.onDrag)
-      document.removeEventListener('mouseup', this.stopDrag)
-      document.removeEventListener('touchmove', this.onDrag)
-      document.removeEventListener('touchend', this.stopDrag)
-    },
+        // 清理所有事件监听器
+        this.cleanupDragListeners()
+      },
 
-    // 新增：更新缓存的尺寸信息
-    updateCachedDimensions() {
-      if (this.isMinimized) {
-        this.cachedDimensions = { width: 250, height: 80 }
-      } else if (this.isCollapsed) {
-        this.cachedDimensions = { width: 300, height: 120 }
-      } else {
-        // 展开状态，使用基础尺寸
-        this.cachedDimensions = { width: 350, height: 400 }
-      }
-    },
+      // 新增：更新缓存的尺寸信息
+      updateCachedDimensions() {
+        if (this.isMinimized) {
+          this.cachedDimensions = { ...DIMENSIONS.MINIMIZED }
+        } else if (this.isCollapsed) {
+          this.cachedDimensions = { ...DIMENSIONS.COLLAPSED }
+        } else {
+          // 展开状态，使用基础尺寸
+          this.cachedDimensions = { ...DIMENSIONS.EXPANDED }
+        }
+      },
 
-    // 获取组件高度（优化版本）
-    getComponentHeight() {
-      // 如果正在拖动，使用缓存的尺寸
-      if (this.isDraggingState) {
-        return this.cachedDimensions.height
-      }
+      // 获取组件高度（优化版本）
+      getComponentHeight() {
+        // 如果正在拖动，使用缓存的尺寸
+        if (this.isDraggingState) {
+          return this.cachedDimensions.height
+        }
 
-      // 正常状态下的计算
-      if (this.isMinimized) {
-        return 80 // 最小化状态高度
-      } else if (this.isCollapsed) {
-        return 120 // 收缩状态高度
-      } else {
-        // 展开状态，根据内容自适应
-        const baseHeight = 400 // 基础高度
-        const logHeight = this.displayLogs.length > 0 ? 60 : 40
-        const adjustmentHeight = this.needsAzimuthAdjustment || this.needsAltitudeAdjustment ? 120 : 80
-        return Math.min(baseHeight + logHeight + adjustmentHeight, window.innerHeight * 0.8)
-      }
-    },
+        // 正常状态下的计算
+        if (this.isMinimized) {
+          return 80 // 最小化状态高度
+        } else if (this.isCollapsed) {
+          return 120 // 收缩状态高度
+        } else {
+          // 展开状态，根据内容自适应
+          const baseHeight = 400 // 基础高度
+          const logHeight = this.displayLogs.length > 0 ? 60 : 40
+          const adjustmentHeight = this.needsAzimuthAdjustment || this.needsAltitudeAdjustment ? 120 : 80
+          return Math.min(baseHeight + logHeight + adjustmentHeight, window.innerHeight * 0.8)
+        }
+      },
 
-    // === 界面状态控制方法 ===
-    toggleMinimize() {
-      this.isMinimized = !this.isMinimized
-      this.isCollapsed = false
-      // 更新缓存的尺寸信息
-      this.updateCachedDimensions()
-      this.addLog(this.isMinimized ? this.$t('Interface Minimized') : this.$t('Interface Expanded'), 'info')
-    },
+      // ========================================
+      // 界面状态控制方法
+      // ========================================
+      toggleMinimize() {
+        this.isMinimized = !this.isMinimized
+        this.isCollapsed = false
+        // 更新缓存的尺寸信息
+        this.updateCachedDimensions()
+        this.addLog(this.isMinimized ? this.$t('Interface Minimized') : this.$t('Interface Expanded'), 'info')
+      },
 
-    toggleCollapse() {
-      this.isCollapsed = !this.isCollapsed
-      // 更新缓存的尺寸信息
-      this.updateCachedDimensions()
-      this.addLog(this.isCollapsed ? this.$t('Interface Collapsed') : this.$t('Interface Expanded'), 'info')
-    },
+      toggleCollapse() {
+        this.isCollapsed = !this.isCollapsed
+        // 更新缓存的尺寸信息
+        this.updateCachedDimensions()
+        this.addLog(this.isCollapsed ? this.$t('Interface Collapsed') : this.$t('Interface Expanded'), 'info')
+      },
 
-    resetCalibration() {
-      this.calibrationPoints = []
-      this.isCalibrationComplete = false
-      this.isPolarAligned = false
-      this.fieldData = null
-      this.calibrationLoopCount = 0
-      this.lastCalibrationProgress = 0
-      this.calibrationPhase = 'initial'
-      this.targetPoint = null
+      resetCalibration() {
+        // 使用统一的内存清理方法
+        this.clearCachedData()
 
-      // 移除假极轴重置代码
-      // this.fakePolarAxis = {
-      //   ra: null,
-      //   dec: null,
-      //   calculated: false
-      // }
+        this.addLog(this.$t('Calibration Data Reset'), 'info')
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'ResetAutoPolarAlignment')
+        this.$bus.$emit('ClearCalibrationPoints')
+        this.$bus.$emit('ClearStatusTextFromStarMap')
+      },
 
-      this.addLog(this.$t('Calibration Data Reset'), 'info')
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'ResetAutoPolarAlignment')
-      this.$bus.$emit('ClearCalibrationPoints')
-      this.$bus.$emit('ClearStatusTextFromStarMap')
-    },
+      restoreCalibration() {
+        this.addLog(this.$t('Calibration Data Restored'), 'success')
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'RestoreAutoPolarAlignment')
+      },
 
-    restoreCalibration() {
-      this.addLog(this.$t('Calibration Data Restored'), 'success')
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'RestoreAutoPolarAlignment')
-    },
-
-    startAutoCalibration() {
-
-      if (!this.isConnected) {
-        this.addLog(this.$t('Error: Mount Not Connected'), 'error')
-        return
-      }
-      if (this.isCalibrationRunning) {
-        this.stopAutoCalibration()
-        return
-      }
-      this.isCalibrationRunning = true
-      this.resetCalibration()
-      this.addLog(this.$t('Starting Auto Calibration'), 'info')
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'StartAutoPolarAlignment')
-    },
-    stopAutoCalibration() {
-      this.isCalibrationRunning = false
-      this.addLog(this.$t('Auto Calibration Stopped'), 'warning')
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'StopAutoPolarAlignment')
-    },
-    // === 视场数据处理方法 ===
-    updateFieldData(data) {
-      if (data && Array.isArray(data) && data.length >= 12) { // 修改长度检查，确保包含假极轴数据
-        const isValidData = data.every(val => typeof val === 'number' && !isNaN(val))
-        if (!isValidData) {
-          this.addLog(this.$t('Warning: Invalid Field Data Received'), 'warning')
+      // ========================================
+      // 校准控制方法
+      // ========================================
+      startAutoCalibration() {
+        if (!this.isConnected) {
+          this.addLog(this.$t('Error: Mount Not Connected'), 'error')
           return
         }
-
-        this.fieldData = {
-          ra: data[0],
-          dec: data[1],
-          maxra: data[2],
-          minra: data[3],
-          maxdec: data[4],
-          mindec: data[5],
-          targetra: data[6],
-          targetdec: data[7],
-          fakePolarRA: data[8],
-          fakePolarDEC: data[9],
-          realPolarRA: data[10],
-          realPolarDEC: data[11]
+        if (this.isCalibrationRunning) {
+          this.stopAutoCalibration()
+          return
         }
+        this.isCalibrationRunning = true
+        this.resetCalibration()
+        this.addLog(this.$t('Starting Auto Calibration'), 'info')
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'StartAutoPolarAlignment')
+      },
 
-        // 保存上一次位置（在更新当前位置之前）
-        if (this.currentPosition.ra !== '00h 00m 00s') {
-          this.previousPosition = { ...this.currentPosition }
-        }
-
-        // 更新当前位置
-        this.currentPosition = {
-          ra: this.formatCoordinate(data[0], 'ra'),
-          dec: this.formatCoordinate(data[1], 'dec')
-        }
-
-        if (data[6] === -1 && data[7] === -1) {
-          // 校准点收集阶段
-          this.calibrationPhase = 'collecting'
-          const pointNumber = this.calibrationPoints.length + 1
-
-          // 添加调试信息
-          this.addLog(`准备收集校准点${pointNumber}，当前已有${this.calibrationPoints.length}个点`, 'info')
-
-          try {
-            this.drawCalibrationPointPolygon(data[0], data[1], pointNumber, this.fieldData)
-            this.addLog(this.$t('Calibration Point', [pointNumber, data[0].toFixed(4), data[1].toFixed(4)]), 'info')
-
-            // 保存校准点
-            this.calibrationPoints.push({
-              ra: data[0],
-              dec: data[1],
-              index: pointNumber
-            })
-
-            this.addLog(`校准点${pointNumber}已添加，现在总共有${this.calibrationPoints.length}个点`, 'info')
-
-            // 如果收集了3个点，进入调整阶段
-            if (this.calibrationPoints.length === 3) {
-              this.calibrationPhase = 'adjusting'
-              this.addLog(this.$t('Three calibration points collected, entering adjustment phase'), 'success')
-            }
-          } catch (error) {
-            this.addLog(this.$t('Error processing calibration point', [error.message]), 'error')
-            console.error('处理校准点错误：', error)
+      stopAutoCalibration() {
+        this.isCalibrationRunning = false
+        this.addLog(this.$t('Auto Calibration Stopped'), 'warning')
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'StopAutoPolarAlignment')
+      },
+      // ========================================
+      // 视场数据处理方法
+      // ========================================
+      updateFieldData(data) {
+        if (data && Array.isArray(data) && data.length >= 12) { // 修改长度检查，确保包含假极轴数据
+          const isValidData = data.every(val => typeof val === 'number' && !isNaN(val))
+          if (!isValidData) {
+            this.addLog(this.$t('Warning: Invalid Field Data Received'), 'warning')
+            return
           }
-        } else if (data[6] !== -1 && data[7] !== -1) {
-          // 调整阶段：显示目标位置和假极轴
-          this.calibrationPhase = 'adjusting'
-          this.targetPoint = { ra: data[6], dec: data[7] }
 
-          try {
-            // 先清除所有之前的元素
-            this.addLog('调整模式：准备清除之前的校准元素', 'info')
-            this.$bus.$emit('ClearCalibrationPoints')
-            this.addLog('调整模式：清除命令已发送', 'info')
+          this.fieldData = {
+            ra: data[0],
+            dec: data[1],
+            ra0: data[2],
+            dec0: data[3],
+            ra1: data[4],
+            dec1: data[5],
+            ra2: data[6],
+            dec2: data[7],
+            ra3: data[8],
+            dec3: data[9],
+            targetra: data[10],
+            targetdec: data[11],
+            fakePolarRA: data[12],
+            fakePolarDEC: data[13],
+            realPolarRA: data[14],
+            realPolarDEC: data[15]
+          }
 
-            // 绘制校准点（如果已收集3个点）
-            if (this.calibrationPoints.length === 3) {
-              this.calibrationPoints.forEach((point, index) => {
-                const pointCoordinates = this.calculateFieldCorners(point.ra, point.dec, this.fieldData, false)
-                const pointColor = {
-                  stroke: "#FFD700",        // 金色边框：校准点
-                  strokeOpacity: 1,         // 边框不透明度
-                  fill: "#FFD700",          // 金色填充：校准点
-                  fillOpacity: 0.3          // 填充不透明度（半透明）
+          // 保存上一次位置（在更新当前位置之前）
+          if (this.currentPosition.ra !== '00h 00m 00s') {
+            this.previousPosition = { ...this.currentPosition }
+          }
+
+          // 更新当前位置
+          this.currentPosition = {
+            ra: this.formatCoordinate(data[0], 'ra'),
+            dec: this.formatCoordinate(data[1], 'dec')
+          }
+
+          if (data[10] === -1 && data[11] === -1) {
+            // 校准点收集阶段
+            this.calibrationPhase = 'collecting'
+            const pointNumber = this.calibrationPoints.length + 1
+
+            // 添加调试信息
+            this.addLog(`准备收集校准点${pointNumber}，当前已有${this.calibrationPoints.length}个点`, 'info')
+
+            try {
+              this.drawCalibrationPointPolygon(data[0], data[1], pointNumber, this.fieldData)
+              this.addLog(this.$t('Calibration Point', [pointNumber, data[0].toFixed(4), data[1].toFixed(4)]), 'info')
+
+              // 保存校准点 - 限制最大数量
+              if (this.calibrationPoints.length < this.maxCalibrationPoints) {
+                this.calibrationPoints.push({
+                  ra: data[0],
+                  dec: data[1],
+                  index: pointNumber
+                })
+              } else {
+                // 如果超过最大数量，替换最旧的点
+                const oldestIndex = (pointNumber - 1) % this.maxCalibrationPoints
+                this.calibrationPoints[oldestIndex] = {
+                  ra: data[0],
+                  dec: data[1],
+                  index: pointNumber
                 }
+              }
 
-                this.$bus.$emit('DrawCalibrationPointPolygon', pointCoordinates, pointColor,
-                  `Calibration_Point_${index + 1}`, `校准点${index + 1}`, "#FFD700")
-              })
+              this.addLog(`校准点${pointNumber}已添加，现在总共有${this.calibrationPoints.length}个点`, 'info')
+
+              // 如果收集了3个点，进入调整阶段
+              if (this.calibrationPoints.length === this.maxCalibrationPoints) {
+                this.calibrationPhase = 'adjusting'
+                this.addLog(this.$t('Three calibration points collected, entering adjustment phase'), 'success')
+              }
+            } catch (error) {
+              this.addLog(this.$t('Error processing calibration point', [error.message]), 'error')
+              console.error('处理校准点错误：', error)
             }
+          } else if (data[10] !== -1 && data[11] !== -1) {
+            // 调整阶段：显示目标位置和假极轴
+            this.calibrationPhase = 'adjusting'
+            this.targetPoint = { ra: data[10], dec: data[11] }
 
-            // 绘制当前位置（蓝色）
-            const currentCoordinates = this.calculateFieldCorners(data[0], data[1], this.fieldData, false)
+            try {
+              // 先清除所有之前的元素
+              this.addLog('调整模式：准备清除之前的校准元素', 'info')
+              this.$bus.$emit('ClearCalibrationPoints')
+              this.addLog('调整模式：清除命令已发送', 'info')
+
+              // 绘制校准点（如果已收集3个点）
+              if (this.calibrationPoints.length === this.maxCalibrationPoints) {
+                this.calibrationPoints.forEach((point, index) => {
+                  const pointCoordinates = this.calculateFieldCorners(point.ra, point.dec, this.fieldData, false)
+                  const pointColor = {
+                    stroke: "#FFD700",        // 金色边框：校准点
+                    strokeOpacity: 1,         // 边框不透明度
+                    fill: "#FFD700",          // 金色填充：校准点
+                    fillOpacity: 0.3          // 填充不透明度（半透明）
+                  }
+
+                  this.$bus.$emit('DrawCalibrationPointPolygon', pointCoordinates, pointColor,
+                    `Calibration_Point_${index + 1}`, `校准点${index + 1}`, "#FFD700")
+                })
+              }
+
+              // 绘制当前位置（蓝色）
+              const currentCoordinates = this.calculateFieldCorners(data[0], data[1], this.fieldData, false)
+              const currentColor = {
+                stroke: "#00BFFF",        // 蓝色边框：当前位置
+                strokeOpacity: 1,         // 边框不透明度
+                fill: "#00BFFF",          // 蓝色填充：当前位置
+                fillOpacity: 0.3          // 填充不透明度（半透明）
+              }
+
+              this.$bus.$emit('DrawCalibrationPointPolygon', currentCoordinates, currentColor,
+                'Current_Position', '当前位置', "#00BFFF")
+
+              // 绘制目标点（绿色圆形）
+              const targetColor = {
+                stroke: "#4CAF50",        // 绿色边框：目标点
+                strokeOpacity: 1,         // 边框不透明度
+                fill: "#4CAF50",          // 绿色填充：目标点
+                fillOpacity: 0.3          // 填充不透明度（半透明）
+              }
+
+              const { az, alt } = this.equatorialToHorizontal(data[10], data[11], new Date(Date.now()), this.$store.state.currentLocation.lat, this.$store.state.currentLocation.lng)
+              // console.log('当前位置目标点', data[6], data[7] + ' 转化为地平坐标为' + az + ' ' + alt);
+              // console.log('使用时间和地点', new Date(Date.now()), $store.state.currentLocation.lat, $store.state.currentLocation.lng);
+
+              this.$bus.$emit('DrawTargetPointCircle',
+                az,
+                alt,
+                targetColor,
+                'Target_Point',
+                '目标点'
+              )
+
+              // 绘制假极轴（紫色圆形）
+              if (data[12] !== -1 && data[13] !== -1 && !isNaN(data[12]) && !isNaN(data[13])) {
+                const { az, alt } = this.equatorialToHorizontal(data[12], data[13], new Date(Date.now()), this.$store.state.currentLocation.lat, this.$store.state.currentLocation.lng)
+                this.drawFakePolarAxis(az, alt)
+              }
+
+              this.addLog(`调整模式：当前位置(${data[0].toFixed(4)}, ${data[1].toFixed(4)}) 目标位置(${data[6].toFixed(4)}, ${data[7].toFixed(4)}) 假极轴(${data[8].toFixed(4)}, ${data[9].toFixed(4)})`, 'info')
+            } catch (error) {
+              this.addLog(this.$t('Error processing adjustment data', [error.message]), 'error')
+              console.error('处理调整数据错误：', error)
+            }
+          }
+        } else {
+          this.addLog(this.$t('Error: Invalid Field Data Format'), 'error')
+        }
+      },
+
+      // 绘制校准点
+      drawCalibrationPointPolygon(ra, dec, pointNumber, fieldData) {
+        this.addLog(this.$t('Drawing Calibration Point', [pointNumber, ra, dec]), 'info')
+
+        try {
+          const coordinates = this.calculateFieldCorners(ra, dec, fieldData)
+          this.addLog(this.$t('Calculated Field Corner Coordinates', [JSON.stringify(coordinates)]), 'info')
+
+          // 验证坐标有效性
+          const validCoordinates = coordinates.every((coord, index) => {
+            const isValid = coord && typeof coord.ra === 'number' && typeof coord.dec === 'number' &&
+              !isNaN(coord.ra) && !isNaN(coord.dec) && isFinite(coord.ra) && isFinite(coord.dec)
+            if (!isValid) {
+              this.addLog(this.$t('Warning: Invalid Coordinate Point', [index, JSON.stringify(coord)]), 'warning')
+            }
+            return isValid
+          })
+
+          if (!validCoordinates) {
+            this.addLog(this.$t('Invalid Field Coordinates'), 'error')
+            return
+          }
+
+          const color = this.getCalibrationPointColor()
+
+          // 添加文本标签
+          const label = `校准点${pointNumber}`
+          const labelColor = "#FFFFFF"
+
+          this.addLog(this.$t('Sending Draw Calibration Event', [pointNumber]), 'info')
+          this.$bus.$emit('DrawCalibrationPointPolygon', coordinates, color, `Calibration_${pointNumber}`, label, labelColor)
+
+        } catch (error) {
+          this.addLog(this.$t('Error Drawing Calibration Point', [error.message]), 'error')
+          console.error('绘制校准点错误：', error)
+        }
+      },
+
+      // 清除所有校准点
+      clearCalibrationPoints() {
+        this.addLog(this.$t('Clearing All Calibration Points'), 'info')
+        this.$bus.$emit('ClearCalibrationPoints')
+        this.$bus.$emit('ClearStatusTextFromStarMap')
+      },
+
+      /**
+       * 绘制极轴校准调整点
+       * 在星图上绘制当前位置、目标位置、校准点等关键位置标记
+       * @param {number} currentRa - 当前赤经位置
+       * @param {number} currentDec - 当前赤纬位置  
+       * @param {number} targetRa - 目标赤经位置
+       * @param {number} targetDec - 目标赤纬位置
+       * @param {object} fieldData - 视场数据（包含视场边界信息）
+       * @param {boolean} isTimerUpdate - 是否为定时器更新（用于区分手动更新和自动更新）
+       */
+      drawAdjustmentPoints(currentRa, currentDec, targetRa, targetDec, fieldData, isTimerUpdate = false) {
+        // 这个方法现在主要用于校准点收集阶段
+        // 调整阶段的绘制逻辑已经移到updateFieldData方法中
+
+        this.addLog(this.$t('Starting Draw Adjustment Points', [currentRa, currentDec, targetRa, targetDec]), 'info')
+
+        try {
+          // 只在校准点收集阶段使用这个方法
+          if (this.calibrationPhase === 'collecting') {
+            // 绘制校准点收集阶段的逻辑
+            const currentCoordinates = this.calculateFieldCorners(currentRa, currentDec, fieldData, false)
             const currentColor = {
               stroke: "#00BFFF",        // 蓝色边框：当前位置
               strokeOpacity: 1,         // 边框不透明度
@@ -717,701 +1091,704 @@ export default {
 
             this.$bus.$emit('DrawCalibrationPointPolygon', currentCoordinates, currentColor,
               'Current_Position', '当前位置', "#00BFFF")
-
-            // 绘制目标点（绿色圆形）
-            const targetColor = {
-              stroke: "#4CAF50",        // 绿色边框：目标点
-              strokeOpacity: 1,         // 边框不透明度
-              fill: "#4CAF50",          // 绿色填充：目标点
-              fillOpacity: 0.3          // 填充不透明度（半透明）
-            }
-
-            const { az, alt } = this.equatorialToHorizontal(data[6], data[7], new Date(Date.now()), this.$store.state.currentLocation.lat, this.$store.state.currentLocation.lng)
-            // console.log('当前位置目标点', data[6], data[7] + ' 转化为地平坐标为' + az + ' ' + alt);
-            // console.log('使用时间和地点', new Date(Date.now()), $store.state.currentLocation.lat, $store.state.currentLocation.lng);
-
-            this.$bus.$emit('DrawTargetPointCircle',
-              az,
-              alt,
-              targetColor,
-              'Target_Point',
-              '目标点'
-            )
-
-            // 绘制假极轴（紫色圆形）
-            if (data[8] !== -1 && data[9] !== -1 && !isNaN(data[8]) && !isNaN(data[9])) {
-              const { az, alt } = this.equatorialToHorizontal(data[8], data[9], new Date(Date.now()), this.$store.state.currentLocation.lat, this.$store.state.currentLocation.lng)
-              this.drawFakePolarAxis(az, alt)
-            }
-
-            this.addLog(`调整模式：当前位置(${data[0].toFixed(4)}, ${data[1].toFixed(4)}) 目标位置(${data[6].toFixed(4)}, ${data[7].toFixed(4)}) 假极轴(${data[8].toFixed(4)}, ${data[9].toFixed(4)})`, 'info')
-          } catch (error) {
-            this.addLog(this.$t('Error processing adjustment data', [error.message]), 'error')
-            console.error('处理调整数据错误：', error)
-          }
-        }
-      } else {
-        this.addLog(this.$t('Error: Invalid Field Data Format'), 'error')
-      }
-    },
-
-    // 绘制校准点
-    drawCalibrationPointPolygon(ra, dec, pointNumber, fieldData) {
-      this.addLog(this.$t('Drawing Calibration Point', [pointNumber, ra, dec]), 'info')
-
-      try {
-        const coordinates = this.calculateFieldCorners(ra, dec, fieldData)
-        this.addLog(this.$t('Calculated Field Corner Coordinates', [JSON.stringify(coordinates)]), 'info')
-
-        // 验证坐标有效性
-        const validCoordinates = coordinates.every((coord, index) => {
-          const isValid = coord && typeof coord.ra === 'number' && typeof coord.dec === 'number' &&
-            !isNaN(coord.ra) && !isNaN(coord.dec) && isFinite(coord.ra) && isFinite(coord.dec)
-          if (!isValid) {
-            this.addLog(this.$t('Warning: Invalid Coordinate Point', [index, JSON.stringify(coord)]), 'warning')
-          }
-          return isValid
-        })
-
-        if (!validCoordinates) {
-          this.addLog(this.$t('Invalid Field Coordinates'), 'error')
-          return
-        }
-
-        const color = {
-          stroke: "#FFFFFF",
-          strokeOpacity: 1,
-          fill: "#FFFFFF",
-          fillOpacity: 0.2
-        }
-
-        // 添加文本标签
-        const label = `校准点${pointNumber}`
-        const labelColor = "#FFFFFF"
-
-        this.addLog(this.$t('Sending Draw Calibration Event', [pointNumber]), 'info')
-        this.$bus.$emit('DrawCalibrationPointPolygon', coordinates, color, `Calibration_${pointNumber}`, label, labelColor)
-
-      } catch (error) {
-        this.addLog(this.$t('Error Drawing Calibration Point', [error.message]), 'error')
-        console.error('绘制校准点错误：', error)
-      }
-    },
-
-    // 清除所有校准点
-    clearCalibrationPoints() {
-      this.addLog(this.$t('Clearing All Calibration Points'), 'info')
-      this.$bus.$emit('ClearCalibrationPoints')
-      this.$bus.$emit('ClearStatusTextFromStarMap')
-    },
-
-    /**
-     * 绘制极轴校准调整点
-     * 在星图上绘制当前位置、目标位置、校准点等关键位置标记
-     * @param {number} currentRa - 当前赤经位置
-     * @param {number} currentDec - 当前赤纬位置  
-     * @param {number} targetRa - 目标赤经位置
-     * @param {number} targetDec - 目标赤纬位置
-     * @param {object} fieldData - 视场数据（包含视场边界信息）
-     * @param {boolean} isTimerUpdate - 是否为定时器更新（用于区分手动更新和自动更新）
-     */
-    drawAdjustmentPoints(currentRa, currentDec, targetRa, targetDec, fieldData, isTimerUpdate = false) {
-      // 这个方法现在主要用于校准点收集阶段
-      // 调整阶段的绘制逻辑已经移到updateFieldData方法中
-
-      this.addLog(this.$t('Starting Draw Adjustment Points', [currentRa, currentDec, targetRa, targetDec]), 'info')
-
-      try {
-        // 只在校准点收集阶段使用这个方法
-        if (this.calibrationPhase === 'collecting') {
-          // 绘制校准点收集阶段的逻辑
-          const currentCoordinates = this.calculateFieldCorners(currentRa, currentDec, fieldData, false)
-          const currentColor = {
-            stroke: "#00BFFF",        // 蓝色边框：当前位置
-            strokeOpacity: 1,         // 边框不透明度
-            fill: "#00BFFF",          // 蓝色填充：当前位置
-            fillOpacity: 0.3          // 填充不透明度（半透明）
           }
 
-          this.$bus.$emit('DrawCalibrationPointPolygon', currentCoordinates, currentColor,
-            'Current_Position', '当前位置', "#00BFFF")
+        } catch (error) {
+          this.addLog(this.$t('Error Drawing Adjustment Points', [error.message]), 'error')
+          console.error('绘制调整点错误：', error)
+        }
+      },
+
+      /**
+       * 计算视场的五个角点坐标
+       * @param {number} centerRa - 视场中心的赤经坐标
+       * @param {number} centerDec - 视场中心的赤纬坐标
+       * @param {object} fieldData - 视场数据（包含视场边界信息）
+       * @param {boolean} useDefaultSize - 是否使用默认视场大小（用于目标点等固定位置）
+       * @returns {Array} 包含5个角点坐标的数组，用于绘制多边形
+       */
+      calculateFieldCorners(centerRa, centerDec, fieldData, useDefaultSize = false) {
+        this.addLog(this.$t('Calculating Field Corners', [centerRa, centerDec]), 'info')
+
+        // 如果指定使用默认大小或者没有视场数据，使用默认的0.5度视场大小
+        if (useDefaultSize || !fieldData) {
+          this.addLog(this.$t('Using Default Field Size: 0.5 Degrees'), 'info')
+          const fieldSize = 0.5
+          const coordinates = [
+            { ra: centerRa + fieldSize / 2, dec: centerDec + fieldSize / 2 },
+            { ra: centerRa - fieldSize / 2, dec: centerDec + fieldSize / 2 },
+            { ra: centerRa - fieldSize / 2, dec: centerDec - fieldSize / 2 },
+            { ra: centerRa + fieldSize / 2, dec: centerDec - fieldSize / 2 },
+            { ra: centerRa + fieldSize / 2, dec: centerDec + fieldSize / 2 }
+          ]
+          this.addLog(this.$t('Default Field Corners', [JSON.stringify(coordinates)]), 'info')
+          return coordinates
         }
 
-      } catch (error) {
-        this.addLog(this.$t('Error Drawing Adjustment Points', [error.message]), 'error')
-        console.error('绘制调整点错误：', error)
-      }
-    },
+        // 如果有视场数据且不强制使用默认大小，基于传入的中心点坐标计算视场角点
+        // 这种情况主要用于当前位置的显示，需要反映实际的视场大小
+        const { ra0, dec0, ra1, dec1, ra2, dec2, ra3, dec3 } = fieldData
 
-    /**
-     * 计算视场的五个角点坐标
-     * @param {number} centerRa - 视场中心的赤经坐标
-     * @param {number} centerDec - 视场中心的赤纬坐标
-     * @param {object} fieldData - 视场数据（包含视场边界信息）
-     * @param {boolean} useDefaultSize - 是否使用默认视场大小（用于目标点等固定位置）
-     * @returns {Array} 包含5个角点坐标的数组，用于绘制多边形
-     */
-    calculateFieldCorners(centerRa, centerDec, fieldData, useDefaultSize = false) {
-      this.addLog(this.$t('Calculating Field Corners', [centerRa, centerDec]), 'info')
+        // 计算视场的实际大小（RA和DEC方向的跨度）
+   
 
-      // 如果指定使用默认大小或者没有视场数据，使用默认的0.5度视场大小
-      if (useDefaultSize || !fieldData) {
-        this.addLog(this.$t('Using Default Field Size: 0.5 Degrees'), 'info')
-        const fieldSize = 0.5
+        // 基于传入的中心点坐标，计算视场的五个角点
         const coordinates = [
-          { ra: centerRa + fieldSize / 2, dec: centerDec + fieldSize / 2 },
-          { ra: centerRa - fieldSize / 2, dec: centerDec + fieldSize / 2 },
-          { ra: centerRa - fieldSize / 2, dec: centerDec - fieldSize / 2 },
-          { ra: centerRa + fieldSize / 2, dec: centerDec - fieldSize / 2 },
-          { ra: centerRa + fieldSize / 2, dec: centerDec + fieldSize / 2 }
+          { ra: ra0, dec: dec0 },     // 右上角
+          { ra: ra1, dec: dec1 },     // 左上角
+          { ra: ra2, dec: dec2 },     // 左下角
+          { ra: ra3, dec: dec3 },     // 右下角
+          { ra: ra0, dec: dec0 }      // 回到右上角（闭合多边形）
         ]
-        this.addLog(this.$t('Default Field Corners', [JSON.stringify(coordinates)]), 'info')
+
+        this.addLog(this.$t('Using Field Data', [ra0, dec0, ra1, dec1, ra2, dec2, ra3, dec3]), 'info')
+        this.addLog(this.$t('Field Corner Calculation Result', [JSON.stringify(coordinates)]), 'info')
         return coordinates
-      }
-
-      // 如果有视场数据且不强制使用默认大小，基于传入的中心点坐标计算视场角点
-      // 这种情况主要用于当前位置的显示，需要反映实际的视场大小
-      const { maxra, minra, maxdec, mindec } = fieldData
-
-      // 计算视场的实际大小（RA和DEC方向的跨度）
-      const raSpan = maxra - minra
-      const decSpan = maxdec - mindec
-
-      // 基于传入的中心点坐标，计算视场的五个角点
-      const coordinates = [
-        { ra: centerRa + raSpan / 2, dec: centerDec + decSpan / 2 },     // 右上角
-        { ra: centerRa - raSpan / 2, dec: centerDec + decSpan / 2 },     // 左上角
-        { ra: centerRa - raSpan / 2, dec: centerDec - decSpan / 2 },     // 左下角
-        { ra: centerRa + raSpan / 2, dec: centerDec - decSpan / 2 },     // 右下角
-        { ra: centerRa + raSpan / 2, dec: centerDec + decSpan / 2 }      // 回到右上角（闭合多边形）
-      ]
-
-      this.addLog(this.$t('Using Field Data', [raSpan, decSpan]), 'info')
-      this.addLog(this.$t('Field Corner Calculation Result', [JSON.stringify(coordinates)]), 'info')
-      return coordinates
-    },
+      },
 
 
 
-    // === 格式化方法 ===
-    formatTime(timestamp) {
-      if (!timestamp) return ''
-      const date = new Date(timestamp)
-      return date.toLocaleTimeString('zh-CN', {
-        hour12: false,
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
-      })
-    },
-
-    formatAdjustmentValue(value) {
-      if (value === null || value === undefined || isNaN(value)) return '0.0\''
-      return Math.abs(value).toFixed(1) + "'"
-    },
-
-    // 格式化坐标显示
-    formatCoordinate(value, type) {
-      if (value === null || value === undefined || isNaN(value)) {
-        return type === 'ra' ? '00h 00m 00s' : '+00° 00\' 00"'
-      }
-
-      if (type === 'ra') {
-        // 格式化RA为时分秒格式
-        const hours = Math.floor(value / 15)
-        const minutes = Math.floor((value % 15) * 4)
-        const seconds = Math.floor(((value % 15) * 4 - minutes) * 60)
-        return `${hours.toString().padStart(2, '0')}h ${minutes.toString().padStart(2, '0')}m ${seconds.toString().padStart(2, '0')}s`
-      } else {
-        // 格式化DEC为度分秒格式
-        const sign = value >= 0 ? '+' : '-'
-        const absValue = Math.abs(value)
-        const degrees = Math.floor(absValue)
-        const minutes = Math.floor((absValue - degrees) * 60)
-        const seconds = Math.floor(((absValue - degrees) * 60 - minutes) * 60)
-        return `${sign}${degrees.toString().padStart(2, '0')}° ${minutes.toString().padStart(2, '0')}' ${seconds.toString().padStart(2, '0')}"`
-      }
-    },
-
-
-    // === 辅助方法 ===
-    parseCoordinate(value, type) {
-      if (typeof value === 'string') {
-        if (type === 'ra') {
-          // 解析时分秒格式 "00h 00m 00s"
-          const match = value.match(/(\d+)h\s*(\d+)m\s*(\d+)s/)
-          if (match) {
-            const hours = parseInt(match[1])
-            const minutes = parseInt(match[2])
-            const seconds = parseInt(match[3])
-            return hours + minutes / 60 + seconds / 3600
-          }
-        } else {
-          // 解析度分秒格式 "+00° 00' 00""
-          const match = value.match(/([+-]?)(\d+)°\s*(\d+)'\s*(\d+)"/)
-          if (match) {
-            const sign = match[1] === '-' ? -1 : 1
-            const degrees = parseInt(match[2])
-            const minutes = parseInt(match[3])
-            const seconds = parseInt(match[4])
-            return sign * (degrees + minutes / 60 + seconds / 3600)
-          }
-        }
-      }
-      return null
-    },
-
-    addStatusTextToStarMap() {
-      // 添加状态文本到星图
-      const statusText = {
-        text: `极轴校准调整中 - 校准点: ${this.calibrationPoints.length}/3`,
-        position: { ra: this.currentPosition.ra, dec: this.currentPosition.dec },
-        color: "#FFFFFF",
-        fontSize: 14,
-        backgroundColor: "rgba(0, 0, 0, 0.7)"
-      }
-
-      // 发送状态文本到星图
-      // this.$bus.$emit('AddStatusTextToStarMap', statusText)
-    },
-
-    getStepClass(index) {
-      // 根据进度百分比确定节点状态
-      const progress = this.progressPercentage
-
-      switch (index) {
-        case 0: // 初始化节点
-          if (progress >= 15) return { completed: true }
-          if (progress >= 0) return { current: true }
-          return {}
-
-        case 1: // 第一次校准节点
-          if (progress >= 25) return { completed: true }
-          if (progress >= 15) return { current: true }
-          return {}
-
-        case 2: // 第二次校准节点
-          if (progress >= 50) return { completed: true }
-          if (progress >= 25) return { current: true }
-          return {}
-
-        case 3: // 第三次校准节点
-          if (progress >= 75) return { completed: true }
-          if (progress >= 50) return { current: true }
-          return {}
-
-        default:
-          return {}
-      }
-    },
-
-    getAzimuthAction(azimuth) {
-      if (azimuth === null || azimuth === undefined || isNaN(azimuth)) return ''
-      if (azimuth > 0.5) return this.$t('Turn Right')
-      if (azimuth < -0.5) return this.$t('Turn Left')
-      return ''
-    },
-
-    getAltitudeAction(altitude) {
-      if (altitude === null || altitude === undefined || isNaN(altitude)) return ''
-      if (altitude > 0.5) return this.$t('Raise Up')
-      if (altitude < -0.5) return this.$t('Lower Down')
-      return ''
-    },
-
-
-
-    // === 日志方法 ===
-    addLog(message, level = 'info') {
-      const log = {
-        id: Date.now() + Math.random(),
-        message,
-        level,
-        timestamp: new Date()
-      }
-      console.log(log.message)
-      this.logs.push(log)
-      // 限制日志数量
-      if (this.logs.length > 100) {
-        this.logs.shift()
-      }
-    },
-
-    clearLogs() {
-      this.logs = []
-    },
-
-    // === 极轴校准状态更新方法 ===
-    calculatePolarAxisOffset() {
-      this.polarAxisOffset = {
-        azimuth: this.adjustment.azimuth,
-        altitude: this.adjustment.altitude
-      }
-    },
-
-    updatePolarAlignmentState(stateNumber, logMessage, progress) {
-      if (logMessage && typeof logMessage === 'string') {
-        let level = 'info'
-        if (logMessage.toLowerCase().includes('error') || logMessage.toLowerCase().includes('失败')) {
-          level = 'error'
-        } else if (logMessage.toLowerCase().includes('warning') || logMessage.toLowerCase().includes('警告')) {
-          level = 'warning'
-        } else if (logMessage.toLowerCase().includes('success') || logMessage.toLowerCase().includes('成功') || logMessage.toLowerCase().includes('完成')) {
-          level = 'success'
-        }
-        this.addLog(logMessage, level)
-      }
-
-      if (progress !== undefined && progress !== null) {
-        this.currentProgress = progress
-
-        if (progress >= 0 && progress <= 100) {
-          // 根据进度更新校准状态
-          if (progress >= 0 && progress < 15) {
-            // 初始化阶段
-            this.calibrationPoints = []
-            this.isCalibrationComplete = false
-            this.isPolarAligned = false
-          } else if (progress >= 15 && progress < 25) {
-            // 第一次校准阶段 - 移除模拟数据添加，实际校准点由updateFieldData处理
-            // 这里只更新状态，不添加模拟校准点
-          } else if (progress >= 25 && progress < 50) {
-            // 第二次校准阶段 - 移除模拟数据添加，实际校准点由updateFieldData处理
-            // 这里只更新状态，不添加模拟校准点
-          } else if (progress >= 50 && progress < 75) {
-            // 第三次校准阶段 - 移除模拟数据添加，实际校准点由updateFieldData处理
-            // 这里只更新状态，不添加模拟校准点
-          } else if (progress >= 75 && progress < 95) {
-            // 循环校准调整阶段
-            this.isCalibrationComplete = true
-            this.calculatePolarAxisOffset()
-
-            // 检测校准循环
-            if (progress < this.lastCalibrationProgress && this.lastCalibrationProgress >= 75) {
-              this.calibrationLoopCount++
-              this.addLog(this.$t('Calibration Round Started', [this.calibrationLoopCount]), 'info')
-            }
-
-            // 在循环校准阶段，进度可能会在75-95之间波动
-            // 这表示系统正在进行多次校准调整
-            if (progress > 85) {
-              this.addLog(this.$t('Calibration Progress Info', [Math.round(progress), this.calibrationLoopCount]), 'info')
-            }
-
-            this.lastCalibrationProgress = progress
-          } else if (progress >= 95 && progress <= 100) {
-            // 最终验证阶段
-            this.isCalibrationComplete = true
-            this.calculatePolarAxisOffset()
-
-            if (Math.abs(this.polarAxisOffset.azimuth) < 1.0 && Math.abs(this.polarAxisOffset.altitude) < 1.0) {
-              this.isPolarAligned = true
-              this.addLog(this.$t('Polar Alignment Completed'), 'success')
-            } else {
-              this.addLog(this.$t('Polar Alignment Needs Manual Adjustment'), 'warning')
-            }
-          }
-        }
-      }
-    },
-
-    /**
-     * 赤道坐标 (RA, Dec) → 地平坐标 (Az, Alt)
-     * @param {number} raDeg 赤经 (度, 0~360)
-     * @param {number} decDeg 赤纬 (度, -90~+90)
-     * @param {Date} dateUTC 观测时间 (UTC 时间)
-     * @param {number} latDeg 观测点纬度 (度, 北正南负)
-     * @param {number} lonDeg 观测点经度 (度, 东正西负)
-     * @returns {{az: number, alt: number}} 方位角/高度角 (度)
-     */
-    equatorialToHorizontal(raDeg, decDeg, dateUTC, latDeg, lonDeg) {
-      // 工具
-      const toJD = d => (Number(d) / 86400000) + 2440587.5; // Date/ms → JD
-      const d2r = x => x * Math.PI / 180, r2d = x => x * 180 / Math.PI;
-      const norm360 = a => ((a % 360) + 360) % 360;
-      const clamp = (x, lo = -1, hi = 1) => Math.min(hi, Math.max(lo, x));
-
-      // 入参归一化 + 硬校验
-      raDeg = Number(raDeg);
-      decDeg = Number(decDeg);
-      latDeg = Number(latDeg);
-      lonDeg = Number(lonDeg);
-      const tms = Number(dateUTC); // Date 或时间戳都可
-
-      console.log('EQ→HOR 入参:', { raDeg, decDeg, latDeg, lonDeg, dateUTC, tms });
-
-      if (![raDeg, decDeg, latDeg, lonDeg, tms].every(Number.isFinite)) {
-        console.error('EQ→HOR 入参非法:', { raDeg, decDeg, latDeg, lonDeg, dateUTC, tms });
-        return { az: NaN, alt: NaN };
-      }
-
-      try {
-        // 1) JD & GMST
-        const JD = toJD(tms);
-        const d = JD - 2451545.0;
-        let GMST = norm360(280.46061837 + 360.98564736629 * d); // 度
-
-        // 2) LST（东经为正）
-        let LST = norm360(GMST + lonDeg);
-
-        // 3) HA（-180~180 更稳）
-        let HA = LST - raDeg;
-        HA = ((HA + 180) % 360) - 180;
-
-        // 4) Alt / Az（稳定形式）
-        const ha = d2r(HA);
-        const dec = d2r(decDeg);
-        const lat = d2r(latDeg);
-
-        const sinAlt = clamp(
-          Math.sin(dec) * Math.sin(lat) + Math.cos(dec) * Math.cos(lat) * Math.cos(ha)
-        );
-        const alt = Math.asin(sinAlt);
-        const y = -Math.sin(ha) * Math.cos(dec);
-        const x = Math.sin(dec) * Math.cos(lat) - Math.cos(dec) * Math.sin(lat) * Math.cos(ha);
-        const az = Math.atan2(y, x);
-
-        const altDeg = r2d(alt);
-        const azDeg = norm360(r2d(az));
-
-        console.log('EQ→HOR 结果:', {
-          JD, GMST, LST, HA,
-          haRad: ha, decRad: dec, latRad: lat,
-          az: azDeg, alt: altDeg
-        });
-
-        return { az: azDeg, alt: altDeg };
-      } catch (e) {
-        console.error('EQ→HOR 计算异常:', e, {
-          raDeg, decDeg, latDeg, lonDeg, dateUTC, tms
-        });
-        return { az: NaN, alt: NaN };
-      }
-    },
-
-
-
-
-
-    // === 增强的卡片信息更新方法 ===
-    updateCardInfo(currentRa, currentDec, targetRa, targetDec, azimuthDegrees, altitudeDegrees, raAdjustment, decAdjustment) {
-      // 数据类型转换和有效性检查
-      const parseValue = (value) => {
-        if (value === null || value === undefined || value === '') return 0
-        const num = parseFloat(value)
-        return isNaN(num) ? 0 : num
-      }
-
-      // 转换并验证所有数值
-      const currentRaNum = parseValue(currentRa)
-      const currentDecNum = parseValue(currentDec)
-      const targetRaNum = parseValue(targetRa)
-      const targetDecNum = parseValue(targetDec)
-      const azimuthNum = parseValue(azimuthDegrees)
-      const altitudeNum = parseValue(altitudeDegrees)
-
-      // 检查数据有效性
-      if (isNaN(currentRaNum) || isNaN(currentDecNum) || isNaN(targetRaNum) || isNaN(targetDecNum) ||
-        isNaN(azimuthNum) || isNaN(altitudeNum)) {
-        console.warn('PolarAlignment: 接收到无效的数值数据:', {
-          currentRa, currentDec, targetRa, targetDec, azimuthDegrees, altitudeDegrees
+      // ========================================
+      // 格式化方法
+      // ========================================
+      formatTime(timestamp) {
+        if (!timestamp) return ''
+        const date = new Date(timestamp)
+        return date.toLocaleTimeString('zh-CN', {
+          hour12: false,
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
         })
-        return
-      }
+      },
 
-      // 更新位置信息
-      this.currentPosition.ra = this.formatCoordinate(currentRaNum, 'ra')
-      this.currentPosition.dec = this.formatCoordinate(currentDecNum, 'dec')
-      // 注意：这里的targetRa和targetDec是应该移动到的目标位置，不是真极轴位置
-      this.targetPosition.ra = this.formatCoordinate(targetRaNum, 'ra')
-      this.targetPosition.dec = this.formatCoordinate(targetDecNum, 'dec')
+      formatAdjustmentValue(value) {
+        if (!Number.isFinite(value)) return `0.0${this.unitGlyph(this.adjustmentUnit)}`
+        // value 的单位 = props.adjustmentUnit
+        const valArcmin = this.unitToArcmin(value, this.adjustmentUnit)
+        // 展示单位仍然用 props.adjustmentUnit（也可改成固定‘arcmin’）
+        return this.formatWithUnit(valArcmin, this.adjustmentUnit, 1)
+      },
 
-      // 更新调整信息
-      this.adjustment.azimuth = azimuthNum
-      this.adjustment.altitude = altitudeNum
-
-      // 更新极轴对齐状态
-      this.isPolarAligned = Math.abs(azimuthNum) < 1.0 && Math.abs(altitudeNum) < 1.0
-
-      // 添加调试日志
-      console.log('PolarAlignment: 更新卡片信息成功:', {
-        currentPosition: { ra: this.currentPosition.ra, dec: this.currentPosition.dec },
-        targetPosition: { ra: this.targetPosition.ra, dec: this.targetPosition.dec },
-        adjustment: { azimuth: this.adjustment.azimuth, altitude: this.adjustment.altitude },
-        isPolarAligned: this.isPolarAligned
-      })
-
-    },
-
-    /**
-     * 根据三个校准点计算假极轴位置
-     * 使用三点极轴校准算法
-     */
-    calculateFakePolarAxis() {
-      if (this.calibrationPoints.length !== 3) {
-        this.addLog('需要3个校准点才能计算假极轴位置', 'warning')
-        return false
-      }
-
-      try {
-        const [p1, p2, p3] = this.calibrationPoints
-
-        // 将三个点转换为笛卡尔坐标
-        const cart1 = this.equatorialToCartesian(p1.ra, p1.dec)
-        const cart2 = this.equatorialToCartesian(p2.ra, p2.dec)
-        const cart3 = this.equatorialToCartesian(p3.ra, p3.dec)
-
-        // 计算两个向量
-        const v1 = {
-          x: cart2.x - cart1.x,
-          y: cart2.y - cart1.y,
-          z: cart2.z - cart1.z
-        }
-        const v2 = {
-          x: cart3.x - cart1.x,
-          y: cart3.y - cart1.y,
-          z: cart3.z - cart1.z
+      // 格式化坐标显示
+      formatCoordinate(value, type) {
+        if (value === null || value === undefined || isNaN(value)) {
+          return type === 'ra' ? '00h 00m 00s' : '+00° 00\' 00"'
         }
 
-        // 计算法向量（叉积）
-        const normal = this.crossProduct(v1, v2)
+        if (type === 'ra') {
+          // 格式化RA为时分秒格式
+          const hours = Math.floor(value / 15)
+          const minutes = Math.floor((value % 15) * 4)
+          const seconds = Math.floor(((value % 15) * 4 - minutes) * 60)
+          return `${hours.toString().padStart(2, '0')}h ${minutes.toString().padStart(2, '0')}m ${seconds.toString().padStart(2, '0')}s`
+        } else {
+          // 格式化DEC为度分秒格式
+          const sign = value >= 0 ? '+' : '-'
+          const absValue = Math.abs(value)
+          const degrees = Math.floor(absValue)
+          const minutes = Math.floor((absValue - degrees) * 60)
+          const seconds = Math.floor(((absValue - degrees) * 60 - minutes) * 60)
+          return `${sign}${degrees.toString().padStart(2, '0')}° ${minutes.toString().padStart(2, '0')}' ${seconds.toString().padStart(2, '0')}"`
+        }
+      },
 
-        // 检查法向量是否为零向量
-        const normalLength = this.vectorLength(normal)
-        if (normalLength < 1e-10) {
-          this.addLog('三个校准点共线，无法计算假极轴位置', 'error')
+
+      // ========================================
+      // 辅助方法
+      // ========================================
+      parseCoordinate(value, type) {
+        if (typeof value === 'string') {
+          if (type === 'ra') {
+            // 解析时分秒格式 "00h 00m 00s"
+            const match = value.match(/(\d+)h\s*(\d+)m\s*(\d+)s/)
+            if (match) {
+              const hours = parseInt(match[1])
+              const minutes = parseInt(match[2])
+              const seconds = parseInt(match[3])
+              return hours + minutes / 60 + seconds / 3600
+            }
+          } else {
+            // 解析度分秒格式 "+00° 00' 00""
+            const match = value.match(/([+-]?)(\d+)°\s*(\d+)'\s*(\d+)"/)
+            if (match) {
+              const sign = match[1] === '-' ? -1 : 1
+              const degrees = parseInt(match[2])
+              const minutes = parseInt(match[3])
+              const seconds = parseInt(match[4])
+              return sign * (degrees + minutes / 60 + seconds / 3600)
+            }
+          }
+        }
+        return null
+      },
+
+      addStatusTextToStarMap() {
+        // 添加状态文本到星图
+        const statusText = {
+          text: `极轴校准调整中 - 校准点: ${this.calibrationPoints.length}/3`,
+          position: { ra: this.currentPosition.ra, dec: this.currentPosition.dec },
+          color: "#FFFFFF",
+          fontSize: 14,
+          backgroundColor: "rgba(0, 0, 0, 0.7)"
+        }
+
+        // 发送状态文本到星图
+        // this.$bus.$emit('AddStatusTextToStarMap', statusText)
+      },
+
+      getStepClass(index) {
+        // 根据进度百分比确定节点状态
+        const progress = this.progressPercentage
+
+        switch (index) {
+          case 0: // 初始化节点
+            if (progress >= PROGRESS_THRESHOLDS.INITIALIZATION) return { completed: true }
+            if (progress >= 0) return { current: true }
+            return {}
+
+          case 1: // 第一次校准节点
+            if (progress >= PROGRESS_THRESHOLDS.FIRST_CALIBRATION) return { completed: true }
+            if (progress >= PROGRESS_THRESHOLDS.INITIALIZATION) return { current: true }
+            return {}
+
+          case 2: // 第二次校准节点
+            if (progress >= PROGRESS_THRESHOLDS.SECOND_CALIBRATION) return { completed: true }
+            if (progress >= PROGRESS_THRESHOLDS.FIRST_CALIBRATION) return { current: true }
+            return {}
+
+          case 3: // 第三次校准节点
+            if (progress >= PROGRESS_THRESHOLDS.THIRD_CALIBRATION) return { completed: true }
+            if (progress >= PROGRESS_THRESHOLDS.SECOND_CALIBRATION) return { current: true }
+            return {}
+
+          default:
+            return {}
+        }
+      },
+
+      getAzimuthAction(azVal) {
+        if (!Number.isFinite(azVal)) return ''
+        const arcmin = this.unitToArcmin(azVal, this.adjustmentUnit)
+        if (Math.abs(arcmin) <= this.deadbandArcmin) return this.$t('No adjustment needed')
+        const dir = this.azLabelBySign(arcmin)
+        // 输出单位与 props.adjustmentUnit 保持一致
+        return `${dir} ${this.formatWithUnit(arcmin, this.adjustmentUnit, 1)}`
+      },
+
+      getAltitudeAction(altVal) {
+        if (!Number.isFinite(altVal)) return ''
+        const arcmin = this.unitToArcmin(altVal, this.adjustmentUnit)
+        if (Math.abs(arcmin) <= this.deadbandArcmin) return this.$t('No adjustment needed')
+        const dir = this.altLabelBySign(arcmin)
+        return `${dir} ${this.formatWithUnit(arcmin, this.adjustmentUnit, 1)}`
+      },
+
+
+
+      // ========================================
+      // 日志方法
+      // ========================================
+      addLog(message, level = 'info') {
+        const log = {
+          id: Date.now() + Math.random(),
+          message,
+          level,
+          timestamp: new Date()
+        }
+        
+        // 生产环境减少console输出
+        if (process.env.NODE_ENV === 'development') {
+          console.log(log.message)
+        }
+        
+        // 使用循环数组优化内存使用
+        if (this.logs.length < this.logCapacity) {
+          this.logs.push(log)
+        } else {
+          // 循环覆盖旧日志
+          this.logs[this.logIndex] = log
+          this.logIndex = (this.logIndex + 1) % this.logCapacity
+        }
+      },
+
+      clearLogs() {
+        this.logs = []
+        this.logIndex = 0
+      },
+
+      // ========================================
+      // 极轴校准状态更新方法
+      // ========================================
+      calculatePolarAxisOffset() {
+        this.polarAxisOffset = {
+          azimuth: this.adjustment.azimuth,
+          altitude: this.adjustment.altitude
+        }
+      },
+
+      updatePolarAlignmentState(stateNumber, logMessage, progress) {
+        if (logMessage && typeof logMessage === 'string') {
+          let level = 'info'
+          if (logMessage.toLowerCase().includes('error') || logMessage.toLowerCase().includes('失败')) {
+            level = 'error'
+          } else if (logMessage.toLowerCase().includes('warning') || logMessage.toLowerCase().includes('警告')) {
+            level = 'warning'
+          } else if (logMessage.toLowerCase().includes('success') || logMessage.toLowerCase().includes('成功') || logMessage.toLowerCase().includes('完成')) {
+            level = 'success'
+          }
+          this.addLog(logMessage, level)
+        }
+
+        if (progress !== undefined && progress !== null) {
+          this.currentProgress = progress
+
+          if (progress >= 0 && progress <= 100) {
+            // 根据进度更新校准状态
+            if (progress >= 0 && progress < 15) {
+              // 初始化阶段
+              this.calibrationPoints = []
+              this.isCalibrationComplete = false
+              this.isPolarAligned = false
+            } else if (progress >= 15 && progress < 25) {
+              // 第一次校准阶段 - 移除模拟数据添加，实际校准点由updateFieldData处理
+              // 这里只更新状态，不添加模拟校准点
+            } else if (progress >= 25 && progress < 50) {
+              // 第二次校准阶段 - 移除模拟数据添加，实际校准点由updateFieldData处理
+              // 这里只更新状态，不添加模拟校准点
+            } else if (progress >= 50 && progress < 75) {
+              // 第三次校准阶段 - 移除模拟数据添加，实际校准点由updateFieldData处理
+              // 这里只更新状态，不添加模拟校准点
+            } else if (progress >= 75 && progress < 95) {
+              // 循环校准调整阶段
+              this.isCalibrationComplete = true
+              this.calculatePolarAxisOffset()
+
+              // 检测校准循环
+              if (progress < this.lastCalibrationProgress && this.lastCalibrationProgress >= 75) {
+                this.calibrationLoopCount++
+                this.addLog(this.$t('Calibration Round Started', [this.calibrationLoopCount]), 'info')
+              }
+
+              // 在循环校准阶段，进度可能会在75-95之间波动
+              // 这表示系统正在进行多次校准调整
+              if (progress > 85) {
+                this.addLog(this.$t('Calibration Progress Info', [Math.round(progress), this.calibrationLoopCount]), 'info')
+              }
+
+              this.lastCalibrationProgress = progress
+            } else if (progress >= 95 && progress <= 100) {
+              // 最终验证阶段
+              this.isCalibrationComplete = true
+              this.calculatePolarAxisOffset()
+
+              if (Math.abs(this.polarAxisOffset.azimuth) < 1.0 && Math.abs(this.polarAxisOffset.altitude) < 1.0) {
+                this.isPolarAligned = true
+                this.addLog(this.$t('Polar Alignment Completed'), 'success')
+              } else {
+                this.addLog(this.$t('Polar Alignment Needs Manual Adjustment'), 'warning')
+              }
+            }
+          }
+        }
+      },
+
+      // ========================================
+      // 坐标转换方法
+      // ========================================
+      /**
+       * 赤道坐标 (RA, Dec) → 地平坐标 (Az, Alt)
+       * @param {number} raDeg 赤经 (度, 0~360)
+       * @param {number} decDeg 赤纬 (度, -90~+90)
+       * @param {Date} dateUTC 观测时间 (UTC 时间)
+       * @param {number} latDeg 观测点纬度 (度, 北正南负)
+       * @param {number} lonDeg 观测点经度 (度, 东正西负)
+       * @returns {{az: number, alt: number}} 方位角/高度角 (度)
+       */
+      equatorialToHorizontal(raDeg, decDeg, dateUTC, latDeg, lonDeg) {
+        // 工具
+        const toJD = d => (Number(d) / 86400000) + 2440587.5; // Date/ms → JD
+        const d2r = x => x * Math.PI / 180, r2d = x => x * 180 / Math.PI;
+        const norm360 = a => ((a % 360) + 360) % 360;
+        const clamp = (x, lo = -1, hi = 1) => Math.min(hi, Math.max(lo, x));
+
+        // 入参归一化 + 硬校验
+        raDeg = Number(raDeg);
+        decDeg = Number(decDeg);
+        latDeg = Number(latDeg);
+        lonDeg = Number(lonDeg);
+        const tms = Number(dateUTC); // Date 或时间戳都可
+
+        if (process.env.NODE_ENV === 'development') {
+          console.log('EQ→HOR 入参:', { raDeg, decDeg, latDeg, lonDeg, dateUTC, tms });
+        }
+
+        if (![raDeg, decDeg, latDeg, lonDeg, tms].every(Number.isFinite)) {
+          console.error('EQ→HOR 入参非法:', { raDeg, decDeg, latDeg, lonDeg, dateUTC, tms });
+          return { az: NaN, alt: NaN };
+        }
+
+        try {
+          // 1) JD & GMST
+          const JD = toJD(tms);
+          const d = JD - 2451545.0;
+          let GMST = norm360(280.46061837 + 360.98564736629 * d); // 度
+
+          // 2) LST（东经为正）
+          let LST = norm360(GMST + lonDeg);
+
+          // 3) HA（-180~180 更稳）
+          let HA = LST - raDeg;
+          HA = ((HA + 180) % 360) - 180;
+
+          // 4) Alt / Az（稳定形式）
+          const ha = d2r(HA);
+          const dec = d2r(decDeg);
+          const lat = d2r(latDeg);
+
+          const sinAlt = clamp(
+            Math.sin(dec) * Math.sin(lat) + Math.cos(dec) * Math.cos(lat) * Math.cos(ha)
+          );
+          const alt = Math.asin(sinAlt);
+          const y = -Math.sin(ha) * Math.cos(dec);
+          const x = Math.sin(dec) * Math.cos(lat) - Math.cos(dec) * Math.sin(lat) * Math.cos(ha);
+          const az = Math.atan2(y, x);
+
+          const altDeg = r2d(alt);
+          const azDeg = norm360(r2d(az));
+
+          if (process.env.NODE_ENV === 'development') {
+            console.log('EQ→HOR 结果:', {
+              JD, GMST, LST, HA,
+              haRad: ha, decRad: dec, latRad: lat,
+              az: azDeg, alt: altDeg
+            });
+          }
+
+          return { az: azDeg, alt: altDeg };
+        } catch (e) {
+          console.error('EQ→HOR 计算异常:', e, {
+            raDeg, decDeg, latDeg, lonDeg, dateUTC, tms
+          });
+          return { az: NaN, alt: NaN };
+        }
+      },
+
+
+
+
+
+      // === 增强的卡片信息更新方法 ===
+      updateCardInfo(currentRa, currentDec, targetRa, targetDec, azimuthVal, altitudeVal, raAdjustment, decAdjustment, unitHint) {
+        const parseValue = v => (v === null || v === '' || v === undefined) ? 0 : (Number(v) || 0)
+
+        const currentRaNum = parseValue(currentRa)
+        const currentDecNum = parseValue(currentDec)
+        const targetRaNum = parseValue(targetRa)
+        const targetDecNum = parseValue(targetDec)
+        const azVal = parseValue(azimuthVal)
+        const altVal = parseValue(altitudeVal)
+
+        // 1) 位置显示（原样）
+        this.currentPosition.ra = this.formatCoordinate(currentRaNum, 'ra')
+        this.currentPosition.dec = this.formatCoordinate(currentDecNum, 'dec')
+        this.targetPosition.ra = this.formatCoordinate(targetRaNum, 'ra')
+        this.targetPosition.dec = this.formatCoordinate(targetDecNum, 'dec')
+
+        // 2) 调整量：以传入单位为准写入（默认用 props.adjustmentUnit）
+        const inUnit = unitHint || this.adjustmentUnit
+        // 如果传入是"度"，但你 props 设为了"arcmin"，也没关系——显示会自动换算
+        // 这里保存"原始数 + 它的单位（通过 props）"
+        this.adjustment.azimuth = azVal
+        this.adjustment.altitude = altVal
+        this.adjustmentUnit = inUnit  // 如果希望每次随数据切换单位，可加入这一行
+
+        // 3) 在调整阶段，每次接收到调整数据时增加校准轮数
+        if (this.calibrationPhase === 'adjusting') {
+          this.calibrationLoopCount++
+          this.addLog(this.$t('Calibration Round Started', [this.calibrationLoopCount]), 'info')
+        }
+
+        // 4) 极轴完成判定（用角分比较）
+        const azArcmin = this.unitToArcmin(azVal, inUnit)
+        const altArcmin = this.unitToArcmin(altVal, inUnit)
+        this.isPolarAligned = Math.abs(azArcmin) < 1.0 && Math.abs(altArcmin) < 1.0
+
+        if (process.env.NODE_ENV === 'development') {
+          console.log('PolarAlignment update:', {
+            unit: inUnit,
+            adj_raw: { azimuth: azVal, altitude: altVal },
+            adj_arcmin: { az: azArcmin, alt: altArcmin },
+            isPolarAligned: this.isPolarAligned,
+            calibrationRound: this.calibrationLoopCount
+          })
+        }
+      },
+
+
+      /**
+       * 根据三个校准点计算假极轴位置
+       * 使用三点极轴校准算法
+       */
+      calculateFakePolarAxis() {
+        if (this.calibrationPoints.length !== this.maxCalibrationPoints) {
+          this.addLog('需要3个校准点才能计算假极轴位置', 'warning')
           return false
         }
 
-        // 归一化法向量
-        const unitNormal = this.normalizeVector(normal)
+        try {
+          const [p1, p2, p3] = this.calibrationPoints
 
-        // 计算与单位球面的交点（假极点）
-        const fakePolarPoint = {
-          x: unitNormal.x,
-          y: unitNormal.y,
-          z: unitNormal.z
+          // 将三个点转换为笛卡尔坐标
+          const cart1 = this.equatorialToCartesian(p1.ra, p1.dec)
+          const cart2 = this.equatorialToCartesian(p2.ra, p2.dec)
+          const cart3 = this.equatorialToCartesian(p3.ra, p3.dec)
+
+          // 计算两个向量
+          const v1 = {
+            x: cart2.x - cart1.x,
+            y: cart2.y - cart1.y,
+            z: cart2.z - cart1.z
+          }
+          const v2 = {
+            x: cart3.x - cart1.x,
+            y: cart3.y - cart1.y,
+            z: cart3.z - cart1.z
+          }
+
+          // 计算法向量（叉积）
+          const normal = this.crossProduct(v1, v2)
+
+          // 检查法向量是否为零向量
+          const normalLength = this.vectorLength(normal)
+          if (normalLength < 1e-10) {
+            this.addLog('三个校准点共线，无法计算假极轴位置', 'error')
+            return false
+          }
+
+          // 归一化法向量
+          const unitNormal = this.normalizeVector(normal)
+
+          // 计算与单位球面的交点（假极点）
+          const fakePolarPoint = {
+            x: unitNormal.x,
+            y: unitNormal.y,
+            z: unitNormal.z
+          }
+
+          // 选择正确的交点（z坐标为正的）
+          if (fakePolarPoint.z < 0) {
+            fakePolarPoint.x = -fakePolarPoint.x
+            fakePolarPoint.y = -fakePolarPoint.y
+            fakePolarPoint.z = -fakePolarPoint.z
+          }
+
+          // 将假极点转换为赤道坐标
+          const fakePolarEquatorial = this.cartesianToEquatorial(fakePolarPoint)
+
+          // 保存假极轴位置
+          this.fakePolarAxis.ra = fakePolarEquatorial.ra
+          this.fakePolarAxis.dec = fakePolarEquatorial.dec
+          this.fakePolarAxis.calculated = true
+
+          this.addLog(`假极轴位置计算完成: RA=${fakePolarEquatorial.ra.toFixed(4)}°, DEC=${fakePolarEquatorial.dec.toFixed(4)}°`, 'success')
+
+          return true
+        } catch (error) {
+          this.addLog(`计算假极轴位置时出错: ${error.message}`, 'error')
+          console.error('计算假极轴位置错误：', error)
+          return false
         }
+      },
 
-        // 选择正确的交点（z坐标为正的）
-        if (fakePolarPoint.z < 0) {
-          fakePolarPoint.x = -fakePolarPoint.x
-          fakePolarPoint.y = -fakePolarPoint.y
-          fakePolarPoint.z = -fakePolarPoint.z
+      /**
+       * 将赤道坐标转换为笛卡尔坐标
+       */
+      equatorialToCartesian(ra, dec, radius = 1) {
+        const raRad = ra * Math.PI / 180.0
+        const decRad = dec * Math.PI / 180.0
+
+        return {
+          x: radius * Math.cos(decRad) * Math.cos(raRad),
+          y: radius * Math.cos(decRad) * Math.sin(raRad),
+          z: radius * Math.sin(decRad)
         }
+      },
 
-        // 将假极点转换为赤道坐标
-        const fakePolarEquatorial = this.cartesianToEquatorial(fakePolarPoint)
+      /**
+       * 将笛卡尔坐标转换为赤道坐标
+       */
+      cartesianToEquatorial(cart) {
+        const radius = Math.sqrt(cart.x * cart.x + cart.y * cart.y + cart.z * cart.z)
 
-        // 保存假极轴位置
-        this.fakePolarAxis.ra = fakePolarEquatorial.ra
-        this.fakePolarAxis.dec = fakePolarEquatorial.dec
-        this.fakePolarAxis.calculated = true
+        const dec = Math.asin(cart.z / radius) * 180.0 / Math.PI
+        let ra = Math.atan2(cart.y, cart.x) * 180.0 / Math.PI
 
-        this.addLog(`假极轴位置计算完成: RA=${fakePolarEquatorial.ra.toFixed(4)}°, DEC=${fakePolarEquatorial.dec.toFixed(4)}°`, 'success')
+        // 确保RA在0-360度范围内
+        if (ra < 0) ra += 360.0
 
-        return true
-      } catch (error) {
-        this.addLog(`计算假极轴位置时出错: ${error.message}`, 'error')
-        console.error('计算假极轴位置错误：', error)
-        return false
-      }
-    },
+        return { ra, dec }
+      },
 
-    /**
-     * 将赤道坐标转换为笛卡尔坐标
-     */
-    equatorialToCartesian(ra, dec, radius = 1) {
-      const raRad = ra * Math.PI / 180.0
-      const decRad = dec * Math.PI / 180.0
-
-      return {
-        x: radius * Math.cos(decRad) * Math.cos(raRad),
-        y: radius * Math.cos(decRad) * Math.sin(raRad),
-        z: radius * Math.sin(decRad)
-      }
-    },
-
-    /**
-     * 将笛卡尔坐标转换为赤道坐标
-     */
-    cartesianToEquatorial(cart) {
-      const radius = Math.sqrt(cart.x * cart.x + cart.y * cart.y + cart.z * cart.z)
-
-      const dec = Math.asin(cart.z / radius) * 180.0 / Math.PI
-      let ra = Math.atan2(cart.y, cart.x) * 180.0 / Math.PI
-
-      // 确保RA在0-360度范围内
-      if (ra < 0) ra += 360.0
-
-      return { ra, dec }
-    },
-
-    /**
-     * 计算两个向量的叉积
-     */
-    crossProduct(v1, v2) {
-      return {
-        x: v1.y * v2.z - v1.z * v2.y,
-        y: v1.z * v2.x - v1.x * v2.z,
-        z: v1.x * v2.y - v1.y * v2.x
-      }
-    },
-
-    /**
-     * 计算向量长度
-     */
-    vectorLength(v) {
-      return Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z)
-    },
-
-    /**
-     * 归一化向量
-     */
-    normalizeVector(v) {
-      const length = this.vectorLength(v)
-      return {
-        x: v.x / length,
-        y: v.y / length,
-        z: v.z / length
-      }
-    },
-
-    /**
-     * 绘制假极轴位置
-     */
-    drawFakePolarAxis(fakePolarRA, fakePolarDEC) {
-      this.addLog(`绘制假极轴位置: RA=${fakePolarRA.toFixed(4)}°, DEC=${fakePolarDEC.toFixed(4)}°`, 'info')
-
-      try {
-        // 定义假极轴的颜色（紫色）
-        const fakePolarColor = {
-          stroke: "#9C27B0",        // 紫色边框
-          strokeOpacity: 1,         // 边框不透明度
-          fill: "#9C27B0",          // 紫色填充
-          fillOpacity: 0.3          // 填充不透明度（半透明）
+      /**
+       * 计算两个向量的叉积
+       */
+      crossProduct(v1, v2) {
+        return {
+          x: v1.y * v2.z - v1.z * v2.y,
+          y: v1.z * v2.x - v1.x * v2.z,
+          z: v1.x * v2.y - v1.y * v2.x
         }
+      },
 
-        // 使用专门的假极轴绘制事件，避免与目标点冲突
-        this.$bus.$emit('DrawFakePolarAxisCircle',
-          fakePolarRA,
-          fakePolarDEC,
-          fakePolarColor,
-          'FakePolarAxis',
-          '假极轴'
-        )
+      /**
+       * 计算向量长度
+       */
+      vectorLength(v) {
+        return Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z)
+      },
 
-        this.addLog(`假极轴位置已绘制: RA=${fakePolarRA.toFixed(4)}°, DEC=${fakePolarDEC.toFixed(4)}°`, 'info')
+      /**
+       * 归一化向量
+       */
+      normalizeVector(v) {
+        const length = this.vectorLength(v)
+        return {
+          x: v.x / length,
+          y: v.y / length,
+          z: v.z / length
+        }
+      },
 
-      } catch (error) {
-        this.addLog(`绘制假极轴位置时出错: ${error.message}`, 'error')
-        console.error('绘制假极轴位置错误：', error)
-      }
+      /**
+       * 绘制假极轴位置
+       */
+      drawFakePolarAxis(fakePolarRA, fakePolarDEC) {
+        this.addLog(`绘制假极轴位置: RA=${fakePolarRA.toFixed(4)}°, DEC=${fakePolarDEC.toFixed(4)}°`, 'info')
+
+        try {
+          // 定义假极轴的颜色（紫色）
+          const fakePolarColor = {
+            stroke: "#9C27B0",        // 紫色边框
+            strokeOpacity: 1,         // 边框不透明度
+            fill: "#9C27B0",          // 紫色填充
+            fillOpacity: 0.3          // 填充不透明度（半透明）
+          }
+
+          // 使用专门的假极轴绘制事件，避免与目标点冲突
+          this.$bus.$emit('DrawFakePolarAxisCircle',
+            fakePolarRA,
+            fakePolarDEC,
+            fakePolarColor,
+            'FakePolarAxis',
+            '假极轴'
+          )
+
+          this.addLog(`假极轴位置已绘制: RA=${fakePolarRA.toFixed(4)}°, DEC=${fakePolarDEC.toFixed(4)}°`, 'info')
+
+        } catch (error) {
+          this.addLog(`绘制假极轴位置时出错: ${error.message}`, 'error')
+          console.error('绘制假极轴位置错误：', error)
+        }
+      },
+      // ========================================
+      // 单位换算方法
+      // ========================================
+      unitToArcmin(val, unit) {
+        if (!Number.isFinite(val)) return NaN
+        if (unit === 'deg') return val * 60
+        if (unit === 'arcsec') return val / 60
+        return val // 'arcmin'
+      },
+      arcminToUnit(valArcmin, unit) {
+        if (!Number.isFinite(valArcmin)) return NaN
+        if (unit === 'deg') return valArcmin / 60
+        if (unit === 'arcsec') return valArcmin * 60
+        return valArcmin
+      },
+      unitGlyph(unit) {
+        if (unit === 'deg') return '°'
+        if (unit === 'arcsec') return '″'
+        return '′' // arcmin
+      },
+
+      // ========================================
+      // 左右/上下映射（面向极点）方法
+      // ========================================
+      // 根据当前坐标计算朝向哪个极点
+      calculateFacingPole() {
+        if (!this.$store || !this.$store.state.currentLocation) {
+          return 'north' // 默认返回北极
+        }
+        
+        const lat = this.$store.state.currentLocation.lat
+        // 北半球（纬度 > 0）面向北极，南半球（纬度 < 0）面向南极
+        return lat >= 0 ? 'north' : 'south'
+      },
+
+      // azSign > 0 = 朝东；azSign < 0 = 朝西
+      azLabelBySign(azSign) {
+        // 动态计算朝向极点，而不是使用 props
+        const facingPole = this.calculateFacingPole()
+        // 面向北极点：东=→右，西=←左；面向南极点则相反
+        const east = (facingPole === 'north') ? this.$t('→ Right (East)') : this.$t('← Left (East)')
+        const west = (facingPole === 'north') ? this.$t('← Left (West)') : this.$t('→ Right (West)')
+        return azSign >= 0 ? east : west
+      },
+      // altSign > 0 = 抬高；altSign < 0 = 降低
+      altLabelBySign(altSign) {
+        return altSign >= 0 ? this.$t('↑ Up (Raise)') : this.$t('↓ Down (Lower)')
+      },
+
+      // ========================================
+      // 统一格式化"数值 + 单位"方法
+      // ========================================
+      formatWithUnit(valInArcmin, unit, digits = 1) {
+        const v = this.arcminToUnit(Math.abs(valInArcmin), unit)
+        const glyph = this.unitGlyph(unit)
+        return `${v.toFixed(digits)}${glyph}`
+      },
+
+      // ========================================
+      // 颜色工具方法
+      // ========================================
+      getCalibrationPointColor() {
+        return {
+          stroke: COLORS.WHITE,
+          strokeOpacity: 1,
+          fill: COLORS.WHITE,
+          fillOpacity: 0.2
+        }
+      },
+
+      getCurrentPositionColor() {
+        return {
+          stroke: "#00BFFF",
+          strokeOpacity: 1,
+          fill: "#00BFFF",
+          fillOpacity: 0.3
+        }
+      },
+
+      getTargetPointColor() {
+        return {
+          stroke: COLORS.SUCCESS,
+          strokeOpacity: 1,
+          fill: COLORS.SUCCESS,
+          fillOpacity: 0.3
+        }
+      },
+
+      getFakePolarAxisColor() {
+        return {
+          stroke: "#9C27B0",
+          strokeOpacity: 1,
+          fill: "#9C27B0",
+          fillOpacity: 0.3
+        }
+      },
     },
-
-
   }
-}
 </script>
 
 <style scoped>

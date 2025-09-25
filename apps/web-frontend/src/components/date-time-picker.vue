@@ -156,7 +156,13 @@ export default {
       const m = Moment()
       m.local()
       this.$emit('input', m.format())
-      this.synchronizeTime()
+      
+      // 直接使用新时间进行同步，避免响应式更新延迟
+      const newTime = m.format('HH:mm:ss')
+      const newDate = m.format('YYYY-MM-DD')
+      console.log('Synchronize time:', newTime)
+      console.log('Synchronize date:', newDate)
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'SynchronizeTime:' + newTime + ':' + newDate);
     },
     togglePauseTime: function () {
       this.$stel.core.time_speed = (this.$stel.core.time_speed === 0) ? 1 : 0

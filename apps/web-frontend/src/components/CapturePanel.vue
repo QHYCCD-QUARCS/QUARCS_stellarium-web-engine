@@ -148,7 +148,7 @@ export default {
     this.$bus.$on('MainCameraTemperature', this.MainCameraTemperature);
   },
   mounted: function () {
-    this.CurrentExpTimeList();
+    // this.CurrentExpTimeList();
     // this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getExpTimeList');
 
   },
@@ -281,7 +281,7 @@ export default {
       {
         this.ExpTimes[i] = parts[i];
       }
-      this.CurrentExpTimeList();
+      // this.CurrentExpTimeList();
     },
 
     CurrentCFWList() {
