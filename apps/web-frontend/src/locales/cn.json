@@ -345,5 +345,16 @@
   "Calibration completed! Focuser travel range has been set. Click the button to end calibration": "校准完成！电调行程范围已设置，点击按钮结束校准",
   "Do you want to perform focuser travel calibration? Calibration will set the maximum and minimum positions of the focuser.": "是否进行电调行程校准？校准将设置电调的最大和最小位置。",
   "solve complete !": "解析完成!",
-  "Solve image succeed!": "解析同步成功!"
+  "Solve image succeed!": "解析同步成功!",
+  "→ Right (East)": "→ 右（朝东）",
+  "← Left (East)": "← 左（朝东）",
+  "← Left (West)": "← 左（朝西）",
+  "→ Right (West)": "→ 右（朝西）",
+  "↑ Up (Raise)": "↑ 向上（抬高）",
+  "↓ Down (Lower)": "↓ 向下（降低）",
+  "Adjustment Instructions": "调整指导",
+  "Adjustment Round": "调整轮数 {0}",
+  "Facing Pole": "朝向极点：{0}，纬度：{1}",
+  "Location Changed": "位置已更改，朝向极点：{0}，纬度：{1}",
+  "Recalculating Adjustment Directions": "重新计算调整方向"
 }
