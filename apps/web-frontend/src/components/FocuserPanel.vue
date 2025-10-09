@@ -341,9 +341,9 @@ export default {
       this.syncROI_length();
     },
     setRedBoxSideLength(length) {
-      if (length === '100') this.ROI_length = 100;
-      else if (length === '300') this.ROI_length = 300;
-      else if (length === '500') this.ROI_length = 500;
+      if (length === '100' || length === 100) this.ROI_length = 100;
+      else if (length === '300' || length === 300) this.ROI_length = 300;
+      else if (length === '500' || length === 500) this.ROI_length = 500;
       else this.ROI_length = 300;
       console.log('QHYCCD | setRedBoxSideLength: ', this.ROI_length);
       this.syncROI_length();
@@ -492,13 +492,17 @@ export default {
       if (this.isLoopActive) {
         this.$bus.$emit('setFocuserState', 'selectstars'); // 设置焦距状态为选择星点
         this.$bus.$emit('setShowSelectStar', true);
+        this.$bus.$emit('setFocusChartTimeMode', true); // 切换图表模式：时间轴模式
       } else {
         this.$bus.$emit('setFocuserState', 'setROI'); // 设置焦距状态为设置ROI区域
         this.$bus.$emit('setShowSelectStar', false);
+        this.$bus.$emit('setFocusChartTimeMode', false)
       }
+      
     },
     startFocusLoopFailed(message) {
       this.isLoopActive = false;
+      this.$bus.$emit('setFocusChartTimeMode', false)
       this.$bus.$emit('disableCaptureButton', this.isLoopActive);
       this.$bus.$emit('SendConsoleLogMsg', message, 'warning');
       this.$bus.$emit('setShowSelectStar', false);
@@ -506,11 +510,13 @@ export default {
     setFocuserLoopingState(state) {
       if (state === 'true') {
         this.isLoopActive = true;
+        this.$bus.$emit('setFocusChartTimeMode', true);
         this.$bus.$emit('setShowSelectStar', true);
       }
       else {
         this.isLoopActive = false;
         this.$bus.$emit('setShowSelectStar', false);
+        this.$bus.$emit('setFocusChartTimeMode', false)
       }
       this.$bus.$emit('disableCaptureButton', this.isLoopActive);
     },

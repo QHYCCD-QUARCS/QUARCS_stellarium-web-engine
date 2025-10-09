@@ -534,9 +534,7 @@
     </div>
 
   </v-app>
-
 </template>
-
 <script>
 import _ from 'lodash'
 import Gui from '@/components/gui.vue'
@@ -1218,8 +1216,11 @@ export default {
               case 'SaveJpgSuccess':
                 if (parts.length === 4) {
                   const fileName = parts[1];
-                  const roi_x = parts[2];
-                  const roi_y = parts[3];
+                  const roi_x = parseInt(parts[2]);
+                  const roi_y = parseInt(parts[3]);
+                  this.ROI_x = roi_x;
+                  this.ROI_y = roi_y;
+
                   // this.$bus.$emit('showRoiImage', fileName);
                   this.showRoiImage(fileName, roi_x, roi_y);
                 }
@@ -1718,7 +1719,6 @@ export default {
                   this.$bus.$emit('HotspotName', Name);
                 }
                 break;
-
               case 'EditHotspotNameSuccess':
                 this.$bus.$emit('EditHotspotNameSuccess');
                 break;
@@ -1967,13 +1967,12 @@ export default {
                 break;
 
               case 'SetRedBoxState':
-                if (parts.length === 6) {
-                  const length = parts[1];
+                if (parts.length === 4) {
+                  const length = parseInt(parts[1]);
                   this.ROI_x = parseFloat(parts[2]);
                   this.ROI_y = parseFloat(parts[3]);
-                  this.ROI_x_qt = parseFloat(parts[4]);
-                  this.ROI_y_qt = parseFloat(parts[5]);
-                  this.setRedBoxState(length, this.ROI_x, this.ROI_y, this.ROI_x_qt, this.ROI_y_qt);
+
+                  this.setRedBoxState(length, this.ROI_x, this.ROI_y);
                   console.log('设置红色ROI框: ', length, this.ROI_x, this.ROI_y);
                 }
                 break;
@@ -2231,6 +2230,14 @@ export default {
                   if (item) {
                     item.value = GotoThenSolve;
                   }
+                }
+                break;
+
+              case 'addFwhmNow':
+                if (parts.length >= 2) {
+                  const fwhm = parseFloat(parts[1]);
+                  console.log('Received addFwhmNow:', fwhm);
+                  this.$bus.$emit('addFwhmNow', fwhm);
                 }
                 break;
 
@@ -3970,7 +3977,7 @@ export default {
           case 'GR': cvmode = cv.COLOR_BayerGR2RGBA; break;
           case 'GB': cvmode = cv.COLOR_BayerGB2RGBA; break;
           case 'BG': cvmode = cv.COLOR_BayerBG2RGBA; break;
-          default: cvmode = cv.COLOR_BayerRG2RGBA;
+          default: cvmode = cv.COLOR_GRAY2RGBA;
         }
 
         cv.cvtColor(img8, rgbaImg, cvmode);
@@ -4549,7 +4556,7 @@ export default {
 
       this.$bus.$emit('setCurrentMainCanvasHasImage', true); // 发送给电调，用于判断是否可以进行循环拍摄
       // 发送消息给QT客户端，用于信息图标
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'sendRedBoxState:' + this.RedBoxSideLength + ':' + this.ROI_x * this.cameraBin + ':' + this.ROI_y * this.cameraBin);
+      // 统一坐标：发送给 QT 的 ROI 坐标采用传感器像素坐标（不再按 bin 放大），避免在回环中被重复乘以 bin 导致指数级增长
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'sendVisibleArea:' + this.visibleX + ':' + this.visibleY + ':' + this.scale);
 
       // 如果选择了星点，则根据选择位置，在ROI区域中绘制一个圆
@@ -4558,7 +4565,7 @@ export default {
         // 如果有星点
         if (this.DrawSelectStarHFR != -1) {
           radius = this.DrawSelectStarHFR / this.scale * 2;
-          if (radius <= 1) radius = 5;
+          if (radius <= 1) radius = 1;
           canvasStarX = (this.DrawSelectStarX / this.cameraBin + this.ROI_x - visibleLeft) * ctx.canvas.width / newVisibleWidth;
           canvasStarY = (this.DrawSelectStarY / this.cameraBin + this.ROI_y - visibleTop) * ctx.canvas.height / newVisibleHeight;
           color = 'green'; // 有星点，绘制绿色的圆
@@ -4574,7 +4581,7 @@ export default {
         const imageData = ctx.getImageData(canvasStarX - radius, canvasStarY - radius, 2 * radius, 2 * radius);
         // 发送图像数据给显示框
         this.$bus.$emit('selectStarImage', imageData);
-
+        console.log('绘制星点的位置和大小: x =', canvasStarX, 'y =', canvasStarY, 'radius =', radius);
         // 在指定位置开始绘制圆
         ctx.beginPath();
         ctx.arc(canvasStarX, canvasStarY, radius, 0, 2 * Math.PI);
@@ -4584,34 +4591,6 @@ export default {
         ctx.closePath();
       }
 
-      if (this.focuserROIStarsList && this.focuserROIStarsList.length > 0) {
-        this.bufferCtx.save();
-
-        // 设置裁剪区域为ROI区域
-        this.bufferCtx.beginPath();
-        this.bufferCtx.rect(this.ROI_x, this.ROI_y, this.ROI_width, this.ROI_height);
-        this.bufferCtx.clip();
-
-        this.bufferCtx.fillStyle = 'rgba(0, 255, 0, 0.2)'; // 半透明绿色
-        this.bufferCtx.strokeStyle = 'rgba(0, 255, 0, 0.4)'; // 绿色边框
-        this.bufferCtx.lineWidth = 1;
-
-        for (const star of this.focuserROIStarsList) {
-          const starRadius = star.HFR / this.cameraBin + 2 || 5; // 如果有HFR参数用它，否则默认5个像素
-          const absoluteX = this.ROI_x + star.x / this.cameraBin;
-          const absoluteY = this.ROI_y + star.y / this.cameraBin;
-
-          // 绘制圆圈
-          this.bufferCtx.beginPath();
-          this.bufferCtx.arc(absoluteX, absoluteY, starRadius, 0, Math.PI * 2);
-          this.bufferCtx.fill();
-          this.bufferCtx.stroke();
-
-        }
-        this.focuserROIStarsList = [];
-        this.bufferCtx.restore();
-        // this.SendConsoleLogMsg('标注了' + this.focuserROIStarsList.length + '个星点', 'info');
-      }
     },
 
     addEventListeners() {
@@ -6486,9 +6465,38 @@ export default {
       const y = event.clientY - rect.top;
       console.log('Mouse clicked at:', x, y);
       if (!this.isFocusLoopShooting) {
-        this.ROI_x = (x / window.innerWidth * this.visibleWidth - this.RedBoxSideLength / 2 / this.cameraBin) + this.visibleX - this.visibleWidth / 2;  // 计算ROI的x坐标
-        this.ROI_y = (y / window.innerHeight * this.visibleHeight - this.RedBoxSideLength / 2 / this.cameraBin) + this.visibleY - this.visibleHeight / 2; // 计算ROI的y坐标
-        // this.$bus.$emit('setRedBoxPosition', x, y, this.ROI_x, this.ROI_y);
+        // 期望中心（画布坐标 → 传感器像素坐标）
+        const desiredCenterX = (x / window.innerWidth * this.visibleWidth) + this.visibleX - this.visibleWidth / 2;
+        const desiredCenterY = (y / window.innerHeight * this.visibleHeight) + this.visibleY - this.visibleHeight / 2;
+
+        // ROI 边长（像素，偶数化），来源于固定 RedBoxSideLength
+        let side = this.RedBoxSideLength / this.cameraBin;
+        side = Math.max(2, Math.floor(side));
+        if (side % 2 !== 0) side += 1; // 强制偶数
+
+        // 将 ROI 左上角按中心反推，并约束在图像范围内
+        const half = side / 2;
+        const imgW = this.mainCameraSizeX;
+        const imgH = this.mainCameraSizeY;
+
+        let roiX = desiredCenterX - half;
+        let roiY = desiredCenterY - half;
+
+        // 边界约束
+        const maxX = Math.max(0, imgW - side);
+        const maxY = Math.max(0, imgH - side);
+        roiX = Math.min(Math.max(0, roiX), maxX);
+        roiY = Math.min(Math.max(0, roiY), maxY);
+
+        // 偶数对齐位置
+        roiX = Math.floor(roiX);
+        roiY = Math.floor(roiY);
+        if (roiX % 2 !== 0) roiX += 1;
+        if (roiY % 2 !== 0) roiY += 1;
+
+        this.ROI_x = roiX;
+        this.ROI_y = roiY;
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'sendRedBoxState:' + this.RedBoxSideLength + ':' + this.ROI_x + ':' + this.ROI_y);
       } else {
         this.selectStarX = ((x / window.innerWidth * this.visibleWidth) + this.visibleX - this.visibleWidth / 2 - this.ROI_x) * this.cameraBin; // 计算选择位置的x坐标
         this.selectStarY = ((y / window.innerHeight * this.visibleHeight) + this.visibleY - this.visibleHeight / 2 - this.ROI_y) * this.cameraBin; // 计算选择位置的y坐标
@@ -6611,9 +6619,38 @@ export default {
       console.log('Touch at:', x, y);
       event.preventDefault();// 阻止默认事件，如页面滚动
       if (!this.isFocusLoopShooting) {
-        this.ROI_x = (x / window.innerWidth * this.visibleWidth - this.RedBoxSideLength / 2 / this.cameraBin) + this.visibleX - this.visibleWidth / 2;  // 计算ROI的x坐标
-        this.ROI_y = (y / window.innerHeight * this.visibleHeight - this.RedBoxSideLength / 2 / this.cameraBin) + this.visibleY - this.visibleHeight / 2; // 计算ROI的y坐标
-        // this.$bus.$emit('setRedBoxPosition', x, y, this.ROI_x, this.ROI_y);
+        // 期望中心（画布坐标 → 传感器像素坐标）
+        const desiredCenterX = (x / window.innerWidth * this.visibleWidth) + this.visibleX - this.visibleWidth / 2;
+        const desiredCenterY = (y / window.innerHeight * this.visibleHeight) + this.visibleY - this.visibleHeight / 2;
+
+        // ROI 边长（像素，偶数化），来源于固定 RedBoxSideLength
+        let side = this.RedBoxSideLength / this.cameraBin;
+        side = Math.max(2, Math.floor(side));
+        if (side % 2 !== 0) side += 1; // 强制偶数
+
+        // 将 ROI 左上角按中心反推，并约束在图像范围内
+        const half = side / 2;
+        const imgW = this.mainCameraSizeX;
+        const imgH = this.mainCameraSizeY;
+
+        let roiX = desiredCenterX - half;
+        let roiY = desiredCenterY - half;
+
+        // 边界约束
+        const maxX = Math.max(0, imgW - side);
+        const maxY = Math.max(0, imgH - side);
+        roiX = Math.min(Math.max(0, roiX), maxX);
+        roiY = Math.min(Math.max(0, roiY), maxY);
+
+        // 偶数对齐位置
+        roiX = Math.floor(roiX);
+        roiY = Math.floor(roiY);
+        if (roiX % 2 !== 0) roiX += 1;
+        if (roiY % 2 !== 0) roiY += 1;
+
+        this.ROI_x = roiX;
+        this.ROI_y = roiY;
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'sendRedBoxState:' + this.RedBoxSideLength + ':' + this.ROI_x + ':' + this.ROI_y);
       } else {
         this.selectStarX = ((x / window.innerWidth * this.visibleWidth) + this.visibleX - this.visibleWidth / 2 - this.ROI_x) * this.cameraBin; // 计算选择位置的x坐标
         this.selectStarY = ((y / window.innerHeight * this.visibleHeight) + this.visibleY - this.visibleHeight / 2 - this.ROI_y) * this.cameraBin; // 计算选择位置的y坐标
@@ -6848,10 +6885,12 @@ export default {
             src.data16U.set(uint16Array);
             let time2 = performance.now();
             this.SendConsoleLogMsg('创建mat对象时间: ' + (time2 - time1).toFixed(0) + 'ms', 'info');
-            if (this.lastImageProcessParams.isColorCamera) {
+            if (this.lastImageProcessParams.isColorCamera == 'true' || this.lastImageProcessParams.isColorCamera == 'True' || this.lastImageProcessParams.isColorCamera) {
               targetImg8 = this.applyStretchAndGain(src, this.lastImageProcessParams.analysis, 'bayer', this.lastImageProcessParams.CFA, this.lastImageProcessParams.blackLevel, this.lastImageProcessParams.whiteLevel);
+
             } else {
               targetImg8 = this.applyStretchAndGain(src, this.lastImageProcessParams.analysis, 'gray', this.lastImageProcessParams.CFA, this.lastImageProcessParams.blackLevel, this.lastImageProcessParams.whiteLevel);
+     
             }
             time1 = performance.now();
             this.SendConsoleLogMsg('applyStretchAndGain时间: ' + (time1 - time2).toFixed(0) + 'ms', 'info');
@@ -6863,7 +6902,7 @@ export default {
             targetImg8.delete();
             targetImg8 = null;
             // 在指定位置开始绘制图像
-            this.bufferCtx.clearRect(this.ROI_x, this.ROI_y, newWidth, newHeight);
+            // this.bufferCtx.clearRect(this.ROI_x, this.ROI_y, targetImg8.cols, targetImg8.rows);
             this.bufferCtx.putImageData(imgData, this.ROI_x, this.ROI_y);
             // this.SendConsoleLogMsg('绘制一次ROI数据:' + fileName + ':' + this.ROI_x + ':' + this.ROI_y, 'info');
             // 标注识别到的星点位置
@@ -6924,6 +6963,7 @@ export default {
     },
     RedBoxSizeChange(length) {
       this.RedBoxSideLength = parseInt(length);
+      // this.$bus.$emit('AppSendMessage', 'Vue_Command', 'sendRedBoxState:' + this.RedBoxSideLength + ':' + this.ROI_x + ':' + this.ROI_y);
     },
     setMainCameraParameters(parameters) {
       for (const parameter in parameters) {
@@ -6933,7 +6973,13 @@ export default {
         } else {
           if (parameter == 'RedBoxSize') {
             this.$bus.$emit('setRedBoxSideLength', parameters[parameter]);
-          } else {
+            this.RedBoxSideLength = parseInt(parameters[parameter]);
+          } else if (parameter == 'ROI_x') {
+            this.ROI_x = parseFloat(parameters[parameter]);
+          } else if (parameter == 'ROI_y') {
+            this.ROI_y = parseFloat(parameters[parameter]);
+          } 
+          else {
             console.error(`未找到参数：${parameter}`);
           }
         }
