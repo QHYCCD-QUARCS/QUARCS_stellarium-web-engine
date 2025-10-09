@@ -428,11 +428,11 @@ export default {
       mouseY: 0, // 鼠标的Y坐标
       mouseX_: 0,
       mouseY_: 0,
-      BoxSideLength: 500,
-      RedBoxWidth: 20,
-      RedBoxHeight: 20,
-      RedBoxWidth_: 20,
-      RedBoxHeight_: 20,
+      BoxSideLength: 300,
+      RedBoxWidth: 300,
+      RedBoxHeight: 300,
+      RedBoxWidth_: 300,
+      RedBoxHeight_: 300,
 
       isStellariumMode: true,
       isCaptureMode: false,
@@ -613,6 +613,7 @@ export default {
       this.$bus.$emit('SwitchImageToShow', true);
     },
     toggleHistogramPanel() {
+      this.showRedBox = false;
       this.showHistogramPanel = !this.showHistogramPanel;
       if (this.showFocuserPanel) {
         this.showFocuserPanel = !this.showFocuserPanel;
@@ -873,11 +874,14 @@ export default {
 
     setOriginalRedBoxLength(length) {
       console.log('初始化小红框大小: RedBoxWidth: ', this.RedBoxWidth, ', RedBoxHeight: ', this.RedBoxHeight, ', BoxSideLength: ', this.BoxSideLength, ', Scale: ', this.Scale);
-      this.RedBoxWidth = ((length / this.BoxSideLength) * this.RedBoxWidth);
-      this.RedBoxHeight = ((length / this.BoxSideLength) * this.RedBoxHeight);
-      this.RedBoxWidth_ = ((length / this.BoxSideLength) * this.RedBoxWidth);
-      this.RedBoxHeight_ = ((length / this.BoxSideLength) * this.RedBoxHeight);
+      const scale = length / this.BoxSideLength;
+      // 使用基准尺寸进行缩放，避免重复累计缩放
+      this.RedBoxWidth = this.RedBoxWidth_ * scale;
+      this.RedBoxHeight = this.RedBoxHeight_ * scale;
       this.BoxSideLength = length;
+      // 更新基准为当前尺寸
+      this.RedBoxWidth_ = this.RedBoxWidth;
+      this.RedBoxHeight_ = this.RedBoxHeight;
       console.log('更新小红框大小: RedBoxWidth: ', this.RedBoxWidth, ', RedBoxHeight: ', this.RedBoxHeight, ', BoxSideLength: ', this.BoxSideLength, ', Scale: ', this.Scale);
     },
 
@@ -1083,6 +1087,7 @@ export default {
 
         // this.$refs.CaptureBtn.SetDuration(convertedTime);
         this.$bus.$emit('SetExpTime', convertedTime);
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'setExposureTime:' + convertedTime);
       } else {
         console.log('No numeric part found in time:', time);
       }

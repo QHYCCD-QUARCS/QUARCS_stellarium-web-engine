@@ -19,10 +19,25 @@ import * as echarts from 'echarts';
 
 export default {
   name: 'LineChart',
+  props: {
+    // 是否使用时间轴模式（也可通过总线 setFocusChartTimeMode 切换）
+    useTimeAxis: {
+      type: Boolean,
+      default: false
+    },
+    // 时间窗口长度（秒），仅在时间轴模式下生效
+    timeWindowSec: {
+      type: Number,
+      default: 60
+    }
+  },
   data() {
     return {
       containerMaxWidth: 150,
-      chartData1: [],
+      // 非时间轴：散点数据（x 为电调位置）
+      chartData1_pos: [],
+      // 时间轴：散点数据（x 为时间戳）
+      chartData1_time: [],
       chartData2: [],
       chartData3: [],
       xAxis_min: 0,
@@ -36,11 +51,34 @@ export default {
       startX: 0,
       deltaX: 0,
       x_min: -60000,
-      x_max: 60000
+      x_max: 60000,
+      // 时间轴模式
+      isTimeMode: false,
+      timeTicker: null,
+      // 可见性控制
+      isVisible: false,
+      ioObserver: null
     };
   },
   mounted() {
+    // 根据可见性启动/停止时间推进
+    const el = this.$refs.linechart;
+    if (window && 'IntersectionObserver' in window && el) {
+      this.ioObserver = new IntersectionObserver((entries) => {
+        const e = entries[0];
+        this.isVisible = !!(e && e.isIntersecting);
+        this.updateTickerByVisibility();
+      }, { threshold: 0.01 });
+      this.ioObserver.observe(el);
+    } else {
+      // 回退：不可见性未知时视为可见
+      this.isVisible = true;
+    }
+    document.addEventListener('visibilitychange', this.updateTickerByVisibility);
 
+    // 初始化时间轴模式（由 prop 控制）
+    this.isTimeMode = !!this.useTimeAxis;
+    this.updateTickerByVisibility();
   },
   created() {
     this.$bus.$on('FocusPosition', this.changeRange_x);
@@ -55,8 +93,39 @@ export default {
     this.$bus.$on('addMinPointData_Point', this.addMinPointData_Point);
     this.$bus.$on('addLineData_Point', this.addLineData_Point);
     this.$bus.$on('setFocusChartRange', this.setFocusChartRange);
+    // 新增：时间轴模式控制与点追加
+    this.$bus.$on('setFocusChartTimeMode', this.setTimeMode);
+    this.$bus.$on('addFwhmNow', this.addFwhmPointNow);
+
+  },
+  beforeDestroy() {
+    this.teardownBusAndTimers();
+  },
+  destroyed() {
+    this.teardownBusAndTimers();
   },
   methods: {
+    teardownBusAndTimers() {
+      this.$bus.$off('FocusPosition', this.changeRange_x);
+      this.$bus.$off('ClearfitQuadraticCurve', this.clearChartData2);
+      this.$bus.$off('ClearAllData', this.ClearAllData);
+      this.$bus.$off('updateFocusChartWidth', this.initChart);
+      this.$bus.$off('addData_Point', this.addData_Point);
+      this.$bus.$off('addMinPointData_Point', this.addMinPointData_Point);
+      this.$bus.$off('addLineData_Point', this.addLineData_Point);
+      this.$bus.$off('setFocusChartRange', this.setFocusChartRange);
+      this.$bus.$off('setFocusChartTimeMode', this.setTimeMode);
+      this.$bus.$off('addFwhmNow', this.addFwhmPointNow);
+      if (this.timeTicker) {
+        clearInterval(this.timeTicker);
+        this.timeTicker = null;
+      }
+      if (this.ioObserver) {
+        try { this.ioObserver.disconnect(); } catch (e) {}
+        this.ioObserver = null;
+      }
+      document.removeEventListener('visibilitychange', this.updateTickerByVisibility);
+    },
     initChart(Width) {
       this.containerMaxWidth = Width - 95;
       const chartDom = this.$refs.linechart;
@@ -65,11 +134,12 @@ export default {
       this.renderChart(this.xAxis_min, this.xAxis_max);
     },
     startDrag(event) {
+      if (this.isTimeMode) return; // 时间轴模式下禁用拖拽
       this.isDragging = true;
       this.startX = event.touches[0].clientX;
     },
     dragging(event) {
-      if (this.isDragging) {
+      if (this.isDragging && !this.isTimeMode) {
         const touch = event.touches[0];
         this.deltaX = (touch.clientX - this.startX) * 10;
         this.startX = touch.clientX;
@@ -84,7 +154,45 @@ export default {
       // this.$bus.$emit('setTargetPosition', (this.xAxis_min + this.xAxis_max) / 2);
     },
     renderChart(lowerBound, upperBound) {
-      const y_max = this.chartData1.length > 0 ? Math.max(...this.chartData1.map(item => item[1])) * 2 : this.yAxis_max;
+      const data1 = this.isTimeMode ? this.chartData1_time : this.chartData1_pos;
+      const y_max = data1.length > 0 ? Math.max(...data1.map(item => item[1])) * 2 : this.yAxis_max;
+      
+      // 调试日志
+      if (this.isTimeMode && data1.length > 0) {
+        console.log('Chart-Focus: renderChart (time mode)', {
+          dataPoints: data1.length,
+          latestPoint: data1[data1.length - 1],
+          y_max: y_max
+        });
+      }
+      const optionXAxis = this.isTimeMode
+        ? {
+            type: 'time',
+            min: Date.now() - this.timeWindowSec * 1000,
+            max: Date.now(),
+            axisLabel: {
+              color: 'white',
+              fontSize: 5,
+              formatter: function (value) {
+                const d = new Date(value);
+                const pad = (n) => (n < 10 ? '0' + n : '' + n);
+                return pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+              }
+            },
+            axisLine: { lineStyle: { color: 'rgba(200, 200, 200, 0.5)' } },
+            splitLine: {
+              show: true,
+              lineStyle: { color: 'rgba(128, 128, 128, 0.5)', width: 1, type: 'solid' }
+            }
+          }
+        : {
+            type: 'value',
+            min: lowerBound,
+            max: upperBound,
+            axisLine: { lineStyle: { color: 'rgba(200, 200, 200, 0.5)' } },
+            axisLabel: { color: 'white', fontSize: 5 },
+            splitLine: { show: true, lineStyle: { color: 'rgba(128, 128, 128, 0.5)', width: 1, type: 'solid' } }
+          };
       const option = {
         grid: {
           left: '0%',
@@ -93,27 +201,7 @@ export default {
           top: '10%',
           containLabel: true
         },
-        xAxis: {
-          min: lowerBound,
-          max: upperBound,
-          axisLine: {
-            lineStyle: {
-              color: 'rgba(200, 200, 200, 0.5)'  // x轴线颜色
-            }
-          },
-          axisLabel: {
-            color: 'white',
-            fontSize: 5
-          },
-          splitLine: {
-            show: true,
-            lineStyle: {
-              color: 'rgba(128, 128, 128, 0.5)', 
-              width: 1,
-              type: 'solid'
-            }
-          }
-        },
+        xAxis: optionXAxis,
         yAxis: {
           min: this.yAxis_min,
           max: y_max,
@@ -140,13 +228,13 @@ export default {
           {
             name: 'FWHM',
             type: 'scatter',
-            data: this.chartData1,
+            data: data1,
             itemStyle: {
               color: 'red'
             },
             symbolSize: 4
           },
-          {
+          !this.isTimeMode ? {
             name: 'Dec',
             type: 'line',
             data: this.chartData2,
@@ -157,8 +245,8 @@ export default {
               width: 1
             },
             symbolSize: 0
-          },
-          {
+          } : null,
+          !this.isTimeMode ? {
             name: 'minPoint',
             type: 'scatter',
             data: this.chartData3,
@@ -166,8 +254,8 @@ export default {
               color: 'rgba(75, 155, 250, 0.7)'
             },
             symbolSize: 4
-          },
-          {
+          } : null,
+          !this.isTimeMode ? {
             name: 'xMinLine',
             type: 'line',
             data: [
@@ -179,8 +267,8 @@ export default {
               width: 1
             },
             symbol: 'none'
-          },
-          {
+          } : null,
+          !this.isTimeMode ? {
             name: 'xMaxLine',
             type: 'line',
             data: [
@@ -192,8 +280,8 @@ export default {
               width: 1
             },
             symbol: 'none'
-          },
-          {
+          } : null,
+          !this.isTimeMode ? {
             name: 'currentPosition',
             type: 'line',
             data: [
@@ -205,21 +293,84 @@ export default {
               width: 1
             },
             symbol: 'none'
-          }
+          } : null
         ]
       };
+      // 过滤掉为 null 的 series 项
+      option.series = option.series.filter(Boolean);
       this.myChart.setOption(option);
+    },
+    // 追加一个以"当前时间"为 x 的 FWHM 点（时间轴模式）
+    addFwhmPointNow(fwhm) {
+      // 确保 fwhm 是数字
+      const fwhmNum = typeof fwhm === 'number' ? fwhm : parseFloat(fwhm);
+      if (isNaN(fwhmNum) || fwhmNum <= 0) {
+        console.warn('Chart-Focus: Invalid FWHM value:', fwhm);
+        return;
+      }
+      
+      const now = Date.now();
+      const point = [now, fwhmNum];
+      this.chartData1_time.push(point);
+      
+      console.log('Chart-Focus: addFwhmPointNow', {
+        fwhm: fwhmNum,
+        time: new Date(now).toLocaleTimeString(),
+        isTimeMode: this.isTimeMode,
+        dataLength: this.chartData1_time.length,
+        chartInitialized: !!this.myChart
+      });
+      
+      // 仅保留窗口期内的数据
+      const minTs = now - this.timeWindowSec * 1000;
+      this.chartData1_time = this.chartData1_time.filter(p => p[0] >= minTs);
+      
+      // 强制重新渲染
+      if (this.myChart) {
+        this.renderChart(this.xAxis_min, this.xAxis_max);
+      } else {
+        console.warn('Chart-Focus: myChart not initialized yet');
+      }
+    },
+    // 开启/关闭时间轴模式
+    setTimeMode(flag) {
+      const enable = !!flag;
+      if (enable === this.isTimeMode) return;
+      this.isTimeMode = enable;
+      this.updateTickerByVisibility();
+      if (this.myChart) { this.myChart.clear(); }
+      this.renderChart(this.xAxis_min, this.xAxis_max);
+    },
+    stopTimeTicker() {
+      if (this.timeTicker) {
+        clearInterval(this.timeTicker);
+        this.timeTicker = null;
+      }
+    },
+    startTimeTicker() {
+      if (this.timeTicker) return;
+      this.timeTicker = setInterval(() => {
+        // 没有新点时也推动时间轴前进
+        if (this.myChart) {
+          this.renderChart(this.xAxis_min, this.xAxis_max);
+        }
+      }, 1000);
+    },
+    updateTickerByVisibility() {
+      const docVisible = typeof document !== 'undefined' ? !document.hidden : true;
+      const shouldRun = this.isTimeMode && this.isVisible && docVisible;
+      if (shouldRun) this.startTimeTicker(); else this.stopTimeTicker();
     },
     addData_Point(x,y) {
       const newDataPoint = [x, y];
-      const existingPointIndex = this.chartData1.findIndex(point => point[0] === newDataPoint[0]);
+      const existingPointIndex = this.chartData1_pos.findIndex(point => point[0] === newDataPoint[0]);
       if (existingPointIndex !== -1) {
         // If the x value already exists, update the y value
-        if (newDataPoint[1] == 0 || newDataPoint[1] == this.chartData1[existingPointIndex][1]) return;
-        this.chartData1[existingPointIndex] = newDataPoint;
+        if (newDataPoint[1] == 0 || newDataPoint[1] == this.chartData1_pos[existingPointIndex][1]) return;
+        this.chartData1_pos[existingPointIndex] = newDataPoint;
       } else {
         // If the x value does not exist, add the new data point
-        this.chartData1.push(newDataPoint);
+        this.chartData1_pos.push(newDataPoint);
       }
       this.renderChart(this.xAxis_min, this.xAxis_max);
     },
@@ -244,7 +395,8 @@ export default {
 
     // 清除数据
     clearChartData1() {
-      this.chartData1 = [];
+      this.chartData1_pos = [];
+      this.chartData1_time = [];
       this.renderChart(this.xAxis_min, this.xAxis_max);
     },
     clearChartData2() {
@@ -252,7 +404,8 @@ export default {
       this.renderChart(this.xAxis_min, this.xAxis_max);
     },
     ClearAllData() {
-      this.chartData1 = [];
+      this.chartData1_pos = [];
+      this.chartData1_time = [];
       this.chartData2 = [];
       this.chartData3 = [];
       this.yAxis_max = 30;
