@@ -1168,16 +1168,19 @@ export default {
     },
 
     QuitPolarAxisMode() {
-      this.showCaptureUI();
       this.isPolarAxisMode = false;
-      // this.isCaptureMode = false;
-      // this.isShowScaleChange = false;
+      this.isStellariumMode = false;
       this.showLocationInputs = false;
+      this.showMountSwitch = false;
+      this.showCaptureUI();
       
       if (this.lastMainPage === 'None') {
         this.CurrentMainPage = 'MainCamera';
       } else {
         this.CurrentMainPage = this.lastMainPage;
+        if (this.CurrentMainPage === 'Stel') {
+          this.isStellariumMode = true;
+        }
       }
       this.$bus.$emit('PolarAxisMode', this.isPolarAxisMode);
       this.$bus.$emit('showCanvas',this.CurrentMainPage);
@@ -1185,6 +1188,7 @@ export default {
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'StopLoopCapture');
       this.$bus.$emit('SendConsoleLogMsg', 'Stop Loop Capture', 'info');
       this.$bus.$emit('hidePolarAlignment');           // 隐藏校准界面
+      
     },
 
     showSolveImage(img) {

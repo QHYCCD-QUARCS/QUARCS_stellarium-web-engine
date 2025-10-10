@@ -57,7 +57,17 @@ export default {
       timeTicker: null,
       // 可见性控制
       isVisible: false,
-      ioObserver: null
+      ioObserver: null,
+      // 渲染调度
+      renderRafId: null,
+      renderScheduled: false,
+      pendingLowerBound: null,
+      pendingUpperBound: null,
+      // 调试日志开关
+      debugRenderLogs: false,
+      // 线条数据来源：若为 null 则使用 quadraticParams 动态采样
+      lineDataFromPoints: null,
+      quadraticParams: null // { a,b,c,x0? }
     };
   },
   mounted() {
@@ -113,6 +123,7 @@ export default {
       this.$bus.$off('addData_Point', this.addData_Point);
       this.$bus.$off('addMinPointData_Point', this.addMinPointData_Point);
       this.$bus.$off('addLineData_Point', this.addLineData_Point);
+      this.$bus.$off('addQuadraticCurve', this.addLineData_Point);
       this.$bus.$off('setFocusChartRange', this.setFocusChartRange);
       this.$bus.$off('setFocusChartTimeMode', this.setTimeMode);
       this.$bus.$off('addFwhmNow', this.addFwhmPointNow);
@@ -136,29 +147,79 @@ export default {
     startDrag(event) {
       if (this.isTimeMode) return; // 时间轴模式下禁用拖拽
       this.isDragging = true;
-      this.startX = event.touches[0].clientX;
+      const x = this.getClientX(event);
+      if (typeof x === 'number') this.startX = x;
     },
     dragging(event) {
       if (this.isDragging && !this.isTimeMode) {
-        const touch = event.touches[0];
-        this.deltaX = (touch.clientX - this.startX) * 10;
-        this.startX = touch.clientX;
-        this.xAxis_min -= this.deltaX;
-        this.xAxis_max -= this.deltaX;
-        this.renderChart(this.xAxis_min, this.xAxis_max);
+        const x = this.getClientX(event);
+        if (typeof x !== 'number') return;
+        this.deltaX = (x - this.startX) * 10;
+        this.startX = x;
+        const windowWidth = this.xAxis_max - this.xAxis_min;
+        // 计算新的范围并做边界裁剪
+        let newMin = this.xAxis_min - this.deltaX;
+        const minAllowed = this.x_min;
+        const maxAllowed = this.x_max - windowWidth;
+        if (maxAllowed < minAllowed) {
+          // 安全处理：若设置不合理，回退到不移动
+          newMin = this.x_min;
+        } else {
+          newMin = Math.max(minAllowed, Math.min(maxAllowed, newMin));
+        }
+        this.xAxis_min = newMin;
+        this.xAxis_max = newMin + windowWidth;
+        this.scheduleRender(this.xAxis_min, this.xAxis_max);
       }
+    },
+    getClientX(e) {
+      if (e && e.touches && e.touches.length) return e.touches[0].clientX;
+      if (e && e.changedTouches && e.changedTouches.length) return e.changedTouches[0].clientX;
+      if (typeof e.clientX === 'number') return e.clientX;
+      return undefined;
     },
     endDrag() {
       this.isDragging = false;
       this.deltaX = 0;
       // this.$bus.$emit('setTargetPosition', (this.xAxis_min + this.xAxis_max) / 2);
     },
+    scheduleRender(lowerBound, upperBound) {
+      this.pendingLowerBound = lowerBound;
+      this.pendingUpperBound = upperBound;
+      if (this.renderScheduled) return;
+      this.renderScheduled = true;
+      const cb = () => {
+        this.renderRafId = null;
+        this.renderScheduled = false;
+        this.renderChart(this.pendingLowerBound, this.pendingUpperBound);
+      };
+      if (typeof window !== 'undefined' && window.requestAnimationFrame) {
+        this.renderRafId = window.requestAnimationFrame(cb);
+      } else {
+        // 回退：无 rAF 时，使用微任务降低阻塞
+        Promise.resolve().then(cb);
+      }
+    },
     renderChart(lowerBound, upperBound) {
       const data1 = this.isTimeMode ? this.chartData1_time : this.chartData1_pos;
       const y_max = data1.length > 0 ? Math.max(...data1.map(item => item[1])) * 2 : this.yAxis_max;
+      // 线数据：若传入系数，则根据当前视图范围动态采样，避免拖动后断裂或消失
+      let decData = [];
+      if (!this.isTimeMode) {
+        if (this.lineDataFromPoints && Array.isArray(this.lineDataFromPoints)) {
+          decData = this.lineDataFromPoints;
+        } else if (this.quadraticParams) {
+          const { a, b, c, x0 } = this.quadraticParams;
+          if (isFinite(a) && isFinite(b) && isFinite(c)) {
+            decData = this.generateQuadraticData(a, b, c, lowerBound, upperBound, isFinite(x0) ? x0 : 0);
+          }
+        } else {
+          decData = this.chartData2; // 兼容旧逻辑
+        }
+      }
       
       // 调试日志
-      if (this.isTimeMode && data1.length > 0) {
+      if (this.debugRenderLogs && this.isTimeMode && data1.length > 0) {
         console.log('Chart-Focus: renderChart (time mode)', {
           dataPoints: data1.length,
           latestPoint: data1[data1.length - 1],
@@ -237,7 +298,7 @@ export default {
           !this.isTimeMode ? {
             name: 'Dec',
             type: 'line',
-            data: this.chartData2,
+            data: decData,
             itemStyle: {
               color: 'green'
             },
@@ -298,7 +359,8 @@ export default {
       };
       // 过滤掉为 null 的 series 项
       option.series = option.series.filter(Boolean);
-      this.myChart.setOption(option);
+      // 使用 lazyUpdate 降低同步开销
+      this.myChart.setOption(option, false, true);
     },
     // 追加一个以"当前时间"为 x 的 FWHM 点（时间轴模式）
     addFwhmPointNow(fwhm) {
@@ -327,7 +389,7 @@ export default {
       
       // 强制重新渲染
       if (this.myChart) {
-        this.renderChart(this.xAxis_min, this.xAxis_max);
+        this.scheduleRender(this.xAxis_min, this.xAxis_max);
       } else {
         console.warn('Chart-Focus: myChart not initialized yet');
       }
@@ -339,7 +401,7 @@ export default {
       this.isTimeMode = enable;
       this.updateTickerByVisibility();
       if (this.myChart) { this.myChart.clear(); }
-      this.renderChart(this.xAxis_min, this.xAxis_max);
+      this.scheduleRender(this.xAxis_min, this.xAxis_max);
     },
     stopTimeTicker() {
       if (this.timeTicker) {
@@ -352,7 +414,7 @@ export default {
       this.timeTicker = setInterval(() => {
         // 没有新点时也推动时间轴前进
         if (this.myChart) {
-          this.renderChart(this.xAxis_min, this.xAxis_max);
+          this.scheduleRender(this.xAxis_min, this.xAxis_max);
         }
       }, 1000);
     },
@@ -372,17 +434,82 @@ export default {
         // If the x value does not exist, add the new data point
         this.chartData1_pos.push(newDataPoint);
       }
-      this.renderChart(this.xAxis_min, this.xAxis_max);
+      this.scheduleRender(this.xAxis_min, this.xAxis_max);
     },
-    // 绘制折线
-    addLineData_Point(dataList) {
-      this.chartData2 = dataList;
-      this.renderChart(this.xAxis_min, this.xAxis_max);
+    // 绘制折线/二次曲线
+    addLineData_Point(dataOrA, b, c) {
+      // 兼容：如果传入的是点数组，直接使用
+      if (Array.isArray(dataOrA)) {
+        this.lineDataFromPoints = dataOrA;
+        this.quadraticParams = null;
+        this.scheduleRender(this.xAxis_min, this.xAxis_max);
+        return;
+      }
+
+      // 若传入的是系数对象 { a, b, c }
+      if (dataOrA && typeof dataOrA === 'object' &&
+          (typeof dataOrA.a === 'number' || typeof dataOrA.a === 'string') &&
+          (typeof dataOrA.b === 'number' || typeof dataOrA.b === 'string') &&
+          (typeof dataOrA.c === 'number' || typeof dataOrA.c === 'string')) {
+        const aNum = typeof dataOrA.a === 'number' ? dataOrA.a : parseFloat(dataOrA.a);
+        const bNum = typeof dataOrA.b === 'number' ? dataOrA.b : parseFloat(dataOrA.b);
+        const cNum = typeof dataOrA.c === 'number' ? dataOrA.c : parseFloat(dataOrA.c);
+        if (!isFinite(aNum) || !isFinite(bNum) || !isFinite(cNum)) {
+          this.scheduleRender(this.xAxis_min, this.xAxis_max);
+          return;
+        }
+        const centerX = typeof dataOrA.x0 === 'number' ? dataOrA.x0 : (typeof dataOrA.x0 === 'string' ? parseFloat(dataOrA.x0) : 0);
+        this.quadraticParams = { a: aNum, b: bNum, c: cNum, x0: isFinite(centerX) ? centerX : 0 };
+        this.lineDataFromPoints = null;
+        this.scheduleRender(this.xAxis_min, this.xAxis_max);
+        return;
+      }
+
+      // 或者以三个独立参数形式传入 a, b, c
+      if ((typeof dataOrA === 'number' || typeof dataOrA === 'string') &&
+          (typeof b === 'number' || typeof b === 'string') &&
+          (typeof c === 'number' || typeof c === 'string')) {
+        const aNum = typeof dataOrA === 'number' ? dataOrA : parseFloat(dataOrA);
+        const bNum = typeof b === 'number' ? b : parseFloat(b);
+        const cNum = typeof c === 'number' ? c : parseFloat(c);
+        if (!isFinite(aNum) || !isFinite(bNum) || !isFinite(cNum)) {
+          this.scheduleRender(this.xAxis_min, this.xAxis_max);
+          return;
+        }
+        this.quadraticParams = { a: aNum, b: bNum, c: cNum };
+        this.lineDataFromPoints = null;
+        this.scheduleRender(this.xAxis_min, this.xAxis_max);
+        return;
+      }
+
+      // 其他非法输入：不处理，仅刷新现状
+      this.scheduleRender(this.xAxis_min, this.xAxis_max);
+    },
+    // 生成一元二次曲线采样点
+    generateQuadraticData(a, b, c, xMin, xMax, centerX = 0) {
+      const start = Number.isFinite(xMin) ? xMin : 0;
+      const end = Number.isFinite(xMax) ? xMax : 100;
+      const span = end - start;
+      const samples = Math.max(2, Math.min(400, Math.ceil(span / 50))); // 根据范围自适应采样密度
+      const step = span / samples || 1;
+      const data = [];
+      for (let x = start; x <= end; x += step) {
+        const t = x - centerX;
+        const y = a * t * t + b * t + c;
+        data.push([x, y]);
+      }
+      // 确保包含尾点
+      if (data.length === 0 || data[data.length - 1][0] < end) {
+        const tEnd = end - centerX;
+        const yEnd = a * tEnd * tEnd + b * tEnd + c;
+        data.push([end, yEnd]);
+      }
+      return data;
     },
     addMinPointData_Point(x,y) {
       const newDataPoint = [x, y];
       this.chartData3.push(newDataPoint);
-      this.renderChart(this.xAxis_min, this.xAxis_max);
+      this.scheduleRender(this.xAxis_min, this.xAxis_max);
     },
     // 更改显示的x轴范围
     changeRange_x(current, target) {
@@ -390,18 +517,18 @@ export default {
       this.xAxis_max = Number(current) + 3000;
       this.currentX = current;
       console.log("QHYCCD | changeRange_x:", current, this.xAxis_min, this.xAxis_max);
-      this.renderChart(this.xAxis_min, this.xAxis_max);
+      this.scheduleRender(this.xAxis_min, this.xAxis_max);
     },
 
     // 清除数据
     clearChartData1() {
       this.chartData1_pos = [];
       this.chartData1_time = [];
-      this.renderChart(this.xAxis_min, this.xAxis_max);
+      this.scheduleRender(this.xAxis_min, this.xAxis_max);
     },
     clearChartData2() {
       this.chartData2 = [];
-      this.renderChart(this.xAxis_min, this.xAxis_max);
+      this.scheduleRender(this.xAxis_min, this.xAxis_max);
     },
     ClearAllData() {
       this.chartData1_pos = [];
