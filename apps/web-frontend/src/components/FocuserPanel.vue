@@ -214,6 +214,12 @@ export default {
 
       moveStartTime: 0,  // 电调移动按下时间记录
 
+      // 长按判定/状态
+      longPressTimer: null,
+      longPressTriggered: false,
+      pressDirection: '',
+      isPressing: false,
+
       // 校准相关数据
       isCalibrating: false, // 是否正在校准
       calibrationStep: 0, // 校准步骤 (1-3)
@@ -361,40 +367,66 @@ export default {
         return;
       }
       if (this.inAutoFocus) return;
-      
-      // 记录按下时间
+
+      // 记录按下时间与方向
       this.moveStartTime = new Date().getTime();
-      
-      if (direction === 'left') {
-        this.$bus.$emit('FocusInProgress', true);
-        this.$bus.$emit('SendConsoleLogMsg', 'Focus Left Move:' + this.MoveSteps, 'info');
-        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'focusMove:' + "Left");
-        this.isMoveInProgress = true;
+      this.pressDirection = direction;
+      this.isPressing = true;
+      this.longPressTriggered = false;
+
+      // 清理可能存在的定时器
+      if (this.longPressTimer) {
+        clearTimeout(this.longPressTimer);
+        this.longPressTimer = null;
       }
-      else if (direction === 'right') {
+
+      // 200ms 后若仍按下则开始连续移动
+      this.longPressTimer = setTimeout(() => {
+        if (!this.isPressing || this.longPressTriggered) return;
+        this.longPressTriggered = true;
         this.$bus.$emit('FocusInProgress', true);
-        this.$bus.$emit('SendConsoleLogMsg', 'Focus Right Move:' + this.MoveSteps, 'info');
-        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'focusMove:' + "Right");
+        if (this.pressDirection === 'left') {
+          this.$bus.$emit('SendConsoleLogMsg', 'Focus Left Move:' + this.MoveSteps, 'info');
+          this.$bus.$emit('AppSendMessage', 'Vue_Command', 'focusMove:' + 'Left');
+        } else if (this.pressDirection === 'right') {
+          this.$bus.$emit('SendConsoleLogMsg', 'Focus Right Move:' + this.MoveSteps, 'info');
+          this.$bus.$emit('AppSendMessage', 'Vue_Command', 'focusMove:' + 'Right');
+        }
         this.isMoveInProgress = true;
-      }
+      }, 200);
     },
 
     FocusAbort() {
-      if (!this.isMoveInProgress) return;
       const pressDuration = new Date().getTime() - this.moveStartTime;
-      this.isMoveInProgress = false;
-      this.$bus.$emit('FocusInProgress', false);
-      
-      // 区分点按和长按
-      if (pressDuration < 200) {
-        // 点按操作 - 移动固定步数
-        this.$bus.$emit('SendConsoleLogMsg', `Focus Click Move: ${this.MoveSteps} steps`, 'info');
-        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'focusMoveStop:true');
-      } else {
-        // 长按操作 - 停止连续移动
+
+      // 停止长按定时器
+      if (this.longPressTimer) {
+        clearTimeout(this.longPressTimer);
+        this.longPressTimer = null;
+      }
+
+      // 标记已松开
+      const wasLongPress = this.longPressTriggered;
+      const dir = this.pressDirection === 'left' ? 'Left' : (this.pressDirection === 'right' ? 'Right' : '');
+      this.isPressing = false;
+
+      if (!wasLongPress && pressDuration < 200) {
+        // 短按：触发一次步进移动（启动后立刻停止，走点击逻辑）
+        if (dir) {
+          this.$bus.$emit('SendConsoleLogMsg', `Focus Click Move: ${this.MoveSteps} steps`, 'info');
+          this.$bus.$emit('AppSendMessage', 'Vue_Command', 'focusMoveStep:' + dir + ':' + this.MoveSteps);
+        }
+      } else if (wasLongPress) {
+        // 长按：停止连续移动
         this.$bus.$emit('SendConsoleLogMsg', 'Focus Abort', 'info');
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'focusMoveStop:false');
       }
+
+      // 复位状态
+      this.isMoveInProgress = false;
+      this.$bus.$emit('FocusInProgress', false);
+      this.longPressTriggered = false;
+      this.pressDirection = '';
     },
 
     getFocuserMoveState() {
