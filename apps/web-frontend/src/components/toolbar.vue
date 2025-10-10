@@ -340,22 +340,7 @@ export default {
     // },
     
     MountStatus(status) {
-      if(status === 'Slewing') {
-        this.MountInProgress = true;
-      } 
-      else if(status === 'Tracking') {
-        this.MountInProgress = false;
-      } 
-      else if(status === 'Busy') {
-        this.MountInProgress = true;
-      } 
-      else if(status === 'Idle' && status === 'OK')  {
-        this.MountInProgress = false;
-      }
-      else if(status === 'Goto') {
-        this.MountInProgress = true;
-      } 
-      else if(status === 'Move') {
+      if(status === 'Moving') {
         this.MountInProgress = true;
       } 
       else {

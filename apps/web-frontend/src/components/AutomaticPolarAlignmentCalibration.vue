@@ -1,8 +1,7 @@
 <template>
   <!-- 最小化状态 -->
-  <div v-if="visible && isMinimized" class="polar-alignment-minimized" 
-       :class="{ 'dragging': isDraggingState }"
-       :style="{ left: position.x + 'px', top: position.y + 'px' }">
+  <div v-if="visible && isMinimized" class="polar-alignment-minimized" :class="{ 'dragging': isDraggingState }"
+    :style="{ left: position.x + 'px', top: position.y + 'px' }">
     <div class="minimized-header">
       <div class="minimized-drag-area" @mousedown="startDrag" @touchstart="startDrag">
         <v-icon class="minimized-icon">mdi-compass-rose</v-icon>
@@ -16,15 +15,15 @@
     </div>
     <div class="minimized-status">
       <div class="status-indicator" :class="{ 'online': isConnected }"></div>
-              <span class="status-text">{{ isConnected ? $t('Connected') : $t('Disconnected') }}</span>
+      <span class="status-text">{{ isConnected ? $t('Connected') : $t('Disconnected') }}</span>
     </div>
   </div>
 
   <!-- 完整界面 -->
-  <div v-else-if="visible" class="polar-alignment-widget" 
-       :class="{ 'collapsed': isCollapsed, 'dragging': isDraggingState }"
-       :style="{ left: position.x + 'px', top: position.y + 'px' }">
-    
+  <div v-else-if="visible" class="polar-alignment-widget"
+    :class="{ 'collapsed': isCollapsed, 'dragging': isDraggingState }"
+    :style="{ left: position.x + 'px', top: position.y + 'px' }">
+
     <!-- 拖动手柄 -->
     <div class="widget-header">
       <div class="header-drag-area" @mousedown="startDrag" @touchstart="startDrag">
@@ -36,7 +35,7 @@
           </div>
         </div>
       </div>
-      
+
       <div class="header-controls">
         <button class="header-btn" @click="toggleCollapse" :title="isCollapsed ? $t('Expand') : $t('Collapse')">
           <v-icon>{{ isCollapsed ? 'mdi-chevron-down' : 'mdi-chevron-up' }}</v-icon>
@@ -94,7 +93,7 @@
                 </div>
                 <div class="node-label">{{ $t('Initialization') }}</div>
               </div>
-              
+
               <!-- 第一次校准节点 -->
               <div class="progress-node" :class="getStepClass(1)">
                 <div class="node-circle">
@@ -103,7 +102,7 @@
                 </div>
                 <div class="node-label">{{ $t('First Calibration') }}</div>
               </div>
-              
+
               <!-- 第二次校准节点 -->
               <div class="progress-node" :class="getStepClass(2)">
                 <div class="node-circle">
@@ -112,7 +111,7 @@
                 </div>
                 <div class="node-label">{{ $t('Second Calibration') }}</div>
               </div>
-              
+
               <!-- 第三次校准节点 -->
               <div class="progress-node" :class="getStepClass(3)">
                 <div class="node-circle">
@@ -121,9 +120,10 @@
                 </div>
                 <div class="node-label">{{ $t('Third Calibration') }}</div>
               </div>
-              
+
               <!-- 校准调整节点 -->
-              <div class="progress-node calibration-node" :class="{ 'active': progressPercentage >= 75, 'looping': progressPercentage >= 75 && progressPercentage < 95 }">
+              <div class="progress-node calibration-node"
+                :class="{ 'active': progressPercentage >= 75, 'looping': progressPercentage >= 75 && progressPercentage < 95 }">
                 <div class="node-circle">
                   <v-icon v-if="progressPercentage >= 95">mdi-check</v-icon>
                   <v-icon v-else-if="progressPercentage >= 75">mdi-refresh</v-icon>
@@ -131,7 +131,7 @@
                 </div>
                 <div class="node-label">{{ $t('Calibration') }}</div>
               </div>
-              
+
               <!-- 最终验证节点 -->
               <div class="progress-node verification-node" :class="{ 'active': progressPercentage >= 95 }">
                 <div class="node-circle">
@@ -156,7 +156,7 @@
             </div>
           </div>
         </div>
-        
+
         <!-- 位置信息 -->
         <div class="position-section">
           <div class="position-grid">
@@ -178,7 +178,7 @@
             </div>
           </div>
         </div>
-        
+
         <!-- 调整指导 -->
         <div class="adjustment-section">
           <div class="adjustment-instructions">
@@ -197,7 +197,7 @@
 
               </div>
             </div>
-            
+
             <div class="adjustment-item" :class="{ 'active': needsAltitudeAdjustment }">
               <div class="adjustment-icon">
                 <v-icon>mdi-compass</v-icon>
@@ -226,172 +226,304 @@
             </button>
 
 
+
           </div>
         </div>
       </div>
     </div>
   </div>
 </template>
-  
-  <script>
-  export default {
-    name: 'AutomaticPolarAlignmentCalibration',
-    
-    props: {
-      visible: {
-        type: Boolean,
-        default: false
+
+<script>
+// 常量定义
+const COLORS = {
+  PRIMARY: '#64b5f6',
+  SUCCESS: '#4caf50',
+  WARNING: '#ff9800',
+  ERROR: '#f44336',
+  INFO: '#2196f3',
+  WHITE: '#ffffff',
+  BACKGROUND: 'rgba(35, 35, 45, 0.95)',
+  SURFACE: 'rgba(60, 60, 70, 0.9)'
+}
+
+const CALIBRATION_PHASES = {
+  INITIAL: 'initial',
+  COLLECTING: 'collecting',
+  ADJUSTING: 'adjusting',
+  VERIFYING: 'verifying'
+}
+
+const PROGRESS_THRESHOLDS = {
+  INITIALIZATION: 15,
+  FIRST_CALIBRATION: 25,
+  SECOND_CALIBRATION: 50,
+  THIRD_CALIBRATION: 75,
+  CALIBRATION_LOOP: 95,
+  COMPLETION: 100
+}
+
+const DIMENSIONS = {
+  MINIMIZED: { width: 250, height: 80 },
+  COLLAPSED: { width: 300, height: 120 },
+  EXPANDED: { width: 350, height: 400 }
+}
+
+const LOG_LIMIT = 100
+const DISPLAY_LOG_LIMIT = 10
+
+export default {
+  name: 'AutomaticPolarAlignmentCalibration',
+
+  props: {
+    visible: {
+      type: Boolean,
+      default: false
+    },
+    autoStart: {
+      type: Boolean,
+      default: false
+    },
+    // 新增：传入调整数据的单位（'deg' | 'arcmin' | 'arcsec'）
+    adjustmentUnit: { type: String, default: 'arcmin' },
+
+    // 新增：用户站位视角（'north' | 'south'），用于左右映射
+    facingPole: { type: String, default: 'north' },
+
+    // 新增：动作死区（以角分定义，UI判定是否需要动作）
+    deadbandArcmin: { type: Number, default: 0.5 }
+  },
+
+  data() {
+    return {
+      // 连接状态
+      isConnected: false,
+
+      // 位置信息
+      currentPosition: {
+        ra: '00h 00m 00s',
+        dec: '+00° 00\' 00"'
       },
-      autoStart: {
-        type: Boolean,
-        default: false
+      targetPosition: {
+        ra: '00h 00m 00s',
+        dec: '+00° 00\' 00"'
+      },
+      previousPosition: {
+        ra: '00h 00m 00s',
+        dec: '+00° 00\' 00"'
+      },
+
+      // 校准数据
+      isCalibrationComplete: false,
+      isPolarAligned: false,
+
+      // 调整信息
+      adjustment: {
+        azimuth: 0.0,
+        altitude: 0.0
+      },
+
+      // 日志系统 - 使用循环数组优化内存
+      logs: [],
+      logIndex: 0,
+      logCapacity: LOG_LIMIT,
+
+      // 校准运行状态
+      isCalibrationRunning: false,
+
+      // 视场数据
+      fieldData: null,
+
+      // 当前进度
+      currentProgress: 0,
+
+      // === 新增：界面控制状态 ===
+      // 拖动状态
+      isDragging: false,
+      dragOffset: { x: 0, y: 0 },
+
+      // 控件位置
+      position: { x: 50, y: 50 },
+
+      // 界面状态
+      isMinimized: false,
+      isCollapsed: false,
+
+      // === 新增：性能优化 ===
+      // 缓存尺寸计算结果
+      cachedDimensions: {
+        width: 350,
+        height: 400
+      },
+      // 拖动状态标记
+      isDraggingState: false,
+
+      // 内存清理定时器
+      memoryCleanupTimer: null,
+
+      // 计算缓存
+      cachedAzimuthArcmin: null,
+      cachedAltitudeArcmin: null,
+      lastAzimuthValue: null,
+      lastAltitudeValue: null,
+
+      // 拖动性能优化
+      lastDragTime: 0,
+
+      // 极轴偏移量
+      polarAxisOffset: {
+        azimuth: 0,
+        altitude: 0
+      },
+
+      // 校准循环计数
+      calibrationLoopCount: 0,
+      lastCalibrationProgress: 0,
+
+      // 校准阶段状态
+      calibrationPhase: 'initial', // 'initial', 'collecting', 'adjusting', 'verifying'
+      calibrationPoints: [], // 存储三个校准点的坐标
+      maxCalibrationPoints: 3, // 最大校准点数量
+      targetPoint: null, // 存储目标点坐标
+
+      // 移除假极轴相关数据
+      // fakePolarAxis: {
+      //   ra: null,
+      //   dec: null,
+      //   calculated: false
+      // },
+    }
+  },
+
+  computed: {
+    // 显示的日志 - 使用缓存优化
+    displayLogs() {
+      // 返回最近的10条日志，按时间倒序（用于显示最新一条）
+      const logs = this.logs
+      if (logs.length <= DISPLAY_LOG_LIMIT) {
+        return logs.slice().reverse()
+      }
+      return logs.slice(-DISPLAY_LOG_LIMIT).reverse()
+    },
+
+    // 校准进度百分比
+    progressPercentage() {
+      // 使用从后端传入的进度
+      return this.currentProgress
+    },
+
+    // 是否可以自动校准
+    canAutoCalibrate() {
+      return this.isConnected
+    },
+
+    // 是否需要方位角调整 - 使用缓存避免重复计算
+    needsAzimuthAdjustment() {
+      const v = this.adjustment?.azimuth
+      if (!Number.isFinite(v)) return false
+      // 使用缓存的值，避免重复计算
+      return this.cachedAzimuthArcmin !== null ? 
+        Math.abs(this.cachedAzimuthArcmin) > this.deadbandArcmin : 
+        Math.abs(this.unitToArcmin(v, this.adjustmentUnit)) > this.deadbandArcmin
+    },
+
+    // 是否需要高度角调整 - 使用缓存避免重复计算
+    needsAltitudeAdjustment() {
+      const v = this.adjustment?.altitude
+      if (!Number.isFinite(v)) return false
+      // 使用缓存的值，避免重复计算
+      return this.cachedAltitudeArcmin !== null ? 
+        Math.abs(this.cachedAltitudeArcmin) > this.deadbandArcmin : 
+        Math.abs(this.unitToArcmin(v, this.adjustmentUnit)) > this.deadbandArcmin
+    }
+  },
+
+  watch: {
+    visible(newVal) {
+      if (newVal && this.autoStart) {
+        this.startAutoCalibration()
       }
     },
     
-    data() {
-      return {
-        // 连接状态
-        isConnected: false,
-        
-        // 位置信息
-        currentPosition: {
-          ra: '00h 00m 00s',
-          dec: '+00° 00\' 00"'
-        },
-        targetPosition: {
-          ra: '00h 00m 00s',
-          dec: '+00° 00\' 00"'
-        },
-        previousPosition: {
-          ra: '00h 00m 00s',
-          dec: '+00° 00\' 00"'
-        },
-        
-        // 校准数据
-        isCalibrationComplete: false,
-        isPolarAligned: false,
-        
-        // 调整信息
-        adjustment: {
-          azimuth: 0.0,
-          altitude: 0.0
-        },
-        
-        // 日志系统
-        logs: [],
-        
-        // 校准运行状态
-        isCalibrationRunning: false,
-        
-        // 视场数据
-        fieldData: null,
-        
-        // 当前进度
-        currentProgress: 0,
-        
-        // === 新增：界面控制状态 ===
-        // 拖动状态
-        isDragging: false,
-        dragOffset: { x: 0, y: 0 },
-        
-        // 控件位置
-        position: { x: 50, y: 50 },
-        
-        // 界面状态
-        isMinimized: false,
-        isCollapsed: false,
-        
-        // === 新增：性能优化 ===
-        // 缓存尺寸计算结果
-        cachedDimensions: {
-          width: 350,
-          height: 400
-        },
-        // 拖动状态标记
-        isDraggingState: false,
-        
-        // 极轴偏移量
-        polarAxisOffset: {
-          azimuth: 0,
-          altitude: 0
-        },
-        
-        // 校准循环计数
-        calibrationLoopCount: 0,
-        lastCalibrationProgress: 0,
-        
-        // 校准阶段状态
-        calibrationPhase: 'initial', // 'initial', 'collecting', 'adjusting', 'verifying'
-        calibrationPoints: [], // 存储三个校准点的坐标
-        targetPoint: null, // 存储目标点坐标
-      }
-    },
-    
-    computed: {
-      // 显示的日志
-      displayLogs() {
-        // 返回最近的10条日志，按时间倒序（用于显示最新一条）
-        return this.logs.slice(-10).reverse()
-      },
-      
-      // 校准进度百分比
-      progressPercentage() {
-        // 使用从后端传入的进度
-        return this.currentProgress
-      },
-      
-      // 是否可以自动校准
-      canAutoCalibrate() {
-        return this.isConnected
-      },
-      
-      // 是否需要方位角调整
-      needsAzimuthAdjustment() {
-        const value = this.adjustment.azimuth
-        if (value === null || value === undefined || isNaN(value)) return false
-        return Math.abs(value) > 0.5
-      },
-      
-      // 是否需要高度角调整
-      needsAltitudeAdjustment() {
-        const value = this.adjustment.altitude
-        if (value === null || value === undefined || isNaN(value)) return false
-        return Math.abs(value) > 0.5
-      }
-    },
-    
-    watch: {
-      visible(newVal) {
-        if (newVal && this.autoStart) {
-          this.startAutoCalibration()
+    // 监听当前坐标变化，自动更新朝向极点
+    '$store.state.currentLocation.lat': {
+      handler(newLat, oldLat) {
+        if (newLat !== oldLat && newLat !== undefined) {
+          const facingPole = this.calculateFacingPole()
+          this.addLog(this.$t('Location Changed', [facingPole, newLat]), 'info')
+          
+          // 如果正在调整阶段，重新计算调整建议
+          if (this.calibrationPhase === 'adjusting') {
+            this.addLog(this.$t('Recalculating Adjustment Directions'), 'info')
+          }
         }
-      }
+      },
+      immediate: false
     },
-    
+
+    // 监听调整值变化，更新缓存 - 使用防抖避免频繁更新
+    'adjustment.azimuth': {
+      handler: function(newVal) {
+        if (Number.isFinite(newVal)) {
+          // 清除之前的定时器
+          if (this._azimuthUpdateTimer) {
+            clearTimeout(this._azimuthUpdateTimer)
+          }
+          // 使用防抖，延迟100ms更新
+          this._azimuthUpdateTimer = setTimeout(() => {
+            this.cachedAzimuthArcmin = this.unitToArcmin(newVal, this.adjustmentUnit)
+            this.lastAzimuthValue = newVal
+          }, 100)
+        }
+      },
+      immediate: true
+    },
+
+    'adjustment.altitude': {
+      handler: function(newVal) {
+        if (Number.isFinite(newVal)) {
+          // 清除之前的定时器
+          if (this._altitudeUpdateTimer) {
+            clearTimeout(this._altitudeUpdateTimer)
+          }
+          // 使用防抖，延迟100ms更新
+          this._altitudeUpdateTimer = setTimeout(() => {
+            this.cachedAltitudeArcmin = this.unitToArcmin(newVal, this.adjustmentUnit)
+            this.lastAltitudeValue = newVal
+          }, 100)
+        }
+      },
+      immediate: true
+    }
+  },
+
     mounted() {
       // 实现组件初始化逻辑
       this.initialize()
-      
+
       // 初始化缓存的尺寸信息
       this.updateCachedDimensions()
-      
+
       // 监听信号总线事件
       this.$bus.$on('showPolarAlignment', this.showInterface)
       this.$bus.$on('hidePolarAlignment', this.hideInterface)
-      
+
       // 监听赤道仪连接状态
       this.$bus.$on('MountConnected', this.updateMountConnection)
 
       // 接收状态更新
       this.$bus.$on('PolarAlignmentState', this.updatePolarAlignmentState)
-      
+
       // 监听视场数据更新
       this.$bus.$on('FieldDataUpdate', this.updateFieldData)
 
       // 监听卡片信息更新
       this.$bus.$on('updateCardInfo', this.updateCardInfo)
+
+      // 启动定期内存清理（每5分钟清理一次）
+      this.startMemoryCleanup()
     },
-    
+
     beforeDestroy() {
       // 移除信号总线监听
       this.$bus.$off('showPolarAlignment', this.showInterface)
@@ -400,64 +532,194 @@
       this.$bus.$off('PolarAlignmentState', this.updatePolarAlignmentState)
       this.$bus.$off('FieldDataUpdate', this.updateFieldData)
       this.$bus.$off('updateCardInfo', this.updateCardInfo)
-      
+
       // 清理拖动事件监听
-      document.removeEventListener('mousemove', this.onDrag)
-      document.removeEventListener('mouseup', this.stopDrag)
-      
+      this.cleanupDragListeners()
+
+      // 清理缓存数据
+      this.clearCachedData()
+
+      // 停止内存清理定时器
+      this.stopMemoryCleanup()
+
+      // 清理防抖定时器
+      this.clearDebounceTimers()
+
       // 实现组件销毁逻辑
       this.cleanup()
     },
-    
+
     methods: {
-      // === 信号总线事件处理 ===
+      // ========================================
+      // 信号总线事件处理
+      // ========================================
       showInterface() {
         this.$emit('update:visible', true)
       },
-      
+
       hideInterface() {
         this.$emit('update:visible', false)
       },
-      
+
       updateMountConnection(status) {
         this.isConnected = status === 1
         const statusText = this.isConnected ? this.$t('Connected') : this.$t('Disconnected')
         this.addLog(this.$t('Mount Connection Status', [statusText]), this.isConnected ? 'success' : 'warning')
       },
-      
-      // === 初始化和清理 ===
+
+      // ========================================
+      // 初始化和清理
+      // ========================================
       initialize() {
         this.addLog(this.$t('Polar Alignment Component Initialized'), 'info')
+        
+        // 记录当前朝向极点
+        const facingPole = this.calculateFacingPole()
+        const lat = this.$store?.state?.currentLocation?.lat || 'unknown'
+        this.addLog(this.$t('Facing Pole', [facingPole, lat]), 'info')
       },
-      
+
       cleanup() {
         this.addLog(this.$t('Polar Alignment Component Cleaned'), 'info')
       },
-      
-      // === 拖动控制方法 ===
+
+      // 内存使用监控（仅在开发环境）
+      getMemoryUsage() {
+        if (process.env.NODE_ENV === 'development' && performance.memory) {
+          return {
+            usedJSHeapSize: Math.round(performance.memory.usedJSHeapSize / 1024 / 1024) + 'MB',
+            totalJSHeapSize: Math.round(performance.memory.totalJSHeapSize / 1024 / 1024) + 'MB',
+            jsHeapSizeLimit: Math.round(performance.memory.jsHeapSizeLimit / 1024 / 1024) + 'MB',
+            logsCount: this.logs.length,
+            calibrationPointsCount: this.calibrationPoints.length
+          }
+        }
+        return null
+      },
+
+      // 启动定期内存清理
+      startMemoryCleanup() {
+        this.memoryCleanupTimer = setInterval(() => {
+          this.performMemoryCleanup()
+        }, 5 * 60 * 1000) // 每5分钟清理一次
+      },
+
+      // 停止内存清理定时器
+      stopMemoryCleanup() {
+        if (this.memoryCleanupTimer) {
+          clearInterval(this.memoryCleanupTimer)
+          this.memoryCleanupTimer = null
+        }
+      },
+
+      // 执行内存清理
+      performMemoryCleanup() {
+        // 清理过期的日志（保留最近50条）
+        if (this.logs.length > 50) {
+          this.logs = this.logs.slice(-50)
+          this.logIndex = Math.min(this.logIndex, 50)
+        }
+
+        // 清理过期的校准点（如果超过最大数量）
+        if (this.calibrationPoints.length > this.maxCalibrationPoints) {
+          this.calibrationPoints = this.calibrationPoints.slice(-this.maxCalibrationPoints)
+        }
+
+        // 强制垃圾回收（如果可用）
+        if (window.gc && typeof window.gc === 'function') {
+          window.gc()
+        }
+
+        // 在开发环境输出内存使用情况
+        if (process.env.NODE_ENV === 'development') {
+          const memoryInfo = this.getMemoryUsage()
+          if (memoryInfo) {
+            console.log('Memory cleanup performed:', memoryInfo)
+          }
+        }
+      },
+
+      // 清理拖动事件监听器
+      cleanupDragListeners() {
+        document.removeEventListener('mousemove', this.onDrag)
+        document.removeEventListener('mouseup', this.stopDrag)
+        document.removeEventListener('touchmove', this.onDrag)
+        document.removeEventListener('touchend', this.stopDrag)
+      },
+
+      // 清理防抖定时器
+      clearDebounceTimers() {
+        if (this._azimuthUpdateTimer) {
+          clearTimeout(this._azimuthUpdateTimer)
+          this._azimuthUpdateTimer = null
+        }
+        if (this._altitudeUpdateTimer) {
+          clearTimeout(this._altitudeUpdateTimer)
+          this._altitudeUpdateTimer = null
+        }
+      },
+
+      // 清理缓存数据
+      clearCachedData() {
+        // 清理计算缓存
+        this.cachedAzimuthArcmin = null
+        this.cachedAltitudeArcmin = null
+        this.lastAzimuthValue = null
+        this.lastAltitudeValue = null
+        this.lastDragTime = 0
+        
+        // 清理日志数据
+        this.logs = []
+        this.logIndex = 0
+        
+        // 清理校准数据
+        this.calibrationPoints = []
+        this.targetPoint = null
+        this.fieldData = null
+        
+        // 清理位置数据
+        this.currentPosition = { ra: '00h 00m 00s', dec: '+00° 00\' 00"' }
+        this.targetPosition = { ra: '00h 00m 00s', dec: '+00° 00\' 00"' }
+        this.previousPosition = { ra: '00h 00m 00s', dec: '+00° 00\' 00"' }
+        
+        // 清理调整数据
+        this.adjustment = { azimuth: 0.0, altitude: 0.0 }
+        this.polarAxisOffset = { azimuth: 0, altitude: 0 }
+        
+        // 重置状态
+        this.isCalibrationComplete = false
+        this.isPolarAligned = false
+        this.calibrationLoopCount = 0
+        this.lastCalibrationProgress = 0
+        this.calibrationPhase = 'initial'
+      },
+
+      // ========================================
+      // 拖动控制方法
+      // ========================================
       startDrag(event) {
         if (event.target.closest('.header-controls, .minimized-controls, .header-btn, .minimized-btn')) {
           return
         }
-        
+
         this.isDragging = true
         this.isDraggingState = true
-        
+
         // 添加dragging类，移除过渡动画
         this.$el.classList.add('dragging')
-        
+
         const rect = event.currentTarget.getBoundingClientRect()
         const clientX = event.clientX || event.touches?.[0]?.clientX || 0
         const clientY = event.clientY || event.touches?.[0]?.clientY || 0
-        
+
         this.dragOffset = {
           x: clientX - rect.left,
           y: clientY - rect.top
         }
-        
+
         // 预计算并缓存尺寸，避免拖动时重复计算
         this.updateCachedDimensions()
-        
+
         // 优化触摸事件处理
         if (event.type === 'touchstart') {
           document.addEventListener('touchmove', this.onDrag, { passive: false })
@@ -467,67 +729,66 @@
           document.addEventListener('mouseup', this.stopDrag)
         }
       },
-      
+
       onDrag(event) {
         if (!this.isDragging) return
-        
+
         // 阻止默认行为，提高触摸响应性
         if (event.type === 'touchmove') {
           event.preventDefault()
         }
+
+        // 使用更高效的节流机制
+        const now = Date.now()
+        if (this.lastDragTime && now - this.lastDragTime < 16) return // 60fps限制
+        this.lastDragTime = now
         
-        // 使用requestAnimationFrame优化拖动性能
-        requestAnimationFrame(() => {
-          const clientX = event.clientX || event.touches?.[0]?.clientX || 0
-          const clientY = event.clientY || event.touches?.[0]?.clientY || 0
-          
-          const newX = clientX - this.dragOffset.x
-          const newY = clientY - this.dragOffset.y
-          
-          // 使用缓存的尺寸，避免重复计算
-          const maxX = window.innerWidth - this.cachedDimensions.width
-          const maxY = window.innerHeight - this.cachedDimensions.height
-          
-          this.position = {
-            x: Math.max(0, Math.min(newX, maxX)),
-            y: Math.max(0, Math.min(newY, maxY))
-          }
-        })
+        const clientX = event.clientX || event.touches?.[0]?.clientX || 0
+        const clientY = event.clientY || event.touches?.[0]?.clientY || 0
+
+        const newX = clientX - this.dragOffset.x
+        const newY = clientY - this.dragOffset.y
+
+        // 使用缓存的尺寸，避免重复计算
+        const maxX = window.innerWidth - this.cachedDimensions.width
+        const maxY = window.innerHeight - this.cachedDimensions.height
+
+        this.position = {
+          x: Math.max(0, Math.min(newX, maxX)),
+          y: Math.max(0, Math.min(newY, maxY))
+        }
       },
-      
+
       stopDrag() {
         this.isDragging = false
         this.isDraggingState = false
-        
+
         // 移除dragging类，恢复过渡动画
         this.$el.classList.remove('dragging')
-        
+
         // 清理所有事件监听器
-        document.removeEventListener('mousemove', this.onDrag)
-        document.removeEventListener('mouseup', this.stopDrag)
-        document.removeEventListener('touchmove', this.onDrag)
-        document.removeEventListener('touchend', this.stopDrag)
+        this.cleanupDragListeners()
       },
-      
+
       // 新增：更新缓存的尺寸信息
       updateCachedDimensions() {
         if (this.isMinimized) {
-          this.cachedDimensions = { width: 250, height: 80 }
+          this.cachedDimensions = { ...DIMENSIONS.MINIMIZED }
         } else if (this.isCollapsed) {
-          this.cachedDimensions = { width: 300, height: 120 }
+          this.cachedDimensions = { ...DIMENSIONS.COLLAPSED }
         } else {
           // 展开状态，使用基础尺寸
-          this.cachedDimensions = { width: 350, height: 400 }
+          this.cachedDimensions = { ...DIMENSIONS.EXPANDED }
         }
       },
-      
+
       // 获取组件高度（优化版本）
       getComponentHeight() {
         // 如果正在拖动，使用缓存的尺寸
         if (this.isDraggingState) {
           return this.cachedDimensions.height
         }
-        
+
         // 正常状态下的计算
         if (this.isMinimized) {
           return 80 // 最小化状态高度
@@ -541,8 +802,10 @@
           return Math.min(baseHeight + logHeight + adjustmentHeight, window.innerHeight * 0.8)
         }
       },
-      
-      // === 界面状态控制方法 ===
+
+      // ========================================
+      // 界面状态控制方法
+      // ========================================
       toggleMinimize() {
         this.isMinimized = !this.isMinimized
         this.isCollapsed = false
@@ -550,34 +813,32 @@
         this.updateCachedDimensions()
         this.addLog(this.isMinimized ? this.$t('Interface Minimized') : this.$t('Interface Expanded'), 'info')
       },
-      
+
       toggleCollapse() {
         this.isCollapsed = !this.isCollapsed
         // 更新缓存的尺寸信息
         this.updateCachedDimensions()
         this.addLog(this.isCollapsed ? this.$t('Interface Collapsed') : this.$t('Interface Expanded'), 'info')
       },
-      
+
       resetCalibration() {
-        this.calibrationPoints = []
-        this.isCalibrationComplete = false
-        this.isPolarAligned = false
-        this.fieldData = null
-        this.calibrationLoopCount = 0
-        this.lastCalibrationProgress = 0
-        this.calibrationPhase = 'initial'
-        this.targetPoint = null
+        // 使用统一的内存清理方法
+        this.clearCachedData()
+
         this.addLog(this.$t('Calibration Data Reset'), 'info')
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'ResetAutoPolarAlignment')
         this.$bus.$emit('ClearCalibrationPoints')
         this.$bus.$emit('ClearStatusTextFromStarMap')
       },
-      
+
       restoreCalibration() {
         this.addLog(this.$t('Calibration Data Restored'), 'success')
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'RestoreAutoPolarAlignment')
       },
-      
+
+      // ========================================
+      // 校准控制方法
+      // ========================================
       startAutoCalibration() {
         if (!this.isConnected) {
           this.addLog(this.$t('Error: Mount Not Connected'), 'error')
@@ -592,15 +853,17 @@
         this.addLog(this.$t('Starting Auto Calibration'), 'info')
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'StartAutoPolarAlignment')
       },
+
       stopAutoCalibration() {
         this.isCalibrationRunning = false
         this.addLog(this.$t('Auto Calibration Stopped'), 'warning')
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'StopAutoPolarAlignment')
       },
-      
-      // === 视场数据处理方法 ===
+      // ========================================
+      // 视场数据处理方法
+      // ========================================
       updateFieldData(data) {
-        if (data && Array.isArray(data) && data.length >= 8) {
+        if (data && Array.isArray(data) && data.length >= 12) { // 修改长度检查，确保包含假极轴数据
           const isValidData = data.every(val => typeof val === 'number' && !isNaN(val))
           if (!isValidData) {
             this.addLog(this.$t('Warning: Invalid Field Data Received'), 'warning')
@@ -610,48 +873,66 @@
           this.fieldData = {
             ra: data[0],
             dec: data[1],
-            maxra: data[2],
-            minra: data[3],
-            maxdec: data[4],
-            mindec: data[5],
-            targetra: data[6],
-            targetdec: data[7]
+            ra0: data[2],
+            dec0: data[3],
+            ra1: data[4],
+            dec1: data[5],
+            ra2: data[6],
+            dec2: data[7],
+            ra3: data[8],
+            dec3: data[9],
+            targetra: data[10],
+            targetdec: data[11],
+            fakePolarRA: data[12],
+            fakePolarDEC: data[13],
+            realPolarRA: data[14],
+            realPolarDEC: data[15]
           }
-          
+
           // 保存上一次位置（在更新当前位置之前）
           if (this.currentPosition.ra !== '00h 00m 00s') {
             this.previousPosition = { ...this.currentPosition }
           }
-          
+
           // 更新当前位置
           this.currentPosition = {
             ra: this.formatCoordinate(data[0], 'ra'),
             dec: this.formatCoordinate(data[1], 'dec')
           }
-          
-          if (data[6] === -1 && data[7] === -1) {
+
+          if (data[10] === -1 && data[11] === -1) {
             // 校准点收集阶段
             this.calibrationPhase = 'collecting'
             const pointNumber = this.calibrationPoints.length + 1
-            
+
             // 添加调试信息
             this.addLog(`准备收集校准点${pointNumber}，当前已有${this.calibrationPoints.length}个点`, 'info')
-            
+
             try {
               this.drawCalibrationPointPolygon(data[0], data[1], pointNumber, this.fieldData)
               this.addLog(this.$t('Calibration Point', [pointNumber, data[0].toFixed(4), data[1].toFixed(4)]), 'info')
-              
-              // 保存校准点
-              this.calibrationPoints.push({
-                ra: data[0],
-                dec: data[1],
-                index: pointNumber
-              })
-              
+
+              // 保存校准点 - 限制最大数量
+              if (this.calibrationPoints.length < this.maxCalibrationPoints) {
+                this.calibrationPoints.push({
+                  ra: data[0],
+                  dec: data[1],
+                  index: pointNumber
+                })
+              } else {
+                // 如果超过最大数量，替换最旧的点
+                const oldestIndex = (pointNumber - 1) % this.maxCalibrationPoints
+                this.calibrationPoints[oldestIndex] = {
+                  ra: data[0],
+                  dec: data[1],
+                  index: pointNumber
+                }
+              }
+
               this.addLog(`校准点${pointNumber}已添加，现在总共有${this.calibrationPoints.length}个点`, 'info')
-              
+
               // 如果收集了3个点，进入调整阶段
-              if (this.calibrationPoints.length === 3) {
+              if (this.calibrationPoints.length === this.maxCalibrationPoints) {
                 this.calibrationPhase = 'adjusting'
                 this.addLog(this.$t('Three calibration points collected, entering adjustment phase'), 'success')
               }
@@ -659,15 +940,72 @@
               this.addLog(this.$t('Error processing calibration point', [error.message]), 'error')
               console.error('处理校准点错误：', error)
             }
-          } else if (data[6] !== -1 && data[7] !== -1) {
-            // 调整阶段：显示目标位置
+          } else if (data[10] !== -1 && data[11] !== -1) {
+            // 调整阶段：显示目标位置和假极轴
             this.calibrationPhase = 'adjusting'
-            this.targetPoint = { ra: data[6], dec: data[7] }
-            
+            this.targetPoint = { ra: data[10], dec: data[11] }
+
             try {
-              // 不清除校准点，保持校准点显示，同时显示调整信息
-              this.drawAdjustmentPoints(data[0], data[1], data[6], data[7], this.fieldData, false)
-              this.addLog(`调整模式：当前位置(${data[0].toFixed(4)}, ${data[1].toFixed(4)}) 目标位置(${data[6].toFixed(4)}, ${data[7].toFixed(4)})`, 'info')
+              // 先清除所有之前的元素
+              this.addLog('调整模式：准备清除之前的校准元素', 'info')
+              this.$bus.$emit('ClearCalibrationPoints')
+              this.addLog('调整模式：清除命令已发送', 'info')
+
+              // 绘制校准点（如果已收集3个点）
+              if (this.calibrationPoints.length === this.maxCalibrationPoints) {
+                this.calibrationPoints.forEach((point, index) => {
+                  const pointCoordinates = this.calculateFieldCorners(point.ra, point.dec, this.fieldData, false)
+                  const pointColor = {
+                    stroke: "#FFD700",        // 金色边框：校准点
+                    strokeOpacity: 1,         // 边框不透明度
+                    fill: "#FFD700",          // 金色填充：校准点
+                    fillOpacity: 0.3          // 填充不透明度（半透明）
+                  }
+
+                  this.$bus.$emit('DrawCalibrationPointPolygon', pointCoordinates, pointColor,
+                    `Calibration_Point_${index + 1}`, `校准点${index + 1}`, "#FFD700")
+                })
+              }
+
+              // 绘制当前位置（蓝色）
+              const currentCoordinates = this.calculateFieldCorners(data[0], data[1], this.fieldData, false)
+              const currentColor = {
+                stroke: "#00BFFF",        // 蓝色边框：当前位置
+                strokeOpacity: 1,         // 边框不透明度
+                fill: "#00BFFF",          // 蓝色填充：当前位置
+                fillOpacity: 0.3          // 填充不透明度（半透明）
+              }
+
+              this.$bus.$emit('DrawCalibrationPointPolygon', currentCoordinates, currentColor,
+                'Current_Position', '当前位置', "#00BFFF")
+
+              // 绘制目标点（绿色圆形）
+              const targetColor = {
+                stroke: "#4CAF50",        // 绿色边框：目标点
+                strokeOpacity: 1,         // 边框不透明度
+                fill: "#4CAF50",          // 绿色填充：目标点
+                fillOpacity: 0.3          // 填充不透明度（半透明）
+              }
+
+              const { az, alt } = this.equatorialToHorizontal(data[10], data[11], new Date(Date.now()), this.$store.state.currentLocation.lat, this.$store.state.currentLocation.lng)
+              // console.log('当前位置目标点', data[6], data[7] + ' 转化为地平坐标为' + az + ' ' + alt);
+              // console.log('使用时间和地点', new Date(Date.now()), $store.state.currentLocation.lat, $store.state.currentLocation.lng);
+
+              this.$bus.$emit('DrawTargetPointCircle',
+                az,
+                alt,
+                targetColor,
+                'Target_Point',
+                '目标点'
+              )
+
+              // 绘制假极轴（紫色圆形）
+              if (data[12] !== -1 && data[13] !== -1 && !isNaN(data[12]) && !isNaN(data[13])) {
+                const { az, alt } = this.equatorialToHorizontal(data[12], data[13], new Date(Date.now()), this.$store.state.currentLocation.lat, this.$store.state.currentLocation.lng)
+                this.drawFakePolarAxis(az, alt)
+              }
+
+              this.addLog(`调整模式：当前位置(${data[0].toFixed(4)}, ${data[1].toFixed(4)}) 目标位置(${data[6].toFixed(4)}, ${data[7].toFixed(4)}) 假极轴(${data[8].toFixed(4)}, ${data[9].toFixed(4)})`, 'info')
             } catch (error) {
               this.addLog(this.$t('Error processing adjustment data', [error.message]), 'error')
               console.error('处理调整数据错误：', error)
@@ -677,57 +1015,52 @@
           this.addLog(this.$t('Error: Invalid Field Data Format'), 'error')
         }
       },
-      
+
       // 绘制校准点
       drawCalibrationPointPolygon(ra, dec, pointNumber, fieldData) {
         this.addLog(this.$t('Drawing Calibration Point', [pointNumber, ra, dec]), 'info')
-        
+
         try {
           const coordinates = this.calculateFieldCorners(ra, dec, fieldData)
           this.addLog(this.$t('Calculated Field Corner Coordinates', [JSON.stringify(coordinates)]), 'info')
-          
+
           // 验证坐标有效性
           const validCoordinates = coordinates.every((coord, index) => {
             const isValid = coord && typeof coord.ra === 'number' && typeof coord.dec === 'number' &&
-                          !isNaN(coord.ra) && !isNaN(coord.dec) && isFinite(coord.ra) && isFinite(coord.dec)
+              !isNaN(coord.ra) && !isNaN(coord.dec) && isFinite(coord.ra) && isFinite(coord.dec)
             if (!isValid) {
               this.addLog(this.$t('Warning: Invalid Coordinate Point', [index, JSON.stringify(coord)]), 'warning')
             }
             return isValid
           })
-          
+
           if (!validCoordinates) {
             this.addLog(this.$t('Invalid Field Coordinates'), 'error')
             return
           }
-          
-          const color = {
-            stroke: "#FFFFFF",
-            strokeOpacity: 1,
-            fill: "#FFFFFF", 
-            fillOpacity: 0.2
-          }
-          
+
+          const color = this.getCalibrationPointColor()
+
           // 添加文本标签
           const label = `校准点${pointNumber}`
           const labelColor = "#FFFFFF"
-          
+
           this.addLog(this.$t('Sending Draw Calibration Event', [pointNumber]), 'info')
           this.$bus.$emit('DrawCalibrationPointPolygon', coordinates, color, `Calibration_${pointNumber}`, label, labelColor)
-          
+
         } catch (error) {
           this.addLog(this.$t('Error Drawing Calibration Point', [error.message]), 'error')
           console.error('绘制校准点错误：', error)
         }
       },
-      
+
       // 清除所有校准点
       clearCalibrationPoints() {
         this.addLog(this.$t('Clearing All Calibration Points'), 'info')
         this.$bus.$emit('ClearCalibrationPoints')
         this.$bus.$emit('ClearStatusTextFromStarMap')
       },
-      
+
       /**
        * 绘制极轴校准调整点
        * 在星图上绘制当前位置、目标位置、校准点等关键位置标记
@@ -739,131 +1072,33 @@
        * @param {boolean} isTimerUpdate - 是否为定时器更新（用于区分手动更新和自动更新）
        */
       drawAdjustmentPoints(currentRa, currentDec, targetRa, targetDec, fieldData, isTimerUpdate = false) {
-        // 记录开始绘制调整点的日志
+        // 这个方法现在主要用于校准点收集阶段
+        // 调整阶段的绘制逻辑已经移到updateFieldData方法中
+
         this.addLog(this.$t('Starting Draw Adjustment Points', [currentRa, currentDec, targetRa, targetDec]), 'info')
-        
+
         try {
-          // 计算当前位置和目标位置的视场角点坐标
-          // 当前位置使用真实视场大小，目标点不需要视场（将绘制为圆）
-          const currentCoordinates = this.calculateFieldCorners(currentRa, currentDec, fieldData, false)
-          // 目标点不需要计算视场角点，将直接绘制为圆
-          
-          // 记录计算得到的坐标信息到日志
-          this.addLog(this.$t('Current Position Field Corners', [JSON.stringify(currentCoordinates)]), 'info')
-          this.addLog(`目标点坐标: RA=${targetRa}, DEC=${targetDec}`, 'info')
-          
-          // 验证当前位置坐标的有效性
-          // 检查每个坐标点是否包含有效的RA和DEC数值
-          const currentValid = currentCoordinates.every((coord, index) => {
-            const isValid = coord && typeof coord.ra === 'number' && typeof coord.dec === 'number' &&
-                          !isNaN(coord.ra) && !isNaN(coord.dec) && isFinite(coord.ra) && isFinite(coord.dec)
-            if (!isValid) {
-              // 如果发现无效坐标，记录警告日志
-              this.addLog(this.$t('Warning: Invalid Current Position Coordinate', [index, JSON.stringify(coord)]), 'warning')
+          // 只在校准点收集阶段使用这个方法
+          if (this.calibrationPhase === 'collecting') {
+            // 绘制校准点收集阶段的逻辑
+            const currentCoordinates = this.calculateFieldCorners(currentRa, currentDec, fieldData, false)
+            const currentColor = {
+              stroke: "#00BFFF",        // 蓝色边框：当前位置
+              strokeOpacity: 1,         // 边框不透明度
+              fill: "#00BFFF",          // 蓝色填充：当前位置
+              fillOpacity: 0.3          // 填充不透明度（半透明）
             }
-            return isValid
-          })
-          
-          // 验证目标位置坐标的有效性（目标点只需要验证中心坐标）
-          const targetValid = typeof targetRa === 'number' && typeof targetDec === 'number' &&
-                            !isNaN(targetRa) && !isNaN(targetDec) && isFinite(targetRa) && isFinite(targetDec)
-          
-          if (!targetValid) {
-            this.addLog(this.$t('Warning: Invalid Target Position Coordinate', [targetRa, targetDec]), 'warning')
+
+            this.$bus.$emit('DrawCalibrationPointPolygon', currentCoordinates, currentColor,
+              'Current_Position', '当前位置', "#00BFFF")
           }
-          
-          // 如果任一位置的坐标无效，则终止绘制
-          if (!currentValid || !targetValid) {
-            this.addLog(this.$t('Error: Invalid Adjustment Point Coordinates'), 'error')
-            return
-          }
-          
-          // 定义不同位置点的颜色方案
-          // 使用不同颜色来区分各种位置，提高可视化效果
-          const currentColor = {
-            stroke: "#00BFFF",        // 蓝色边框：当前位置
-            strokeOpacity: 1,         // 边框不透明度
-            fill: "#00BFFF",          // 蓝色填充：当前位置
-            fillOpacity: 0.3          // 填充不透明度（半透明）
-          }
-          
-          const targetColor = {
-            stroke: "#FF8C00",        // 橙色边框：目标位置
-            strokeOpacity: 1,         // 边框不透明度
-            fill: "#FF8C00",          // 橙色填充：目标位置
-            fillOpacity: 0.3          // 填充不透明度（半透明）
-          }
-          
-          const previousColor = {
-            stroke: "#FFD700",        // 黄色边框：上一次位置
-            strokeOpacity: 1,         // 边框不透明度
-            fill: "#FFD700",          // 黄色填充：上一次位置
-            fillOpacity: 0.2          // 填充不透明度（更透明）
-          }
-          
-          // 判断是否绘制完整的调整视图
-          // 条件：已收集到3个校准点（放宽previousPosition的要求）
-          if (this.calibrationPoints.length === 3) {
-            // 在绘制新元素前，先清除所有之前的元素
-            this.addLog('准备清除之前的校准元素', 'info')
-            this.$bus.$emit('ClearCalibrationPoints')
-            this.addLog('清除命令已发送', 'info')
-            
-            // 绘制完整的校准调整视图，包含所有关键位置点
-            
-            // 1. 绘制三个校准点（白色多边形）
-            // 这些点代表校准过程中收集的参考位置
-            this.calibrationPoints.forEach((point, index) => {
-              // 计算每个校准点的视场角点坐标，使用真实视场大小
-              const pointCoordinates = this.calculateFieldCorners(point.ra, point.dec, fieldData, false)
-              // 定义校准点的颜色（白色）
-              const whiteColor = {
-                stroke: "#FFFFFF",        // 白色边框
-                strokeOpacity: 1,         // 边框不透明度
-                fill: "#FFFFFF",          // 白色填充
-                fillOpacity: 0.2          // 填充不透明度（较透明）
-              }
-              // 发送绘制校准点多边形的事件
-              this.$bus.$emit('DrawCalibrationPointPolygon', pointCoordinates, whiteColor, 
-                             `Calibration_${index + 1}`, `校准点${index + 1}`, "#FFFFFF")
-            })
-            
-            // 2. 绘制目标点（橙色圆形）
-            // 这是望远镜应该移动到的目标位置
-            // 目标点使用圆形绘制，不需要视场多边形
-            this.$bus.$emit('DrawTargetPointCircle', targetRa, targetDec, targetColor)
-            
-            // 3. 绘制当前位置（蓝色多边形）
-            // 这是望远镜当前指向的位置
-            this.$bus.$emit('DrawCalibrationPointPolygon', currentCoordinates, currentColor, 
-                           'Current_Position', '当前位置', "#00BFFF")
-            
-            // 4. 上一次位置点已移除，不再绘制
-            
-            // 5. 在星图上添加状态文本提示
-            // 显示当前校准状态和进度信息
-            this.addStatusTextToStarMap()
-            
-          } else {
-            // 标准调整模式：只绘制当前位置和目标位置
-            // 这种情况通常发生在校准初期或数据不完整时
-            // 在绘制前先清除所有之前的元素
-            this.addLog('标准模式：准备清除之前的校准元素', 'info')
-            this.$bus.$emit('ClearCalibrationPoints')
-            this.addLog('标准模式：清除命令已发送', 'info')
-            
-            // 目标点使用圆形绘制，当前位置使用多边形
-            this.$bus.$emit('DrawAdjustmentPointsPolygon', currentCoordinates, null, currentColor, targetColor, isTimerUpdate)
-            this.$bus.$emit('DrawTargetPointCircle', targetRa, targetDec, targetColor)
-          }
-          
+
         } catch (error) {
-          // 捕获并记录绘制过程中的任何错误
           this.addLog(this.$t('Error Drawing Adjustment Points', [error.message]), 'error')
           console.error('绘制调整点错误：', error)
         }
       },
-      
+
       /**
        * 计算视场的五个角点坐标
        * @param {number} centerRa - 视场中心的赤经坐标
@@ -874,69 +1109,73 @@
        */
       calculateFieldCorners(centerRa, centerDec, fieldData, useDefaultSize = false) {
         this.addLog(this.$t('Calculating Field Corners', [centerRa, centerDec]), 'info')
-        
+
         // 如果指定使用默认大小或者没有视场数据，使用默认的0.5度视场大小
         if (useDefaultSize || !fieldData) {
           this.addLog(this.$t('Using Default Field Size: 0.5 Degrees'), 'info')
           const fieldSize = 0.5
           const coordinates = [
-            { ra: centerRa + fieldSize/2, dec: centerDec + fieldSize/2 },
-            { ra: centerRa - fieldSize/2, dec: centerDec + fieldSize/2 },
-            { ra: centerRa - fieldSize/2, dec: centerDec - fieldSize/2 },
-            { ra: centerRa + fieldSize/2, dec: centerDec - fieldSize/2 },
-            { ra: centerRa + fieldSize/2, dec: centerDec + fieldSize/2 }
+            { ra: centerRa + fieldSize / 2, dec: centerDec + fieldSize / 2 },
+            { ra: centerRa - fieldSize / 2, dec: centerDec + fieldSize / 2 },
+            { ra: centerRa - fieldSize / 2, dec: centerDec - fieldSize / 2 },
+            { ra: centerRa + fieldSize / 2, dec: centerDec - fieldSize / 2 },
+            { ra: centerRa + fieldSize / 2, dec: centerDec + fieldSize / 2 }
           ]
           this.addLog(this.$t('Default Field Corners', [JSON.stringify(coordinates)]), 'info')
           return coordinates
         }
-        
+
         // 如果有视场数据且不强制使用默认大小，基于传入的中心点坐标计算视场角点
         // 这种情况主要用于当前位置的显示，需要反映实际的视场大小
-        const { maxra, minra, maxdec, mindec } = fieldData
-        
+        const { ra0, dec0, ra1, dec1, ra2, dec2, ra3, dec3 } = fieldData
+
         // 计算视场的实际大小（RA和DEC方向的跨度）
-        const raSpan = maxra - minra
-        const decSpan = maxdec - mindec
-        
+   
+
         // 基于传入的中心点坐标，计算视场的五个角点
         const coordinates = [
-          { ra: centerRa + raSpan/2, dec: centerDec + decSpan/2 },     // 右上角
-          { ra: centerRa - raSpan/2, dec: centerDec + decSpan/2 },     // 左上角
-          { ra: centerRa - raSpan/2, dec: centerDec - decSpan/2 },     // 左下角
-          { ra: centerRa + raSpan/2, dec: centerDec - decSpan/2 },     // 右下角
-          { ra: centerRa + raSpan/2, dec: centerDec + decSpan/2 }      // 回到右上角（闭合多边形）
+          { ra: ra0, dec: dec0 },     // 右上角
+          { ra: ra1, dec: dec1 },     // 左上角
+          { ra: ra2, dec: dec2 },     // 左下角
+          { ra: ra3, dec: dec3 },     // 右下角
+          { ra: ra0, dec: dec0 }      // 回到右上角（闭合多边形）
         ]
-        
-        this.addLog(this.$t('Using Field Data', [raSpan, decSpan]), 'info')
+
+        this.addLog(this.$t('Using Field Data', [ra0, dec0, ra1, dec1, ra2, dec2, ra3, dec3]), 'info')
         this.addLog(this.$t('Field Corner Calculation Result', [JSON.stringify(coordinates)]), 'info')
         return coordinates
       },
-      
 
-      
-      // === 格式化方法 ===
+
+
+      // ========================================
+      // 格式化方法
+      // ========================================
       formatTime(timestamp) {
         if (!timestamp) return ''
         const date = new Date(timestamp)
-        return date.toLocaleTimeString('zh-CN', { 
-          hour12: false, 
-          hour: '2-digit', 
-          minute: '2-digit', 
-          second: '2-digit' 
+        return date.toLocaleTimeString('zh-CN', {
+          hour12: false,
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
         })
       },
-      
+
       formatAdjustmentValue(value) {
-        if (value === null || value === undefined || isNaN(value)) return '0.0\''
-        return Math.abs(value).toFixed(1) + "'"
+        if (!Number.isFinite(value)) return `0.0${this.unitGlyph(this.adjustmentUnit)}`
+        // value 的单位 = props.adjustmentUnit
+        const valArcmin = this.unitToArcmin(value, this.adjustmentUnit)
+        // 展示单位仍然用 props.adjustmentUnit（也可改成固定‘arcmin’）
+        return this.formatWithUnit(valArcmin, this.adjustmentUnit, 1)
       },
-      
+
       // 格式化坐标显示
       formatCoordinate(value, type) {
         if (value === null || value === undefined || isNaN(value)) {
           return type === 'ra' ? '00h 00m 00s' : '+00° 00\' 00"'
         }
-        
+
         if (type === 'ra') {
           // 格式化RA为时分秒格式
           const hours = Math.floor(value / 15)
@@ -953,8 +1192,11 @@
           return `${sign}${degrees.toString().padStart(2, '0')}° ${minutes.toString().padStart(2, '0')}' ${seconds.toString().padStart(2, '0')}"`
         }
       },
-      
-      // === 辅助方法 ===
+
+
+      // ========================================
+      // 辅助方法
+      // ========================================
       parseCoordinate(value, type) {
         if (typeof value === 'string') {
           if (type === 'ra') {
@@ -980,7 +1222,7 @@
         }
         return null
       },
-      
+
       addStatusTextToStarMap() {
         // 添加状态文本到星图
         const statusText = {
@@ -990,58 +1232,63 @@
           fontSize: 14,
           backgroundColor: "rgba(0, 0, 0, 0.7)"
         }
-        
+
         // 发送状态文本到星图
         // this.$bus.$emit('AddStatusTextToStarMap', statusText)
       },
-      
+
       getStepClass(index) {
         // 根据进度百分比确定节点状态
         const progress = this.progressPercentage
-        
-        switch(index) {
+
+        switch (index) {
           case 0: // 初始化节点
-            if (progress >= 15) return { completed: true }
+            if (progress >= PROGRESS_THRESHOLDS.INITIALIZATION) return { completed: true }
             if (progress >= 0) return { current: true }
             return {}
-            
+
           case 1: // 第一次校准节点
-            if (progress >= 25) return { completed: true }
-            if (progress >= 15) return { current: true }
+            if (progress >= PROGRESS_THRESHOLDS.FIRST_CALIBRATION) return { completed: true }
+            if (progress >= PROGRESS_THRESHOLDS.INITIALIZATION) return { current: true }
             return {}
-            
+
           case 2: // 第二次校准节点
-            if (progress >= 50) return { completed: true }
-            if (progress >= 25) return { current: true }
+            if (progress >= PROGRESS_THRESHOLDS.SECOND_CALIBRATION) return { completed: true }
+            if (progress >= PROGRESS_THRESHOLDS.FIRST_CALIBRATION) return { current: true }
             return {}
-            
+
           case 3: // 第三次校准节点
-            if (progress >= 75) return { completed: true }
-            if (progress >= 50) return { current: true }
+            if (progress >= PROGRESS_THRESHOLDS.THIRD_CALIBRATION) return { completed: true }
+            if (progress >= PROGRESS_THRESHOLDS.SECOND_CALIBRATION) return { current: true }
             return {}
-            
+
           default:
             return {}
         }
       },
-      
-      getAzimuthAction(azimuth) {
-        if (azimuth === null || azimuth === undefined || isNaN(azimuth)) return ''
-        if (azimuth > 0.5) return this.$t('Turn Right')
-        if (azimuth < -0.5) return this.$t('Turn Left')
-        return ''
-      },
-      
-      getAltitudeAction(altitude) {
-        if (altitude === null || altitude === undefined || isNaN(altitude)) return ''
-        if (altitude > 0.5) return this.$t('Raise Up')
-        if (altitude < -0.5) return this.$t('Lower Down')
-        return ''
-      },
-      
 
-      
-      // === 日志方法 ===
+      getAzimuthAction(azVal) {
+        if (!Number.isFinite(azVal)) return ''
+        const arcmin = this.unitToArcmin(azVal, this.adjustmentUnit)
+        if (Math.abs(arcmin) <= this.deadbandArcmin) return this.$t('No adjustment needed')
+        const dir = this.azLabelBySign(arcmin)
+        // 输出单位与 props.adjustmentUnit 保持一致
+        return `${dir} ${this.formatWithUnit(arcmin, this.adjustmentUnit, 1)}`
+      },
+
+      getAltitudeAction(altVal) {
+        if (!Number.isFinite(altVal)) return ''
+        const arcmin = this.unitToArcmin(altVal, this.adjustmentUnit)
+        if (Math.abs(arcmin) <= this.deadbandArcmin) return this.$t('No adjustment needed')
+        const dir = this.altLabelBySign(arcmin)
+        return `${dir} ${this.formatWithUnit(arcmin, this.adjustmentUnit, 1)}`
+      },
+
+
+
+      // ========================================
+      // 日志方法
+      // ========================================
       addLog(message, level = 'info') {
         const log = {
           id: Date.now() + Math.random(),
@@ -1049,26 +1296,37 @@
           level,
           timestamp: new Date()
         }
-        console.log(log.message)
-        this.logs.push(log)
-        // 限制日志数量
-        if (this.logs.length > 100) {
-          this.logs.shift()
+        
+        // 生产环境减少console输出
+        if (process.env.NODE_ENV === 'development') {
+          console.log(log.message)
+        }
+        
+        // 使用循环数组优化内存使用
+        if (this.logs.length < this.logCapacity) {
+          this.logs.push(log)
+        } else {
+          // 循环覆盖旧日志
+          this.logs[this.logIndex] = log
+          this.logIndex = (this.logIndex + 1) % this.logCapacity
         }
       },
-      
+
       clearLogs() {
         this.logs = []
+        this.logIndex = 0
       },
-      
-      // === 极轴校准状态更新方法 ===
+
+      // ========================================
+      // 极轴校准状态更新方法
+      // ========================================
       calculatePolarAxisOffset() {
         this.polarAxisOffset = {
           azimuth: this.adjustment.azimuth,
           altitude: this.adjustment.altitude
         }
       },
-      
+
       updatePolarAlignmentState(stateNumber, logMessage, progress) {
         if (logMessage && typeof logMessage === 'string') {
           let level = 'info'
@@ -1081,10 +1339,10 @@
           }
           this.addLog(logMessage, level)
         }
-        
+
         if (progress !== undefined && progress !== null) {
           this.currentProgress = progress
-          
+
           if (progress >= 0 && progress <= 100) {
             // 根据进度更新校准状态
             if (progress >= 0 && progress < 15) {
@@ -1105,25 +1363,25 @@
               // 循环校准调整阶段
               this.isCalibrationComplete = true
               this.calculatePolarAxisOffset()
-              
+
               // 检测校准循环
               if (progress < this.lastCalibrationProgress && this.lastCalibrationProgress >= 75) {
                 this.calibrationLoopCount++
                 this.addLog(this.$t('Calibration Round Started', [this.calibrationLoopCount]), 'info')
               }
-              
+
               // 在循环校准阶段，进度可能会在75-95之间波动
               // 这表示系统正在进行多次校准调整
               if (progress > 85) {
                 this.addLog(this.$t('Calibration Progress Info', [Math.round(progress), this.calibrationLoopCount]), 'info')
               }
-              
+
               this.lastCalibrationProgress = progress
             } else if (progress >= 95 && progress <= 100) {
               // 最终验证阶段
               this.isCalibrationComplete = true
               this.calculatePolarAxisOffset()
-              
+
               if (Math.abs(this.polarAxisOffset.azimuth) < 1.0 && Math.abs(this.polarAxisOffset.altitude) < 1.0) {
                 this.isPolarAligned = true
                 this.addLog(this.$t('Polar Alignment Completed'), 'success')
@@ -1134,1533 +1392,1895 @@
           }
         }
       },
-      
 
-      
-      // === 增强的卡片信息更新方法 ===
-      updateCardInfo(currentRa, currentDec, targetRa, targetDec, azimuthDegrees, altitudeDegrees, raAdjustment, decAdjustment) {
-        // 数据类型转换和有效性检查
-        const parseValue = (value) => {
-          if (value === null || value === undefined || value === '') return 0
-          const num = parseFloat(value)
-          return isNaN(num) ? 0 : num
+      // ========================================
+      // 坐标转换方法
+      // ========================================
+      /**
+       * 赤道坐标 (RA, Dec) → 地平坐标 (Az, Alt)
+       * @param {number} raDeg 赤经 (度, 0~360)
+       * @param {number} decDeg 赤纬 (度, -90~+90)
+       * @param {Date} dateUTC 观测时间 (UTC 时间)
+       * @param {number} latDeg 观测点纬度 (度, 北正南负)
+       * @param {number} lonDeg 观测点经度 (度, 东正西负)
+       * @returns {{az: number, alt: number}} 方位角/高度角 (度)
+       */
+      equatorialToHorizontal(raDeg, decDeg, dateUTC, latDeg, lonDeg) {
+        // 工具
+        const toJD = d => (Number(d) / 86400000) + 2440587.5; // Date/ms → JD
+        const d2r = x => x * Math.PI / 180, r2d = x => x * 180 / Math.PI;
+        const norm360 = a => ((a % 360) + 360) % 360;
+        const clamp = (x, lo = -1, hi = 1) => Math.min(hi, Math.max(lo, x));
+
+        // 入参归一化 + 硬校验
+        raDeg = Number(raDeg);
+        decDeg = Number(decDeg);
+        latDeg = Number(latDeg);
+        lonDeg = Number(lonDeg);
+        const tms = Number(dateUTC); // Date 或时间戳都可
+
+        if (process.env.NODE_ENV === 'development') {
+          console.log('EQ→HOR 入参:', { raDeg, decDeg, latDeg, lonDeg, dateUTC, tms });
         }
-        
-        // 转换并验证所有数值
+
+        if (![raDeg, decDeg, latDeg, lonDeg, tms].every(Number.isFinite)) {
+          console.error('EQ→HOR 入参非法:', { raDeg, decDeg, latDeg, lonDeg, dateUTC, tms });
+          return { az: NaN, alt: NaN };
+        }
+
+        try {
+          // 1) JD & GMST
+          const JD = toJD(tms);
+          const d = JD - 2451545.0;
+          let GMST = norm360(280.46061837 + 360.98564736629 * d); // 度
+
+          // 2) LST（东经为正）
+          let LST = norm360(GMST + lonDeg);
+
+          // 3) HA（-180~180 更稳）
+          let HA = LST - raDeg;
+          HA = ((HA + 180) % 360) - 180;
+
+          // 4) Alt / Az（稳定形式）
+          const ha = d2r(HA);
+          const dec = d2r(decDeg);
+          const lat = d2r(latDeg);
+
+          const sinAlt = clamp(
+            Math.sin(dec) * Math.sin(lat) + Math.cos(dec) * Math.cos(lat) * Math.cos(ha)
+          );
+          const alt = Math.asin(sinAlt);
+          const y = -Math.sin(ha) * Math.cos(dec);
+          const x = Math.sin(dec) * Math.cos(lat) - Math.cos(dec) * Math.sin(lat) * Math.cos(ha);
+          const az = Math.atan2(y, x);
+
+          const altDeg = r2d(alt);
+          const azDeg = norm360(r2d(az));
+
+          if (process.env.NODE_ENV === 'development') {
+            console.log('EQ→HOR 结果:', {
+              JD, GMST, LST, HA,
+              haRad: ha, decRad: dec, latRad: lat,
+              az: azDeg, alt: altDeg
+            });
+          }
+
+          return { az: azDeg, alt: altDeg };
+        } catch (e) {
+          console.error('EQ→HOR 计算异常:', e, {
+            raDeg, decDeg, latDeg, lonDeg, dateUTC, tms
+          });
+          return { az: NaN, alt: NaN };
+        }
+      },
+
+
+
+
+
+      // === 增强的卡片信息更新方法 ===
+      updateCardInfo(currentRa, currentDec, targetRa, targetDec, azimuthVal, altitudeVal, raAdjustment, decAdjustment, unitHint) {
+        const parseValue = v => (v === null || v === '' || v === undefined) ? 0 : (Number(v) || 0)
+
         const currentRaNum = parseValue(currentRa)
         const currentDecNum = parseValue(currentDec)
         const targetRaNum = parseValue(targetRa)
         const targetDecNum = parseValue(targetDec)
-        const azimuthNum = parseValue(azimuthDegrees)
-        const altitudeNum = parseValue(altitudeDegrees)
-        
-        // 检查数据有效性
-        if (isNaN(currentRaNum) || isNaN(currentDecNum) || isNaN(targetRaNum) || isNaN(targetDecNum) || 
-            isNaN(azimuthNum) || isNaN(altitudeNum)) {
-          console.warn('PolarAlignment: 接收到无效的数值数据:', {
-            currentRa, currentDec, targetRa, targetDec, azimuthDegrees, altitudeDegrees
-          })
-          return
-        }
-        
-        // 更新位置信息
+        const azVal = parseValue(azimuthVal)
+        const altVal = parseValue(altitudeVal)
+
+        // 1) 位置显示（原样）
         this.currentPosition.ra = this.formatCoordinate(currentRaNum, 'ra')
         this.currentPosition.dec = this.formatCoordinate(currentDecNum, 'dec')
-        // 注意：这里的targetRa和targetDec是应该移动到的目标位置，不是真极轴位置
         this.targetPosition.ra = this.formatCoordinate(targetRaNum, 'ra')
         this.targetPosition.dec = this.formatCoordinate(targetDecNum, 'dec')
-        
-        // 更新调整信息
-        this.adjustment.azimuth = azimuthNum
-        this.adjustment.altitude = altitudeNum
-        
-        // 更新极轴对齐状态
-        this.isPolarAligned = Math.abs(azimuthNum) < 1.0 && Math.abs(altitudeNum) < 1.0
-        
-        // 添加调试日志
-        console.log('PolarAlignment: 更新卡片信息成功:', {
-          currentPosition: { ra: this.currentPosition.ra, dec: this.currentPosition.dec },
-          targetPosition: { ra: this.targetPosition.ra, dec: this.targetPosition.dec },
-          adjustment: { azimuth: this.adjustment.azimuth, altitude: this.adjustment.altitude },
-          isPolarAligned: this.isPolarAligned
-        })
-        
+
+        // 2) 调整量：以传入单位为准写入（默认用 props.adjustmentUnit）
+        const inUnit = unitHint || this.adjustmentUnit
+        // 如果传入是"度"，但你 props 设为了"arcmin"，也没关系——显示会自动换算
+        // 这里保存"原始数 + 它的单位（通过 props）"
+        this.adjustment.azimuth = azVal
+        this.adjustment.altitude = altVal
+        this.adjustmentUnit = inUnit  // 如果希望每次随数据切换单位，可加入这一行
+
+        // 3) 在调整阶段，每次接收到调整数据时增加校准轮数
+        if (this.calibrationPhase === 'adjusting') {
+          this.calibrationLoopCount++
+          this.addLog(this.$t('Calibration Round Started', [this.calibrationLoopCount]), 'info')
+        }
+
+        // 4) 极轴完成判定（用角分比较）
+        const azArcmin = this.unitToArcmin(azVal, inUnit)
+        const altArcmin = this.unitToArcmin(altVal, inUnit)
+        this.isPolarAligned = Math.abs(azArcmin) < 1.0 && Math.abs(altArcmin) < 1.0
+
+        if (process.env.NODE_ENV === 'development') {
+          console.log('PolarAlignment update:', {
+            unit: inUnit,
+            adj_raw: { azimuth: azVal, altitude: altVal },
+            adj_arcmin: { az: azArcmin, alt: altArcmin },
+            isPolarAligned: this.isPolarAligned,
+            calibrationRound: this.calibrationLoopCount
+          })
+        }
       },
-      
-    }
+
+
+      /**
+       * 根据三个校准点计算假极轴位置
+       * 使用三点极轴校准算法
+       */
+      calculateFakePolarAxis() {
+        if (this.calibrationPoints.length !== this.maxCalibrationPoints) {
+          this.addLog('需要3个校准点才能计算假极轴位置', 'warning')
+          return false
+        }
+
+        try {
+          const [p1, p2, p3] = this.calibrationPoints
+
+          // 将三个点转换为笛卡尔坐标
+          const cart1 = this.equatorialToCartesian(p1.ra, p1.dec)
+          const cart2 = this.equatorialToCartesian(p2.ra, p2.dec)
+          const cart3 = this.equatorialToCartesian(p3.ra, p3.dec)
+
+          // 计算两个向量
+          const v1 = {
+            x: cart2.x - cart1.x,
+            y: cart2.y - cart1.y,
+            z: cart2.z - cart1.z
+          }
+          const v2 = {
+            x: cart3.x - cart1.x,
+            y: cart3.y - cart1.y,
+            z: cart3.z - cart1.z
+          }
+
+          // 计算法向量（叉积）
+          const normal = this.crossProduct(v1, v2)
+
+          // 检查法向量是否为零向量
+          const normalLength = this.vectorLength(normal)
+          if (normalLength < 1e-10) {
+            this.addLog('三个校准点共线，无法计算假极轴位置', 'error')
+            return false
+          }
+
+          // 归一化法向量
+          const unitNormal = this.normalizeVector(normal)
+
+          // 计算与单位球面的交点（假极点）
+          const fakePolarPoint = {
+            x: unitNormal.x,
+            y: unitNormal.y,
+            z: unitNormal.z
+          }
+
+          // 选择正确的交点（z坐标为正的）
+          if (fakePolarPoint.z < 0) {
+            fakePolarPoint.x = -fakePolarPoint.x
+            fakePolarPoint.y = -fakePolarPoint.y
+            fakePolarPoint.z = -fakePolarPoint.z
+          }
+
+          // 将假极点转换为赤道坐标
+          const fakePolarEquatorial = this.cartesianToEquatorial(fakePolarPoint)
+
+          // 保存假极轴位置
+          this.fakePolarAxis.ra = fakePolarEquatorial.ra
+          this.fakePolarAxis.dec = fakePolarEquatorial.dec
+          this.fakePolarAxis.calculated = true
+
+          this.addLog(`假极轴位置计算完成: RA=${fakePolarEquatorial.ra.toFixed(4)}°, DEC=${fakePolarEquatorial.dec.toFixed(4)}°`, 'success')
+
+          return true
+        } catch (error) {
+          this.addLog(`计算假极轴位置时出错: ${error.message}`, 'error')
+          console.error('计算假极轴位置错误：', error)
+          return false
+        }
+      },
+
+      /**
+       * 将赤道坐标转换为笛卡尔坐标
+       */
+      equatorialToCartesian(ra, dec, radius = 1) {
+        const raRad = ra * Math.PI / 180.0
+        const decRad = dec * Math.PI / 180.0
+
+        return {
+          x: radius * Math.cos(decRad) * Math.cos(raRad),
+          y: radius * Math.cos(decRad) * Math.sin(raRad),
+          z: radius * Math.sin(decRad)
+        }
+      },
+
+      /**
+       * 将笛卡尔坐标转换为赤道坐标
+       */
+      cartesianToEquatorial(cart) {
+        const radius = Math.sqrt(cart.x * cart.x + cart.y * cart.y + cart.z * cart.z)
+
+        const dec = Math.asin(cart.z / radius) * 180.0 / Math.PI
+        let ra = Math.atan2(cart.y, cart.x) * 180.0 / Math.PI
+
+        // 确保RA在0-360度范围内
+        if (ra < 0) ra += 360.0
+
+        return { ra, dec }
+      },
+
+      /**
+       * 计算两个向量的叉积
+       */
+      crossProduct(v1, v2) {
+        return {
+          x: v1.y * v2.z - v1.z * v2.y,
+          y: v1.z * v2.x - v1.x * v2.z,
+          z: v1.x * v2.y - v1.y * v2.x
+        }
+      },
+
+      /**
+       * 计算向量长度
+       */
+      vectorLength(v) {
+        return Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z)
+      },
+
+      /**
+       * 归一化向量
+       */
+      normalizeVector(v) {
+        const length = this.vectorLength(v)
+        return {
+          x: v.x / length,
+          y: v.y / length,
+          z: v.z / length
+        }
+      },
+
+      /**
+       * 绘制假极轴位置
+       */
+      drawFakePolarAxis(fakePolarRA, fakePolarDEC) {
+        this.addLog(`绘制假极轴位置: RA=${fakePolarRA.toFixed(4)}°, DEC=${fakePolarDEC.toFixed(4)}°`, 'info')
+
+        try {
+          // 定义假极轴的颜色（紫色）
+          const fakePolarColor = {
+            stroke: "#9C27B0",        // 紫色边框
+            strokeOpacity: 1,         // 边框不透明度
+            fill: "#9C27B0",          // 紫色填充
+            fillOpacity: 0.3          // 填充不透明度（半透明）
+          }
+
+          // 使用专门的假极轴绘制事件，避免与目标点冲突
+          this.$bus.$emit('DrawFakePolarAxisCircle',
+            fakePolarRA,
+            fakePolarDEC,
+            fakePolarColor,
+            'FakePolarAxis',
+            '假极轴'
+          )
+
+          this.addLog(`假极轴位置已绘制: RA=${fakePolarRA.toFixed(4)}°, DEC=${fakePolarDEC.toFixed(4)}°`, 'info')
+
+        } catch (error) {
+          this.addLog(`绘制假极轴位置时出错: ${error.message}`, 'error')
+          console.error('绘制假极轴位置错误：', error)
+        }
+      },
+      // ========================================
+      // 单位换算方法
+      // ========================================
+      unitToArcmin(val, unit) {
+        if (!Number.isFinite(val)) return NaN
+        if (unit === 'deg') return val * 60
+        if (unit === 'arcsec') return val / 60
+        return val // 'arcmin'
+      },
+      arcminToUnit(valArcmin, unit) {
+        if (!Number.isFinite(valArcmin)) return NaN
+        if (unit === 'deg') return valArcmin / 60
+        if (unit === 'arcsec') return valArcmin * 60
+        return valArcmin
+      },
+      unitGlyph(unit) {
+        if (unit === 'deg') return '°'
+        if (unit === 'arcsec') return '″'
+        return '′' // arcmin
+      },
+
+      // ========================================
+      // 左右/上下映射（面向极点）方法
+      // ========================================
+      // 根据当前坐标计算朝向哪个极点
+      calculateFacingPole() {
+        if (!this.$store || !this.$store.state.currentLocation) {
+          return 'north' // 默认返回北极
+        }
+        
+        const lat = this.$store.state.currentLocation.lat
+        // 北半球（纬度 > 0）面向北极，南半球（纬度 < 0）面向南极
+        return lat >= 0 ? 'north' : 'south'
+      },
+
+      // azSign > 0 = 朝东；azSign < 0 = 朝西
+      azLabelBySign(azSign) {
+        // 动态计算朝向极点，而不是使用 props
+        const facingPole = this.calculateFacingPole()
+        // 面向北极点：东=→右，西=←左；面向南极点则相反
+        const east = (facingPole === 'north') ? this.$t('→ Right (East)') : this.$t('← Left (East)')
+        const west = (facingPole === 'north') ? this.$t('← Left (West)') : this.$t('→ Right (West)')
+        return azSign >= 0 ? east : west
+      },
+      // altSign > 0 = 抬高；altSign < 0 = 降低
+      altLabelBySign(altSign) {
+        return altSign >= 0 ? this.$t('↑ Up (Raise)') : this.$t('↓ Down (Lower)')
+      },
+
+      // ========================================
+      // 统一格式化"数值 + 单位"方法
+      // ========================================
+      formatWithUnit(valInArcmin, unit, digits = 1) {
+        const v = this.arcminToUnit(Math.abs(valInArcmin), unit)
+        const glyph = this.unitGlyph(unit)
+        return `${v.toFixed(digits)}${glyph}`
+      },
+
+      // ========================================
+      // 颜色工具方法
+      // ========================================
+      getCalibrationPointColor() {
+        return {
+          stroke: COLORS.WHITE,
+          strokeOpacity: 1,
+          fill: COLORS.WHITE,
+          fillOpacity: 0.2
+        }
+      },
+
+      getCurrentPositionColor() {
+        return {
+          stroke: "#00BFFF",
+          strokeOpacity: 1,
+          fill: "#00BFFF",
+          fillOpacity: 0.3
+        }
+      },
+
+      getTargetPointColor() {
+        return {
+          stroke: COLORS.SUCCESS,
+          strokeOpacity: 1,
+          fill: COLORS.SUCCESS,
+          fillOpacity: 0.3
+        }
+      },
+
+      getFakePolarAxisColor() {
+        return {
+          stroke: "#9C27B0",
+          strokeOpacity: 1,
+          fill: "#9C27B0",
+          fillOpacity: 0.3
+        }
+      },
+    },
   }
-  </script>
-  
-  <style scoped>
-  /* === 最小化状态样式 === */
-  .polar-alignment-minimized {
-    position: fixed;
-    width: 250px;
-    max-width: 80vw;
-    background: rgba(35, 35, 45, 0.95);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
-    backdrop-filter: blur(10px);
-    z-index: 1000;
-    cursor: move;
-    user-select: none;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-    transition: all 0.3s ease;
-    /* 添加背景隔离，防止操作映射到背景 */
-    isolation: isolate;
-    /* 移除contain属性，它可能阻止拖动事件 */
-    touch-action: none;
-    -webkit-tap-highlight-color: transparent;
-    -webkit-touch-callout: none;
-    -webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
+</script>
+
+<style scoped>
+/* === 最小化状态样式 === */
+.polar-alignment-minimized {
+  position: fixed;
+  width: 250px;
+  max-width: 80vw;
+  background: rgba(35, 35, 45, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  backdrop-filter: blur(10px);
+  z-index: 1000;
+  cursor: move;
+  user-select: none;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s ease;
+  /* 添加背景隔离，防止操作映射到背景 */
+  isolation: isolate;
+  /* 移除contain属性，它可能阻止拖动事件 */
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* 拖动状态：移除过渡动画和复杂效果 */
+.polar-alignment-minimized.dragging {
+  transition: none !important;
+  backdrop-filter: none !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+  touch-action: manipulation;
+}
+
+.polar-alignment-minimized:hover {
+  box-shadow: 0 6px 25px rgba(0, 0, 0, 0.4);
+}
+
+.polar-alignment-minimized.dragging:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+}
+
+.minimized-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: rgba(60, 60, 70, 0.9);
+  border-radius: 8px 8px 0 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.minimized-drag-area {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  cursor: move;
+  /* 确保拖动区域有正确的交互 */
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.minimized-icon {
+  color: #64b5f6;
+  font-size: 16px;
+  margin-right: 8px;
+}
+
+.minimized-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #ffffff;
+  flex: 1;
+}
+
+.minimized-controls {
+  display: flex;
+  gap: 4px;
+  /* 确保控制区域可以接收事件 */
+  position: relative;
+  z-index: 20;
+  pointer-events: auto;
+}
+
+.minimized-btn {
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  color: #ffffff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  /* 移动端触摸优化 */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  /* 确保按钮可以正确点击 */
+  position: relative;
+  z-index: 10;
+  /* 确保按钮可以接收点击事件 */
+  pointer-events: auto;
+}
+
+.minimized-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.minimized-btn:active {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(0.95);
+}
+
+.minimized-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 11px;
+}
+
+.status-indicator {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #f44336;
+  transition: all 0.3s ease;
+}
+
+.status-indicator.online {
+  background: #4caf50;
+  box-shadow: 0 0 4px rgba(76, 175, 80, 0.6);
+}
+
+.status-text {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* === 完整控件样式 === */
+.polar-alignment-widget {
+  position: fixed;
+  width: 350px;
+  max-width: 90vw;
+  background: rgba(35, 35, 45, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  backdrop-filter: blur(10px);
+  z-index: 1000;
+  cursor: move;
+  user-select: none;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s ease;
+  overflow: hidden;
+  /* 添加背景隔离，防止操作映射到背景 */
+  isolation: isolate;
+  /* 移除contain属性，它可能阻止拖动事件 */
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* 拖动状态：移除过渡动画和复杂效果 */
+.polar-alignment-widget.dragging {
+  transition: none !important;
+  backdrop-filter: none !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+  touch-action: manipulation;
+}
+
+.polar-alignment-widget:hover {
+  box-shadow: 0 6px 25px rgba(0, 0, 0, 0.4);
+}
+
+.polar-alignment-widget.dragging:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+}
+
+.polar-alignment-widget.collapsed {
+  width: 300px;
+  max-width: 85vw;
+}
+
+/* === 控件头部样式 === */
+.widget-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: rgba(60, 60, 70, 0.9);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.header-drag-area {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  cursor: move;
+  /* 确保拖动区域有正确的交互 */
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  /* 添加拖动时的视觉反馈 */
+  transition: background-color 0.2s ease;
+  /* 确保拖动区域有正确的指针事件 */
+  pointer-events: auto;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.widget-header:hover {
+  background: rgba(60, 60, 70, 0.95);
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.header-icon {
+  color: #64b5f6;
+  font-size: 18px;
+}
+
+.header-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.connection-indicator {
+  display: flex;
+  align-items: center;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #f44336;
+  transition: all 0.3s ease;
+}
+
+.status-dot.online {
+  background: #4caf50;
+  box-shadow: 0 0 6px rgba(76, 175, 80, 0.6);
+}
+
+.header-controls {
+  display: flex;
+  gap: 4px;
+  /* 确保控制区域可以接收事件 */
+  position: relative;
+  z-index: 20;
+  pointer-events: auto;
+}
+
+.header-btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  color: #ffffff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  /* 移动端触摸优化 */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  /* 确保按钮可以正确点击 */
+  position: relative;
+  z-index: 10;
+  /* 确保按钮可以接收点击事件 */
+  pointer-events: auto;
+}
+
+.header-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.header-btn:active {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(0.95);
+}
+
+.header-btn.close-btn:hover {
+  background: #f44336;
+}
+
+/* === 控件内容样式 === */
+.widget-content {
+  transition: all 0.3s ease;
+  /* 确保内容区域有适当的背景隔离 */
+  background: rgba(35, 35, 45, 0.95);
+  position: relative;
+  z-index: 1;
+  /* 确保内容区域不会阻止拖动事件 */
+  pointer-events: auto;
+}
+
+/* 拖动状态：移除过渡动画 */
+.widget-content.dragging {
+  transition: none !important;
+}
+
+.widget-content.collapsed {
+  padding: 12px;
+}
+
+.widget-content.expanded {
+  padding: 16px;
+  max-height: 80vh;
+  overflow-y: auto;
+  /* 优化内容布局，充分利用空间 */
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  /* 确保内容充分利用可用空间 */
+  min-height: 0;
+  flex: 1;
+  /* 自适应高度 */
+  height: auto;
+}
+
+/* === 收缩状态样式 === */
+.collapsed-info {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.collapsed-progress {
+  flex-shrink: 0;
+}
+
+.progress-circle {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: conic-gradient(#64b5f6 0deg var(--progress, 0deg),
+      rgba(255, 255, 255, 0.1) var(--progress, 0deg) 360deg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.progress-circle::before {
+  content: '';
+  position: absolute;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: rgba(35, 35, 45, 0.95);
+}
+
+.progress-text {
+  position: relative;
+  z-index: 1;
+  font-size: 12px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.collapsed-status {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.status-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+}
+
+.status-label {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.status-value {
+  color: #ffffff;
+  font-weight: 600;
+  font-family: monospace;
+}
+
+.status-value.needs-adjustment {
+  color: #ff9800;
+}
+
+/* === 展开状态样式 === */
+.content-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  /* 优化布局，充分利用可用空间 */
+  width: 100%;
+  min-height: 0;
+}
+
+/* === 校准步骤进度条样式 === */
+.calibration-progress {
+  margin-bottom: 16px;
+}
+
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.progress-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.calibration-loop-info {
+  font-size: 10px;
+  color: #ff9800;
+  font-weight: 500;
+  padding: 2px 6px;
+  background: rgba(255, 152, 0, 0.2);
+  border-radius: 4px;
+  animation: loop-pulse 2s infinite;
+}
+
+@keyframes loop-pulse {
+
+  0%,
+  100% {
+    opacity: 1;
   }
-  
-  /* 拖动状态：移除过渡动画和复杂效果 */
-  .polar-alignment-minimized.dragging {
-    transition: none !important;
-    backdrop-filter: none !important;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
-    touch-action: manipulation;
+
+  50% {
+    opacity: 0.7;
   }
-  
-  .polar-alignment-minimized:hover {
-    box-shadow: 0 6px 25px rgba(0, 0, 0, 0.4);
+}
+
+.progress-bar {
+  position: relative;
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  overflow: visible;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #64b5f6, #4caf50);
+  border-radius: 4px;
+  transition: width 0.1s ease;
+}
+
+.progress-nodes {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  transform: translateY(-50%);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.progress-node {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+
+.node-circle {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: bold;
+  color: #ffffff;
+  transition: all 0.3s ease;
+}
+
+.progress-node.completed .node-circle {
+  background: #4caf50;
+  border-color: #4caf50;
+  box-shadow: 0 0 8px rgba(76, 175, 80, 0.4);
+}
+
+.progress-node.current .node-circle {
+  background: #64b5f6;
+  border-color: #64b5f6;
+  box-shadow: 0 0 8px rgba(100, 181, 246, 0.4);
+}
+
+.progress-node.adjustment-node .node-circle {
+  background: rgba(255, 152, 0, 0.3);
+  border-color: rgba(255, 152, 0, 0.5);
+}
+
+.progress-node.adjustment-node.active .node-circle {
+  background: #ff9800;
+  border-color: #ff9800;
+  box-shadow: 0 0 8px rgba(255, 152, 0, 0.4);
+}
+
+.progress-node.calibration-node .node-circle {
+  background: rgba(255, 152, 0, 0.3);
+  border-color: rgba(255, 152, 0, 0.5);
+}
+
+.progress-node.calibration-node.active .node-circle {
+  background: #ff9800;
+  border-color: #ff9800;
+  box-shadow: 0 0 8px rgba(255, 152, 0, 0.4);
+}
+
+.progress-node.calibration-node.looping .node-circle {
+  animation: calibration-pulse 2s infinite;
+}
+
+@keyframes calibration-pulse {
+  0% {
+    background: #ff9800;
+    box-shadow: 0 0 8px rgba(255, 152, 0, 0.4);
   }
-  
-  .polar-alignment-minimized.dragging:hover {
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+
+  50% {
+    background: #ff5722;
+    box-shadow: 0 0 12px rgba(255, 152, 0, 0.6);
   }
-  
-  .minimized-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 8px 12px;
-    background: rgba(60, 60, 70, 0.9);
-    border-radius: 8px 8px 0 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+
+  100% {
+    background: #ff9800;
+    box-shadow: 0 0 8px rgba(255, 152, 0, 0.4);
   }
-  
-  .minimized-drag-area {
-    display: flex;
-    align-items: center;
-    flex: 1;
-    cursor: move;
-    /* 确保拖动区域有正确的交互 */
-    user-select: none;
-    -webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    touch-action: none;
-    -webkit-tap-highlight-color: transparent;
+}
+
+.progress-node.calibration-node.looping .node-circle i {
+  animation: calibration-rotate 2s linear infinite;
+}
+
+@keyframes calibration-rotate {
+  from {
+    transform: rotate(0deg);
   }
-  
-  .minimized-icon {
-    color: #64b5f6;
-    font-size: 16px;
-    margin-right: 8px;
+
+  to {
+    transform: rotate(360deg);
   }
-  
-  .minimized-title {
-    font-size: 12px;
-    font-weight: 600;
-    color: #ffffff;
-    flex: 1;
-  }
-  
-  .minimized-controls {
-    display: flex;
-    gap: 4px;
-    /* 确保控制区域可以接收事件 */
-    position: relative;
-    z-index: 20;
-    pointer-events: auto;
-  }
-  
-  .minimized-btn {
-    width: 24px;
-    height: 24px;
-    border: none;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 4px;
-    color: #ffffff;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s ease;
-    /* 移动端触摸优化 */
-    touch-action: manipulation;
-    -webkit-tap-highlight-color: transparent;
-    /* 确保按钮可以正确点击 */
-    position: relative;
-    z-index: 10;
-    /* 确保按钮可以接收点击事件 */
-    pointer-events: auto;
-  }
-  
-  .minimized-btn:hover {
-    background: rgba(255, 255, 255, 0.2);
-  }
-  
-  .minimized-btn:active {
-    background: rgba(255, 255, 255, 0.3);
-    transform: scale(0.95);
-  }
-  
-  .minimized-status {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
-    font-size: 11px;
-  }
-  
-  .status-indicator {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: #f44336;
-    transition: all 0.3s ease;
-  }
-  
-  .status-indicator.online {
-    background: #4caf50;
-    box-shadow: 0 0 4px rgba(76, 175, 80, 0.6);
-  }
-  
-  .status-text {
-    color: rgba(255, 255, 255, 0.8);
-  }
-  
-  /* === 完整控件样式 === */
+}
+
+.progress-node.verification-node .node-circle {
+  background: rgba(76, 175, 80, 0.3);
+  border-color: rgba(76, 175, 80, 0.5);
+}
+
+.progress-node.verification-node.active .node-circle {
+  background: #4caf50;
+  border-color: #4caf50;
+  box-shadow: 0 0 8px rgba(76, 175, 80, 0.4);
+}
+
+.node-label {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 500;
+  margin-top: 4px;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.progress-node {
+  position: relative;
+}
+
+/* === 位置信息样式 === */
+.position-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.position-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.position-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px;
+  border-radius: 4px;
+  transition: all 0.3s ease;
+}
+
+.position-cell.current {
+  background: rgba(100, 181, 246, 0.1);
+  border: 1px solid rgba(100, 181, 246, 0.2);
+}
+
+.position-cell.target {
+  background: rgba(255, 152, 0, 0.1);
+  border: 1px solid rgba(255, 152, 0, 0.2);
+}
+
+.cell-label {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.cell-value {
+  font-size: 11px;
+  color: #ffffff;
+  font-family: monospace;
+  font-weight: 600;
+}
+
+/* === 调整指导样式 === */
+.adjustment-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.adjustment-instructions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.adjustment-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  transition: all 0.3s ease;
+  border: 1px solid transparent;
+}
+
+.adjustment-item.active {
+  background: rgba(255, 152, 0, 0.15);
+  border-color: #ff9800;
+}
+
+.adjustment-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: #ffffff;
+  flex-shrink: 0;
+}
+
+.adjustment-item.active .adjustment-icon {
+  background: #ff9800;
+}
+
+.adjustment-details {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.adjustment-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.adjustment-type {
+  font-size: 12px;
+  color: #ffffff;
+  font-weight: 500;
+}
+
+.adjustment-value {
+  font-size: 18px;
+  color: #ffffff;
+  font-family: monospace;
+  font-weight: 700;
+  text-shadow: 0 0 4px rgba(255, 255, 255, 0.3);
+  letter-spacing: 1px;
+}
+
+.adjustment-action {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 500;
+}
+
+.adjustment-item.active .adjustment-action {
+  color: #ff9800;
+}
+
+/* === 操作按钮样式 === */
+.control-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.action-buttons {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+}
+
+.action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  pointer-events: auto;
+  min-height: 40px;
+  touch-action: manipulation;
+  position: relative;
+  flex: 1;
+}
+
+.action-btn.primary {
+  background: linear-gradient(135deg, #64b5f6, #42a5f5);
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(100, 181, 246, 0.3);
+}
+
+.action-btn.primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #42a5f5, #2196f3);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(100, 181, 246, 0.4);
+}
+
+.action-btn.secondary {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.action-btn.secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+
+.action-btn.success {
+  background: linear-gradient(135deg, #4caf50, #43a047);
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(76, 175, 80, 0.3);
+}
+
+.action-btn.success:hover:not(:disabled) {
+  background: linear-gradient(135deg, #43a047, #388e3c);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
+}
+
+.action-btn.restore {
+  background: linear-gradient(135deg, #ff9800, #f57c00);
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(255, 152, 0, 0.3);
+}
+
+.action-btn.restore:hover:not(:disabled) {
+  background: linear-gradient(135deg, #f57c00, #ef6c00);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 152, 0, 0.4);
+}
+
+.action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* === 日志显示样式 === */
+.log-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.log-display {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.latest-log {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  background: rgba(255, 255, 255, 0.05);
+  border-left: 3px solid transparent;
+}
+
+.latest-log.info {
+  border-left-color: #64b5f6;
+}
+
+.latest-log.warning {
+  border-left-color: #ff9800;
+}
+
+.latest-log.success {
+  border-left-color: #4caf50;
+}
+
+.latest-log.error {
+  border-left-color: #f44336;
+}
+
+.log-timestamp {
+  color: rgba(255, 255, 255, 0.6);
+  font-family: monospace;
+  font-size: 10px;
+  min-width: 65px;
+  flex-shrink: 0;
+}
+
+.log-message {
+  color: rgba(255, 255, 255, 0.9);
+  flex: 1;
+  line-height: 1.4;
+}
+
+.log-empty {
+  text-align: center;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 11px;
+  padding: 20px;
+  font-style: italic;
+}
+
+/* === 响应式设计 === */
+@media (max-width: 768px) {
   .polar-alignment-widget {
-    position: fixed;
-    width: 350px;
-    max-width: 90vw;
-    background: rgba(35, 35, 45, 0.95);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
-    backdrop-filter: blur(10px);
-    z-index: 1000;
-    cursor: move;
-    user-select: none;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-    transition: all 0.3s ease;
-    overflow: hidden;
-    /* 添加背景隔离，防止操作映射到背景 */
-    isolation: isolate;
-    /* 移除contain属性，它可能阻止拖动事件 */
-    touch-action: none;
-    -webkit-tap-highlight-color: transparent;
-    -webkit-touch-callout: none;
-    -webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
+    width: 320px;
+    max-width: 95vw;
   }
-  
-  /* 拖动状态：移除过渡动画和复杂效果 */
-  .polar-alignment-widget.dragging {
-    transition: none !important;
-    backdrop-filter: none !important;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
-    touch-action: manipulation;
-  }
-  
-  .polar-alignment-widget:hover {
-    box-shadow: 0 6px 25px rgba(0, 0, 0, 0.4);
-  }
-  
-  .polar-alignment-widget.dragging:hover {
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
-  }
-  
+
   .polar-alignment-widget.collapsed {
-    width: 300px;
-    max-width: 85vw;
+    width: 280px;
+    max-width: 90vw;
   }
-  
-  /* === 控件头部样式 === */
+
+  .polar-alignment-minimized {
+    width: 240px;
+  }
+
   .widget-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 12px 16px;
-    background: rgba(60, 60, 70, 0.9);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 10px 12px;
   }
-  
-  .header-drag-area {
-    display: flex;
-    align-items: center;
-    flex: 1;
-    cursor: move;
-    /* 确保拖动区域有正确的交互 */
-    user-select: none;
-    -webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    /* 添加拖动时的视觉反馈 */
-    transition: background-color 0.2s ease;
-    /* 确保拖动区域有正确的指针事件 */
-    pointer-events: auto;
-    touch-action: none;
-    -webkit-tap-highlight-color: transparent;
-  }
-  
-  .widget-header:hover {
-    background: rgba(60, 60, 70, 0.95);
-  }
-  
-  .header-left {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex: 1;
-  }
-  
-  .header-icon {
-    color: #64b5f6;
-    font-size: 18px;
-  }
-  
+
   .header-title {
-    font-size: 14px;
-    font-weight: 600;
-    color: #ffffff;
+    font-size: 12px;
   }
-  
-  .connection-indicator {
-    display: flex;
-    align-items: center;
-  }
-  
-  .status-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: #f44336;
-    transition: all 0.3s ease;
-  }
-  
-  .status-dot.online {
-    background: #4caf50;
-    box-shadow: 0 0 6px rgba(76, 175, 80, 0.6);
-  }
-  
-  .header-controls {
-    display: flex;
-    gap: 4px;
-    /* 确保控制区域可以接收事件 */
-    position: relative;
-    z-index: 20;
-    pointer-events: auto;
-  }
-  
-  .header-btn {
-    width: 28px;
-    height: 28px;
-    border: none;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 4px;
-    color: #ffffff;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s ease;
-    /* 移动端触摸优化 */
-    touch-action: manipulation;
-    -webkit-tap-highlight-color: transparent;
-    /* 确保按钮可以正确点击 */
-    position: relative;
-    z-index: 10;
-    /* 确保按钮可以接收点击事件 */
-    pointer-events: auto;
-  }
-  
-  .header-btn:hover {
-    background: rgba(255, 255, 255, 0.2);
-  }
-  
-  .header-btn:active {
-    background: rgba(255, 255, 255, 0.3);
-    transform: scale(0.95);
-  }
-  
-  .header-btn.close-btn:hover {
-    background: #f44336;
-  }
-  
-  /* === 控件内容样式 === */
-  .widget-content {
-    transition: all 0.3s ease;
-    /* 确保内容区域有适当的背景隔离 */
-    background: rgba(35, 35, 45, 0.95);
-    position: relative;
-    z-index: 1;
-    /* 确保内容区域不会阻止拖动事件 */
-    pointer-events: auto;
-  }
-  
-  /* 拖动状态：移除过渡动画 */
-  .widget-content.dragging {
-    transition: none !important;
-  }
-  
-  .widget-content.collapsed {
-    padding: 12px;
-  }
-  
+
   .widget-content.expanded {
-    padding: 16px;
-    max-height: 80vh;
-    overflow-y: auto;
-    /* 优化内容布局，充分利用空间 */
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    /* 确保内容充分利用可用空间 */
-    min-height: 0;
-    flex: 1;
-    /* 自适应高度 */
-    height: auto;
-  }
-  
-  /* === 收缩状态样式 === */
-  .collapsed-info {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-  }
-  
-  .collapsed-progress {
-    flex-shrink: 0;
-  }
-  
-  .progress-circle {
-    width: 60px;
-    height: 60px;
-    border-radius: 50%;
-    background: conic-gradient(
-      #64b5f6 0deg var(--progress, 0deg),
-      rgba(255, 255, 255, 0.1) var(--progress, 0deg) 360deg
-    );
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-  }
-  
-  .progress-circle::before {
-    content: '';
-    position: absolute;
-    width: 50px;
-    height: 50px;
-    border-radius: 50%;
-    background: rgba(35, 35, 45, 0.95);
-  }
-  
-  .progress-text {
-    position: relative;
-    z-index: 1;
-    font-size: 12px;
-    font-weight: 600;
-    color: #ffffff;
-  }
-  
-  .collapsed-status {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-  
-  .status-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 11px;
-  }
-  
-  .status-label {
-    color: rgba(255, 255, 255, 0.7);
-  }
-  
-  .status-value {
-    color: #ffffff;
-    font-weight: 600;
-    font-family: monospace;
-  }
-  
-  .status-value.needs-adjustment {
-    color: #ff9800;
-  }
-  
-  /* === 展开状态样式 === */
-  .content-sections {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    /* 优化布局，充分利用可用空间 */
-    width: 100%;
-    min-height: 0;
-  }
-  
-  /* === 校准步骤进度条样式 === */
-  .calibration-progress {
-    margin-bottom: 16px;
-  }
-
-  .progress-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 8px;
-  }
-
-  .progress-title {
-    font-size: 12px;
-    font-weight: 600;
-    color: #ffffff;
-  }
-
-  .calibration-loop-info {
-    font-size: 10px;
-    color: #ff9800;
-    font-weight: 500;
-    padding: 2px 6px;
-    background: rgba(255, 152, 0, 0.2);
-    border-radius: 4px;
-    animation: loop-pulse 2s infinite;
-  }
-
-  @keyframes loop-pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.7; }
-  }
-
-  .progress-bar {
-    position: relative;
-    width: 100%;
-    height: 8px;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 4px;
-    overflow: visible;
-  }
-
-  .progress-fill {
-    height: 100%;
-    background: linear-gradient(90deg, #64b5f6, #4caf50);
-    border-radius: 4px;
-    transition: width 0.1s ease;
-  }
-
-  .progress-nodes {
-    position: absolute;
-    top: 50%;
-    left: 0;
-    right: 0;
-    transform: translateY(-50%);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-
-  .progress-node {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 2;
-  }
-
-  .node-circle {
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.2);
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 10px;
-    font-weight: bold;
-    color: #ffffff;
-    transition: all 0.3s ease;
-  }
-
-  .progress-node.completed .node-circle {
-    background: #4caf50;
-    border-color: #4caf50;
-    box-shadow: 0 0 8px rgba(76, 175, 80, 0.4);
-  }
-
-  .progress-node.current .node-circle {
-    background: #64b5f6;
-    border-color: #64b5f6;
-    box-shadow: 0 0 8px rgba(100, 181, 246, 0.4);
-  }
-
-  .progress-node.adjustment-node .node-circle {
-    background: rgba(255, 152, 0, 0.3);
-    border-color: rgba(255, 152, 0, 0.5);
-  }
-
-  .progress-node.adjustment-node.active .node-circle {
-    background: #ff9800;
-    border-color: #ff9800;
-    box-shadow: 0 0 8px rgba(255, 152, 0, 0.4);
-  }
-
-  .progress-node.calibration-node .node-circle {
-    background: rgba(255, 152, 0, 0.3);
-    border-color: rgba(255, 152, 0, 0.5);
-  }
-
-  .progress-node.calibration-node.active .node-circle {
-    background: #ff9800;
-    border-color: #ff9800;
-    box-shadow: 0 0 8px rgba(255, 152, 0, 0.4);
-  }
-
-  .progress-node.calibration-node.looping .node-circle {
-    animation: calibration-pulse 2s infinite;
-  }
-
-  @keyframes calibration-pulse {
-    0% { 
-      background: #ff9800;
-      box-shadow: 0 0 8px rgba(255, 152, 0, 0.4);
-    }
-    50% { 
-      background: #ff5722;
-      box-shadow: 0 0 12px rgba(255, 152, 0, 0.6);
-    }
-    100% { 
-      background: #ff9800;
-      box-shadow: 0 0 8px rgba(255, 152, 0, 0.4);
-    }
-  }
-
-  .progress-node.calibration-node.looping .node-circle i {
-    animation: calibration-rotate 2s linear infinite;
-  }
-
-  @keyframes calibration-rotate {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-  }
-
-  .progress-node.verification-node .node-circle {
-    background: rgba(76, 175, 80, 0.3);
-    border-color: rgba(76, 175, 80, 0.5);
-  }
-
-  .progress-node.verification-node.active .node-circle {
-    background: #4caf50;
-    border-color: #4caf50;
-    box-shadow: 0 0 8px rgba(76, 175, 80, 0.4);
-  }
-
-  .node-label {
-    position: absolute;
-    top: 100%;
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: 9px;
-    color: rgba(255, 255, 255, 0.7);
-    font-weight: 500;
-    margin-top: 4px;
-    white-space: nowrap;
-    text-align: center;
-  }
-
-  .progress-node {
-    position: relative;
-  }
-
-  /* === 位置信息样式 === */
-  .position-section {
-    margin-top: 16px;
-    padding-top: 16px;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-  }
-
-  .position-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    grid-template-rows: 1fr 1fr;
-    gap: 8px;
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 6px;
     padding: 12px;
+    max-height: 500px;
   }
 
-  .position-cell {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
+  .widget-content.collapsed {
     padding: 8px;
-    border-radius: 4px;
-    transition: all 0.3s ease;
-  }
-
-  .position-cell.current {
-    background: rgba(100, 181, 246, 0.1);
-    border: 1px solid rgba(100, 181, 246, 0.2);
-  }
-
-  .position-cell.target {
-    background: rgba(255, 152, 0, 0.1);
-    border: 1px solid rgba(255, 152, 0, 0.2);
-  }
-
-  .cell-label {
-    font-size: 10px;
-    color: rgba(255, 255, 255, 0.7);
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-
-  .cell-value {
-    font-size: 11px;
-    color: #ffffff;
-    font-family: monospace;
-    font-weight: 600;
-  }
-
-  /* === 调整指导样式 === */
-  .adjustment-section {
-    margin-top: 16px;
-    padding-top: 16px;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-  }
-
-  .adjustment-instructions {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .adjustment-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px;
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 6px;
-    transition: all 0.3s ease;
-    border: 1px solid transparent;
-  }
-
-  .adjustment-item.active {
-    background: rgba(255, 152, 0, 0.15);
-    border-color: #ff9800;
-  }
-
-  .adjustment-icon {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.1);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 14px;
-    color: #ffffff;
-    flex-shrink: 0;
-  }
-
-  .adjustment-item.active .adjustment-icon {
-    background: #ff9800;
-  }
-
-  .adjustment-details {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  .adjustment-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-
-  .adjustment-type {
-    font-size: 12px;
-    color: #ffffff;
-    font-weight: 500;
-  }
-
-  .adjustment-value {
-    font-size: 18px;
-    color: #ffffff;
-    font-family: monospace;
-    font-weight: 700;
-    text-shadow: 0 0 4px rgba(255, 255, 255, 0.3);
-    letter-spacing: 1px;
-  }
-
-  .adjustment-action {
-    font-size: 10px;
-    color: rgba(255, 255, 255, 0.7);
-    font-weight: 500;
-  }
-
-  .adjustment-item.active .adjustment-action {
-    color: #ff9800;
-  }
-  
-  /* === 操作按钮样式 === */
-  .control-section {
-    margin-top: 16px;
-    padding-top: 16px;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-  }
-
-  .action-buttons {
-    display: flex;
-    flex-direction: row;
-    gap: 10px;
   }
 
   .action-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
+    padding: 10px 12px;
+    font-size: 12px;
+    min-height: 36px;
+  }
+
+  .adjustment-value {
+    font-size: 16px;
+  }
+
+  .progress-circle {
+    width: 50px;
+    height: 50px;
+  }
+
+  .progress-text {
+    font-size: 10px;
+  }
+
+  .node-label {
+    font-size: 8px;
+    margin-top: 2px;
+  }
+
+  .node-circle {
+    width: 16px;
+    height: 16px;
+    font-size: 8px;
+  }
+
+  .progress-header {
+    margin-bottom: 6px;
+  }
+
+  .progress-title {
+    font-size: 11px;
+  }
+
+  .calibration-loop-info {
+    font-size: 9px;
+    padding: 1px 4px;
+  }
+}
+
+/* 移动端触摸优化 */
+@media (hover: none) and (pointer: coarse) {
+  .action-btn {
+    min-height: 48px;
+    padding: 14px 18px;
+    font-size: 14px;
+  }
+
+  .widget-header {
+    padding: 16px 20px;
+  }
+
+  .minimized-header {
     padding: 12px 16px;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 13px;
-    font-weight: 500;
-    transition: all 0.3s ease;
-    pointer-events: auto;
-    min-height: 40px;
-    touch-action: manipulation;
-    position: relative;
+  }
+
+  .header-btn {
+    width: 32px;
+    height: 32px;
+  }
+
+  .minimized-btn {
+    width: 28px;
+    height: 28px;
+  }
+}
+
+@media (max-width: 480px) {
+  .polar-alignment-widget {
+    width: 280px;
+    max-width: 98vw;
+  }
+
+  .polar-alignment-widget.collapsed {
+    width: 240px;
+    max-width: 95vw;
+  }
+
+  .polar-alignment-minimized {
+    width: 200px;
+  }
+
+  .widget-header {
+    padding: 8px 10px;
+  }
+
+  .header-title {
+    font-size: 11px;
+  }
+
+  .header-btn {
+    width: 20px;
+    height: 20px;
+  }
+
+  .widget-content.expanded {
+    padding: 10px;
+    max-height: 400px;
+  }
+
+  .widget-content.collapsed {
+    padding: 6px;
+  }
+
+  .action-btn {
+    padding: 8px 10px;
+    font-size: 11px;
+    min-height: 32px;
+  }
+
+  .adjustment-value {
+    font-size: 14px;
+  }
+
+  .progress-circle {
+    width: 40px;
+    height: 40px;
+  }
+
+  .progress-text {
+    font-size: 9px;
+  }
+
+  .minimized-header {
+    padding: 6px 8px;
+  }
+
+  .minimized-title {
+    font-size: 10px;
+  }
+
+  .minimized-btn {
+    width: 16px;
+    height: 16px;
+  }
+
+  .node-label {
+    font-size: 7px;
+    margin-top: 1px;
+  }
+
+  .node-circle {
+    width: 14px;
+    height: 14px;
+    font-size: 7px;
+  }
+
+  .progress-nodes {
+    gap: 2px;
+  }
+
+  .progress-header {
+    margin-bottom: 4px;
+  }
+
+  .progress-title {
+    font-size: 10px;
+  }
+
+  .calibration-loop-info {
+    font-size: 8px;
+    padding: 1px 3px;
+  }
+}
+
+/* 面板标题 */
+.panel-header {
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  pointer-events: auto;
+}
+
+.panel-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.panel-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #64b5f6;
+}
+
+.panel-indicator.live {
+  animation: pulse 2s infinite;
+}
+
+.panel-indicator.control {
+  background: #ff9800;
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
+
+
+
+.card-header {
+  background: rgba(60, 60, 70, 0.8);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  pointer-events: auto;
+}
+
+.card-header span {
+  font-size: 14px;
+  font-weight: 500;
+  color: #ffffff;
+}
+
+.card-icon {
+  color: #64b5f6;
+  font-size: 18px;
+}
+
+.card-icon.warning {
+  color: #ff9800;
+}
+
+.card-icon.success {
+  color: #4caf50;
+}
+
+
+
+
+
+
+/* === 响应式设计 === */
+@media (max-width: 1200px) {
+  .info-panel {
+    flex: 0 0 350px;
+  }
+}
+
+@media (max-width: 768px) {
+  .polar-alignment-interface {
+    font-size: 12px;
+  }
+
+  .main-layout {
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .display-panel {
+    flex: 1;
+    min-height: 300px;
+    padding: 12px;
+  }
+
+  .info-panel {
+    flex: 0 0 auto;
+    max-height: 50vh;
+    overflow-y: auto;
+    padding: 12px;
+  }
+
+  /* 状态相关样式已删除 */
+
+  .calibration-progress {
+    margin-bottom: 12px;
+  }
+
+  .progress-bar {
+    height: 6px;
+  }
+
+  .node-circle {
+    width: 16px;
+    height: 16px;
+    font-size: 8px;
+  }
+
+  .position-section {
+    margin-top: 12px;
+    padding-top: 12px;
+  }
+
+  .position-grid {
+    gap: 6px;
+    padding: 8px;
+  }
+
+  .position-cell {
+    padding: 6px;
+  }
+
+  .adjustment-section {
+    margin-top: 12px;
+    padding-top: 12px;
+  }
+
+  .adjustment-item {
+    padding: 8px;
+  }
+
+  .adjustment-icon {
+    width: 24px;
+    height: 24px;
+  }
+
+  .control-section {
+    margin-top: 12px;
+    padding-top: 12px;
+  }
+
+  .action-btn {
+    padding: 10px 12px;
+    font-size: 12px;
+    min-height: 36px;
     flex: 1;
   }
 
-  .action-btn.primary {
-    background: linear-gradient(135deg, #64b5f6, #42a5f5);
-    color: #ffffff;
-    box-shadow: 0 2px 6px rgba(100, 181, 246, 0.3);
-  }
-
-  .action-btn.primary:hover:not(:disabled) {
-    background: linear-gradient(135deg, #42a5f5, #2196f3);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(100, 181, 246, 0.4);
-  }
-
-  .action-btn.secondary {
-    background: rgba(255, 255, 255, 0.1);
-    color: #ffffff;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-  }
-
-  .action-btn.secondary:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.2);
-    transform: translateY(-1px);
-  }
-
-  .action-btn.success {
-    background: linear-gradient(135deg, #4caf50, #43a047);
-    color: #ffffff;
-    box-shadow: 0 2px 6px rgba(76, 175, 80, 0.3);
-  }
-
-  .action-btn.success:hover:not(:disabled) {
-    background: linear-gradient(135deg, #43a047, #388e3c);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
-  }
-
-  .action-btn.restore {
-    background: linear-gradient(135deg, #ff9800, #f57c00);
-    color: #ffffff;
-    box-shadow: 0 2px 6px rgba(255, 152, 0, 0.3);
-  }
-
-  .action-btn.restore:hover:not(:disabled) {
-    background: linear-gradient(135deg, #f57c00, #ef6c00);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(255, 152, 0, 0.4);
-  }
-
-  .action-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    transform: none !important;
-    box-shadow: none !important;
-  }
-
-  /* === 日志显示样式 === */
   .log-section {
-    margin-top: 16px;
-    padding-top: 16px;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    margin-top: 12px;
+    padding-top: 12px;
   }
 
   .log-display {
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 6px;
-    padding: 10px;
+    padding: 8px;
+  }
+
+  .panel-header {
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+  }
+
+  .interface-title {
+    font-size: 14px;
+  }
+
+  .connection-status {
+    font-size: 10px;
+  }
+
+  .card-header {
+    padding: 8px 12px;
+  }
+
+  .card-header span {
+    font-size: 12px;
+  }
+
+  .card-content {
+    padding: 12px;
+  }
+
+
+
+  .node-circle {
+    width: 14px;
+    height: 14px;
+    font-size: 7px;
+  }
+
+  .log-display {
+    padding: 6px;
   }
 
   .latest-log {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 10px;
-    border-radius: 4px;
-    font-size: 11px;
-    background: rgba(255, 255, 255, 0.05);
-    border-left: 3px solid transparent;
-  }
-
-  .latest-log.info {
-    border-left-color: #64b5f6;
-  }
-
-  .latest-log.warning {
-    border-left-color: #ff9800;
-  }
-
-  .latest-log.success {
-    border-left-color: #4caf50;
-  }
-
-  .latest-log.error {
-    border-left-color: #f44336;
+    font-size: 10px;
   }
 
   .log-timestamp {
-    color: rgba(255, 255, 255, 0.6);
-    font-family: monospace;
+    min-width: 50px;
+  }
+}
+
+@media (max-width: 480px) {
+  .polar-alignment-interface {
     font-size: 10px;
-    min-width: 65px;
-    flex-shrink: 0;
   }
 
-  .log-message {
-    color: rgba(255, 255, 255, 0.9);
+  .main-layout {
+    flex-direction: column;
+    gap: 6px;
+    padding: 6px;
+  }
+
+  .display-panel {
     flex: 1;
-    line-height: 1.4;
+    min-height: 250px;
+    padding: 8px;
   }
 
-  .log-empty {
-    text-align: center;
-    color: rgba(255, 255, 255, 0.5);
-    font-size: 11px;
-    padding: 20px;
-    font-style: italic;
+  .info-panel {
+    flex: 0 0 auto;
+    max-height: 45vh;
+    overflow-y: auto;
+    padding: 8px;
   }
-  
-  /* === 响应式设计 === */
-  @media (max-width: 768px) {
-    .polar-alignment-widget {
-      width: 320px;
-      max-width: 95vw;
-    }
-    
-    .polar-alignment-widget.collapsed {
-      width: 280px;
-      max-width: 90vw;
-    }
-    
-    .polar-alignment-minimized {
-      width: 240px;
-    }
-    
-    .widget-header {
-      padding: 10px 12px;
-    }
-    
-    .header-title {
-      font-size: 12px;
-    }
-    
-    .widget-content.expanded {
-      padding: 12px;
-      max-height: 500px;
-    }
-    
-    .widget-content.collapsed {
-      padding: 8px;
-    }
-    
-    .action-btn {
-      padding: 10px 12px;
-      font-size: 12px;
-      min-height: 36px;
-    }
-    
-    .adjustment-value {
-      font-size: 16px;
-    }
-    
-    .progress-circle {
-      width: 50px;
-      height: 50px;
-    }
-    
-    .progress-text {
-      font-size: 10px;
-    }
-    
-    .node-label {
-      font-size: 8px;
-      margin-top: 2px;
-    }
-    
-    .node-circle {
-      width: 16px;
-      height: 16px;
-      font-size: 8px;
-    }
-    
-    .progress-header {
-      margin-bottom: 6px;
-    }
-    
-    .progress-title {
-      font-size: 11px;
-    }
-    
-    .calibration-loop-info {
-      font-size: 9px;
-      padding: 1px 4px;
-    }
-  }
-  
-  /* 移动端触摸优化 */
-  @media (hover: none) and (pointer: coarse) {
-    .action-btn {
-      min-height: 48px;
-      padding: 14px 18px;
-      font-size: 14px;
-    }
-    
-    .widget-header {
-      padding: 16px 20px;
-    }
-    
-    .minimized-header {
-      padding: 12px 16px;
-    }
-    
-    .header-btn {
-      width: 32px;
-      height: 32px;
-    }
-    
-    .minimized-btn {
-      width: 28px;
-      height: 28px;
-    }
-  }
-  
-  @media (max-width: 480px) {
-    .polar-alignment-widget {
-      width: 280px;
-      max-width: 98vw;
-    }
-    
-    .polar-alignment-widget.collapsed {
-      width: 240px;
-      max-width: 95vw;
-    }
-    
-    .polar-alignment-minimized {
-      width: 200px;
-    }
-    
-    .widget-header {
-      padding: 8px 10px;
-    }
-    
-    .header-title {
-      font-size: 11px;
-    }
-    
-    .header-btn {
-      width: 20px;
-      height: 20px;
-    }
-    
-    .widget-content.expanded {
-      padding: 10px;
-      max-height: 400px;
-    }
-    
-    .widget-content.collapsed {
-      padding: 6px;
-    }
-    
-    .action-btn {
-      padding: 8px 10px;
-      font-size: 11px;
-      min-height: 32px;
-    }
-    
-    .adjustment-value {
-      font-size: 14px;
-    }
-    
-    .progress-circle {
-      width: 40px;
-      height: 40px;
-    }
-    
-    .progress-text {
-      font-size: 9px;
-    }
-    
-    .minimized-header {
-      padding: 6px 8px;
-    }
-    
-    .minimized-title {
-      font-size: 10px;
-    }
-    
-    .minimized-btn {
-      width: 16px;
-      height: 16px;
-    }
-    
-    .node-label {
-      font-size: 7px;
-      margin-top: 1px;
-    }
-    
-    .node-circle {
-      width: 14px;
-      height: 14px;
-      font-size: 7px;
-    }
-    
-    .progress-nodes {
-      gap: 2px;
-    }
-    
-    .progress-header {
-      margin-bottom: 4px;
-    }
-    
-    .progress-title {
-      font-size: 10px;
-    }
-    
-    .calibration-loop-info {
-      font-size: 8px;
-      padding: 1px 3px;
-    }
-  }
-  
-  /* 面板标题 */
-  .panel-header {
-    margin-bottom: 16px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    pointer-events: auto;
-  }
-  
-  .panel-header h3 {
-    margin: 0;
-    font-size: 18px;
-    font-weight: 600;
-    color: #ffffff;
-  }
-  
-  .panel-indicator {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: #64b5f6;
-  }
-  
-  .panel-indicator.live {
-    animation: pulse 2s infinite;
-  }
-  
-  .panel-indicator.control {
-    background: #ff9800;
-  }
-  
-  @keyframes pulse {
-    0% { opacity: 1; }
-    50% { opacity: 0.5; }
-    100% { opacity: 1; }
-  }
-  
 
-  
   .card-header {
-    background: rgba(60, 60, 70, 0.8);
-    padding: 12px 16px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    pointer-events: auto;
+    padding: 8px 12px;
   }
-  
+
   .card-header span {
-    font-size: 14px;
-    font-weight: 500;
-    color: #ffffff;
-  }
-  
-  .card-icon {
-    color: #64b5f6;
-    font-size: 18px;
-  }
-  
-  .card-icon.warning {
-    color: #ff9800;
-  }
-  
-  .card-icon.success {
-    color: #4caf50;
-  }
-  
-
-
-  
-
-  
-    /* === 响应式设计 === */
-  @media (max-width: 1200px) {
-    .info-panel {
-      flex: 0 0 350px;
-    }
+    font-size: 11px;
   }
 
-  @media (max-width: 768px) {
-    .polar-alignment-interface {
-      font-size: 12px;
-    }
-
-    .main-layout {
-      flex-direction: column;
-      gap: 8px;
-      padding: 8px;
-    }
-
-    .display-panel {
-      flex: 1;
-      min-height: 300px;
-      padding: 12px;
-    }
-
-    .info-panel {
-      flex: 0 0 auto;
-      max-height: 50vh;
-      overflow-y: auto;
-      padding: 12px;
-    }
-
-    /* 状态相关样式已删除 */
-
-    .calibration-progress {
-      margin-bottom: 12px;
-    }
-
-    .progress-bar {
-      height: 6px;
-    }
-
-    .node-circle {
-      width: 16px;
-      height: 16px;
-      font-size: 8px;
-    }
-
-    .position-section {
-      margin-top: 12px;
-      padding-top: 12px;
-    }
-
-    .position-grid {
-      gap: 6px;
-      padding: 8px;
-    }
-
-    .position-cell {
-      padding: 6px;
-    }
-
-    .adjustment-section {
-      margin-top: 12px;
-      padding-top: 12px;
-    }
-
-    .adjustment-item {
-      padding: 8px;
-    }
-
-    .adjustment-icon {
-      width: 24px;
-      height: 24px;
-    }
-
-    .control-section {
-      margin-top: 12px;
-      padding-top: 12px;
-    }
-
-    .action-btn {
-      padding: 10px 12px;
-      font-size: 12px;
-      min-height: 36px;
-      flex: 1;
-    }
-
-    .log-section {
-      margin-top: 12px;
-      padding-top: 12px;
-    }
-
-    .log-display {
-      padding: 8px;
-    }
-    
-    .panel-header {
-      margin-bottom: 8px;
-      padding-bottom: 8px;
-    }
-    
-    .interface-title {
-      font-size: 14px;
-    }
-    
-    .connection-status {
-      font-size: 10px;
-    }
-    
-    .card-header {
-      padding: 8px 12px;
-    }
-    
-    .card-header span {
-      font-size: 12px;
-    }
-    
-    .card-content {
-      padding: 12px;
-    }
-    
-
-    
-    .node-circle {
-      width: 14px;
-      height: 14px;
-      font-size: 7px;
-    }
-    
-    .log-display {
-      padding: 6px;
-    }
-    
-    .latest-log {
-      font-size: 10px;
-    }
-    
-    .log-timestamp {
-      min-width: 50px;
-    }
+  .card-content {
+    padding: 12px;
   }
-  
-    @media (max-width: 480px) {
-    .polar-alignment-interface {
-      font-size: 10px;
-    }
 
-    .main-layout {
-      flex-direction: column;
-      gap: 6px;
-      padding: 6px;
-    }
+  /* 状态相关样式已删除 */
 
-    .display-panel {
-      flex: 1;
-      min-height: 250px;
-      padding: 8px;
-    }
-
-    .info-panel {
-      flex: 0 0 auto;
-      max-height: 45vh;
-      overflow-y: auto;
-      padding: 8px;
-    }
-
-    .card-header {
-      padding: 8px 12px;
-    }
-
-    .card-header span {
-      font-size: 11px;
-    }
-
-    .card-content {
-      padding: 12px;
-    }
-
-    /* 状态相关样式已删除 */
-
-    .calibration-progress {
-      margin-bottom: 8px;
-    }
-
-    .progress-bar {
-      height: 4px;
-    }
-
-    .node-circle {
-      width: 14px;
-      height: 14px;
-      font-size: 7px;
-    }
-
-    .position-section {
-      margin-top: 8px;
-      padding-top: 8px;
-    }
-
-    .position-grid {
-      gap: 4px;
-      padding: 6px;
-    }
-
-    .position-cell {
-      padding: 4px;
-    }
-
-    .cell-label {
-      font-size: 8px;
-    }
-
-    .cell-value {
-      font-size: 9px;
-    }
-
-    .adjustment-section {
-      margin-top: 8px;
-      padding-top: 8px;
-    }
-
-    .adjustment-item {
-      padding: 6px;
-    }
-
-    .adjustment-icon {
-      width: 20px;
-      height: 20px;
-    }
-
-    .adjustment-type {
-      font-size: 10px;
-    }
-
-    .adjustment-value {
-      font-size: 10px;
-    }
-
-    .adjustment-action {
-      font-size: 8px;
-    }
-
-    .control-section {
-      margin-top: 8px;
-      padding-top: 8px;
-    }
-
-    .action-btn {
-      padding: 8px 10px;
-      font-size: 10px;
-      min-height: 32px;
-      flex: 1;
-    }
-
-    .log-section {
-      margin-top: 8px;
-      padding-top: 8px;
-    }
-
-    .log-display {
-      padding: 6px;
-    }
-
-    .latest-log {
-      font-size: 9px;
-    }
-
-    .log-timestamp {
-      font-size: 8px;
-      min-width: 45px;
-    }
-    
-    .panel-header {
-      margin-bottom: 6px;
-      padding-bottom: 6px;
-    }
-    
+  .calibration-progress {
+    margin-bottom: 8px;
   }
-  
-  /* === 触摸优化 === */
-  .polar-alignment-widget,
-  .polar-alignment-minimized {
-    /* 触摸优化 */
-    touch-action: none;
-    -webkit-tap-highlight-color: transparent;
-    -webkit-touch-callout: none;
-    -webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
+
+  .progress-bar {
+    height: 4px;
   }
-  
-  .header-drag-area,
-  .minimized-drag-area {
-    /* 触摸优化 */
-    touch-action: none;
-    -webkit-tap-highlight-color: transparent;
+
+  .node-circle {
+    width: 14px;
+    height: 14px;
+    font-size: 7px;
   }
-  
-  /* 拖动状态：移除触摸优化，允许正常触摸 */
-  .polar-alignment-widget.dragging,
-  .polar-alignment-minimized.dragging {
-    touch-action: manipulation;
+
+  .position-section {
+    margin-top: 8px;
+    padding-top: 8px;
   }
-  
-  /* === 性能优化 === */
-  /* 拖动时禁用不必要的动画和效果 */
-  .dragging * {
-    animation: none !important;
-    transition: none !important;
+
+  .position-grid {
+    gap: 4px;
+    padding: 6px;
   }
-  
-  /* 拖动时简化阴影和模糊效果 */
-  .dragging .progress-circle::before,
-  .dragging .node-circle,
-  .dragging .status-indicator {
-    box-shadow: none !important;
-    filter: none !important;
+
+  .position-cell {
+    padding: 4px;
   }
-  </style>
+
+  .cell-label {
+    font-size: 8px;
+  }
+
+  .cell-value {
+    font-size: 9px;
+  }
+
+  .adjustment-section {
+    margin-top: 8px;
+    padding-top: 8px;
+  }
+
+  .adjustment-item {
+    padding: 6px;
+  }
+
+  .adjustment-icon {
+    width: 20px;
+    height: 20px;
+  }
+
+  .adjustment-type {
+    font-size: 10px;
+  }
+
+  .adjustment-value {
+    font-size: 10px;
+  }
+
+  .adjustment-action {
+    font-size: 8px;
+  }
+
+  .control-section {
+    margin-top: 8px;
+    padding-top: 8px;
+  }
+
+  .action-btn {
+    padding: 8px 10px;
+    font-size: 10px;
+    min-height: 32px;
+    flex: 1;
+  }
+
+  .log-section {
+    margin-top: 8px;
+    padding-top: 8px;
+  }
+
+  .log-display {
+    padding: 6px;
+  }
+
+  .latest-log {
+    font-size: 9px;
+  }
+
+  .log-timestamp {
+    font-size: 8px;
+    min-width: 45px;
+  }
+
+  .panel-header {
+    margin-bottom: 6px;
+    padding-bottom: 6px;
+  }
+
+}
+
+/* === 触摸优化 === */
+.polar-alignment-widget,
+.polar-alignment-minimized {
+  /* 触摸优化 */
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+.header-drag-area,
+.minimized-drag-area {
+  /* 触摸优化 */
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 拖动状态：移除触摸优化，允许正常触摸 */
+.polar-alignment-widget.dragging,
+.polar-alignment-minimized.dragging {
+  touch-action: manipulation;
+}
+
+/* === 性能优化 === */
+/* 拖动时禁用不必要的动画和效果 */
+.dragging * {
+  animation: none !important;
+  transition: none !important;
+}
+
+/* 拖动时简化阴影和模糊效果 */
+.dragging .progress-circle::before,
+.dragging .node-circle,
+.dragging .status-indicator {
+  box-shadow: none !important;
+  filter: none !important;
+}
+</style>

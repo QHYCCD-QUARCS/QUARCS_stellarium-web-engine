@@ -346,5 +346,16 @@
   "Calibration completed! Focuser travel range has been set. Click the button to end calibration": "Calibration completed! Focuser travel range has been set. Click the button to end calibration",
   "Do you want to perform focuser travel calibration? Calibration will set the maximum and minimum positions of the focuser.": "Do you want to perform focuser travel calibration? Calibration will set the maximum and minimum positions of the focuser.",
   "solve complete !": "Solve complete!",
-  "Solve image succeed!": "Solve image succeed!"
+  "Solve image succeed!": "Solve image succeed!",
+  "→ Right (East)": "→ Right (East)",
+  "← Left (East)": "← Left (East)",
+  "← Left (West)": "← Left (West)",
+  "→ Right (West)": "→ Right (West)",
+  "↑ Up (Raise)": "↑ Up (Raise)",
+  "↓ Down (Lower)": "↓ Down (Lower)",
+  "Adjustment Instructions": "Adjustment Instructions",
+  "Adjustment Round": "Adjustment Round {0}",
+  "Facing Pole": "Facing Pole: {0}, Latitude: {1}",
+  "Location Changed": "Location changed, facing pole: {0}, latitude: {1}",
+  "Recalculating Adjustment Directions": "Recalculating adjustment directions"
 }
