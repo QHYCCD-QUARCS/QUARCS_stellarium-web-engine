@@ -1316,16 +1316,12 @@ export default {
                 }
                 break;
               case 'addLineData_Point':
-                if (parts.length === 2) {
-                  const dataList = parts[1].split(',');  // 将字符串分割成数组
-                  const coordinates = [];
-                  for (let i = 0; i < dataList.length - 1; i += 2) {
-                    const x = parseInt(dataList[i]);
-                    const y = parseFloat(dataList[i + 1]);
-                    const coordinate = [x, y];
-                    coordinates.push(coordinate);
-                  }
-                  this.$bus.$emit('addLineData_Point', coordinates);
+                if (parts.length === 4) {
+                  const a = parseFloat(parts[1]);
+                  const b = parseFloat(parts[2]);
+                  const c = parseFloat(parts[3]);
+                  console.log('addLineData_Point:', a, b, c);
+                  this.$bus.$emit('addLineData_Point', a, b, c);
                 }
                 break;
               case 'MainCameraSize':
@@ -3583,11 +3579,12 @@ export default {
         return 0;
       };
 
-      // 安全掩码设置
-      const safeUcharAt = (mask, y, x, value) => {
+      // 安全掩码设置（setter）：OpenCV.js 设置像素需使用 ucharPtr 返回的视图再赋值
+      const safeSetMask = (mask, y, x, value) => {
         if (y >= 0 && y < mask.rows && x >= 0 && x < mask.cols) {
           try {
-            mask.ucharAt(y, x, value);
+            const ptr = mask.ucharPtr(y, x);
+            if (ptr && ptr.length > 0) ptr[0] = value;
           } catch (e) {
             console.error(`设置掩码错误: (${y},${x})`);
           }
@@ -3670,7 +3667,7 @@ export default {
               const px = x + pos.x;
               if (py < rows && px < cols && py >= 0 && px >= 0) {
                 try {
-                  maskR.ucharAt(py, px, 255);
+                  safeSetMask(maskR, py, px, 255);
                   if (calculateGain && y % (sampleStep * 2) === 0 && x % (sampleStep * 2) === 0) {
                     rValues.push(safeUshortAt(img16, py, px));
                   }
@@ -3686,7 +3683,7 @@ export default {
               const px = x + pos.x;
               if (py < rows && px < cols && py >= 0 && px >= 0) {
                 try {
-                  maskG.ucharAt(py, px, 255);
+                  safeSetMask(maskG, py, px, 255);
                   if (calculateGain && y % (sampleStep * 2) === 0 && x % (sampleStep * 2) === 0) {
                     gValues.push(safeUshortAt(img16, py, px));
                   }
@@ -3702,7 +3699,7 @@ export default {
               const px = x + pos.x;
               if (py < rows && px < cols && py >= 0 && px >= 0) {
                 try {
-                  maskB.ucharAt(py, px, 255);
+                  safeSetMask(maskB, py, px, 255);
                   if (calculateGain && y % (sampleStep * 2) === 0 && x % (sampleStep * 2) === 0) {
                     bValues.push(safeUshortAt(img16, py, px));
                   }
