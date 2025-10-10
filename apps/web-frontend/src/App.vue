@@ -938,6 +938,24 @@ export default {
         }
       }
     },
+
+    // 处理星点识别结果
+    handleStarDetectionResult(detected, hfr) {
+      if (detected) {
+        this.callShowMessageBox(`星点的HFR为：${hfr}`, 'info');
+      } else {
+        this.callShowMessageBox('未识别到星点', 'warning');
+      }
+    },
+
+    // 处理自动对焦模式变化
+    handleAutoFocusModeChanged(mode, hfr) {
+      if (mode === 'coarse') {
+        this.callShowMessageBox('进入粗调模式', 'info');
+      } else if (mode === 'fine') {
+        this.callShowMessageBox('进入精调模式', 'info');
+      }
+    },
     
 
     preventDefault(event) {
@@ -1211,10 +1229,34 @@ export default {
               case 'FocusMoveDone':
                 if (parts.length === 3) {
                   const CurrentPosition = parts[1];
-                  const FWHM = parts[2];
-                  this.$bus.$emit('UpdateFWHM', CurrentPosition, FWHM);
-                  this.$bus.$emit('addData_Point', CurrentPosition, FWHM);
+                  const HFR = parts[2];
+                  this.$bus.$emit('UpdateHFR', CurrentPosition, HFR);
+                  this.$bus.$emit('addData_Point', CurrentPosition, HFR);
                 }
+                break;
+
+              case 'addData_Point':
+                if (parts.length === 3) {
+                  const position = parseFloat(parts[1]);
+                  const hfr = parseFloat(parts[2]);
+                  const stage = parts[3] || 'fine';
+                  
+                  if (stage === 'clear' || position === -1 || hfr === -1) {
+                    console.log('App.vue | 接收到清空数据消息');
+                    this.$bus.$emit('ClearFineData');
+                  } else {
+                    console.log('App.vue | 接收到数据点消息:', { position, hfr, stage });
+                    console.log('App.vue | 原始消息:', data.message);
+                    this.$bus.$emit('addData_Point', position, hfr);
+                  }
+                } else {
+                  console.error('App.vue | 数据点消息格式错误:', parts);
+                }
+                break;
+
+              case 'AutofocusFailed':
+                console.log('App.vue | 接收到AutofocusFailed消息');
+                this.$bus.$emit('showAutofocusFailureAlert');
                 break;
 
               case 'addMinPointData_Point':
@@ -1256,22 +1298,19 @@ export default {
                 break;
 
               case 'fitQuadraticCurve':
+                // 新的数据格式: "fitQuadraticCurve:a:b:c:bestPosition:minHFR"
+                console.log('App.vue | 接收到fitQuadraticCurve消息:', data.message);
+                // 使用setTimeout确保清除操作在添加数据之前完成
                 this.$bus.$emit('ClearfitQuadraticCurve');
-                for (let x = 0; x <= 601; x += 1) {
-                  const a = parts[x];
-                  const b = a.split('|');
-                  if (b.length === 2) {
-                    const x = b[0];
-                    const y = b[1];
-                    this.$bus.$emit('fitQuadraticCurve', x, y);
-                  }
-                }
+                setTimeout(() => {
+                  this.$bus.$emit('fitQuadraticCurve', data.message);
+                }, 10);
                 break;
 
               case 'fitQuadraticCurve_minPoint':
-                const x = parts[1];
-                const y = parts[2];
-                this.$bus.$emit('fitQuadraticCurve_minPoint', x, y);
+                // 新的数据格式: "fitQuadraticCurve_minPoint:bestPosition:minHFR"
+                console.log('App.vue | 接收到fitQuadraticCurve_minPoint消息:', data.message);
+                this.$bus.$emit('fitQuadraticCurve_minPoint', data.message);
                 break;
 
 
@@ -1335,7 +1374,32 @@ export default {
                 break;
 
               case 'AutoFocusOver':
-                this.$bus.$emit('AutoFocusOver');
+                if (parts.length >= 4) {
+                  // 新格式: AutoFocusOver:success:bestPosition:minHFR
+                  const success = parts[1] === 'true';
+                  const bestPosition = parseFloat(parts[2]);
+                  const minHFR = parseFloat(parts[3]);
+                  this.$bus.$emit('AutoFocusOver', success, bestPosition, minHFR);
+                } else {
+                  // 兼容旧格式: AutoFocusOver
+                  this.$bus.$emit('AutoFocusOver');
+                }
+                break;
+
+              case 'StarDetectionResult':
+                if (parts.length === 3) {
+                  const detected = parts[1] === 'true';
+                  const hfr = parseFloat(parts[2]);
+                  this.handleStarDetectionResult(detected, hfr);
+                }
+                break;
+
+              case 'AutoFocusModeChanged':
+                if (parts.length === 3) {
+                  const mode = parts[1];
+                  const hfr = parseFloat(parts[2]);
+                  this.handleAutoFocusModeChanged(mode, hfr);
+                }
                 break;
 
               case 'CFWPositionMax':

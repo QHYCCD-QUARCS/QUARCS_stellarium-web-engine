@@ -45,6 +45,7 @@ export default {
           containLabel: true
         },
         xAxis: {
+          
           min: x_min,
           max: x_max,
           axisLine: {

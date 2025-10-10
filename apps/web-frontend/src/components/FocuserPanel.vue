@@ -120,6 +120,7 @@
           </div>
         </button>
 
+
         <!-- <button @click="StepsChange" @touchend="active" class="get-click btn-Steps">
           <span v-if="MoveSteps === 100">
             <div style="display: flex; justify-content: center; align-items: center;">
@@ -164,7 +165,7 @@
 
       <div class="State-Bar" :style="{ left: 80 + 'px', right: 80 + 'px', fontSize: '8px' }">
         <div style="text-align: left;"> Current:{{ this.CurrentPosition }}</div>
-        <div style="text-align: center;"> FWHM:{{ this.FWHM }}</div>
+        <div style="text-align: center;"> HFR:{{ this.HFR }}</div>
         <!-- <div style="text-align: right;">Target:{{ this.TargetPosition }} </div> -->
       </div>
 
@@ -197,7 +198,7 @@ export default {
 
       CurrentPosition: 0,
       // TargetPosition: 0,
-      FWHM: 0,
+      HFR: 0,
 
       isBtnMoveDisabled: false, // 调焦按钮是否禁用
       isMoveInProgress: false, // 调焦是否进行中
@@ -238,7 +239,7 @@ export default {
     this.$bus.$on('FocusChangeSpeedSuccess', this.ShowSpeedNum);
     this.$bus.$on('FocusPosition', this.ShowPositionNum);
     // this.$bus.$on('FocusMoveDone', this.MoveDone);
-    this.$bus.$on('UpdateFWHM', this.UpdateFWHM);
+    this.$bus.$on('UpdateHFR', this.UpdateHFR);
     this.$bus.$on('showRoiImage', this.loadAndDisplayImage);
     // this.$bus.$on('setTargetPosition', this.setTargetPosition);
     this.$bus.$on('AutoFocusOver', this.AutoFocusOver);
@@ -249,12 +250,18 @@ export default {
     this.$bus.$on('setCurrentMainCanvasHasImage', this.setCurrentMainCanvasHasImage);
     this.$bus.$on('FocuserConnected', this.setFocuserIsConnected);
     this.$bus.$on('setRedBoxSideLength', this.setRedBoxSideLength);
+    this.$bus.$on('showAutofocusFailureAlert', this.showAlert);
     this.$bus.$on('syncROI_length', this.syncROI_length);
     this.$bus.$on('StartCalibration', this.startCalibrationProcess);
     this.$bus.$on('focusSetTravelRangeSuccess', this.focusSetTravelRangeSuccess);
     this.$bus.$on('focusMoveFailed', this.focusMoveFailed);
+    this.$bus.$on('StarDetectionResult', this.handleStarDetectionResult);
   },
   methods: {
+    showAlert() {
+      alert('本次对焦失败');
+    },
+    
     updatePosition() {
       const screenWidth = window.innerWidth;
       const halfWidth = screenWidth / 2 - 250;
@@ -294,10 +301,25 @@ export default {
       }
     },
 
-    AutoFocusOver() {
-      console.log('QHYCCD | AutoFocusOver');
-      this.$bus.$emit('SendConsoleLogMsg', 'AutoFocusOver', 'info');
+    AutoFocusOver(success = null, bestPosition = null, minHFR = null) {
+      console.log('QHYCCD | AutoFocusOver', { success, bestPosition, minHFR });
+      
+      // 关闭自动对焦按钮
       this.inAutoFocus = false;
+      
+      // 根据成功状态发送不同的日志消息
+      if (success !== null) {
+        if (success) {
+          console.log('QHYCCD | 自动对焦成功完成');
+          this.$bus.$emit('SendConsoleLogMsg', `自动对焦成功完成 - 最佳位置: ${bestPosition}, 最小HFR: ${minHFR}`, 'success');
+        } else {
+          console.log('QHYCCD | 自动对焦失败');
+          this.$bus.$emit('SendConsoleLogMsg', '自动对焦失败', 'error');
+        }
+      } else {
+        // 兼容旧版本调用（无参数）
+        this.$bus.$emit('SendConsoleLogMsg', 'AutoFocusOver', 'info');
+      }
     },
 
     StepsChange() {
@@ -440,9 +462,9 @@ export default {
     //   this.$bus.$emit('SendConsoleLogMsg', 'FocusMoveDone', 'info');
     // },
 
-    UpdateFWHM(current, FWHM) {
+    UpdateHFR(current, HFR) {
       this.CurrentPosition = current;
-      this.FWHM = FWHM;
+      this.HFR = HFR;
     },
 
     // loadAndDisplayImage(file) {
@@ -640,7 +662,17 @@ export default {
       setTimeout(() => {
         this.$bus.$emit('EndCalibration');
       }, 1000);
-    }
+    },
+
+    // 处理星点识别结果
+    handleStarDetectionResult(detected, hfr) {
+      if (detected) {
+        alert(`星点的HFR为：${hfr}`);
+      } else {
+        alert('未识别到星点');
+      }
+    },
+    
   }
 }
 </script>
@@ -953,6 +985,18 @@ export default {
   to {
     transform: scale(1.1);
   }
+}
+
+.btn-Test {
+  width: 30px;
+  height: 30px;
+
+  user-select: none;
+  background-color: rgba(255, 165, 0, 0.7);
+  backdrop-filter: blur(5px);
+  border: none;
+  border-radius: 50%;
+  box-sizing: border-box;
 }
 
 
