@@ -98,8 +98,38 @@ export default {
       debugRenderLogs: false,
       // 线条数据来源：若为 null 则使用 quadraticParams 动态采样
       lineDataFromPoints: null,
-      quadraticParams: null // { a,b,c,x0? }
+      quadraticParams: null, // { a,b,c,x0? }
+      // 二次拟合结果显示
+      quadraticResult: {
+        show: false,
+        a: '0.000000',
+        b: '0.000000',
+        c: '0.000000',
+        bestPosition: '0.00',
+        minHFR: '0.000'
+      },
+      // 日志记录器
+      logger: {
+        info: (msg, data) => console.log(msg, data || ''),
+        warn: (msg, data) => console.warn(msg, data || ''),
+        error: (msg, data) => console.error(msg, data || ''),
+        debug: (msg, data) => console.debug(msg, data || '')
+      }
     };
+  },
+  computed: {
+    // 计算有效数据点数量
+    validDataPointCount() {
+      const currentData = this.isTimeMode ? this.chartData1_time : this.chartData1_pos;
+      return currentData.length;
+    },
+    // 计算异常点数据
+    outlierDataPoints() {
+      const currentData = this.isTimeMode ? this.chartData1_time : this.chartData1_pos;
+      if (currentData.length < 4) return [];
+      // 这里可以添加异常点检测逻辑，暂时返回空数组
+      return [];
+    }
   },
   mounted() {
     // 根据可见性启动/停止时间推进
@@ -147,6 +177,33 @@ export default {
     this.teardownBusAndTimers();
   },
   methods: {
+    // 检查是否为水平拟合（线性拟合）
+    isHorizontalFit() {
+      return this.quadraticResult.a === "0.000000" || Math.abs(parseFloat(this.quadraticResult.a)) < 1e-10;
+    },
+    // 获取最佳位置显示文本
+    getBestPositionDisplay() {
+      if (this.isHorizontalFit()) {
+        return "线性拟合";
+      }
+      return this.quadraticResult.bestPosition;
+    },
+    // 关闭面板
+    closePanel() {
+      this.quadraticResult.show = false;
+    },
+    // 验证拟合系数的有效性
+    validateFitCoefficients(a, b, c) {
+      // 检查系数是否为有效数字
+      if (!isFinite(a) || !isFinite(b) || !isFinite(c)) {
+        return false;
+      }
+      // 检查是否为水平线拟合（a接近0）
+      if (Math.abs(a) < 1e-10) {
+        return false; // 水平线拟合
+      }
+      return true;
+    },
     teardownBusAndTimers() {
       this.$bus.$off('FocusPosition', this.changeRange_x);
       this.$bus.$off('ClearfitQuadraticCurve', this.clearChartData2);
@@ -203,12 +260,6 @@ export default {
         this.xAxis_max = newMin + windowWidth;
         this.scheduleRender(this.xAxis_min, this.xAxis_max);
       }
-    },
-    getClientX(e) {
-      if (e && e.touches && e.touches.length) return e.touches[0].clientX;
-      if (e && e.changedTouches && e.changedTouches.length) return e.changedTouches[0].clientX;
-      if (typeof e.clientX === 'number') return e.clientX;
-      return undefined;
     },
     getClientX(e) {
       if (e && e.touches && e.touches.length) return e.touches[0].clientX;
@@ -302,7 +353,7 @@ export default {
         },
         xAxis: optionXAxis,
         yAxis: {
-          min: y_min,
+          min: this.yAxis_min,
           max: y_max,
           axisLine: {
             lineStyle: {
@@ -594,7 +645,8 @@ export default {
     // 清空精调数据（在精调开始时调用）
     ClearFineData() {
       this.logger.info('Chart-Focus.vue | 清空精调数据');
-      this.chartData1 = [];
+      this.chartData1_pos = [];
+      this.chartData1_time = [];
       this.chartData2 = [];
       this.chartData3 = [];
       this.chartData4 = [];
@@ -604,7 +656,8 @@ export default {
     
     // 更新异常点数据
     updateOutlierData() {
-      if (this.chartData1.length >= 4) {
+      const currentData = this.isTimeMode ? this.chartData1_time : this.chartData1_pos;
+      if (currentData.length >= 4) {
         this.chartData4 = this.outlierDataPoints;
         this.logger.debug('Chart-Focus.vue | 更新异常点数据，异常点数量:', this.chartData4.length);
       } else {
@@ -715,8 +768,8 @@ export default {
       
       // 从数据点中找到最小位置作为偏移量（修正：不使用bestPosition作为minPos）
       let minPos = 0;
-      if (this.chartData1.length > 0) {
-        minPos = Math.min(...this.chartData1.map(point => point[0]));
+      if (this.chartData1_pos.length > 0) {
+        minPos = Math.min(...this.chartData1_pos.map(point => point[0]));
       }
       
       this.logger.debug('Chart-Focus.vue | 坐标系统信息:');
@@ -728,7 +781,7 @@ export default {
       console.log('Chart-Focus.vue | - 数据点最小位置 (minPos):', minPos);
       console.log('Chart-Focus.vue | - 后端发送的最佳位置 (bestPosition):', bestPosition);
       console.log('Chart-Focus.vue | - 拟合系数 a:', a, 'b:', b, 'c:', c);
-      console.log('Chart-Focus.vue | - 当前数据点:', this.chartData1);
+      console.log('Chart-Focus.vue | - 当前数据点:', this.chartData1_pos);
       
       // 验证最佳位置的计算是否正确
       const expectedBestRelativePos = -b / (2 * a);
@@ -742,10 +795,10 @@ export default {
       // 智能确定曲线生成范围
       let startX, endX, stepSize;
       
-      if (this.chartData1.length > 0) {
+      if (this.chartData1_pos.length > 0) {
         // 基于数据点范围生成曲线
-        const dataMinX = Math.min(...this.chartData1.map(point => point[0]));
-        const dataMaxX = Math.max(...this.chartData1.map(point => point[0]));
+        const dataMinX = Math.min(...this.chartData1_pos.map(point => point[0]));
+        const dataMaxX = Math.max(...this.chartData1_pos.map(point => point[0]));
         const dataRange = dataMaxX - dataMinX;
         
         // 扩展范围以确保曲线覆盖完整
@@ -784,8 +837,8 @@ export default {
       }
       
       // 添加关键点：确保数据点位置在曲线上有精确的点
-      if (this.chartData1.length > 0) {
-        for (const point of this.chartData1) {
+      if (this.chartData1_pos.length > 0) {
+        for (const point of this.chartData1_pos) {
           const x = point[0];
           const relativeX = x - minPos;
           const y = a * relativeX * relativeX + b * relativeX + c;
@@ -831,7 +884,7 @@ export default {
       curveData.sort((a, b) => a[0] - b[0]);
       
       // 在数据点密集区域增加曲线密度
-      if (this.chartData1.length > 0) {
+      if (this.chartData1_pos.length > 0) {
         const enhancedCurveData = [];
         const fineStepSize = Math.max(stepSize / 5, 5); // 在密集区域使用更小的步长
         
@@ -842,7 +895,7 @@ export default {
           enhancedCurveData.push(currentPoint);
           
           // 检查当前段是否包含数据点
-          const hasDataPoint = this.chartData1.some(point => 
+          const hasDataPoint = this.chartData1_pos.some(point => 
             point[0] >= currentPoint[0] && point[0] <= nextPoint[0]
           );
           
@@ -881,8 +934,8 @@ export default {
         
         // 验证数据点是否在曲线上
         this.logger.debug('Chart-Focus.vue | 数据点与曲线对比:');
-        for (let i = 0; i < Math.min(this.chartData1.length, 5); i++) {
-          const point = this.chartData1[i];
+        for (let i = 0; i < Math.min(this.chartData1_pos.length, 5); i++) {
+          const point = this.chartData1_pos[i];
           const pointRelativeX = point[0] - minPos;
           const pointY = a * pointRelativeX * pointRelativeX + b * pointRelativeX + c;
           const actualY = point[1];
@@ -948,8 +1001,8 @@ export default {
       
       // 对于线性拟合，我们需要找到数据点的最小位置作为偏移量
       let minPos = 0;
-      if (this.chartData1.length > 0) {
-        minPos = Math.min(...this.chartData1.map(point => point[0]));
+      if (this.chartData1_pos.length > 0) {
+        minPos = Math.min(...this.chartData1_pos.map(point => point[0]));
       }
       
       this.logger.debug('Chart-Focus.vue | 线性拟合坐标系统信息:');
@@ -965,10 +1018,10 @@ export default {
       // 智能确定曲线生成范围
       let startX, endX, stepSize;
       
-      if (this.chartData1.length > 0) {
+      if (this.chartData1_pos.length > 0) {
         // 基于数据点范围生成曲线
-        const dataMinX = Math.min(...this.chartData1.map(point => point[0]));
-        const dataMaxX = Math.max(...this.chartData1.map(point => point[0]));
+        const dataMinX = Math.min(...this.chartData1_pos.map(point => point[0]));
+        const dataMaxX = Math.max(...this.chartData1_pos.map(point => point[0]));
         const dataRange = dataMaxX - dataMinX;
         
         // 扩展范围以确保曲线覆盖完整
@@ -1007,8 +1060,8 @@ export default {
       }
       
       // 添加关键点：确保数据点位置在曲线上有精确的点
-      if (this.chartData1.length > 0) {
-        for (const point of this.chartData1) {
+      if (this.chartData1_pos.length > 0) {
+        for (const point of this.chartData1_pos) {
           const x = point[0];
           const relativeX = x - minPos;
           const y = b * relativeX + c;
