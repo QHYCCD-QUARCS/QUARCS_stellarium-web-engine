@@ -605,13 +605,13 @@ export default {
       MainCameraGainMax: 0,
 
       devices: [
-        { name: '导星镜', driverType: 'Guider', type: 'CCDs', ListNum: "1", isget: false, device: '', BaudRate: 9600, driverName: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_Guider' },
-        { name: '主相机', driverType: 'MainCamera', type: 'CCDs', ListNum: "20", isget: false, device: '', BaudRate: 9600, driverName: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_MainCamera' },
-        { name: '赤道仪', driverType: 'Mount', type: 'Telescopes', ListNum: "0", isget: false, device: '', BaudRate: 9600, driverName: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_Mount' },
+        { name: '导星镜', driverType: 'Guider', type: 'CCDs', ListNum: "1", isget: false, device: '', BaudRate: 9600, driverName: '', usbSerialPath: '', sdkVersion: '',isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_Guider' },
+        { name: '主相机', driverType: 'MainCamera', type: 'CCDs', ListNum: "20", isget: false, device: '', BaudRate: 9600, driverName: '', usbSerialPath: '', sdkVersion: '',isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_MainCamera' },
+        { name: '赤道仪', driverType: 'Mount', type: 'Telescopes', ListNum: "0", isget: false, device: '', BaudRate: 9600, driverName: '', usbSerialPath: '', sdkVersion: '',isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_Mount' },
         { name: '望远镜', driverType: 'Telescopes', device: '', isConnected: true },
-        { name: '电动调焦器', driverType: 'Focuser', type: 'Focusers', ListNum: "22", isget: false, device: '', BaudRate: 9600, driverName: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_Focuser' },
-        { name: '电子极轴镜', driverType: 'PoleCamera', type: 'CCDs', ListNum: "2", isget: false, device: '', BaudRate: 9600, driverName: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_PoleCamera' },
-        { name: '滤镜轮', driverType: 'CFW', type: 'Filter Wheels', ListNum: "21", isget: false, device: '', BaudRate: 9600, driverName: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_CFW' },
+        { name: '电动调焦器', driverType: 'Focuser', type: 'Focusers', ListNum: "22", isget: false, device: '', BaudRate: 9600, driverName: '', usbSerialPath: '', sdkVersion: '',isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_Focuser' },
+        { name: '电子极轴镜', driverType: 'PoleCamera', type: 'CCDs', ListNum: "2", isget: false, device: '', BaudRate: 9600, driverName: '', usbSerialPath: '', sdkVersion: '',isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_PoleCamera' },
+        { name: '滤镜轮', driverType: 'CFW', type: 'Filter Wheels', ListNum: "21", isget: false, device: '', BaudRate: 9600, driverName: '', usbSerialPath: '', sdkVersion: '',isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_CFW' },
       ],
 
       // Changing the label name also requires changing the emit signal name
@@ -893,6 +893,7 @@ export default {
     this.$bus.$on('CurrentExpTimeList', this.CurrentExpTimeList);
     this.$bus.$on('disconnectAllDevice', this.disconnectAllDevice);
     this.$bus.$on('GetConnectedDevices', this.ReturnConnectedDevices);
+    this.$bus.$on('GetCurrentConnectedDevices', this.ReturnCurrentConnectedDevices);
     this.$bus.$on('CurrentCFWList', this.CurrentCFWList);
     this.$bus.$on('calcWhiteBalanceGains', this.calcWhiteBalanceGains);
     this.$bus.$on('SwitchOutPutPower', this.SwitchOutPutPower);
@@ -1797,6 +1798,36 @@ export default {
                 }
                 break;
 
+              case 'getDevicePort':
+                if (parts.length === 3) {
+                  const driverType = parts[1];
+                  const usbSerialPath = parts[2];
+                  const target = this.devices.find(dev => dev.driverType === driverType);
+                  if (target) {
+                    target.usbSerialPath = usbSerialPath;
+                    this.$bus.$emit('sendCurrentConnectedDevices', this.devices);
+                  } else {
+                    console.warn('getUSBSerialPath | device not found for type:', driverType);
+                  }
+                }
+                break;
+
+              case 'getSDKVersion':
+                if (parts.length === 3) {
+                  const driverType = parts[1];
+                  const sdkVersion = parts[2];
+                  console.log('getSDKVersion:', driverType, ',', sdkVersion);
+                  const target = this.devices.find(dev => dev.driverType === driverType);
+                  if (target) {
+                    target.sdkVersion = sdkVersion;
+                    this.$bus.$emit('sendCurrentConnectedDevices', this.devices);
+                  } else {
+                    console.warn('getSDKVersion | device not found for type:', driverType);
+                  }
+                  console.log('New devices:', this.devices);
+                }
+                break;
+
               case 'ConnectDriverFailed':
                 if (parts.length === 2) {
                   const message = parts[1];
@@ -1814,7 +1845,7 @@ export default {
               case 'DisconnectDriverFail':
                 if (parts.length === 2) {
                   const driver = parts[1];
-                  this.disconnectDriverFail(device)
+                  this.disconnectDriverFail(driver)
                 }
 
               case 'SelectedDriverList':
@@ -1839,6 +1870,28 @@ export default {
                     return acc;
                   }, []);
                   this.loadBindDeviceList(deviceObjects);
+                }
+                break;
+
+              case 'SDKVersionAndUSBSerialPath':
+                // 固定格式：SDKVersionAndUSBSerialPath:Type1:SDK1:USB1:Type2:SDK2:USB2:...
+                if (parts.length > 1 && ((parts.length - 1) % 3 === 0)) {
+                  for (let i = 1; i < parts.length; i += 3) {
+                    const Type = (parts[i] || '').trim();
+                    const SDK = (parts[i + 1] || '').trim();
+                    const USB = (parts[i + 2] || '').trim();
+                    const target = this.devices.find(dev => dev.driverType === Type);
+                    if (target) {
+                      // 非空才赋值；空或 "null" 则清空
+                      if (SDK && SDK.toLowerCase() !== 'null') target.sdkVersion = SDK; else target.sdkVersion = '';
+                      if (USB && USB.toLowerCase() !== 'null') target.usbSerialPath = USB; else target.usbSerialPath = '';
+                    } else {
+                      console.warn('SDKVersionAndUSBSerialPath | device not found for type:', Type);
+                    }
+                  }
+                  this.$bus.$emit('sendCurrentConnectedDevices', this.devices);
+                } else {
+                  console.warn('SDKVersionAndUSBSerialPath | invalid payload:', data.message);
                 }
                 break;
 
@@ -2236,7 +2289,25 @@ export default {
                   this.$bus.$emit('addFwhmNow', fwhm);
                 }
                 break;
-
+              case 'Box_Space':
+                // 后端返回盒子可用空间（字节），转发给内存设置面板
+                if (parts.length === 2) {
+                  const bytes = parts[1];
+                  this.$bus.$emit('Box_Space', bytes);
+                }
+                break;
+              case 'ClearLogs':
+                // 后端清理日志完成回执
+                if (parts.length >= 2 && parts[1] === 'Success') {
+                  this.SendConsoleLogMsg('Logs cleared successfully', 'info');
+                }
+                break;
+              case 'ClearBoxCache':
+                // 后端清理缓存完成回执
+                if (parts.length >= 2 && parts[1] === 'Success') {
+                  this.SendConsoleLogMsg('Box cache cleared successfully', 'info');
+                }
+                break;
               default:
                 console.warn('未处理命令: ', data.message);
                 break;
@@ -2438,6 +2509,7 @@ export default {
       this.sendMessage('Vue_Command', 'getGPIOsStatus'); // 获取GPIO状态
       // this.sendMessage('Vue_Command', 'getStagingImage'); // 获取最后拍摄的图像
       this.sendMessage('Vue_Command', 'getPolarAlignmentState'); // 获取极轴对齐状态
+      this.sendMessage('Vue_Command', 'loadSDKVersionAndUSBSerialPath'); // 获取SDK版本和USB序列号路径
 
 
       this.disconnectTimeoutTriggered = false;
@@ -2764,6 +2836,10 @@ export default {
       this.sendMessage('Vue_Command', 'loadSelectedDriverList');
       this.sendMessage('Vue_Command', 'loadBindDeviceList');
       this.sendMessage('Vue_Command', 'loadBindDeviceTypeList');
+      
+    },
+    ReturnCurrentConnectedDevices() {
+      this.$bus.$emit('sendCurrentConnectedDevices',this.devices);
     },
 
     OpenIamgeFolder() {
