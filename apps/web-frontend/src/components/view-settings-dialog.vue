@@ -56,20 +56,25 @@
       <v-tab-item>
         <div class="qs-pane">
           <div class="qs-narrow">
-            <v-list dense class="qs-list">
-              <div v-for="(dev, idx) in deviceEntries" :key="dev.driverType + '-' + (dev.driverName || '') + '-' + idx">
-                <v-subheader>{{ dev.title }}</v-subheader>
-                <v-list-item>
-                  <v-list-item-content>
-                    <v-list-item-title>{{ $t('Driver') }}: {{ dev.driverName || '—' }}</v-list-item-title>
-                    <v-list-item-subtitle>{{ $t('Connected') }}: {{ dev.connected ? 'Yes' : 'No' }}</v-list-item-subtitle>
-                    <v-list-item-subtitle v-if="dev.sdkVersion">{{ $t('SDK Version') }}: {{ dev.sdkVersion }}</v-list-item-subtitle>
-                    <v-list-item-subtitle v-if="dev.usbSerialPath">{{ $t('USB Serial Path') }}: {{ dev.usbSerialPath }}</v-list-item-subtitle>
-                  </v-list-item-content>
-                </v-list-item>
-                <v-divider class="qs-divider" v-if="idx < deviceEntries.length - 1"></v-divider>
+            <div v-for="(dev, idx) in deviceEntries" :key="dev.driverType + '-' + (dev.driverName || '') + '-' + idx" class="qs-section">
+              <div class="qs-subheader">{{ dev.title }}</div>
+              <div class="qs-field">
+                <span class="qs-inline-label">{{ $t('Driver') }}</span>
+                <span>{{ dev.driverName || '—' }}</span>
               </div>
-            </v-list>
+              <div class="qs-field">
+                <span class="qs-inline-label">{{ $t('Connected') }}</span>
+                <span>{{ dev.connected ? 'Yes' : 'No' }}</span>
+              </div>
+              <div v-if="dev.sdkVersion" class="qs-field">
+                <span class="qs-inline-label">{{ $t('SDK Version') }}</span>
+                <span>{{ dev.sdkVersion }}</span>
+              </div>
+              <div v-if="dev.usbSerialPath" class="qs-field">
+                <span class="qs-inline-label">{{ $t('USB Serial Path') }}</span>
+                <span>{{ dev.usbSerialPath }}</span>
+              </div>
+            </div>
             <div class="qs-actions">
               <v-btn small text @click="refreshDevices">{{ $t('Refresh') }}</v-btn>
             </div>
@@ -80,29 +85,34 @@
       <v-tab-item>
         <div class="qs-pane">
           <div class="qs-narrow">
-            <v-list dense class="qs-list">
-              <v-list-item>
-                <v-list-item-content>
-                  <v-list-item-title>{{ $t('USB Drive') }}: {{ usbInfo.name }}</v-list-item-title>
-                  <v-list-item-subtitle>{{ $t('Free Space') }}: {{ usbInfo.spaceFormatted }}</v-list-item-subtitle>
-                </v-list-item-content>
-                <v-list-item-action>
-                  <v-btn small text @click="refreshUSB">{{ $t('Refresh') }}</v-btn>
-                </v-list-item-action>
-              </v-list-item>
-              <v-divider class="qs-divider"></v-divider>
-              <v-list-item>
-                <v-list-item-content>
-                  <v-list-item-title>{{ $t('Box Free Space') }}: {{ boxInfo.spaceFormatted }}</v-list-item-title>
-                </v-list-item-content>
-                <v-list-item-action>
-                  <v-btn small text @click="refreshBoxSpace">{{ $t('Refresh') }}</v-btn>
-                </v-list-item-action>
-              </v-list-item>
-            </v-list>
+            <div class="qs-section">
+              <div class="qs-subheader">{{ $t('USB Drive') }}</div>
+              <div class="qs-field">
+                <span class="qs-inline-label">{{ $t('Name') }}</span>
+                <span>{{ usbInfo.name }}</span>
+              </div>
+              <div class="qs-field">
+                <span class="qs-inline-label">{{ $t('Free Space') }}</span>
+                <span>{{ usbInfo.spaceFormatted }}</span>
+              </div>
+            </div>
+
+            <v-divider class="qs-divider"></v-divider>
+
+            <div class="qs-section">
+              <div class="qs-subheader">{{ $t('Box Free Space') }}</div>
+              <div class="qs-field">
+                <span class="qs-inline-label">{{ $t('Free Space') }}</span>
+                <span>{{ boxInfo.spaceFormatted }}</span>
+              </div>
+              <div class="qs-actions">
+                <v-btn small text @click="clearBoxCache">{{ $t('Clear Box Cache') }}</v-btn>
+                <v-btn small color="red" text @click="clearLogs">{{ $t('Clear Logs') }}</v-btn>
+              </div>
+            </div>
+
             <div class="qs-actions">
-              <v-btn small text @click="clearBoxCache">{{ $t('Clear Box Cache') }}</v-btn>
-              <v-btn small color="red" text @click="clearLogs">{{ $t('Clear Logs') }}</v-btn>
+              <v-btn small text @click="refreshStorage">{{ $t('Refresh') }}</v-btn>
             </div>
           </div>
         </div>
@@ -203,6 +213,11 @@ export default {
     },
     clearLogs() {
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'ClearLogs');
+    },
+    refreshStorage() {
+      // 统一刷新 USB 与盒子可用空间
+      this.refreshUSB();
+      this.refreshBoxSpace();
     },
     onSendCurrentConnectedDevices(payload) {
       // 接收来自 App.vue 的完整设备列表，并更新本地 devices 列表
@@ -369,6 +384,7 @@ export default {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.qs-field { display: flex; gap: 8px; align-items: center; margin: 4px 0; }
 .qs-tabs-items,
 .qs-tabs-items .v-window__container,
 .qs-tabs-items .v-window-item,

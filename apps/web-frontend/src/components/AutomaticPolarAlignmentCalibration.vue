@@ -1,4 +1,5 @@
 <template>
+  <div class="polar-alignment-root">
   <!-- 最小化状态 -->
   <div v-if="visible && isMinimized" class="polar-alignment-minimized" :class="{ 'dragging': isDraggingState }"
     :style="{ left: position.x + 'px', top: position.y + 'px' }">
@@ -22,7 +23,7 @@
   <!-- 完整界面 -->
   <div v-else-if="visible" class="polar-alignment-widget"
     :class="{ 'collapsed': isCollapsed, 'dragging': isDraggingState }"
-    :style="{ left: position.x + 'px', top: position.y + 'px' }">
+    :style="{ left: position.x + 'px', top: position.y + 'px', pointerEvents: (showTrajectoryOverlay && overlayMode === 'fullscreen' ? 'none' : 'auto') }">
 
     <!-- 拖动手柄 -->
     <div class="widget-header">
@@ -39,6 +40,9 @@
       <div class="header-controls">
         <button class="header-btn" @click="toggleCollapse" :title="isCollapsed ? $t('Expand') : $t('Collapse')">
           <v-icon>{{ isCollapsed ? 'mdi-chevron-down' : 'mdi-chevron-up' }}</v-icon>
+        </button>
+        <button class="header-btn" @click="toggleTrajectoryOverlay" :title="showTrajectoryOverlay ? $t('Hide Trajectory Canvas') : $t('Show Trajectory Canvas')">
+          <v-icon>{{ showTrajectoryOverlay ? 'mdi-eye-off' : 'mdi-crosshairs-gps' }}</v-icon>
         </button>
         <button class="header-btn" @click="toggleMinimize" :title="$t('Minimize')">
           <v-icon>mdi-minus</v-icon>
@@ -232,6 +236,50 @@
       </div>
     </div>
   </div>
+
+  <!-- 轨迹画布：全屏模式 -->
+  <div v-if="visible && showTrajectoryOverlay && overlayMode === 'fullscreen'" class="trajectory-overlay"
+       @wheel.prevent="onOverlayWheel" @mousedown.stop @touchstart.stop>
+    <canvas ref="trajectoryCanvas"></canvas>
+    <button class="overlay-close-btn" @click.stop="toggleTrajectoryOverlay" :title="$t('Hide Trajectory Canvas')">
+      <v-icon>mdi-close</v-icon>
+    </button>
+    <div class="overlay-hint">{{ $t('Target fixed at center') }}</div>
+    <div class="overlay-panel">
+      <div class="panel-row">
+        <span class="panel-label">{{ $t('Current') }}:</span>
+        <span class="panel-value">RA {{ currentPosition.ra }} / DEC {{ currentPosition.dec }}</span>
+      </div>
+      <div class="panel-row">
+        <span class="panel-label">{{ $t('Target') }}:</span>
+        <span class="panel-value">RA {{ targetPosition.ra }} / DEC {{ targetPosition.dec }}</span>
+      </div>
+      <div class="panel-actions">
+        <!-- <button class="panel-btn" disabled :title="$t('Disabled')">{{ $t('Clear All Trajectory') }}</button> -->
+        <button class="panel-btn" @click.stop="clearOldTrajectory">{{ $t('Clear Old Trajectory') }}</button>
+        <button class="panel-btn" @click.stop="switchToWindowed">{{ $t('Switch to Windowed Mode') }}</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 轨迹画布：窗口模式 -->
+  <div v-if="visible && showTrajectoryOverlay && overlayMode === 'windowed'"
+       class="trajectory-window" :style="{ left: windowedRect.x + 'px', top: windowedRect.y + 'px', width: windowedRect.width + 'px', height: windowedRect.height + 'px' }"
+       @mousedown.stop @touchstart.stop>
+    <div class="window-header" @mousedown.stop="startWindowDrag" @touchstart.stop="startWindowDrag">
+      <span class="window-title">{{ $t('Trajectory') }}</span>
+      <div class="window-actions">
+        <button class="panel-btn small" @click.stop="switchToFullscreen">{{ $t('Switch to Fullscreen Mode') }}</button>
+        <button class="panel-btn small" @click.stop="clearOldTrajectory">{{ $t('Clear Old Trajectory') }}</button>
+        <!-- <button class="panel-btn small" disabled :title="$t('Disabled')">{{ $t('Clear All Trajectory') }}</button> -->
+        <button class="panel-btn small" @click.stop="toggleTrajectoryOverlay" :title="$t('Hide Trajectory Canvas')"><v-icon>mdi-close</v-icon></button>
+      </div>
+    </div>
+    <div class="window-content">
+      <canvas ref="trajectoryCanvas"></canvas>
+    </div>
+  </div>
+  </div>
 </template>
 
 <script>
@@ -392,6 +440,31 @@ export default {
       //   dec: null,
       //   calculated: false
       // },
+
+      // === 轨迹画布状态 ===
+      showTrajectoryOverlay: false,
+      overlayMode: 'fullscreen', // 'fullscreen' | 'windowed'
+      trajectoryScale: 1, // 已弃用（不再使用手动缩放）
+      autoFitPxPerDeg: 40, // 自动适配计算出的 px/deg（基于当前画布尺寸与数据范围）
+      trajectoryPoints: [], // [{x, y}] in overlay canvas space after transform
+      rawTrajectoryPoints: [], // 保存原始的 {ra, dec} 序列
+      lastRawPosition: null, // {ra, dec} numeric
+      targetRawPosition: null, // {ra, dec} numeric, fixed as overlay center reference
+      windowedRect: { x: 40, y: 80, width: 420, height: 300 },
+      // 逻辑画布尺寸：用于窗口模式将“全屏画布”按比例缩放进窗口
+      baseCanvasLogicalSize: { width: 1280, height: 720 },
+      windowDrag: { active: false, offsetX: 0, offsetY: 0 },
+      // === 视图变换（仅缩小比例；以目标与首点填满画布） ===
+      currentPxPerDeg: null, // 当前像素/度，只会缩小
+      viewMinWorldX: null, // 世界坐标：X 为 dRA(unwrapped)，Y 为 dDec
+      viewMaxWorldX: null,
+      viewMinWorldY: null,
+      viewMaxWorldY: null,
+      raUnwrapAnchor: null, // dRA 展开锚点（首点相对目标）
+      viewPadRatioX: 0.12,
+      viewPadRatioY: 0.10,
+      viewOffsetXPx: 0,
+      viewOffsetYPx: 0,
     }
   },
 
@@ -520,6 +593,9 @@ export default {
       // 监听卡片信息更新
       this.$bus.$on('updateCardInfo', this.updateCardInfo)
 
+      // 监听自动校准状态
+      this.$bus.$on('PolarAlignmentIsRunning', this.updatePolarAlignmentIsRunning)
+
       // 启动定期内存清理（每5分钟清理一次）
       this.startMemoryCleanup()
     },
@@ -532,6 +608,7 @@ export default {
       this.$bus.$off('PolarAlignmentState', this.updatePolarAlignmentState)
       this.$bus.$off('FieldDataUpdate', this.updateFieldData)
       this.$bus.$off('updateCardInfo', this.updateCardInfo)
+      this.$bus.$off('PolarAlignmentIsRunning', this.updatePolarAlignmentIsRunning)
 
       // 清理拖动事件监听
       this.cleanupDragListeners()
@@ -821,14 +898,716 @@ export default {
         this.addLog(this.isCollapsed ? this.$t('Interface Collapsed') : this.$t('Interface Expanded'), 'info')
       },
 
+      // === 轨迹画布相关 ===
+      toggleTrajectoryOverlay() {
+        this.showTrajectoryOverlay = !this.showTrajectoryOverlay
+        if (this.showTrajectoryOverlay) {
+          if (this.overlayMode === 'fullscreen') this.enableOverlayEventCapture(); else this.disableOverlayEventCapture()
+          this.$nextTick(() => {
+            this.initTrajectoryCanvas()
+            this.redrawTrajectory()
+          })
+        } else {
+          this.disableOverlayEventCapture()
+        }
+      },
+      switchToWindowed() {
+        this.overlayMode = 'windowed'
+        this.disableOverlayEventCapture()
+        this.resetViewMapping()
+        this.$nextTick(() => {
+          this.initTrajectoryCanvas()
+          this.redrawTrajectory()
+        })
+      },
+      switchToFullscreen() {
+        this.overlayMode = 'fullscreen'
+        this.enableOverlayEventCapture()
+        this.resetViewMapping()
+        this.clearTrajectoryCanvas()
+        this.$nextTick(() => {
+          this.initTrajectoryCanvas()
+          this.redrawTrajectory()
+        })
+      },
+      onOverlayWheel(e) {
+        // 已取消全屏缩放需求：忽略滚轮，仅防止穿透
+        e.preventDefault()
+      },
+      resetViewMapping() {
+        this.currentPxPerDeg = null
+        this.viewMinWorldX = null
+        this.viewMaxWorldX = null
+        this.viewMinWorldY = null
+        this.viewMaxWorldY = null
+        this.raUnwrapAnchor = null
+        this.viewOffsetXPx = 0
+        this.viewOffsetYPx = 0
+      },
+      // 清空视图映射，但保留 RA 展开锚点，防止清理旧点或模式切换时方向翻转
+      resetViewMappingKeepAnchor() {
+        const anchor = this.raUnwrapAnchor
+        this.currentPxPerDeg = null
+        this.viewMinWorldX = null
+        this.viewMaxWorldX = null
+        this.viewMinWorldY = null
+        this.viewMaxWorldY = null
+        this.viewOffsetXPx = 0
+        this.viewOffsetYPx = 0
+        this.raUnwrapAnchor = anchor
+      },
+      startWindowDrag(event) {
+        const e = event.touches ? event.touches[0] : event
+        this.windowDrag.active = true
+        this.windowDrag.offsetX = e.clientX - this.windowedRect.x
+        this.windowDrag.offsetY = e.clientY - this.windowedRect.y
+        window.addEventListener('mousemove', this.onWindowDragMove, { passive: false })
+        window.addEventListener('mouseup', this.stopWindowDrag, { passive: false })
+        window.addEventListener('touchmove', this.onWindowDragMove, { passive: false })
+        window.addEventListener('touchend', this.stopWindowDrag, { passive: false })
+      },
+      onWindowDragMove(event) {
+        if (!this.windowDrag.active) return
+        const e = event.touches ? event.touches[0] : event
+        const nx = e.clientX - this.windowDrag.offsetX
+        const ny = e.clientY - this.windowDrag.offsetY
+        this.windowedRect.x = Math.max(0, Math.min(nx, window.innerWidth - this.windowedRect.width))
+        this.windowedRect.y = Math.max(0, Math.min(ny, window.innerHeight - this.windowedRect.height))
+      },
+      stopWindowDrag() {
+        this.windowDrag.active = false
+        window.removeEventListener('mousemove', this.onWindowDragMove)
+        window.removeEventListener('mouseup', this.stopWindowDrag)
+        window.removeEventListener('touchmove', this.onWindowDragMove)
+        window.removeEventListener('touchend', this.stopWindowDrag)
+      },
+      enableOverlayEventCapture() {
+        // 拦截全局滚轮/触摸/鼠标事件，避免穿透到底图
+        const preventAll = e => { e.preventDefault(); e.stopPropagation(); }
+        this._overlayHandlers = this._overlayHandlers || {}
+        this._overlayHandlers.wheel = preventAll
+        this._overlayHandlers.touchmove = preventAll
+        this._overlayHandlers.mousedown = preventAll
+        window.addEventListener('wheel', this._overlayHandlers.wheel, { passive: false, capture: true })
+        window.addEventListener('touchmove', this._overlayHandlers.touchmove, { passive: false, capture: true })
+        window.addEventListener('mousedown', this._overlayHandlers.mousedown, { passive: false, capture: true })
+      },
+      disableOverlayEventCapture() {
+        if (!this._overlayHandlers) return
+        window.removeEventListener('wheel', this._overlayHandlers.wheel, { capture: true })
+        window.removeEventListener('touchmove', this._overlayHandlers.touchmove, { capture: true })
+        window.removeEventListener('mousedown', this._overlayHandlers.mousedown, { capture: true })
+        this._overlayHandlers = null
+      },
+      clearAllTrajectory() {
+        this.rawTrajectoryPoints = []
+        this.trajectoryPoints = []
+        this.lastRawPosition = null
+        this.resetViewMapping()
+        this.redrawTrajectory()
+      },
+      clearOldTrajectory() {
+        if (this.rawTrajectoryPoints.length <= 2) return
+        this.rawTrajectoryPoints = this.rawTrajectoryPoints.slice(-2)
+        this.trajectoryPoints = []
+        this.resetViewMappingKeepAnchor()
+        this.redrawTrajectory()
+      },
+      initTrajectoryCanvas() {
+        const canvas = this.$refs.trajectoryCanvas
+        if (!canvas) return
+        const dpr = window.devicePixelRatio || 1
+        let w, h, scaleX = 1, scaleY = 1
+        if (this.overlayMode === 'fullscreen') {
+          w = window.innerWidth
+          h = window.innerHeight
+          canvas.width = Math.round(w * dpr)
+          canvas.height = Math.round(h * dpr)
+          canvas.style.width = w + 'px'
+          canvas.style.height = h + 'px'
+        } else {
+          // 窗口模式：使用逻辑画布尺寸，绘制后整体缩放到窗口区域
+          const HEADER = 32
+          const vw = Math.max(50, Math.round(this.windowedRect.width))
+          const vh = Math.max(50, Math.round(this.windowedRect.height - HEADER))
+          const lw = this.baseCanvasLogicalSize.width
+          const lh = this.baseCanvasLogicalSize.height
+          // 计算将逻辑画布缩放到可视窗口的缩放比
+          scaleX = vw / lw
+          scaleY = vh / lh
+          // Canvas 显示尺寸 = 窗口尺寸，内部像素 = 显示尺寸 * DPR
+          w = vw
+          h = vh
+          canvas.style.width = vw + 'px'
+          canvas.style.height = vh + 'px'
+          canvas.width = Math.round(vw * dpr)
+          canvas.height = Math.round(vh * dpr)
+        }
+        const ctx = canvas.getContext('2d')
+        // 设置设备像素比缩放
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+        // 窗口模式下增加整体缩放，将逻辑画布缩放到窗口尺寸
+        if (this.overlayMode === 'windowed') {
+          ctx.scale(scaleX, scaleY)
+        }
+        this.clearTrajectoryCanvas()
+        // 背景由 drawTargetMarker 统一绘制
+      },
+      clearTrajectoryCanvas() {
+        const canvas = this.$refs.trajectoryCanvas
+        if (!canvas) return
+        const ctx = canvas.getContext('2d')
+        ctx.save()
+        ctx.setTransform(1, 0, 0, 1, 0, 0)
+        ctx.clearRect(0, 0, canvas.width, canvas.height)
+        ctx.restore()
+      },
+      // === 视图映射与工具 ===
+      getCanvasGeom() {
+        const canvas = this.$refs.trajectoryCanvas
+        if (!canvas) return null
+        // 在窗口模式下，Canvas 内部逻辑为 baseCanvasLogicalSize，
+        // 外部通过 ctx.scale 显示到窗口，所以几何计算返回逻辑尺寸
+        const w = this.overlayMode === 'windowed' ? this.baseCanvasLogicalSize.width : canvas.clientWidth
+        const h = this.overlayMode === 'windowed' ? this.baseCanvasLogicalSize.height : canvas.clientHeight
+        const padX = Math.round(w * (this.viewPadRatioX || 0.12))
+        const padY = Math.round(h * (this.viewPadRatioY || 0.10))
+        return { w, h, padX, padY }
+      },
+      worldForPoint(raDeg, decDeg) {
+        // 世界坐标以目标为原点：X=展开后的 dRA，Y=dDec（Dec 增大为正）
+        if (!this.targetRawPosition) return { x: 0, y: 0 }
+        const dRaNorm = this.normalizeRaDelta(raDeg - this.targetRawPosition.ra)
+        // 使用基于首点的展开锚点，避免跨 0/360 跳变
+        let x = dRaNorm
+        if (this.raUnwrapAnchor != null) {
+          // 将 x 调整到靠近锚点邻域
+          while (x - this.raUnwrapAnchor > 180) x -= 360
+          while (x - this.raUnwrapAnchor < -180) x += 360
+        }
+        const y = decDeg - this.targetRawPosition.dec
+        return { x, y }
+      },
+      makeWorldSeq(rawPoints) {
+        if (!this.targetRawPosition || !rawPoints || rawPoints.length === 0) return []
+        const dRasNorm = rawPoints.map(p => this.normalizeRaDelta(p.ra - this.targetRawPosition.ra))
+        // 将所有 dRA 先对齐到 raUnwrapAnchor 的邻域，避免切换模式或点数变化时展开方向反转
+        let anchor = this.raUnwrapAnchor
+        if (anchor == null && dRasNorm.length > 0) anchor = dRasNorm[0]
+        const aligned = dRasNorm.map(x => {
+          let v = x
+          while (v - anchor > 180) v -= 360
+          while (v - anchor < -180) v += 360
+          return v
+        })
+        // 再做连续展开，保证相邻点连接连贯
+        const dRas = this.unwrapRaDeltaSequence(aligned)
+        return rawPoints.map((p, i) => ({ x: dRas[i], y: p.dec - this.targetRawPosition.dec }))
+      },
+      // 基于“全量轨迹”的连续展开，返回用于垂线的最后两点世界坐标（允许超出常规范围）
+      getWorldABForPerp() {
+        if (!this.targetRawPosition || this.rawTrajectoryPoints.length < 2) return null
+        const all = this.rawTrajectoryPoints
+        const dRasNorm = all.map(p => this.normalizeRaDelta(p.ra - this.targetRawPosition.ra))
+        // 先按锚点对齐到同一邻域，再做连续展开，确保坐标轴/展开方向一致
+        let anchor = this.raUnwrapAnchor
+        if (anchor == null && dRasNorm.length > 0) anchor = dRasNorm[0]
+        const aligned = dRasNorm.map(x => {
+          let v = x
+          while (v - anchor > 180) v -= 360
+          while (v - anchor < -180) v += 360
+          return v
+        })
+        const dRas = this.unwrapRaDeltaSequence(aligned)
+        const n = all.length
+        const A = { x: dRas[n - 2], y: all[n - 2].dec - this.targetRawPosition.dec }
+        const B = { x: dRas[n - 1], y: all[n - 1].dec - this.targetRawPosition.dec }
+        return { A, B }
+      },
+      screenForWorld(wx, wy) {
+        const g = this.getCanvasGeom()
+        if (!g || !Number.isFinite(this.currentPxPerDeg)) return { x: 0, y: 0 }
+        const { w, h, padX, padY } = g
+        const x = padX + this.viewOffsetXPx + (wx - (this.viewMinWorldX || 0)) * this.currentPxPerDeg
+        const y = h - padY - this.viewOffsetYPx - (wy - (this.viewMinWorldY || 0)) * this.currentPxPerDeg
+        return { x, y }
+      },
+      ensureViewMappingInitialized(seqWorld) {
+        if (!seqWorld || seqWorld.length === 0) return
+        if (this.currentPxPerDeg != null && this.viewMinWorldX != null) return
+        const g = this.getCanvasGeom()
+        if (!g) return
+        const { w, h, padX, padY } = g
+        // 起始点：序列第一个；目标原点为 (0,0)
+        const first = seqWorld[0]
+        // 初始化展开锚点为首点 X（相对目标）
+        this.raUnwrapAnchor = first.x
+        const minX = Math.min(0, first.x)
+        const maxX = Math.max(0, first.x)
+        const minY = Math.min(0, first.y)
+        const maxY = Math.max(0, first.y)
+        const spanX = Math.max(1e-6, maxX - minX)
+        const spanY = Math.max(1e-6, maxY - minY)
+        const scaleX = (w - 2 * padX) / spanX
+        const scaleY = (h - 2 * padY) / spanY
+        this.currentPxPerDeg = Math.max(5, Math.min(scaleX, scaleY))
+        this.viewMinWorldX = minX
+        this.viewMaxWorldX = maxX
+        this.viewMinWorldY = minY
+        this.viewMaxWorldY = maxY
+        // 初次视图内容居中：仅在初始化时设置一次偏移
+        const contentWpx = spanX * this.currentPxPerDeg
+        const contentHpx = spanY * this.currentPxPerDeg
+        this.viewOffsetXPx = Math.round(((w - 2 * padX) - contentWpx) / 2)
+        this.viewOffsetYPx = Math.round(((h - 2 * padY) - contentHpx) / 2)
+      },
+      maybeExpandViewForPoint(wx, wy) {
+        // 若点在当前屏幕内，则不更新比例尺；若越界，扩展边界并仅缩小比例尺
+        const g = this.getCanvasGeom()
+        if (!g || this.currentPxPerDeg == null) return
+        const { w, h, padX, padY } = g
+        const px = padX + this.viewOffsetXPx + (wx - this.viewMinWorldX) * this.currentPxPerDeg
+        const py = h - padY - this.viewOffsetYPx - (wy - this.viewMinWorldY) * this.currentPxPerDeg
+        const inside = px >= padX && px <= (w - padX) && py >= padY && py <= (h - padY)
+        if (inside) return
+        // 扩展世界边界到包含该点
+        const newMinX = Math.min(this.viewMinWorldX, wx)
+        const newMaxX = Math.max(this.viewMaxWorldX, wx)
+        const newMinY = Math.min(this.viewMinWorldY, wy)
+        const newMaxY = Math.max(this.viewMaxWorldY, wy)
+        const spanX = Math.max(1e-6, newMaxX - newMinX)
+        const spanY = Math.max(1e-6, newMaxY - newMinY)
+        const scaleX = (w - 2 * padX) / spanX
+        const scaleY = (h - 2 * padY) / spanY
+        const candidate = Math.max(5, Math.min(scaleX, scaleY))
+        // 仅缩小
+        this.currentPxPerDeg = this.currentPxPerDeg == null ? candidate : Math.min(this.currentPxPerDeg, candidate)
+        this.viewMinWorldX = newMinX
+        this.viewMaxWorldX = newMaxX
+        this.viewMinWorldY = newMinY
+        this.viewMaxWorldY = newMaxY
+        // 固定锚点：不再重算偏移，保持目标点屏幕位置恒定
+      },
+      drawTargetMarker(scaleOverride = null) {
+        const canvas = this.$refs.trajectoryCanvas
+        if (!canvas) return
+        const ctx = canvas.getContext('2d')
+        const g = this.getCanvasGeom()
+        if (!g) return
+        const { w, h } = g
+        ctx.save()
+        // 背景
+        ctx.fillStyle = 'black'
+        ctx.fillRect(0, 0, w, h)
+        // 目标圆环
+        const center = this.screenForWorld(0, 0)
+        const ringDeg = this.getTargetRingDeg()
+        const scale = (scaleOverride != null ? scaleOverride : this.currentPxPerDeg) || 40
+        // 半径限制：不超出可见区域
+        const rPx = Math.max(6, Math.min(Math.min(w, h) * 0.45, ringDeg * scale))
+        ctx.strokeStyle = '#4CAF50'
+        ctx.lineWidth = 2
+        ctx.beginPath()
+        ctx.arc(center.x, center.y, rPx, 0, Math.PI * 2)
+        ctx.stroke()
+        ctx.fillStyle = '#4CAF50'
+        ctx.beginPath()
+        ctx.arc(center.x, center.y, 3, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.restore()
+      },
+      drawTargetAtCenter(ringDegOverride = null) {
+        const canvas = this.$refs.trajectoryCanvas
+        if (!canvas) return
+        const ctx = canvas.getContext('2d')
+        const cx = Math.round((this.overlayMode === 'windowed' ? this.baseCanvasLogicalSize.width : canvas.clientWidth) / 2)
+        const cy = Math.round((this.overlayMode === 'windowed' ? this.baseCanvasLogicalSize.height : canvas.clientHeight) / 2)
+        ctx.save()
+        // 黑色背景
+        ctx.fillStyle = 'black'
+        const bw = this.overlayMode === 'windowed' ? this.baseCanvasLogicalSize.width : canvas.clientWidth
+        const bh = this.overlayMode === 'windowed' ? this.baseCanvasLogicalSize.height : canvas.clientHeight
+        ctx.fillRect(0, 0, bw, bh)
+        // 目标点环（空心）+ 中心小点
+        const base = this.autoFitPxPerDeg || 40
+        const scalePxPerDeg = base
+        const ringDeg = ringDegOverride !== null ? ringDegOverride : this.getTargetRingDeg()
+        const halfW = bw / 2
+        const halfH = bh / 2
+        const pad = 24
+        const rMax = Math.max(6, Math.min(halfW - pad, halfH - pad))
+        const rPx = Math.max(6, Math.min(rMax, ringDeg * scalePxPerDeg))
+        // 空心圆
+        ctx.strokeStyle = '#4CAF50'
+        ctx.lineWidth = 2
+        ctx.beginPath()
+        ctx.arc(cx, cy, rPx, 0, Math.PI * 2)
+        ctx.stroke()
+        // 中心小点
+        ctx.fillStyle = '#4CAF50'
+        ctx.beginPath()
+        ctx.arc(cx, cy, 3, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.restore()
+      },
+      getTargetRingDeg() {
+        // 环大小不超过视场半径（取 RA/DEC 跨度的较小一半，留 90% 边距）
+        if (!this.fieldData) return 0.3
+        const ras = [this.fieldData.ra0, this.fieldData.ra1, this.fieldData.ra2, this.fieldData.ra3]
+        const decs = [this.fieldData.dec0, this.fieldData.dec1, this.fieldData.dec2, this.fieldData.dec3]
+        const raSpan = Math.max(...ras) - Math.min(...ras)
+        const decSpan = Math.max(...decs) - Math.min(...decs)
+        const halfMin = Math.max(0.01, Math.min(raSpan, decSpan) / 2)
+        return halfMin * 0.9
+      },
+      raDecToCanvasDelta(raDeg, decDeg) {
+        // 将相对目标点的 (ΔRA, ΔDEC) 转换为画布像素偏移。
+        // 使用自适应像素/度比例，并在全屏模式下再乘以用户缩放因子。
+        const base = this.autoFitPxPerDeg || 40
+        const scalePxPerDeg = base
+        // 固定约定：RA 增大向右
+        const dx = (this.normalizeRaDelta(raDeg)) * scalePxPerDeg
+        const dy = (-decDeg) * scalePxPerDeg
+        return { dx, dy }
+      },
+      normalizeRaDelta(deltaDeg) {
+        // 将 RA 差值归一到 [-180, 180)
+        let x = deltaDeg
+        x = ((x + 540) % 360) - 180
+        return x
+      },
+      unwrapRaDeltaSequence(dRaDegList) {
+        // 使相邻 dRA 序列在数值上连续，避免跨 0/360 发生长连线
+        if (!dRaDegList || dRaDegList.length === 0) return []
+        const out = [dRaDegList[0]]
+        for (let i = 1; i < dRaDegList.length; i++) {
+          let curr = dRaDegList[i]
+          let prev = out[i - 1]
+          let diff = curr - prev
+          while (diff > 180) { curr -= 360; diff = curr - prev }
+          while (diff < -180) { curr += 360; diff = curr - prev }
+          out.push(curr)
+        }
+        return out
+      },
+      appendTrajectoryPoint(rawRaDeg, rawDecDeg) {
+        // 已保留以兼容调用，但当前重绘使用 redrawTrajectory 覆盖全量绘制
+        if (!this.targetRawPosition) return
+        const canvas = this.$refs.trajectoryCanvas
+        if (!canvas) return
+        const cx = Math.round((this.overlayMode === 'windowed' ? this.baseCanvasLogicalSize.width : canvas.clientWidth) / 2)
+        const cy = Math.round((this.overlayMode === 'windowed' ? this.baseCanvasLogicalSize.height : canvas.clientHeight) / 2)
+        const dRa = rawRaDeg - this.targetRawPosition.ra
+        const dDec = rawDecDeg - this.targetRawPosition.dec
+        const { dx, dy } = this.raDecToCanvasDelta(dRa, dDec)
+        const point = { x: cx + dx, y: cy + dy }
+        this.trajectoryPoints.push(point)
+        this.drawPoint(point.x, point.y, '#FFD54F')
+      },
+      drawPoint(x, y, color) {
+        const canvas = this.$refs.trajectoryCanvas
+        if (!canvas) return
+        const ctx = canvas.getContext('2d')
+        ctx.save()
+        ctx.fillStyle = color || '#00BFFF'
+        ctx.beginPath()
+        ctx.arc(x, y, 3, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.restore()
+      },
+      drawArrow(x1, y1, x2, y2, color) {
+        const canvas = this.$refs.trajectoryCanvas
+        if (!canvas) return
+        const ctx = canvas.getContext('2d')
+        ctx.save()
+        ctx.strokeStyle = color || '#FFD54F'
+        ctx.fillStyle = color || '#FFD54F'
+        ctx.lineWidth = 2
+        ctx.beginPath()
+        ctx.moveTo(x1, y1)
+        ctx.lineTo(x2, y2)
+        ctx.stroke()
+        // 箭头
+        const angle = Math.atan2(y2 - y1, x2 - x1)
+        const headLen = 8
+        ctx.beginPath()
+        ctx.moveTo(x2, y2)
+        ctx.lineTo(x2 - headLen * Math.cos(angle - Math.PI / 6), y2 - headLen * Math.sin(angle - Math.PI / 6))
+        ctx.lineTo(x2 - headLen * Math.cos(angle + Math.PI / 6), y2 - headLen * Math.sin(angle + Math.PI / 6))
+        ctx.lineTo(x2, y2)
+        ctx.fill()
+        ctx.restore()
+      },
+      // 画从目标到最后一段的垂线（虚线）；如垂足不在段内，仅将线段有限延长至垂点
+      drawPerpendicularAuxLine() {
+        if (!this.targetRawPosition || this.rawTrajectoryPoints.length < 2) return
+        // 使用“全量连续展开”的最后两点，允许 RA 超出常规范围，保证几何连续
+        const pair = this.getWorldABForPerp(); if (!pair) return
+        const { A, B } = pair
+        const O = { x: 0, y: 0 } // 目标在世界坐标为原点（与 worldForPoint/展开保持一致）
+        // 线段 AB 的向量与 O 到 AB 的投影参数 t
+        const vx = B.x - A.x
+        const vy = B.y - A.y
+        const len2 = vx * vx + vy * vy
+        if (len2 < 1e-9) return
+        const t = ((O.x - A.x) * vx + (O.y - A.y) * vy) / len2
+        let Hx, Hy, segment
+        if (t >= 0 && t <= 1) {
+          // 垂足在线段上
+          Hx = A.x + t * vx
+          Hy = A.y + t * vy
+          // 垂足在线段上时，不再绘制整段，只画 O→H 的垂线
+          segment = null
+        } else {
+          // 垂足在线段外：计算真正的垂足 H，并把线段朝 H 方向有限延长至 H
+          Hx = A.x + t * vx
+          Hy = A.y + t * vy
+          if (t < 0) {
+            segment = { x1: Hx, y1: Hy, x2: A.x, y2: A.y }
+          } else {
+            segment = { x1: B.x, y1: B.y, x2: Hx, y2: Hy }
+          }
+        }
+        // 画垂线（O->H）与（可能的延长）线段，均使用虚线
+        const canvas = this.$refs.trajectoryCanvas
+        if (!canvas) return
+        const ctx = canvas.getContext('2d')
+        const Opx = this.screenForWorld(O.x, O.y)
+        const Hpx = this.screenForWorld(Hx, Hy)
+        // const S1 = this.screenForWorld(segment.x1, segment.y1)
+        // const S2 = this.screenForWorld(segment.x2, segment.y2)
+        ctx.save()
+        ctx.setLineDash([6, 6])
+        ctx.lineWidth = 1.5
+        ctx.strokeStyle = '#9E9E9E'
+        // 垂线 O-H
+        ctx.beginPath()
+        ctx.moveTo(Opx.x, Opx.y)
+        ctx.lineTo(Hpx.x, Hpx.y)
+        ctx.stroke()
+        // 在辅助线（虚线）上用箭头标明方向：从 H 指向 O（指向目标）
+        // 选择线段内一点作为箭头位置，避免与目标环重叠
+        const tArrow = 0.6
+        const ax = Hpx.x + (Opx.x - Hpx.x) * tArrow
+        const ay = Hpx.y + (Opx.y - Hpx.y) * tArrow
+        const ang = Math.atan2(Opx.y - Hpx.y, Opx.x - Hpx.x)
+        const head = 8
+        ctx.setLineDash([])
+        ctx.fillStyle = '#9E9E9E'
+        ctx.beginPath()
+        ctx.moveTo(ax, ay)
+        ctx.lineTo(ax - head * Math.cos(ang - Math.PI / 6), ay - head * Math.sin(ang - Math.PI / 6))
+        ctx.lineTo(ax - head * Math.cos(ang + Math.PI / 6), ay - head * Math.sin(ang + Math.PI / 6))
+        ctx.closePath()
+        ctx.fill()
+        // 恢复虚线样式，用于绘制延长段
+        ctx.setLineDash([6, 6])
+        // 仅当垂足不在段上时绘制“延长到垂点”的那段
+        if (segment) {
+          const S1 = this.screenForWorld(segment.x1, segment.y1)
+          const S2 = this.screenForWorld(segment.x2, segment.y2)
+          ctx.beginPath()
+          ctx.moveTo(S1.x, S1.y)
+          ctx.lineTo(S2.x, S2.y)
+          ctx.stroke()
+          // 在延长段上也标注一个朝向“垂足 H”的小箭头
+          const exStart = (t < 0) ? { x: A.x, y: A.y } : { x: B.x, y: B.y }
+          const exEnd = { x: Hx, y: Hy }
+          const ES = this.screenForWorld(exStart.x, exStart.y)
+          const EE = this.screenForWorld(exEnd.x, exEnd.y)
+          const exdx = EE.x - ES.x
+          const exdy = EE.y - ES.y
+          const exLen2 = exdx * exdx + exdy * exdy
+          if (exLen2 > 1) {
+            const tEx = 0.5
+            const eax = ES.x + exdx * tEx
+            const eay = ES.y + exdy * tEx
+            const eang = Math.atan2(exdy, exdx)
+            ctx.setLineDash([])
+            ctx.beginPath()
+            ctx.moveTo(eax, eay)
+            ctx.lineTo(eax - head * Math.cos(eang - Math.PI / 6), eay - head * Math.sin(eang - Math.PI / 6))
+            ctx.lineTo(eax - head * Math.cos(eang + Math.PI / 6), eay - head * Math.sin(eang + Math.PI / 6))
+            ctx.closePath()
+            ctx.fill()
+          }
+        }
+        ctx.restore()
+      },
+      computeAutoFitScale() {
+        const canvas = this.$refs.trajectoryCanvas
+        if (!canvas || !this.targetRawPosition) return 40
+        const cx = this.targetRawPosition.ra
+        const cy = this.targetRawPosition.dec
+        let maxDx = 0, maxDy = 0
+        // 历史点
+        for (let i = 0; i < this.rawTrajectoryPoints.length; i++) {
+          const p = this.rawTrajectoryPoints[i]
+          maxDx = Math.max(maxDx, Math.abs(this.normalizeRaDelta(p.ra - cx)))
+          maxDy = Math.max(maxDy, Math.abs(p.dec - cy))
+        }
+        // 目标环半径（确保环不会顶边）
+        const ringDeg = this.getTargetRingDeg()
+        maxDx = Math.max(maxDx, ringDeg)
+        maxDy = Math.max(maxDy, ringDeg)
+        // 全屏时纳入视场角点以适配视场框；窗口模式不纳入
+        if (this.overlayMode === 'fullscreen') {
+          if (this.fieldData && Number.isFinite(this.fieldData.ra0)) {
+            const corners = [
+              { ra: this.fieldData.ra0, dec: this.fieldData.dec0 },
+              { ra: this.fieldData.ra1, dec: this.fieldData.dec1 },
+              { ra: this.fieldData.ra2, dec: this.fieldData.dec2 },
+              { ra: this.fieldData.ra3, dec: this.fieldData.dec3 },
+            ]
+            for (const c of corners) {
+              maxDx = Math.max(maxDx, Math.abs(this.normalizeRaDelta(c.ra - cx)))
+              maxDy = Math.max(maxDy, Math.abs(c.dec - cy))
+            }
+          }
+        }
+        if (maxDx === 0 && maxDy === 0) return 40
+        const w = this.overlayMode === 'windowed' ? this.baseCanvasLogicalSize.width : canvas.clientWidth
+        const h = this.overlayMode === 'windowed' ? this.baseCanvasLogicalSize.height : canvas.clientHeight
+        // 固定像素内边距，考虑箭头长度（8px）与点半径（4px）
+        const arrowHead = 8, pointR = 4
+        const pixelPadding = 32 + arrowHead + pointR
+        const halfW = Math.max(60, (w / 2) - pixelPadding)
+        const halfH = Math.max(50, (h / 2) - pixelPadding)
+        // 让最远点落在中心到边界距离的 80% 处（留足可视余量）
+        const margin = 0.8
+        let scale = Math.max(5, Math.min((halfW * margin) / (maxDx || 1e-6), (halfH * margin) / (maxDy || 1e-6)))
+        // 二次校验：按该比例转换一次，确保确实未越界，如越界再缩小比例
+        const pad = pixelPadding
+        const cxPx = w / 2, cyPx = h / 2
+        let maxAbsPxX = 0, maxAbsPxY = 0
+        const collect = []
+        for (let i = 0; i < this.rawTrajectoryPoints.length; i++) collect.push(this.rawTrajectoryPoints[i])
+        if (this.overlayMode === 'fullscreen' && this.fieldData && Number.isFinite(this.fieldData.ra0)) {
+          collect.push({ ra: this.fieldData.ra0, dec: this.fieldData.dec0 })
+          collect.push({ ra: this.fieldData.ra1, dec: this.fieldData.dec1 })
+          collect.push({ ra: this.fieldData.ra2, dec: this.fieldData.dec2 })
+          collect.push({ ra: this.fieldData.ra3, dec: this.fieldData.dec3 })
+        }
+        for (const p of collect) {
+          const dxDeg = this.normalizeRaDelta(p.ra - cx)
+          const dyDeg = (p.dec - cy)
+          maxAbsPxX = Math.max(maxAbsPxX, Math.abs(dxDeg * scale))
+          maxAbsPxY = Math.max(maxAbsPxY, Math.abs(dyDeg * scale))
+        }
+        const allowedX = halfW - pad
+        const allowedY = halfH - pad
+        const adj = Math.min(1, allowedX / (maxAbsPxX || 1e-6), allowedY / (maxAbsPxY || 1e-6))
+        scale *= adj
+        return scale
+      },
+      redrawTrajectory() {
+        if (!this.showTrajectoryOverlay || !this.targetRawPosition) return
+        this.initTrajectoryCanvas()
+        const canvas = this.$refs.trajectoryCanvas
+        if (!canvas) return
+        const ctx = canvas.getContext('2d')
+        // 预先将所有点转换到世界坐标，并初始化映射
+        const rawAll = this.rawTrajectoryPoints
+        // 使用全量点序列初始化/扩展视图映射，确保跨 0/360 时展开方向一致
+        const ensureRaw = rawAll
+        const worldSeq = this.makeWorldSeq(ensureRaw)
+        this.ensureViewMappingInitialized(worldSeq)
+        // 选择绘制的数据集：全屏=全部；窗口=最新三个，但保持展开锚点稳定
+        const raw = this.overlayMode === 'windowed' ? rawAll.slice(-3) : rawAll
+        const world = this.makeWorldSeq(raw)
+        // 先走一遍更新比例/边界，不绘制，确保下游图元坐标系一致
+        for (let i = 0; i < world.length; i++) this.maybeExpandViewForPoint(world[i].x, world[i].y)
+        // 再绘背景/目标环
+        this.drawTargetMarker()
+        // 绘制轨迹
+        this.trajectoryPoints = []
+        let prevPt = null
+        for (let i = 0; i < world.length; i++) {
+          const spt = this.screenForWorld(world[i].x, world[i].y)
+          const px = spt.x
+          const py = spt.y
+          const isLast = i === raw.length - 1
+          if (!isLast) {
+            this.drawPoint(px, py, '#FFD54F')
+            if (prevPt) this.drawArrow(prevPt.x, prevPt.y, px, py, '#FFD54F')
+          } else {
+            if (this.overlayMode === 'fullscreen') {
+              this.drawPoint(px, py, '#00BFFF')
+              this.drawCurrentFoV('#00BFFF', 0.3)
+            } else {
+              this.drawHollowCircle(px, py, 8, '#00BFFF', 2)
+            }
+            if (prevPt) this.drawArrow(prevPt.x, prevPt.y, px, py, '#FFD54F')
+          }
+          prevPt = { x: px, y: py }
+          this.trajectoryPoints.push({ x: px, y: py })
+        }
+        // 辅助：目标到最后段的垂线（虚线）
+        this.drawPerpendicularAuxLine()
+      },
+      drawHollowCircle(x, y, r = 8, color = '#FFFFFF', lineWidth = 2) {
+        const canvas = this.$refs.trajectoryCanvas
+        if (!canvas) return
+        const ctx = canvas.getContext('2d')
+        ctx.save()
+        ctx.strokeStyle = color
+        ctx.lineWidth = lineWidth
+        ctx.beginPath()
+        ctx.arc(x, y, r, 0, Math.PI * 2)
+        ctx.stroke()
+        ctx.restore()
+      },
+      drawCurrentFoV(color = '#00BFFF', fillOpacity = 0.25) {
+        if (!this.fieldData || !this.targetRawPosition) return
+        const canvas = this.$refs.trajectoryCanvas
+        if (!canvas) return
+        const ctx = canvas.getContext('2d')
+        const corners = [
+          { ra: this.fieldData.ra0, dec: this.fieldData.dec0 },
+          { ra: this.fieldData.ra1, dec: this.fieldData.dec1 },
+          { ra: this.fieldData.ra2, dec: this.fieldData.dec2 },
+          { ra: this.fieldData.ra3, dec: this.fieldData.dec3 },
+        ]
+        // 依据“展开锚点 raUnwrapAnchor”决定展开方向，避免切换模式时朝向反转
+        const anchor = (this.raUnwrapAnchor != null) ? (this.raUnwrapAnchor >= 0 ? 1 : -1) : 1
+        const pts = corners.map((c, i) => {
+          // 先取世界坐标，再在 X 方向按 lastSide 选择最临近展开
+          const wpt = this.worldForPoint(c.ra, c.dec)
+          // 如果与 lastSide 相反且两侧等价，选择 lastSide 方向的等效点
+          let wx = wpt.x
+          if (anchor > 0 && wx < 0) wx += Math.ceil((-wx) / 360) * 360
+          if (anchor < 0 && wx > 0) wx -= Math.ceil((wx) / 360) * 360
+          return this.screenForWorld(wx, wpt.y)
+        })
+        if (pts.length !== 4) return
+        ctx.save()
+        ctx.strokeStyle = color
+        ctx.fillStyle = color
+        ctx.globalAlpha = 1
+        ctx.beginPath()
+        ctx.moveTo(pts[0].x, pts[0].y)
+        for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y)
+        ctx.closePath()
+        ctx.globalAlpha = 1
+        ctx.stroke()
+        ctx.globalAlpha = fillOpacity
+        ctx.fill()
+        ctx.restore()
+      },
+
       resetCalibration() {
         // 使用统一的内存清理方法
         this.clearCachedData()
 
         this.addLog(this.$t('Calibration Data Reset'), 'info')
-        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'ResetAutoPolarAlignment')
+        // this.$bus.$emit('AppSendMessage', 'Vue_Command', 'ResetAutoPolarAlignment')
         this.$bus.$emit('ClearCalibrationPoints')
         this.$bus.$emit('ClearStatusTextFromStarMap')
+        // 清空轨迹
+        this.rawTrajectoryPoints = []
+        this.trajectoryPoints = []
+        this.lastRawPosition = null
+        this.targetRawPosition = null
       },
 
       restoreCalibration() {
@@ -898,6 +1677,26 @@ export default {
           this.currentPosition = {
             ra: this.formatCoordinate(data[0], 'ra'),
             dec: this.formatCoordinate(data[1], 'dec')
+          }
+
+          // === 轨迹逻辑挂接 ===
+          // 使用原始角度（假设 data[0], data[1], data[10], data[11] 为度单位）
+          const rawRa = data[0]
+          const rawDec = data[1]
+          // 在进入调整阶段（目标提供）时固定目标点；否则不绘制
+          if (data[10] !== -1 && data[11] !== -1) {
+            if (!this.targetRawPosition || (this.targetRawPosition.ra !== data[10] || this.targetRawPosition.dec !== data[11])) {
+              this.targetRawPosition = { ra: data[10], dec: data[11] }
+              // 重绘以目标点为中心
+              if (this.showTrajectoryOverlay) this.redrawTrajectory()
+            }
+            const posChanged = !this.lastRawPosition || this.lastRawPosition.ra !== rawRa || this.lastRawPosition.dec !== rawDec
+            if (posChanged) {
+              this.rawTrajectoryPoints.push({ ra: rawRa, dec: rawDec })
+              // 改为全量重绘（确保自适应比例包含所有点、并绘制视场框）
+              if (this.showTrajectoryOverlay) this.redrawTrajectory()
+              this.lastRawPosition = { ra: rawRa, dec: rawDec }
+            }
           }
 
           if (data[10] === -1 && data[11] === -1) {
@@ -1166,7 +1965,7 @@ export default {
         if (!Number.isFinite(value)) return `0.0${this.unitGlyph(this.adjustmentUnit)}`
         // value 的单位 = props.adjustmentUnit
         const valArcmin = this.unitToArcmin(value, this.adjustmentUnit)
-        // 展示单位仍然用 props.adjustmentUnit（也可改成固定‘arcmin’）
+        // 展示单位仍然用 props.adjustmentUnit（也可改成固定'arcmin'）
         return this.formatWithUnit(valArcmin, this.adjustmentUnit, 1)
       },
 
@@ -1391,6 +2190,10 @@ export default {
             }
           }
         }
+      },
+
+      updatePolarAlignmentIsRunning(isRunning) {
+        this.isCalibrationRunning = isRunning
       },
 
       // ========================================
@@ -1792,6 +2595,90 @@ export default {
 </script>
 
 <style scoped>
+/* === 轨迹覆盖层样式 === */
+.trajectory-overlay {
+  position: fixed;
+  inset: 0;
+  background: black;
+  z-index: 10002 !important;
+  pointer-events: auto;
+}
+.trajectory-overlay canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+}
+.overlay-panel {
+  position: absolute;
+  left: 16px;
+  top: 16px;
+  background: rgba(30, 30, 30, 0.7);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 8px;
+  padding: 10px 12px;
+  cursor: move;
+}
+.panel-row { display: flex; gap: 8px; margin-bottom: 6px; font-size: 12px; }
+.panel-label { opacity: 0.85; }
+.panel-value { opacity: 0.95; }
+.panel-actions { display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+.panel-btn { background: rgba(255,255,255,0.14); color: #fff; border: none; border-radius: 6px; padding: 6px 10px; cursor: pointer; }
+.panel-btn.small { padding: 4px 8px; font-size: 12px; }
+.panel-btn:hover { background: rgba(255,255,255,0.22); }
+
+.trajectory-window {
+  position: fixed;
+  z-index: 10002 !important;
+  background: rgba(18,18,18,0.95);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.4);
+  overflow: hidden;
+  pointer-events: auto;
+}
+.window-header {
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px;
+  background: rgba(45,45,55,0.9);
+  color: #fff;
+  cursor: move;
+}
+.window-title { font-size: 13px; }
+.window-actions { display: flex; gap: 6px; }
+.window-content { width: 100%; height: calc(100% - 32px); position: relative; overflow: hidden; }
+.window-content canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+.overlay-close-btn {
+  position: absolute;
+  right: 16px;
+  top: 16px;
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: rgba(255,255,255,0.12);
+  color: #fff;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.overlay-close-btn:hover {
+  background: rgba(255,255,255,0.2);
+}
+.overlay-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  color: rgba(255,255,255,0.85);
+  font-size: 12px;
+}
 /* === 最小化状态样式 === */
 .polar-alignment-minimized {
   position: fixed;

@@ -1,5 +1,6 @@
 {
   "View Settings": "View Settings",
+  "Settings": "Settings",
   "Planets Tonight": "Planets Tonight",
   "Data Credits": "Data Credits",
   "Search...": "Search...",
@@ -380,4 +381,15 @@
   "Facing Pole": "Facing Pole: {0}, Latitude: {1}",
   "Location Changed": "Location changed, facing pole: {0}, latitude: {1}",
   "Recalculating Adjustment Directions": "Recalculating adjustment directions"
+  ,
+  "Show Trajectory Canvas": "Show Trajectory Canvas",
+  "Hide Trajectory Canvas": "Hide Trajectory Canvas",
+  "Scroll to zoom, target fixed at center": "Target fixed at center",
+  "Target fixed at center": "Target fixed at center"
+  ,
+  "Clear All Trajectory": "Clear All Trajectory",
+  "Clear Old Trajectory": "Clear Old Trajectory",
+  "Switch to Windowed Mode": "Switch to Windowed Mode",
+  "Switch to Fullscreen Mode": "Switch to Fullscreen Mode",
+  "Trajectory": "Trajectory"
 }

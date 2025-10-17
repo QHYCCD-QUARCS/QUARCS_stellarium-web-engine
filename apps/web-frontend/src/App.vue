@@ -294,7 +294,7 @@
               </div>
             </v-list-item-icon>
             <v-list-item-content>
-              <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('View Settings')
+              <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('General Settings')
                 }}</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
@@ -2141,10 +2141,12 @@ export default {
                 window.location.reload();
                 break;
               case 'PolarAlignmentState':
-                if (parts.length === 4) {
-                  const state = parts[1];
-                  const message = parts[2];
-                  const percentage = parts[3];
+                if (parts.length === 5) {
+                  const isRunning = parts[1];
+                  const state = parts[2];
+                  const message = parts[3];
+                  const percentage = parts[4];
+                  this.$bus.$emit('PolarAlignmentIsRunning', isRunning);
                   this.$bus.$emit('PolarAlignmentState', state, message, percentage);
                 }
                 break;
@@ -6068,6 +6070,18 @@ export default {
         } catch (error) {
           console.warn('清除目标点时出错:', error);
         }
+      }
+
+      if (this.fakePolarAxisCircle) {
+        try {
+          if (glLayer) {
+            glLayer.remove(this.fakePolarAxisCircle);
+            console.log('成功清除假极轴');
+          }
+        } catch (error) {
+          console.warn('清除假极轴时出错:', error);
+        }
+        this.fakePolarAxisCircle = null;
       }
 
       console.log('所有校准相关元素清除完成');

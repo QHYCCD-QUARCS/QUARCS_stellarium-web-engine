@@ -576,7 +576,7 @@ export default {
     this.$bus.$on('PHD2StarBoxView', this.togglePHD2StarBox);
     this.$bus.$on('PHD2StarCrossView', this.togglePHD2StarCross);
     this.$bus.$on("ImageSolveFinished", this.ImageSolveFinished);
-    this.$bus.$on('Focal Length (mm)', this.FocalLengthSet);
+    // this.$bus.$on('Focal Length (mm)', this.FocalLengthSet);
     this.$bus.$on('SetFocalLengthNum', this.FocalLengthSet);
     this.$bus.$on('FocalLength', this.FocalLengthSet);
     this.$bus.$on('SetBinningNum', this.SetBinningNum);

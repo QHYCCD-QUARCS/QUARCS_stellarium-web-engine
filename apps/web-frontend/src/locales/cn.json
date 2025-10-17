@@ -1,5 +1,6 @@
 {
   "View Settings": "视图设置",
+  "Settings": "设置",
   "Planets Tonight": "今夜行星",
   "Data Credits": "数据来源",
   "Search...": "搜索...",
@@ -379,4 +380,15 @@
   "Facing Pole": "朝向极点：{0}，纬度：{1}",
   "Location Changed": "位置已更改，朝向极点：{0}，纬度：{1}",
   "Recalculating Adjustment Directions": "重新计算调整方向"
+  ,
+  "Show Trajectory Canvas": "显示轨迹画布",
+  "Hide Trajectory Canvas": "隐藏轨迹画布",
+  "Scroll to zoom, target fixed at center": "目标固定在中心",
+  "Target fixed at center": "目标固定在中心"
+  ,
+  "Clear All Trajectory": "清除全部轨迹",
+  "Clear Old Trajectory": "清除旧轨迹",
+  "Switch to Windowed Mode": "切换为窗口模式",
+  "Switch to Fullscreen Mode": "切换为全屏模式",
+  "Trajectory": "轨迹"
 }
