@@ -15,8 +15,5 @@ deltat.data
 deltat.preds
 hip_main.dat.gz
 
-<<<<<<< HEAD
-=======
-apps/web-frontend/dist.zip
-apps/web-frontend/dist.zip
->>>>>>> 351c9f1b39408f99521e92b25dcf7c598465d762
+apps/web-frontend/node_modules/.cache/*
+
