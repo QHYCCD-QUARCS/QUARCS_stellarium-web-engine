@@ -334,6 +334,7 @@
   "Clearing All Calibration Points": "清除所有校准点",
   "Calibration Round Started": "第{0}轮校准调整开始",
   "Polar Alignment Completed": "极轴校准完成，极轴已对准！",
+  "Trajectory.Instruction": "调整赤道仪，使小圆圈圈住目标中心即可完成校准",
   "Polar Alignment Needs Manual Adjustment": "极轴校准完成，需要手动调整",
   "Interface Minimized": "界面已最小化",
   "Interface Expanded": "界面已展开",
@@ -390,5 +391,27 @@
   "Clear Old Trajectory": "清除旧轨迹",
   "Switch to Windowed Mode": "切换为窗口模式",
   "Switch to Fullscreen Mode": "切换为全屏模式",
-  "Trajectory": "轨迹"
+  "Trajectory": "轨迹",
+  "Common": {
+    "close": "关闭"
+  },
+  "MeridianFlipNotifier": {
+    "banner": {
+      "text": "中天翻转将在 {time} 后开始"
+    },
+    "actions": {
+      "autoAtTime": "到时自动翻转",
+      "manual": "手动翻转",
+      "flipNow": "立即翻转"
+    },
+    "modal": {
+      "title": "中天翻转提醒",
+      "body": "剩余时间 {time}，请选择翻转方式："
+    },
+    "mini": {
+      "title": "中天翻转倒计时",
+      "auto": "自动",
+      "manual": "手动"
+    }
+  }
 }

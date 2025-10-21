@@ -335,6 +335,7 @@
   "Clearing All Calibration Points": "Clearing all calibration points",
   "Calibration Round Started": "Round {0} calibration adjustment started",
   "Polar Alignment Completed": "Polar alignment completed, polar axis aligned!",
+  "Trajectory.Instruction": "Move the mount until the small circle encloses the target center",
   "Polar Alignment Needs Manual Adjustment": "Polar alignment completed, manual adjustment needed",
   "Interface Minimized": "Interface minimized",
   "Interface Expanded": "Interface expanded",
@@ -391,5 +392,27 @@
   "Clear Old Trajectory": "Clear Old Trajectory",
   "Switch to Windowed Mode": "Switch to Windowed Mode",
   "Switch to Fullscreen Mode": "Switch to Fullscreen Mode",
-  "Trajectory": "Trajectory"
+  "Trajectory": "Trajectory",
+  "Common": {
+    "close": "Close"
+  },
+  "MeridianFlipNotifier": {
+    "banner": {
+      "text": "Meridian flip will start in {time}"
+    },
+    "actions": {
+      "autoAtTime": "Auto flip at time",
+      "manual": "Manual flip",
+      "flipNow": "Flip Now"
+    },
+    "modal": {
+      "title": "Meridian Flip Reminder",
+      "body": "Remaining time {time}, please choose a flip mode:"
+    },
+    "mini": {
+      "title": "Meridian Flip Countdown",
+      "auto": "Auto",
+      "manual": "Manual"
+    }
+  }
 }

@@ -244,7 +244,7 @@
     <button class="overlay-close-btn" @click.stop="toggleTrajectoryOverlay" :title="$t('Hide Trajectory Canvas')">
       <v-icon>mdi-close</v-icon>
     </button>
-    <div class="overlay-hint">{{ $t('Target fixed at center') }}</div>
+    <div class="overlay-hint">{{ $t('Trajectory.Instruction') }}</div>
     <div class="overlay-panel">
       <div class="panel-row">
         <span class="panel-label">{{ $t('Current') }}:</span>
@@ -465,6 +465,11 @@ export default {
       viewPadRatioY: 0.10,
       viewOffsetXPx: 0,
       viewOffsetYPx: 0,
+      // 轨迹点合并容差（角分）
+      trajectoryMergeTolArcmin: 2.0,  // 轨迹点合并容差（角分）
+      calibrationCircleArcmin: 1.0,  // 校准圆半径（角分）-- 约等于校准精度
+
+      hasAcceptUpdateMessage: false, // 是否已经接受更新消息,防止由于组件加载顺序导致组件更新丢失
     }
   },
 
@@ -595,6 +600,11 @@ export default {
 
       // 监听自动校准状态
       this.$bus.$on('PolarAlignmentIsRunning', this.updatePolarAlignmentIsRunning)
+
+      // 组件加载完成后，若尚未收到更新消息，则主动请求极轴对齐状态
+      if (!this.hasAcceptUpdateMessage) {
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getPolarAlignmentState')
+      }
 
       // 启动定期内存清理（每5分钟清理一次）
       this.startMemoryCleanup()
@@ -1074,54 +1084,74 @@ export default {
         const padY = Math.round(h * (this.viewPadRatioY || 0.10))
         return { w, h, padX, padY }
       },
-      worldForPoint(raDeg, decDeg) {
-        // 世界坐标以目标为原点：X=展开后的 dRA，Y=dDec（Dec 增大为正）
+      worldForPoint(raDeg, decDeg, timeMsOrDate = null) {
+        // 使用地平坐标（Az/Alt）绘制：世界坐标以“目标点”为原点
         if (!this.targetRawPosition) return { x: 0, y: 0 }
-        const dRaNorm = this.normalizeRaDelta(raDeg - this.targetRawPosition.ra)
+        const loc = this.$store?.state?.currentLocation || {}
+        const lat = Number(loc.lat)
+        const lon = Number(loc.lng)
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) return { x: 0, y: 0 }
+        const t = (timeMsOrDate instanceof Date) ? timeMsOrDate : new Date(timeMsOrDate || Date.now())
+        const cur = this.equatorialToHorizontal(raDeg, decDeg, t, lat, lon)
+        const tgt = this.equatorialToHorizontal(this.targetRawPosition.ra, this.targetRawPosition.dec, t, lat, lon)
+        let dx = this.normalizeAzDelta(cur.az - tgt.az) // dAz（考虑 0/360 包裹）
+        let dy = cur.alt - tgt.alt                    // dAlt
         // 使用基于首点的展开锚点，避免跨 0/360 跳变
-        let x = dRaNorm
         if (this.raUnwrapAnchor != null) {
-          // 将 x 调整到靠近锚点邻域
-          while (x - this.raUnwrapAnchor > 180) x -= 360
-          while (x - this.raUnwrapAnchor < -180) x += 360
+          while (dx - this.raUnwrapAnchor > 180) dx -= 360
+          while (dx - this.raUnwrapAnchor < -180) dx += 360
         }
-        const y = decDeg - this.targetRawPosition.dec
-        return { x, y }
+        return { x: dx, y: dy }
       },
       makeWorldSeq(rawPoints) {
         if (!this.targetRawPosition || !rawPoints || rawPoints.length === 0) return []
-        const dRasNorm = rawPoints.map(p => this.normalizeRaDelta(p.ra - this.targetRawPosition.ra))
-        // 将所有 dRA 先对齐到 raUnwrapAnchor 的邻域，避免切换模式或点数变化时展开方向反转
+        const loc = this.$store?.state?.currentLocation || {}
+        const lat = Number(loc.lat)
+        const lon = Number(loc.lng)
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) return []
+        const times = rawPoints.map((p, idx) => {
+          if (p.t) return new Date(p.t)
+          if (idx > 0 && rawPoints[idx - 1].t) return new Date(rawPoints[idx - 1].t)
+          return new Date()
+        })
+        const targAltAz = times.map(t => this.equatorialToHorizontal(this.targetRawPosition.ra, this.targetRawPosition.dec, t, lat, lon))
+        const curAltAz = rawPoints.map((p, i) => this.equatorialToHorizontal(p.ra, p.dec, times[i], lat, lon))
+        const dAzNorm = curAltAz.map((c, i) => this.normalizeAzDelta(c.az - targAltAz[i].az))
         let anchor = this.raUnwrapAnchor
-        if (anchor == null && dRasNorm.length > 0) anchor = dRasNorm[0]
-        const aligned = dRasNorm.map(x => {
+        if (anchor == null && dAzNorm.length > 0) anchor = dAzNorm[0]
+        const aligned = dAzNorm.map(x => {
           let v = x
           while (v - anchor > 180) v -= 360
           while (v - anchor < -180) v += 360
           return v
         })
-        // 再做连续展开，保证相邻点连接连贯
-        const dRas = this.unwrapRaDeltaSequence(aligned)
-        return rawPoints.map((p, i) => ({ x: dRas[i], y: p.dec - this.targetRawPosition.dec }))
+        const dAzs = this.unwrapRaDeltaSequence(aligned)
+        return rawPoints.map((p, i) => ({ x: dAzs[i], y: curAltAz[i].alt - targAltAz[i].alt }))
       },
       // 基于“全量轨迹”的连续展开，返回用于垂线的最后两点世界坐标（允许超出常规范围）
       getWorldABForPerp() {
         if (!this.targetRawPosition || this.rawTrajectoryPoints.length < 2) return null
+        const loc = this.$store?.state?.currentLocation || {}
+        const lat = Number(loc.lat)
+        const lon = Number(loc.lng)
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null
         const all = this.rawTrajectoryPoints
-        const dRasNorm = all.map(p => this.normalizeRaDelta(p.ra - this.targetRawPosition.ra))
-        // 先按锚点对齐到同一邻域，再做连续展开，确保坐标轴/展开方向一致
-        let anchor = this.raUnwrapAnchor
-        if (anchor == null && dRasNorm.length > 0) anchor = dRasNorm[0]
-        const aligned = dRasNorm.map(x => {
-          let v = x
-          while (v - anchor > 180) v -= 360
-          while (v - anchor < -180) v += 360
-          return v
-        })
-        const dRas = this.unwrapRaDeltaSequence(aligned)
-        const n = all.length
-        const A = { x: dRas[n - 2], y: all[n - 2].dec - this.targetRawPosition.dec }
-        const B = { x: dRas[n - 1], y: all[n - 1].dec - this.targetRawPosition.dec }
+        const tA = new Date(all[all.length - 2].t || Date.now())
+        const tB = new Date(all[all.length - 1].t || Date.now())
+        const tgtA = this.equatorialToHorizontal(this.targetRawPosition.ra, this.targetRawPosition.dec, tA, lat, lon)
+        const tgtB = this.equatorialToHorizontal(this.targetRawPosition.ra, this.targetRawPosition.dec, tB, lat, lon)
+        const curA = this.equatorialToHorizontal(all[all.length - 2].ra, all[all.length - 2].dec, tA, lat, lon)
+        const curB = this.equatorialToHorizontal(all[all.length - 1].ra, all[all.length - 1].dec, tB, lat, lon)
+        let dxA = this.normalizeAzDelta(curA.az - tgtA.az)
+        let dxB = this.normalizeAzDelta(curB.az - tgtB.az)
+        if (this.raUnwrapAnchor != null) {
+          while (dxA - this.raUnwrapAnchor > 180) dxA -= 360
+          while (dxA - this.raUnwrapAnchor < -180) dxA += 360
+          while (dxB - this.raUnwrapAnchor > 180) dxB -= 360
+          while (dxB - this.raUnwrapAnchor < -180) dxB += 360
+        }
+        const A = { x: dxA, y: curA.alt - tgtA.alt }
+        const B = { x: dxB, y: curB.alt - tgtB.alt }
         return { A, B }
       },
       screenForWorld(wx, wy) {
@@ -1275,6 +1305,46 @@ export default {
         let x = deltaDeg
         x = ((x + 540) % 360) - 180
         return x
+      },
+      normalizeAzDelta(deltaDeg) {
+        // 将 Az 差值归一到 [-180, 180)
+        let x = deltaDeg
+        x = ((x + 540) % 360) - 180
+        return x
+      },
+
+      // === 轨迹点合并/追加（按 Alt/Az 容差） ===
+      appendRawTrajectoryPoint(raDeg, decDeg, timeMs = Date.now()) {
+        if (!Number.isFinite(raDeg) || !Number.isFinite(decDeg)) return
+        const loc = this.$store?.state?.currentLocation || {}
+        const lat = Number(loc.lat)
+        const lon = Number(loc.lng)
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+          // 无法转换 Alt/Az，则直接追加
+          this.rawTrajectoryPoints.push({ ra: raDeg, dec: decDeg, t: timeMs })
+          return
+        }
+        const t = new Date(timeMs)
+        // 计算当前点与上一点在 Alt/Az 上的距离
+        const curAltAz = this.equatorialToHorizontal(raDeg, decDeg, t, lat, lon)
+        const tolDeg = (Number(this.trajectoryMergeTolArcmin) || 0) / 60
+        const last = this.rawTrajectoryPoints[this.rawTrajectoryPoints.length - 1]
+        if (!last) {
+          this.rawTrajectoryPoints.push({ ra: raDeg, dec: decDeg, t: timeMs })
+          return
+        }
+        const lastAltAz = this.equatorialToHorizontal(last.ra, last.dec, new Date(last.t || timeMs), lat, lon)
+        const dAz = this.normalizeAzDelta(curAltAz.az - lastAltAz.az)
+        const dAlt = curAltAz.alt - lastAltAz.alt
+        const sep = Math.hypot(dAz, dAlt)
+        if (sep <= tolDeg) {
+          // 合并：更新最后一点为当前值（保持时间最新）
+          last.ra = raDeg
+          last.dec = decDeg
+          last.t = timeMs
+        } else {
+          this.rawTrajectoryPoints.push({ ra: raDeg, dec: decDeg, t: timeMs })
+        }
       },
       unwrapRaDeltaSequence(dRaDegList) {
         // 使相邻 dRA 序列在数值上连续，避免跨 0/360 发生长连线
@@ -1511,12 +1581,25 @@ export default {
         // 使用全量点序列初始化/扩展视图映射，确保跨 0/360 时展开方向一致
         const ensureRaw = rawAll
         const worldSeq = this.makeWorldSeq(ensureRaw)
-        this.ensureViewMappingInitialized(worldSeq)
+        // 当存在视场数据时，也将视场四角纳入初始映射，防止目标附近尺度过小导致视场绘制异常
+        let fovWorld = []
+        if (this.fieldData) {
+          const timeRef = rawAll.length ? new Date(rawAll[rawAll.length - 1].t || Date.now()) : new Date()
+          const corners = [
+            { ra: this.fieldData.ra0, dec: this.fieldData.dec0 },
+            { ra: this.fieldData.ra1, dec: this.fieldData.dec1 },
+            { ra: this.fieldData.ra2, dec: this.fieldData.dec2 },
+            { ra: this.fieldData.ra3, dec: this.fieldData.dec3 },
+          ]
+          fovWorld = corners.map(c => this.worldForPoint(c.ra, c.dec, timeRef))
+        }
+        this.ensureViewMappingInitialized(worldSeq.concat(fovWorld))
         // 选择绘制的数据集：全屏=全部；窗口=最新三个，但保持展开锚点稳定
         const raw = this.overlayMode === 'windowed' ? rawAll.slice(-3) : rawAll
         const world = this.makeWorldSeq(raw)
         // 先走一遍更新比例/边界，不绘制，确保下游图元坐标系一致
         for (let i = 0; i < world.length; i++) this.maybeExpandViewForPoint(world[i].x, world[i].y)
+        for (let i = 0; i < fovWorld.length; i++) this.maybeExpandViewForPoint(fovWorld[i].x, fovWorld[i].y)
         // 再绘背景/目标环
         this.drawTargetMarker()
         // 绘制轨迹
@@ -1531,11 +1614,17 @@ export default {
             this.drawPoint(px, py, '#FFD54F')
             if (prevPt) this.drawArrow(prevPt.x, prevPt.y, px, py, '#FFD54F')
           } else {
-            if (this.overlayMode === 'fullscreen') {
-              this.drawPoint(px, py, '#00BFFF')
-              this.drawCurrentFoV('#00BFFF', 0.3)
-            } else {
-              this.drawHollowCircle(px, py, 8, '#00BFFF', 2)
+            // 当前位置以空心圆表示（半径约 1 角分）
+            const arcmin = (this.calibrationCircleArcmin || 1)
+            const rPx = Math.max(4, (arcmin / 60) * ((this.currentPxPerDeg || 40)))
+            this.drawHollowCircle(px, py, rPx, '#00BFFF', 2)
+            // 圈住目标（目标在世界原点），当圆心到原点的距离小于半径时视为完成
+            const rDeg = Math.hypot(world[i].x, world[i].y)
+            if (rDeg <= (arcmin / 60)) {
+              if (!this.isPolarAligned) {
+                this.isPolarAligned = true
+                this.addLog(this.$t('Polar Alignment Completed'), 'success')
+              }
             }
             if (prevPt) this.drawArrow(prevPt.x, prevPt.y, px, py, '#FFD54F')
           }
@@ -1557,43 +1646,7 @@ export default {
         ctx.stroke()
         ctx.restore()
       },
-      drawCurrentFoV(color = '#00BFFF', fillOpacity = 0.25) {
-        if (!this.fieldData || !this.targetRawPosition) return
-        const canvas = this.$refs.trajectoryCanvas
-        if (!canvas) return
-        const ctx = canvas.getContext('2d')
-        const corners = [
-          { ra: this.fieldData.ra0, dec: this.fieldData.dec0 },
-          { ra: this.fieldData.ra1, dec: this.fieldData.dec1 },
-          { ra: this.fieldData.ra2, dec: this.fieldData.dec2 },
-          { ra: this.fieldData.ra3, dec: this.fieldData.dec3 },
-        ]
-        // 依据“展开锚点 raUnwrapAnchor”决定展开方向，避免切换模式时朝向反转
-        const anchor = (this.raUnwrapAnchor != null) ? (this.raUnwrapAnchor >= 0 ? 1 : -1) : 1
-        const pts = corners.map((c, i) => {
-          // 先取世界坐标，再在 X 方向按 lastSide 选择最临近展开
-          const wpt = this.worldForPoint(c.ra, c.dec)
-          // 如果与 lastSide 相反且两侧等价，选择 lastSide 方向的等效点
-          let wx = wpt.x
-          if (anchor > 0 && wx < 0) wx += Math.ceil((-wx) / 360) * 360
-          if (anchor < 0 && wx > 0) wx -= Math.ceil((wx) / 360) * 360
-          return this.screenForWorld(wx, wpt.y)
-        })
-        if (pts.length !== 4) return
-        ctx.save()
-        ctx.strokeStyle = color
-        ctx.fillStyle = color
-        ctx.globalAlpha = 1
-        ctx.beginPath()
-        ctx.moveTo(pts[0].x, pts[0].y)
-        for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y)
-        ctx.closePath()
-        ctx.globalAlpha = 1
-        ctx.stroke()
-        ctx.globalAlpha = fillOpacity
-        ctx.fill()
-        ctx.restore()
-      },
+      // FoV 绘制已不再需要
 
       resetCalibration() {
         // 使用统一的内存清理方法
@@ -1692,7 +1745,7 @@ export default {
             }
             const posChanged = !this.lastRawPosition || this.lastRawPosition.ra !== rawRa || this.lastRawPosition.dec !== rawDec
             if (posChanged) {
-              this.rawTrajectoryPoints.push({ ra: rawRa, dec: rawDec })
+              this.appendRawTrajectoryPoint(rawRa, rawDec, Date.now())
               // 改为全量重绘（确保自适应比例包含所有点、并绘制视场框）
               if (this.showTrajectoryOverlay) this.redrawTrajectory()
               this.lastRawPosition = { ra: rawRa, dec: rawDec }
@@ -2194,6 +2247,7 @@ export default {
 
       updatePolarAlignmentIsRunning(isRunning) {
         this.isCalibrationRunning = isRunning
+        this.hasAcceptUpdateMessage = true
       },
 
       // ========================================

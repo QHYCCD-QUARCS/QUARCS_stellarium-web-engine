@@ -504,6 +504,14 @@
             <!-- <img id="imageSrc" alt="Source" :src="imageSrc" crossOrigin = "" /> -->
             <ProgressBar :progress="progressValue" :description="progressDescription" :showDescription="true"
               :isShow="currentcanvas === 'MainCamera'" />
+            <MeridianFlipNotifier
+              :remaining-seconds="flipEtaSeconds"
+              :menu-offset-px="56"
+              @mode-change="onFlipModeChange"
+              @auto-flip-selected="onAutoFlipSelected"
+              @manual-flip-selected="onManualFlipSelected"
+              @flip-due="onFlipDue"
+            />
           </div>
         </div>
 
@@ -544,6 +552,7 @@ import Moment from 'moment'
 import BackgroundImage from '@/assets/images/svg/ui/Background.svg';
 import ErrorImage from '@/assets/images/svg/ui/errorImage.svg';
 import ProgressBar from '@/components/ProgressBar.vue';
+import MeridianFlipNotifier from '@/components/MeridianFlipNotifier.vue';
 
 let glTestCircle;
 let glLayer;
@@ -855,6 +864,7 @@ export default {
     Gui,
     GuiLoader,
     ProgressBar,
+    MeridianFlipNotifier,
     // MessageBox,
   },
   created() {
@@ -925,6 +935,41 @@ export default {
 
   },
   methods: {
+    // 中天翻转选择回调：自动/手动
+    // 触发时机：来自提示组件的 @mode-change（顶部横幅 / 居中弹窗 / 左上角挂件）。
+    // 主要作用：把 'auto' | 'manual' 转为 AutoFlip:true/false，并通过 AutoFlipSet 下发给后端。
+    // 影响范围：更新后端自动翻转开关；前端倒计时挂件继续显示，便于随时查看剩余时间。
+    onFlipModeChange(mode) {
+      try {
+        const isAuto = mode === 'auto';
+        // 直接调用现有方法，向后端发送 AutoFlip 指令
+        // this.AutoFlipSet(`AutoFlip:${isAuto}`);
+        this.sendMessage('Vue_Command', 'setAutoFlip', isAuto);
+        this.SendConsoleLogMsg('Meridian Flip mode: ' + mode, 'info');
+      } catch (e) {
+        console.warn('onFlipModeChange error', e);
+      }
+    },
+    // 触发时机：用户在提示组件中点击“自动”按钮时。
+    // 主要作用：当前仅记录日志，用作埋点或后续 UI 反馈扩展点（如 Toast 提示）。
+    onAutoFlipSelected() {
+      this.SendConsoleLogMsg('Auto Flip selected', 'info');
+      this.sendMessage('Vue_Command', 'setAutoFlip', true);
+    },
+    // 触发时机：用户在提示组件中点击“手动”按钮时。
+    // 主要作用：当前仅记录日志；手动模式下到时不会由前端强制触发翻转，留给用户决策。
+    onManualFlipSelected() {
+      this.SendConsoleLogMsg('Manual Flip selected', 'info');
+      this.sendMessage('Vue_Command', 'setAutoFlip', false);
+    },
+    // 触发时机：提示组件检测剩余时间 <= 0 时发出 @flip-due 事件。
+    // 主要作用：记录到时信息；若后端 AutoFlip 为 true，实际翻转由后端策略执行。
+    // 注意：此处不直接下发翻转指令，避免与后端状态机/安全检查冲突。
+    onFlipDue() {
+      // 到时触发：若已设置自动翻转，后端应按 AutoFlip 执行
+      this.SendConsoleLogMsg('Meridian Flip due', 'info');
+      this.sendMessage('Vue_Command', 'startAutoFlip');
+    },
     // 是否允许小数：step 不是整数，或显式允许
     allowsDecimal(item) {
       const step = item.step ?? 1;
@@ -2146,6 +2191,7 @@ export default {
                   const state = parts[2];
                   const message = parts[3];
                   const percentage = parts[4];
+                  console.log('PolarAlignmentState: ', isRunning, state, message, percentage);
                   this.$bus.$emit('PolarAlignmentIsRunning', isRunning);
                   this.$bus.$emit('PolarAlignmentState', state, message, percentage);
                 }
@@ -2510,7 +2556,7 @@ export default {
       this.sendMessage('Vue_Command', 'getStagingSolveResult'); // 获取定标结果
       this.sendMessage('Vue_Command', 'getGPIOsStatus'); // 获取GPIO状态
       // this.sendMessage('Vue_Command', 'getStagingImage'); // 获取最后拍摄的图像
-      this.sendMessage('Vue_Command', 'getPolarAlignmentState'); // 获取极轴对齐状态
+      // this.sendMessage('Vue_Command', 'getPolarAlignmentState'); // 获取极轴对齐状态
       this.sendMessage('Vue_Command', 'loadSDKVersionAndUSBSerialPath'); // 获取SDK版本和USB序列号路径
 
 
@@ -7192,6 +7238,22 @@ export default {
     },
     isDesktop() {
       return !this.isMobile;
+    },
+    flipEtaSeconds() {
+      try {
+        const item = this.MountConfigItems && this.MountConfigItems.find(i => i.label === 'Flip ETA');
+        const raw = item ? (item.displayValue != null ? String(item.displayValue) : String(item.value || '')) : '';
+        const m = raw.match(/^(-)?(\d{1,2}):(\d{1,2}):(\d{1,2})$/);
+        if (!m) return 999999;
+        const sign = m[1] === '-' ? -1 : 1;
+        const h = parseInt(m[2], 10) || 0;
+        const mi = parseInt(m[3], 10) || 0;
+        const s = parseInt(m[4], 10) || 0;
+        const total = sign * (h * 3600 + mi * 60 + s);
+        return Number.isFinite(total) ? total : 999999;
+      } catch (e) {
+        return 999999;
+      }
     },
   },
   watch: {
