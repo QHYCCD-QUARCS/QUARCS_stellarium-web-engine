@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div v-if="isMountConnected">
     <!-- 顶部横幅提示：小于5分钟时一次性提示，可关闭，10秒自动关闭 -->
     <transition name="mf-slide-down">
       <div v-if="bannerVisible" class="mf-banner" :style="{ zIndex: String(zIndexBaseComputed) }" role="alert" aria-live="polite">
@@ -74,6 +74,10 @@ export default {
       type: Boolean,
       default: false
     },
+    isMountConnected: {
+      type: Boolean,
+      default: false
+    },
     menuOffsetPx: {
       type: Number,
       default: 56
@@ -95,7 +99,9 @@ export default {
       miniVisible: false,
       fiveMinCycleTriggered: false,
       oneMinCycleTriggered: false,
-      bannerTimer: null
+      bannerTimer: null,
+      autoOneMinSent: false,
+      negativeOnceSent: false
     };
   },
   computed: {
@@ -137,6 +143,14 @@ export default {
     remainingSeconds: {
       immediate: true,
       handler(sec) {
+        // 赤道仪未连接：不显示任何提示，也不发送事件
+        if (!this.isMountConnected) {
+          this.bannerVisible = false;
+          this.centerVisible = false;
+          this.miniVisible = false;
+          this.clearBannerTimer();
+          return;
+        }
         // 赤道仪移动中：不弹出任何横幅/弹窗
         if (this.isMountMoving) {
           this.bannerVisible = false;
@@ -150,7 +164,11 @@ export default {
           this.centerVisible = false;
           // 保持小窗口状态，以便在负数倒计时时可操作“立即翻转”
           this.clearBannerTimer();
-          this.$emit('flip-due');
+          // 小于0后：在自动模式下仅发送一次
+          if (this.autoIsActive && !this.negativeOnceSent) {
+            this.$emit('flip-due');
+            this.negativeOnceSent = true;
+          }
           // 规则：小于1min或为负数时，小窗口强制显示
           this.miniVisible = true;
           return;
@@ -173,8 +191,16 @@ export default {
           this.bannerVisible = false; // 避免同时出现
           this.clearBannerTimer();
           this.$emit('prompt-shown', 'oneMin');
+          // 若默认选择为自动：小于 1 分钟时发送一次
+          if (this.resolvedDefaultMode === 'auto' && !this.autoOneMinSent) {
+            this.$emit('auto-flip-pre-1min');
+            this.autoOneMinSent = true;
+          }
         } else if (sec >= 60) {
           this.oneMinCycleTriggered = false;
+          // 回到 >=60s：允许下一次周期再次发送 1 分钟事件；复位负数事件
+          this.autoOneMinSent = false;
+          this.negativeOnceSent = false;
         }
 
         // 规则：当时间小于1min时，小窗口强制显示；当时间大于等于5min时不显示
@@ -197,6 +223,19 @@ export default {
         this.bannerVisible = false;
         this.centerVisible = false;
         this.clearBannerTimer();
+      }
+    },
+    isMountConnected(next) {
+      if (!next) {
+        // 断开连接：关闭所有可视元素并清理状态
+        this.bannerVisible = false;
+        this.centerVisible = false;
+        this.miniVisible = false;
+        this.clearBannerTimer();
+        this.fiveMinCycleTriggered = false;
+        this.oneMinCycleTriggered = false;
+        this.autoOneMinSent = false;
+        this.negativeOnceSent = false;
       }
     }
   },

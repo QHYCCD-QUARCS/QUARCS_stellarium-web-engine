@@ -507,9 +507,11 @@
             <MeridianFlipNotifier
               :remaining-seconds="flipEtaSeconds"
               :menu-offset-px="56"
+              :is-mount-connected="isMountConnected"
               @mode-change="onFlipModeChange"
               @auto-flip-selected="onAutoFlipSelected"
               @manual-flip-selected="onManualFlipSelected"
+              @auto-flip-pre-1min="onAutoFlipPre1Min"
               @flip-due="onFlipDue"
             />
           </div>
@@ -955,6 +957,8 @@ export default {
     onAutoFlipSelected() {
       this.SendConsoleLogMsg('Auto Flip selected', 'info');
       this.sendMessage('Vue_Command', 'setAutoFlip', true);
+      // 选择自动按钮后：立即向后端发送一次启动请求（一次性动作由后端状态机去重）
+      this.sendMessage('Vue_Command', 'startAutoFlip');
     },
     // 触发时机：用户在提示组件中点击“手动”按钮时。
     // 主要作用：当前仅记录日志；手动模式下到时不会由前端强制触发翻转，留给用户决策。
@@ -968,6 +972,11 @@ export default {
     onFlipDue() {
       // 到时触发：若已设置自动翻转，后端应按 AutoFlip 执行
       this.SendConsoleLogMsg('Meridian Flip due', 'info');
+      this.sendMessage('Vue_Command', 'startAutoFlip');
+    },
+    // 小于1分钟且默认选中自动：一次性提前通知
+    onAutoFlipPre1Min() {
+      this.SendConsoleLogMsg('Auto Flip pre 1 min', 'info');
       this.sendMessage('Vue_Command', 'startAutoFlip');
     },
     // 是否允许小数：step 不是整数，或显式允许
@@ -7238,6 +7247,14 @@ export default {
     },
     isDesktop() {
       return !this.isMobile;
+    },
+    isMountConnected() {
+      try {
+        const dev = this.devices && this.devices.find(d => d.driverType === 'Mount');
+        return !!(dev && dev.isConnected);
+      } catch (e) {
+        return false;
+      }
     },
     flipEtaSeconds() {
       try {
