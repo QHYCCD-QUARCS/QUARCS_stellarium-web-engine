@@ -41,17 +41,56 @@
         role="status"
         aria-live="polite"
       >
-        <div class="mf-mini__line">
-          <span class="mf-mini__label">{{ $t('MeridianFlipNotifier.mini.title') }}</span>
-          <span class="mf-mini__time">{{ mmss }}</span>
-        </div>
-        <div class="mf-mini__line mf-mini__line--controls">
-          <button class="mf-link" :class="{ 'mf-link--active': autoIsActive }" @click="selectMode('auto')">{{ $t('MeridianFlipNotifier.mini.auto') }}</button>
-          <span class="mf-sep">/</span>
-          <button class="mf-link" :class="{ 'mf-link--active': manualIsActive }" @click="selectMode('manual')">{{ $t('MeridianFlipNotifier.mini.manual') }}</button>
-          <button v-if="isManualSelected" class="mf-btn mf-btn--immediate" :disabled="!isNegative" @click="triggerFlipNow">{{ $t('MeridianFlipNotifier.actions.flipNow') }}</button>
-          <button class="mf-mini__close" :aria-label="$t('Common.close')" @click="closeMini">×</button>
-        </div>
+        <!-- 常规倒计时显示 -->
+        <template v-if="flipUiState === 'idle'">
+          <div class="mf-mini__line">
+            <span class="mf-mini__label">{{ $t('MeridianFlipNotifier.mini.title') }}</span>
+            <span class="mf-mini__time">{{ mmss }}</span>
+          </div>
+          <div class="mf-mini__line mf-mini__line--controls">
+            <button class="mf-link" :class="{ 'mf-link--active': autoIsActive }" @click="selectMode('auto')">{{ $t('MeridianFlipNotifier.mini.auto') }}</button>
+            <span class="mf-sep">/</span>
+            <button class="mf-link" :class="{ 'mf-link--active': manualIsActive }" @click="selectMode('manual')">{{ $t('MeridianFlipNotifier.mini.manual') }}</button>
+            <button v-if="isManualSelected" class="mf-btn mf-btn--immediate" :disabled="!isNegative" @click="triggerFlipNow">{{ $t('MeridianFlipNotifier.actions.flipNow') }}</button>
+            <button class="mf-mini__close" :aria-label="$t('Common.close')" @click="closeMini">×</button>
+          </div>
+        </template>
+
+        <!-- 预备翻转倒计时 -->
+        <template v-else-if="flipUiState === 'prepare'">
+          <div class="mf-mini__line">
+            <span class="mf-mini__label">{{ $t('MeridianFlipNotifier.mini.title') }}</span>
+            <span class="mf-mini__time">{{ prepareMmss }}</span>
+          </div>
+          <div class="mf-mini__line mf-mini__line--controls">
+            <button class="mf-link" :class="{ 'mf-link--active': autoIsActive }" @click="selectMode('auto')">{{ $t('MeridianFlipNotifier.mini.auto') }}</button>
+            <span class="mf-sep">/</span>
+            <button class="mf-link" :class="{ 'mf-link--active': manualIsActive }" @click="selectMode('manual')">{{ $t('MeridianFlipNotifier.mini.manual') }}</button>
+            <button class="mf-mini__close" :aria-label="$t('Common.close')" @click="closeMini">×</button>
+          </div>
+        </template>
+
+        <!-- 正式翻转：仅显示中止与不确定进度条 -->
+        <template v-else-if="flipUiState === 'flipping'">
+          <div class="mf-mini__line">
+            <span class="mf-mini__label">{{ $t('MeridianFlipNotifier.mini.title') }}</span>
+            <span class="mf-mini__time">{{ $t('MeridianFlipNotifier.mini.inProgress') }}</span>
+          </div>
+          <div class="mf-mini__line mf-mini__line--controls">
+            <button class="mf-btn mf-btn--immediate" @click="abortFlip">{{ $t('Common.abort') }}</button>
+            <div class="mf-progress--indeterminate" aria-label="progress" />
+          </div>
+        </template>
+
+        <!-- 结果：成功或失败提示，10 秒后恢复 -->
+        <template v-else-if="flipUiState === 'result'">
+          <div class="mf-mini__line">
+            <span class="mf-mini__label">{{ $t('MeridianFlipNotifier.mini.title') }}</span>
+            <span class="mf-mini__time" :style="{ color: resultKind==='success' ? '#22c55e' : '#ef4444' }">
+              {{ resultKind==='success' ? $t('MeridianFlipNotifier.result.success') : $t('MeridianFlipNotifier.result.fail') }}
+            </span>
+          </div>
+        </template>
       </div>
     </transition>
   </div>
@@ -101,14 +140,39 @@ export default {
       oneMinCycleTriggered: false,
       bannerTimer: null,
       autoOneMinSent: false,
-      negativeOnceSent: false
+      negativeOnceSent: false,
+      // 翻转 UI 状态机
+      flipUiState: 'idle', // 'idle' | 'prepare' | 'flipping' | 'result'
+      prepareBaseSeconds: 0,
+      prepareStartMs: 0,
+      prepareTicker: null,
+      resultKind: null, // 'success' | 'fail' | null
+      resultTimerId: null
     };
+  },
+  created() {
+    // 监听全局信号：允许外部随时切换模式
+    if (this.$bus && this.$bus.$on) {
+      this.$bus.$on('SetFlipMode', this.setFlipMode);
+      this.$bus.$on('FlipStatus', this.setFlipStatus);
+    }
+    this.$bus.$emit('getMountAutoFlip'); // 要求与主程序同步
   },
   computed: {
     mmss() {
       const s = Math.max(0, Math.floor(this.remainingSeconds || 0));
       const m = Math.floor(s / 60);
       const r = s % 60;
+      const mm = String(m).padStart(2, '0');
+      const ss = String(r).padStart(2, '0');
+      return `${mm}:${ss}`;
+    },
+    prepareMmss() {
+      const now = Date.now();
+      const elapsed = Math.floor((now - (this.prepareStartMs || now)) / 1000);
+      const left = Math.max(0, (this.prepareBaseSeconds || 0) - elapsed);
+      const m = Math.floor(left / 60);
+      const r = left % 60;
       const mm = String(m).padStart(2, '0');
       const ss = String(r).padStart(2, '0');
       return `${mm}:${ss}`;
@@ -166,7 +230,10 @@ export default {
           this.clearBannerTimer();
           // 小于0后：在自动模式下仅发送一次
           if (this.autoIsActive && !this.negativeOnceSent) {
-            this.$emit('flip-due');
+            // 到点：在自动模式下仅触发一次，让后端开始自动翻转
+            if (this.$bus && this.$bus.$emit) {
+              this.$bus.$emit('AppSendMessage', 'Vue_Command', 'AutoFlip:true');
+            }
             this.negativeOnceSent = true;
           }
           // 规则：小于1min或为负数时，小窗口强制显示
@@ -178,7 +245,6 @@ export default {
         if (sec < 300 && !this.fiveMinCycleTriggered && this.mode === null) {
           this.fiveMinCycleTriggered = true;
           this.showBannerOnce();
-          this.$emit('prompt-shown', 'fiveMin');
         } else if (sec >= 300) {
           this.fiveMinCycleTriggered = false;
           this.closeBanner();
@@ -190,10 +256,11 @@ export default {
           this.centerVisible = true;
           this.bannerVisible = false; // 避免同时出现
           this.clearBannerTimer();
-          this.$emit('prompt-shown', 'oneMin');
-          // 若默认选择为自动：小于 1 分钟时发送一次
+          // 若默认选择为自动：小于 1 分钟时向后端发送一次预触发
           if (this.resolvedDefaultMode === 'auto' && !this.autoOneMinSent) {
-            this.$emit('auto-flip-pre-1min');
+            if (this.$bus && this.$bus.$emit) {
+              this.$bus.$emit('AppSendMessage', 'Vue_Command', 'AutoFlip:true');
+            }
             this.autoOneMinSent = true;
           }
         } else if (sec >= 60) {
@@ -236,10 +303,102 @@ export default {
         this.oneMinCycleTriggered = false;
         this.autoOneMinSent = false;
         this.negativeOnceSent = false;
+        // 重置翻转状态
+        this.clearPrepareTicker();
+        this.clearResultTimer();
+        this.flipUiState = 'idle';
+        this.resultKind = null;
       }
     }
   },
   methods: {
+    setFlipStatus(payload) {
+      if (!payload || typeof payload !== 'string') return;
+      if (payload.startsWith('FlipPrepareTime,')) {
+        const parts = payload.split(',');
+        const sec = parseInt(parts[1], 10) || 0;
+        this.flipUiState = 'prepare';
+        this.prepareBaseSeconds = sec;
+        this.prepareStartMs = Date.now();
+        this.startPrepareTicker();
+        // 展示小挂件
+        this.miniVisible = true;
+        this.bannerVisible = false;
+        this.centerVisible = false;
+        return;
+      }
+      if (payload === 'start') {
+        this.flipUiState = 'flipping';
+        this.clearPrepareTicker();
+        // 隐藏横幅/居中，只保留左上角挂件
+        this.bannerVisible = false;
+        this.centerVisible = false;
+        this.miniVisible = true;
+        return;
+      }
+      if (payload === 'success' || payload === 'fail') {
+        this.flipUiState = 'result';
+        this.resultKind = payload;
+        this.clearPrepareTicker();
+        this.clearResultTimer();
+        // 10 秒后恢复常规倒计时显示
+        this.resultTimerId = setTimeout(() => {
+          this.flipUiState = 'idle';
+          this.resultKind = null;
+        }, 10000);
+        this.miniVisible = true;
+        return;
+      }
+    },
+    startPrepareTicker() {
+      if (this.prepareTicker != null) return;
+      this.prepareTicker = setInterval(() => {
+        if (this.flipUiState !== 'prepare') {
+          this.clearPrepareTicker();
+        }
+      }, 1000);
+    },
+    clearPrepareTicker() {
+      if (this.prepareTicker != null) {
+        clearInterval(this.prepareTicker);
+        this.prepareTicker = null;
+      }
+    },
+    clearResultTimer() {
+      if (this.resultTimerId != null) {
+        clearTimeout(this.resultTimerId);
+        this.resultTimerId = null;
+      }
+    },
+    abortFlip() {
+      if (this.$bus && this.$bus.$emit) {
+        this.$bus.$emit('SendConsoleLogMsg', 'Abort Flip requested', 'warning');
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'MountMoveAbort');
+        this.flipUiState = 'idle';
+      }
+    },
+    setFlipMode(next) {
+      if (next !== 'auto' && next !== 'manual') return;
+      this.mode = next;
+      if (next === 'auto') this.onAutoFlipSelected();
+      else this.onManualFlipSelected();
+    },
+    onAutoFlipSelected() {
+      // 记录日志并通知后端启用自动翻转
+      if (this.$bus && this.$bus.$emit) {
+        this.$bus.$emit('SendConsoleLogMsg', 'Auto Flip selected', 'info');
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'AutoFlip:true');
+        // 选择自动后，立即触发一次启动请求（由后端状态机去重）
+        // this.$bus.$emit('AppSendMessage', 'Vue_Command', 'startAutoFlip');
+      }
+    },
+    onManualFlipSelected() {
+      // 记录日志并通知后端关闭自动翻转
+      if (this.$bus && this.$bus.$emit) {
+        this.$bus.$emit('SendConsoleLogMsg', 'Manual Flip selected', 'info');
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'AutoFlip:false');
+      }
+    },
     btnClass(kind) {
       const active = kind === 'auto' ? this.autoIsActive : this.manualIsActive;
       return active ? 'mf-btn--success' : 'mf-btn--ghost';
@@ -282,8 +441,14 @@ export default {
     selectMode(next) {
       this.mode = next; // 'auto' | 'manual'
       this.$emit('mode-change', next);
-      if (next === 'auto') this.$emit('auto-flip-selected');
-      if (next === 'manual') this.$emit('manual-flip-selected');
+      if (next === 'auto') {
+        this.onAutoFlipSelected();
+        this.$emit('auto-flip-selected');
+      }
+      if (next === 'manual') {
+        this.onManualFlipSelected();
+        this.$emit('manual-flip-selected');
+      }
       // 选择后：关闭横幅和中心弹窗，显示左上角挂件
       this.bannerVisible = false;
       this.centerVisible = false;
@@ -293,6 +458,10 @@ export default {
   },
   beforeDestroy() {
     this.clearBannerTimer();
+    if (this.$bus && this.$bus.$off) {
+      this.$bus.$off('SetFlipMode', this.setFlipMode);
+      this.$bus.$off('FlipStatus', this.setFlipStatus);
+    }
   }
 };
 </script>
@@ -363,6 +532,29 @@ export default {
   background: #4b5563; /* 灰色 */
   border-color: #4b5563;
   color: #e5e7eb;
+}
+/* 不确定进度条 */
+.mf-progress--indeterminate {
+  position: relative;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 2px;
+  overflow: hidden;
+  min-width: 120px;
+}
+.mf-progress--indeterminate::before {
+  content: "";
+  position: absolute;
+  left: -40%;
+  width: 40%;
+  height: 100%;
+  background: #60a5fa;
+  animation: mf-indeterminate 1.2s infinite ease;
+}
+@keyframes mf-indeterminate {
+  0% { left: -40%; width: 40%; }
+  50% { left: 20%; width: 60%; }
+  100% { left: 100%; width: 40%; }
 }
 .mf-btn:disabled {
   opacity: 0.6;

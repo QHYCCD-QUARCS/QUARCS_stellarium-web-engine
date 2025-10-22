@@ -394,7 +394,8 @@
   "Switch to Fullscreen Mode": "Switch to Fullscreen Mode",
   "Trajectory": "Trajectory",
   "Common": {
-    "close": "Close"
+    "close": "Close",
+    "abort": "Abort"
   },
   "MeridianFlipNotifier": {
     "banner": {
@@ -412,7 +413,12 @@
     "mini": {
       "title": "Meridian Flip Countdown",
       "auto": "Auto",
-      "manual": "Manual"
+      "manual": "Manual",
+      "inProgress": "Flipping..."
+    },
+    "result": {
+      "success": "Flip succeeded",
+      "fail": "Flip failed"
     }
   }
 }

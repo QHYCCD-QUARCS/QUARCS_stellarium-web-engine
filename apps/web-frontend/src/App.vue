@@ -504,16 +504,11 @@
             <!-- <img id="imageSrc" alt="Source" :src="imageSrc" crossOrigin = "" /> -->
             <ProgressBar :progress="progressValue" :description="progressDescription" :showDescription="true"
               :isShow="currentcanvas === 'MainCamera'" />
-            <MeridianFlipNotifier
+            <!-- <MeridianFlipNotifier
               :remaining-seconds="flipEtaSeconds"
               :menu-offset-px="56"
               :is-mount-connected="isMountConnected"
-              @mode-change="onFlipModeChange"
-              @auto-flip-selected="onAutoFlipSelected"
-              @manual-flip-selected="onManualFlipSelected"
-              @auto-flip-pre-1min="onAutoFlipPre1Min"
-              @flip-due="onFlipDue"
-            />
+            /> -->
           </div>
         </div>
 
@@ -650,9 +645,10 @@ export default {
       MountConfigItems: [
         { driverType: 'Mount', label: 'Flip ETA', value: '00:00:00', displayValue: '00:00:00', inputType: 'tip' },
         { driverType: 'Mount', label: 'GotoThenSolve', value: false, inputType: 'switch' },
+        // { driverType: 'Mount', label: 'AutoFlip', value: false, inputType: 'switch' },
 
-        // { driverType: 'Mount', label: 'isAutoFlip', value: false, inputType: 'switch' },
       ],
+
 
       TelescopesConfigItems: [
         { driverType: 'Telescopes', num: 1, label: 'Focal Length (mm)', value: '', inputType: 'number' },
@@ -919,7 +915,7 @@ export default {
     this.$bus.$on('setShowSelectStar', this.setShowSelectStar);  // 设置是否显示选择星点
     this.$bus.$on('ScaleChange', this.ScaleChange);
     this.$bus.$on('showCanvas', this.showCanvas);
-
+    this.$bus.$on('getMountAutoFlip', this.sendMountAutoFlip);  // 子组件获取赤道仪自动翻转模式
     // 极轴校准绘制相关监听器
     this.$bus.$on('DrawCalibrationPointPolygon', this.drawCalibrationPointPolygon);
     this.$bus.$on('ClearCalibrationPoints', this.clearCalibrationPoints);
@@ -937,48 +933,6 @@ export default {
 
   },
   methods: {
-    // 中天翻转选择回调：自动/手动
-    // 触发时机：来自提示组件的 @mode-change（顶部横幅 / 居中弹窗 / 左上角挂件）。
-    // 主要作用：把 'auto' | 'manual' 转为 AutoFlip:true/false，并通过 AutoFlipSet 下发给后端。
-    // 影响范围：更新后端自动翻转开关；前端倒计时挂件继续显示，便于随时查看剩余时间。
-    onFlipModeChange(mode) {
-      try {
-        const isAuto = mode === 'auto';
-        // 直接调用现有方法，向后端发送 AutoFlip 指令
-        // this.AutoFlipSet(`AutoFlip:${isAuto}`);
-        this.sendMessage('Vue_Command', 'setAutoFlip', isAuto);
-        this.SendConsoleLogMsg('Meridian Flip mode: ' + mode, 'info');
-      } catch (e) {
-        console.warn('onFlipModeChange error', e);
-      }
-    },
-    // 触发时机：用户在提示组件中点击“自动”按钮时。
-    // 主要作用：当前仅记录日志，用作埋点或后续 UI 反馈扩展点（如 Toast 提示）。
-    onAutoFlipSelected() {
-      this.SendConsoleLogMsg('Auto Flip selected', 'info');
-      this.sendMessage('Vue_Command', 'setAutoFlip', true);
-      // 选择自动按钮后：立即向后端发送一次启动请求（一次性动作由后端状态机去重）
-      this.sendMessage('Vue_Command', 'startAutoFlip');
-    },
-    // 触发时机：用户在提示组件中点击“手动”按钮时。
-    // 主要作用：当前仅记录日志；手动模式下到时不会由前端强制触发翻转，留给用户决策。
-    onManualFlipSelected() {
-      this.SendConsoleLogMsg('Manual Flip selected', 'info');
-      this.sendMessage('Vue_Command', 'setAutoFlip', false);
-    },
-    // 触发时机：提示组件检测剩余时间 <= 0 时发出 @flip-due 事件。
-    // 主要作用：记录到时信息；若后端 AutoFlip 为 true，实际翻转由后端策略执行。
-    // 注意：此处不直接下发翻转指令，避免与后端状态机/安全检查冲突。
-    onFlipDue() {
-      // 到时触发：若已设置自动翻转，后端应按 AutoFlip 执行
-      this.SendConsoleLogMsg('Meridian Flip due', 'info');
-      this.sendMessage('Vue_Command', 'startAutoFlip');
-    },
-    // 小于1分钟且默认选中自动：一次性提前通知
-    onAutoFlipPre1Min() {
-      this.SendConsoleLogMsg('Auto Flip pre 1 min', 'info');
-      this.sendMessage('Vue_Command', 'startAutoFlip');
-    },
     // 是否允许小数：step 不是整数，或显式允许
     allowsDecimal(item) {
       const step = item.step ?? 1;
@@ -2276,6 +2230,9 @@ export default {
 
               case 'AutoFlip':
                 if (parts.length >= 2) {
+                  // TODO::自动翻转功能暂时关闭，需要时再打开
+                  console.log('当前AutoFlip命令未启用: ', parts[1]);
+                  break;
                   const isAutoFlip = parts[1];
                   // 查找是否已存在 "AutoFlip" 项
                   let item = this.MountConfigItems.find(i => i.label === 'AutoFlip');
@@ -2286,9 +2243,21 @@ export default {
                     // 不存在 → 新增
                     this.MountConfigItems.push({ driverType: 'Mount', label: 'AutoFlip', value: isAutoFlip == 'true', inputType: 'switch' },);
                   }
+                  // 同步子组件模式（无需重建组件）
+                  const next = (isAutoFlip == 'true') ? 'auto' : 'manual';
+                  if (this.$bus && this.$bus.$emit) {
+                    this.$bus.$emit('SetFlipMode', next);
+                  }
                 }
                 break;
-
+              
+              case 'FlipStatus':
+                if (parts.length === 2) {
+                  if (this.$bus && this.$bus.$emit) {
+                    this.$bus.$emit('FlipStatus', parts[1]);
+                  }
+                }
+                break;
               // case 'MinutesPastMeridian':
               //   if (parts.length >= 3) {
               //     const EastMinutesPastMeridian = parts[1];
@@ -3175,7 +3144,13 @@ export default {
       const [signal, value] = payload.split(':'); // 拆分信号和值
       const BooleanValue = Boolean(value);
       this.SendConsoleLogMsg('Auto Flip:' + BooleanValue, 'info');
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'AutoFlip:' + BooleanValue);
+      this.$bus.$emit('SetFlipMode', BooleanValue ? 'auto' : 'manual');  // 同步子组件模式
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'AutoFlip:' + BooleanValue); // 同步到后端
+    },
+
+    sendMountAutoFlip() {
+      const isAutoFlip = this.MountConfigItems.find(item => item.label === 'AutoFlip').value;
+      this.$bus.$emit('SetFlipMode', isAutoFlip ? 'auto' : 'manual');
     },
 
     WestMinutesPastMeridianSet(payload) {

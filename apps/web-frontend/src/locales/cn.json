@@ -393,7 +393,8 @@
   "Switch to Fullscreen Mode": "切换为全屏模式",
   "Trajectory": "轨迹",
   "Common": {
-    "close": "关闭"
+    "close": "关闭",
+    "abort": "中止"
   },
   "MeridianFlipNotifier": {
     "banner": {
@@ -411,7 +412,12 @@
     "mini": {
       "title": "中天翻转倒计时",
       "auto": "自动",
-      "manual": "手动"
+      "manual": "手动",
+      "inProgress": "翻转进行中..."
+    },
+    "result": {
+      "success": "翻转成功",
+      "fail": "翻转失败"
     }
   }
 }
