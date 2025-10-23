@@ -12,8 +12,10 @@
       @touchend="endDrag"
     ></div>
     
-    <!-- 对焦结果状态框（移入根节点内部，保持单一根元素） -->
-    <div class="focus-result-panel" v-if="quadraticResult && quadraticResult.show">
+
+  </div>
+      <!-- 对焦结果状态框（移入根节点内部，保持单一根元素） -->
+      <div class="focus-result-panel" v-if="quadraticResult && quadraticResult.show">
       <div class="panel-header">
         <div class="header-left">
           <div class="status-icon success">
@@ -40,7 +42,6 @@
         </div>
       </div>
     </div>
-  </div>
 </template>
 
 <script>
@@ -458,6 +459,9 @@ export default {
     },
     addData_Point(x,y) {
       const newDataPoint = [x, y];
+      try {
+        console.log('[Focus] add point:', JSON.stringify({ x, y }));
+      } catch (e) {}
       const existingPointIndex = this.chartData1_pos.findIndex(point => point[0] === newDataPoint[0]);
       if (existingPointIndex !== -1) {
         // If the x value already exists, update the y value
@@ -527,6 +531,9 @@ export default {
         const c = parseFloat(parts[3]);
         const bestPosition = parseFloat(parts[4]);
         const minHFR = parseFloat(parts[5]);
+        try {
+          console.log('[Focus] fit params from backend:', JSON.stringify({ a, b, c, bestPosition, minHFR }));
+        } catch (e) {}
         this.quadraticResult.a = this.formatCoefficient(a);
         this.quadraticResult.b = this.formatCoefficient(b);
         this.quadraticResult.c = this.formatCoefficient(c);
@@ -538,6 +545,9 @@ export default {
       }
     },
     generateQuadraticCurve(a, b, c, bestPosition) {
+      try {
+        console.log('[Focus] draw quadratic curve with params:', JSON.stringify({ a, b, c, bestPosition }));
+      } catch (e) {}
       // 复用已有 generateQuadraticData 与 chartData1_pos
       let minPos = 0;
       if (this.chartData1_pos.length > 0) {
