@@ -715,4 +715,43 @@ export default {
   border-radius: 5px;
   box-sizing: border-box;
 }
+
+/* 使对焦结果面板固定在全屏中央，而不是相对图表容器定位 */
+.focus-result-panel {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 10000;
+  background-color: rgba(64, 64, 64, 0.9);
+  backdrop-filter: blur(5px);
+  border-radius: 10px;
+  border: 4px solid rgba(128, 128, 128, 0.5);
+  padding: 12px 16px;
+  width: min(420px, calc(100vw - 40px));
+  color: #ffffff;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.panel-title {
+  font-size: 16px;
+}
+
+.close-button {
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+}
 </style>

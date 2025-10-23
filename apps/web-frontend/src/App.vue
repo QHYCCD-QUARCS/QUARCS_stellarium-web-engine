@@ -7366,7 +7366,7 @@ export default {
       try {
         
         this.autoFocusInfo.step = step;
-        this.autoFocusInfo.message = message;
+        this.autoFocusInfo.message = this.$t(message);
         if (step === 0) {
           this.autoFocusInfo.isRunning = true;
         }
