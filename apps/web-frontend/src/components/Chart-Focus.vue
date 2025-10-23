@@ -460,6 +460,20 @@ export default {
       if (shouldRun) this.startTimeTicker(); else this.stopTimeTicker();
     },
     addData_Point(x,y) {
+      // 过滤掉无效的数据点（clear消息产生的-1,-1点）
+      if (x === -1 && y === -1) {
+        // 这是clear消息，清空数据
+        this.chartData1_pos = [];
+        this.chartData1_time = [];
+        this.scheduleRender(this.xAxis_min, this.xAxis_max);
+        return;
+      }
+      
+      // 过滤掉其他无效数据点
+      if (x < 0 || y < 0 || !isFinite(x) || !isFinite(y)) {
+        return;
+      }
+      
       const newDataPoint = [x, y];
       try {
         console.log('[Focus] add point:', JSON.stringify({ x, y }));
