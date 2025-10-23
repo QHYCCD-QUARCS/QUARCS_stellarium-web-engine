@@ -470,7 +470,7 @@ export default {
       }
       
       // 过滤掉其他无效数据点
-      if (x < 0 || y < 0 || !isFinite(x) || !isFinite(y)) {
+      if (x < 0 || y <= 0 || !isFinite(x) || !isFinite(y)) {
         return;
       }
       
