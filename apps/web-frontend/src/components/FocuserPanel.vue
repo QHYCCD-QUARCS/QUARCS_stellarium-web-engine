@@ -257,8 +257,16 @@ export default {
     this.$bus.$on('setRedBoxSideLength', this.setRedBoxSideLength);
     this.$bus.$on('syncROI_length', this.syncROI_length);
     this.$bus.$on('StartCalibration', this.startCalibrationProcess);
+
+
+
     this.$bus.$on('focusSetTravelRangeSuccess', this.focusSetTravelRangeSuccess);
     this.$bus.$on('focusMoveFailed', this.focusMoveFailed);
+
+    this.$bus.$on('updateAutoFocuserState', this.updateAutoFocuserState);  // 更新自动对焦状态
+
+    // 当ui初始化完成,自动获取当前状态
+    this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getFocuserState');
   },
   methods: {
     updatePosition() {
@@ -282,22 +290,17 @@ export default {
         this.$bus.$emit('showMsgBox', 'Focuser is moving!', 'warning');
         return;
       }
+
       if (this.inAutoFocus) {
         this.inAutoFocus = false;
         // console.log('QHYCCD | StopAutoFocus');
         this.$bus.$emit('SendConsoleLogMsg', 'StopAutoFocus', 'info');
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'StopAutoFocus');
-      }
-      else {
-        console.log('QHYCCD | StartAutoFocus');
-        this.$bus.$emit('SendConsoleLogMsg', 'StartAutoFocus', 'info');
-        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'ClearDataPoints');
-        this.$bus.$emit('ClearAllData');
-
-        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'AutoFocus');
-
+      }else{
         this.inAutoFocus = true;
+        this.$bus.$emit('ShowConfirmDialog','Confirm', 'Are you sure you want to start auto focus?', 'startAutoFocus');
       }
+ 
     },
 
     AutoFocusOver() {
@@ -678,7 +681,10 @@ export default {
       setTimeout(() => {
         this.$bus.$emit('EndCalibration');
       }, 1000);
-    }
+    },
+    updateAutoFocuserState(state) {
+      this.inAutoFocus = state;
+    },
   }
 }
 </script>

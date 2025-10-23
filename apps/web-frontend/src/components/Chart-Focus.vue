@@ -11,6 +11,35 @@
       @touchmove="dragging"
       @touchend="endDrag"
     ></div>
+    
+    <!-- 对焦结果状态框（移入根节点内部，保持单一根元素） -->
+    <div class="focus-result-panel" v-if="quadraticResult && quadraticResult.show">
+      <div class="panel-header">
+        <div class="header-left">
+          <div class="status-icon success">
+            <i class="icon-check">✓</i>
+          </div>
+          <div class="panel-title">{{ $t('Focus.status') }}</div>
+        </div>
+        <div class="close-button" @click="closePanel">
+          <i class="icon-close">×</i>
+        </div>
+      </div>
+      <div class="panel-content">
+        <div class="status-row">
+          <span class="label">{{ $t('Focus.bestPosition') }}</span>
+          <span class="value">{{ getBestPositionDisplay() }}</span>
+        </div>
+        <div class="status-row">
+          <span class="label">{{ $t('Focus.minHFR') }}</span>
+          <span class="value">{{ quadraticResult.minHFR }}</span>
+        </div>
+        <div class="status-row">
+          <span class="label">{{ $t('Focus.dataPoints') }}</span>
+          <span class="value">{{ validDataPointCount }}</span>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -63,12 +92,26 @@ export default {
       renderScheduled: false,
       pendingLowerBound: null,
       pendingUpperBound: null,
-      // 调试日志开关
-      debugRenderLogs: false,
       // 线条数据来源：若为 null 则使用 quadraticParams 动态采样
       lineDataFromPoints: null,
-      quadraticParams: null // { a,b,c,x0? }
+      quadraticParams: null, // { a,b,c,x0? }
+      // 二次拟合结果显示（合并新增功能）
+      quadraticResult: {
+        show: false,
+        a: '0.000000',
+        b: '0.000000',
+        c: '0.000000',
+        bestPosition: '0.00',
+        minHFR: '0.000'
+      }
     };
+  },
+  computed: {
+    // 合并新增：有效数据点数
+    validDataPointCount() {
+      const currentData = this.isTimeMode ? this.chartData1_time : this.chartData1_pos;
+      return currentData.length;
+    }
   },
   mounted() {
     // 根据可见性启动/停止时间推进
@@ -92,9 +135,9 @@ export default {
   },
   created() {
     this.$bus.$on('FocusPosition', this.changeRange_x);
-    // this.$bus.$on('UpdateFWHM', this.UpdateFWHM);
-    // this.$bus.$on('fitQuadraticCurve', this.fitQuadraticCurve);
-    // this.$bus.$on('fitQuadraticCurve_minPoint', this.fitQuadraticCurve_minPoint);
+    // 合并：启用后端拟合显示
+    this.$bus.$on('fitQuadraticCurve', this.fitQuadraticCurve);
+    this.$bus.$on('fitQuadraticCurve_minPoint', this.fitQuadraticCurve_minPoint);
 
     this.$bus.$on('ClearfitQuadraticCurve', this.clearChartData2);
     this.$bus.$on('ClearAllData', this.ClearAllData);
@@ -115,6 +158,17 @@ export default {
     this.teardownBusAndTimers();
   },
   methods: {
+    getBestPositionDisplay() {
+      return this.quadraticResult.bestPosition;
+    },
+    closePanel() {
+      this.quadraticResult.show = false;
+    },
+    formatCoefficient(value) {
+      if (Math.abs(value) < 1e-6) return value.toExponential(6);
+      return value.toFixed(6);
+    },
+    
     teardownBusAndTimers() {
       this.$bus.$off('FocusPosition', this.changeRange_x);
       this.$bus.$off('ClearfitQuadraticCurve', this.clearChartData2);
@@ -218,14 +272,7 @@ export default {
         }
       }
       
-      // 调试日志
-      if (this.debugRenderLogs && this.isTimeMode && data1.length > 0) {
-        console.log('Chart-Focus: renderChart (time mode)', {
-          dataPoints: data1.length,
-          latestPoint: data1[data1.length - 1],
-          y_max: y_max
-        });
-      }
+      
       const optionXAxis = this.isTimeMode
         ? {
             type: 'time',
@@ -366,33 +413,19 @@ export default {
     addFwhmPointNow(fwhm) {
       // 确保 fwhm 是数字
       const fwhmNum = typeof fwhm === 'number' ? fwhm : parseFloat(fwhm);
-      if (isNaN(fwhmNum) || fwhmNum <= 0) {
-        console.warn('Chart-Focus: Invalid FWHM value:', fwhm);
-        return;
-      }
+      if (isNaN(fwhmNum) || fwhmNum <= 0) { return; }
       
       const now = Date.now();
       const point = [now, fwhmNum];
       this.chartData1_time.push(point);
       
-      console.log('Chart-Focus: addFwhmPointNow', {
-        fwhm: fwhmNum,
-        time: new Date(now).toLocaleTimeString(),
-        isTimeMode: this.isTimeMode,
-        dataLength: this.chartData1_time.length,
-        chartInitialized: !!this.myChart
-      });
       
       // 仅保留窗口期内的数据
       const minTs = now - this.timeWindowSec * 1000;
       this.chartData1_time = this.chartData1_time.filter(p => p[0] >= minTs);
       
       // 强制重新渲染
-      if (this.myChart) {
-        this.scheduleRender(this.xAxis_min, this.xAxis_max);
-      } else {
-        console.warn('Chart-Focus: myChart not initialized yet');
-      }
+      if (this.myChart) { this.scheduleRender(this.xAxis_min, this.xAxis_max); }
     },
     // 开启/关闭时间轴模式
     setTimeMode(flag) {
@@ -485,6 +518,79 @@ export default {
       // 其他非法输入：不处理，仅刷新现状
       this.scheduleRender(this.xAxis_min, this.xAxis_max);
     },
+    // 合并：后端拟合结果处理（始终按二次曲线绘制）
+    fitQuadraticCurve(dataString) {
+      const parts = dataString.split(':');
+      if (parts.length >= 6) {
+        const a = parseFloat(parts[1]);
+        const b = parseFloat(parts[2]);
+        const c = parseFloat(parts[3]);
+        const bestPosition = parseFloat(parts[4]);
+        const minHFR = parseFloat(parts[5]);
+        this.quadraticResult.a = this.formatCoefficient(a);
+        this.quadraticResult.b = this.formatCoefficient(b);
+        this.quadraticResult.c = this.formatCoefficient(c);
+        this.quadraticResult.bestPosition = bestPosition.toFixed(2);
+        this.quadraticResult.minHFR = minHFR.toFixed(3);
+        this.quadraticResult.show = true;
+
+        this.generateQuadraticCurve(a, b, c, bestPosition);
+      }
+    },
+    generateQuadraticCurve(a, b, c, bestPosition) {
+      // 复用已有 generateQuadraticData 与 chartData1_pos
+      let minPos = 0;
+      if (this.chartData1_pos.length > 0) {
+        minPos = Math.min(...this.chartData1_pos.map(p => p[0]));
+      }
+      let startX, endX, stepSize;
+      if (this.chartData1_pos.length > 0) {
+        const dataMinX = Math.min(...this.chartData1_pos.map(p => p[0]));
+        const dataMaxX = Math.max(...this.chartData1_pos.map(p => p[0]));
+        const dataRange = dataMaxX - dataMinX;
+        const extension = Math.max(dataRange * 0.2, 1000);
+        startX = dataMinX - extension;
+        endX = dataMaxX + extension;
+        stepSize = Math.max(Math.floor(dataRange / 100), 20);
+      } else {
+        const range = 5000;
+        startX = bestPosition - range;
+        endX = bestPosition + range;
+        stepSize = 50;
+      }
+      // 针对 |a| 很小时扩展范围以可见曲率
+      const minA = 1e-16;
+      const targetDelta = 1.0; // 期望在可视范围内至少 ~1 的 HFR 变化
+      const curvatureRange = Math.sqrt(targetDelta / Math.max(Math.abs(a), minA));
+      startX = Math.min(startX, bestPosition - curvatureRange, this.xAxis_min);
+      endX = Math.max(endX, bestPosition + curvatureRange, this.xAxis_max);
+
+      const curve = [];
+      for (let x = startX; x <= endX; x += stepSize) {
+        const rx = x - minPos;
+        const y = a * rx * rx + b * rx + c;
+        if (isFinite(y) && y >= 0) curve.push([x, y]);
+      }
+      // 加密顶点附近
+      const fineRange = Math.max(stepSize * 2, 200, curvatureRange / 4);
+      const fineStep = Math.max(stepSize / 10, 5);
+      for (let off = -fineRange; off <= fineRange; off += fineStep) {
+        const x = bestPosition + off;
+        if (x >= startX && x <= endX) {
+          const rx = x - minPos;
+          const y = a * rx * rx + b * rx + c;
+          if (isFinite(y) && y >= 0) curve.push([x, y]);
+        }
+      }
+      curve.sort((p, q) => p[0] - q[0]);
+      this.chartData2 = curve;
+      if (curve.length > 0) {
+        this.xAxis_min = Math.min(this.xAxis_min, curve[0][0]);
+        this.xAxis_max = Math.max(this.xAxis_max, curve[curve.length - 1][0]);
+      }
+      this.renderChart(this.xAxis_min, this.xAxis_max);
+    },
+    // 删除线性分支，统一用二次曲线
     // 生成一元二次曲线采样点
     generateQuadraticData(a, b, c, xMin, xMax, centerX = 0) {
       const start = Number.isFinite(xMin) ? xMin : 0;
@@ -516,7 +622,7 @@ export default {
       this.xAxis_min = Number(current) - 3000;
       this.xAxis_max = Number(current) + 3000;
       this.currentX = current;
-      console.log("QHYCCD | changeRange_x:", current, this.xAxis_min, this.xAxis_max);
+      
       this.scheduleRender(this.xAxis_min, this.xAxis_max);
     },
 
@@ -578,8 +684,25 @@ export default {
     //   this.chartData3.push(newDataPoint);
     // },
     setFocusChartRange(lowerBound, upperBound) {
-      this.x_min = lowerBound;
-      this.x_max = upperBound;
+      if (typeof lowerBound === 'string') {
+        lowerBound = parseInt(lowerBound);
+      }
+      if (typeof upperBound === 'string') {
+        upperBound = parseInt(upperBound);
+      }
+      if (isNaN(lowerBound) || isNaN(upperBound)) {
+        return;
+      }
+      if (lowerBound === upperBound) {
+        return;
+      }
+      if (lowerBound < upperBound) {
+        this.x_min = lowerBound;
+        this.x_max = upperBound;
+      } else {
+        this.x_min = upperBound;
+        this.x_max = lowerBound;
+      }
     }
   }
 }

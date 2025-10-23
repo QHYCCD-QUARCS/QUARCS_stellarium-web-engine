@@ -392,6 +392,12 @@
   "Switch to Windowed Mode": "切换为窗口模式",
   "Switch to Fullscreen Mode": "切换为全屏模式",
   "Trajectory": "轨迹",
+  "Focus": {
+    "status": "对焦状态",
+    "bestPosition": "最佳位置",
+    "minHFR": "最小HFR",
+    "dataPoints": "数据点数"
+  },
   "Common": {
     "close": "关闭",
     "abort": "中止"
@@ -420,4 +426,14 @@
       "fail": "翻转失败"
     }
   }
+  ,
+  "Auto Focus": "自动对焦",
+  "Preparing to start auto focus...": "准备开始自动对焦...",
+  "Auto Focus Step": "自动对焦步骤",
+  "Auto Focus Step {0}": "自动对焦步骤 {0}",
+  "Auto Focus Step {0} Message": "自动对焦步骤 {0} 消息",
+  "Please observe if the camera has started shooting the full image. If it has started shooting, please wait for the shooting to complete": "请观察相机是否开始拍摄全图，如果已开始拍摄，请等待拍摄完成",
+  "Coarse adjustment in progress, please observe if the focuser has started moving. If it has started moving, please wait for the coarse adjustment to complete": "正在进行粗调，请观察电调是否开始移动，如果已开始移动，请等待粗调完成",
+  "Fine adjustment in progress, please observe if the focuser has started moving. If it has started moving, please wait for the fine adjustment to complete": "正在进行精调，请观察电调是否开始移动，如果已开始移动，请等待精调完成",
+  "Are you sure you want to start auto focus?": "您确定要开始自动对焦吗？"
 }

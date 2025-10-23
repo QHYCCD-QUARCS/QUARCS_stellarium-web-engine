@@ -239,7 +239,7 @@
           </v-card-text>
           <v-card-actions style="margin-top: -20px; padding-top: -20px;">
             <v-spacer></v-spacer>
-            <v-btn @click="ConfirmDialog = false" style="background-color: rgba(255, 255, 255, 0.1);">
+            <v-btn @click="ConfirmDialogCancel()" style="background-color: rgba(255, 255, 255, 0.1);">
               <v-icon color="rgba(255, 0, 0)"> mdi-close </v-icon>
             </v-btn>
             <v-btn @click="ConfirmDialogToDo()" style="background-color: rgba(255, 255, 255, 0.1);">
@@ -1262,6 +1262,14 @@ export default {
       this.ConfirmToDo = ToDo;
     },
 
+    ConfirmDialogCancel() {
+      this.ConfirmDialog = false;
+      if (this.ConfirmToDo === 'startAutoFocus') {
+        this.$bus.$emit('updateAutoFocuserState', false);
+        this.$bus.$emit('SendConsoleLogMsg', 'Cancel Auto Focus', 'info');
+      }
+    },
+
     ConfirmDialogToDo() {
       this.ConfirmDialog = false;
       if (this.ConfirmToDo === 'Refresh') {
@@ -1293,6 +1301,10 @@ export default {
         this.showUpdateDialog = true;
       } else if (this.ConfirmToDo === 'StartCalibration') {
         this.$bus.$emit('StartCalibration');
+      }else if (this.ConfirmToDo === 'startAutoFocus') {
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'AutoFocusConfirm:Yes');
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'ClearDataPoints');
+        this.$bus.$emit('ClearAllData');
       }
     },
 

@@ -393,6 +393,12 @@
   "Switch to Windowed Mode": "Switch to Windowed Mode",
   "Switch to Fullscreen Mode": "Switch to Fullscreen Mode",
   "Trajectory": "Trajectory",
+  "Focus": {
+    "status": "Focus Status",
+    "bestPosition": "Best Position",
+    "minHFR": "Minimum HFR",
+    "dataPoints": "Data Points"
+  },
   "Common": {
     "close": "Close",
     "abort": "Abort"
@@ -421,4 +427,14 @@
       "fail": "Flip failed"
     }
   }
+  ,
+  "Auto Focus": "Auto Focus",
+  "Preparing to start auto focus...": "Preparing to start auto focus...",
+  "Auto Focus Step": "Auto Focus Step",
+  "Auto Focus Step {0}": "Auto Focus Step {0}",
+  "Auto Focus Step {0} Message": "Auto Focus Step {0} Message",
+  "Please observe if the camera has started shooting the full image. If it has started shooting, please wait for the shooting to complete": "Please observe if the camera has started shooting the full image. If it has started shooting, please wait for the shooting to complete",
+  "Coarse adjustment in progress, please observe if the focuser has started moving. If it has started moving, please wait for the coarse adjustment to complete": "Coarse adjustment in progress, please observe if the focuser has started moving. If it has started moving, please wait for the coarse adjustment to complete",
+  "Fine adjustment in progress, please observe if the focuser has started moving. If it has started moving, please wait for the fine adjustment to complete": "Fine adjustment in progress, please observe if the focuser has started moving. If it has started moving, please wait for the fine adjustment to complete",
+  "Are you sure you want to start auto focus?": "Are you sure you want to start auto focus?"
 }

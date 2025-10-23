@@ -538,6 +538,16 @@
       </div>
     </div>
 
+    <!-- 自动对焦信息显示框 - [AUTO_FOCUS_UI_ENHANCEMENT] -->
+    <div v-if="(autoFocusInfo.isRunning || autoFocusInfo.state === 'complete') && currentcanvas === 'MainCamera'"
+      class="calibration-info-box">
+      <div class="calibration-content">
+        <div class="calibration-title">{{ $t('Auto Focus') }}</div>
+        <div class="calibration-message">{{ autoFocusInfo.message }}</div>
+        <div class="calibration-progress">{{ $t('Step') }} {{ autoFocusInfo.step }}/3</div>
+      </div>
+    </div>
+
   </v-app>
 </template>
 <script>
@@ -596,6 +606,14 @@ export default {
         calibrationState: 'idle',
         calibrationStep: 0,
         calibrationMessage: ''
+      },
+
+      // 自动对焦信息对象 - [AUTO_FOCUS_UI_ENHANCEMENT]
+      autoFocusInfo: {
+        isRunning: false,
+        state: 'idle',
+        step: 0,
+        message: ''
       },
 
       // isMessageBoxShow: false,
@@ -658,6 +676,7 @@ export default {
         { driverType: 'Focuser', num: 2, label: 'Sync Focuser Step', value: '', inputType: 'text' },
         { driverType: 'Focuser', num: 2, label: 'Min Limit', value: '', inputType: 'number' },
         { driverType: 'Focuser', num: 2, label: 'Max Limit', value: '', inputType: 'number' },
+        { driverType: 'Focuser', num: 2, label: 'Backlash', value: '', inputType: 'number' },
       ],
 
       PoleCameraConfigItems: [
@@ -888,6 +907,9 @@ export default {
     this.$bus.$on('Ra Aggression', this.RaAggressionSet);
     this.$bus.$on('Dec Aggression', this.DecAggressionSet);
     this.$bus.$on('Sync Focuser Step', this.SyncFocuserStep);
+    this.$bus.$on('Min Limit', this.MinLimitSet);
+    this.$bus.$on('Max Limit', this.MaxLimitSet);
+    this.$bus.$on('Backlash', this.BacklashSet);
     this.$bus.$on('GotoThenSolve', this.GotoThenSolve);
     this.$bus.$on('AutoFlip', this.AutoFlipSet);
     this.$bus.$on('WestMinutesPastMeridian', this.WestMinutesPastMeridianSet);
@@ -927,6 +949,11 @@ export default {
     this.$bus.$on('StartCalibration', this.startCalibrationProcess);
     this.$bus.$on('UpdateCalibrationInfo', this.updateCalibrationInfo);
     this.$bus.$on('EndCalibration', this.endCalibration);
+
+    // 自动对焦相关事件监听器 - [AUTO_FOCUS_UI_ENHANCEMENT]
+    this.$bus.$on('StartAutoFocus', this.startAutoFocusProcess);
+    this.$bus.$on('UpdateAutoFocusStep', this.updateAutoFocusStep);
+    this.$bus.$on('EndAutoFocus', this.endAutoFocus);
 
     this.memoryCheckInterval = setInterval(this.checkMemoryUsage, 30000);
 
@@ -1316,6 +1343,43 @@ export default {
                   this.$bus.$emit('addData_Point', CurrentPosition, FWHM);
                 }
                 break;
+              case 'FitResult':
+                if (parts.length === 3) {
+                  this.callShowMessageBox('FitResult:' + parts[2], 'warning');
+                }
+
+              case 'StarDetectionResult':
+                if (parts.length === 3) {
+                  const detected = parts[1] === 'true';
+                  const hfr = parseFloat(parts[2]);
+                  if (detected) {
+                    this.callShowMessageBox(`星点的HFR为：${hfr}`, 'info');
+                  } else {
+                    this.callShowMessageBox('未识别到星点', 'warning');
+                  }
+                }
+                break;
+
+              case 'AutoFocusModeChanged':
+                if (parts.length === 3) {
+                  const mode = parts[1];
+                  const hfr = parseFloat(parts[2]);
+                  if (mode === 'coarse') {
+                    this.callShowMessageBox('进入粗调模式', 'info');
+                  } else if (mode === 'fine') {
+                    this.callShowMessageBox('进入精调模式', 'info');
+                  }
+                }
+                break;
+
+              case 'AutoFocusStepChanged': // [AUTO_FOCUS_UI_ENHANCEMENT]
+                if (parts.length >= 3) {
+                  const step = parts[1];
+                  const description = parts[2];
+                  console.log('AutoFocusStepChanged:', step, description);
+                  this.$bus.$emit('UpdateAutoFocusStep', step, description);
+                }
+                break;
 
               case 'addMinPointData_Point':
                 if (parts.length === 3) {
@@ -1351,25 +1415,24 @@ export default {
                 }
                 break;
 
+              // -------------- 特殊处理,内部解析数据
               case 'fitQuadraticCurve':
+                // 新的数据格式: "fitQuadraticCurve:a:b:c:bestPosition:minHFR"
+                console.log('App.vue | 接收到fitQuadraticCurve消息:', data.message);
+                // 使用setTimeout确保清除操作在添加数据之前完成
                 this.$bus.$emit('ClearfitQuadraticCurve');
-                for (let x = 0; x <= 601; x += 1) {
-                  const a = parts[x];
-                  const b = a.split('|');
-                  if (b.length === 2) {
-                    const x = b[0];
-                    const y = b[1];
-                    this.$bus.$emit('fitQuadraticCurve', x, y);
-                  }
-                }
+                setTimeout(() => {
+                  this.$bus.$emit('fitQuadraticCurve', data.message);
+                }, 10);
                 break;
 
               case 'fitQuadraticCurve_minPoint':
-                const x = parts[1];
-                const y = parts[2];
-                this.$bus.$emit('fitQuadraticCurve_minPoint', x, y);
+                // 新的数据格式: "fitQuadraticCurve_minPoint:bestPosition:minHFR"
+                console.log('App.vue | 接收到fitQuadraticCurve_minPoint消息:', data.message);
+                this.$bus.$emit('fitQuadraticCurve_minPoint', data.message);
                 break;
 
+              // --------------------------------------
 
               case 'TelescopePark':
                 if (parts.length === 2) {
@@ -1431,7 +1494,16 @@ export default {
                 break;
 
               case 'AutoFocusOver':
-                this.$bus.$emit('AutoFocusOver');
+                if (parts.length >= 4) {
+                  // 新格式: AutoFocusOver:success:bestPosition:minHFR
+                  const success = parts[1] === 'true';
+                  const bestPosition = parseFloat(parts[2]);
+                  const minHFR = parseFloat(parts[3]);
+                  this.$bus.$emit('AutoFocusOver', success, bestPosition, minHFR);
+                } else {
+                  // 兼容旧格式: AutoFocusOver
+                  this.$bus.$emit('AutoFocusOver');
+                }
                 break;
 
               case 'CFWPositionMax':
@@ -2334,6 +2406,82 @@ export default {
                   this.SendConsoleLogMsg('Box cache cleared successfully', 'info');
                 }
                 break;
+
+              case 'FocuserLimit':
+                if (parts.length === 3) {
+                  const FocuserMinLimit = parts[1];
+                  const FocuserMaxLimit = parts[2];
+                  let item = this.FocuserConfigItems.find(i => i.label === 'Min Limit');
+                  if (item) {
+                    item.value = FocuserMinLimit;
+                  } else {
+                    this.FocuserConfigItems.push({ driverType: 'Focuser', label: 'Min Limit', value: FocuserMinLimit, inputType: 'number' },);
+                  }
+                  item = this.FocuserConfigItems.find(i => i.label === 'Max Limit');
+                  if (item) {
+                    item.value = FocuserMaxLimit;
+                  } else {
+                    this.FocuserConfigItems.push({ driverType: 'Focuser', label: 'Max Limit', value: FocuserMaxLimit, inputType: 'number' },);
+                  }
+                  this.$bus.$emit('setFocusChartRange', FocuserMinLimit, FocuserMaxLimit);
+                }
+                break;
+              case 'Backlash':
+                if (parts.length === 2) {
+                  const FocuserBacklash = parts[1];
+                  let item = this.FocuserConfigItems.find(i => i.label === 'Backlash');
+                  if (item) {
+                    item.value = FocuserBacklash;
+                  }
+                }
+                break;
+              case 'updateAutoFocuserState':
+                if (parts.length === 2 ) {
+                  const autoFocusState = parts[1];
+                  this.$bus.$emit('updateAutoFocuserState', autoFocusState == 'true'); // 更新自动对焦按钮状态
+                  
+                }
+                break;
+              case 'AutoFocusConfirm': // [AUTO_FOCUS_UI_ENHANCEMENT]
+                if (parts.length >= 2) {
+                  const question = parts[1];
+                  console.log('AutoFocusConfirm:', question);
+                  this.ShowConfirmDialog('自动对焦', question, 'AutoFocusConfirm');
+                }
+                break;
+
+              case 'AutoFocusStepChanged': // [AUTO_FOCUS_UI_ENHANCEMENT]
+                if (parts.length >= 3) {
+                  const step = parts[1];
+                  const description = parts[2];
+                  console.log('AutoFocusStepChanged:', step, description);
+                  this.$bus.$emit('UpdateAutoFocusStep', step, description);
+                }
+                break;
+
+              case 'AutoFocusCancelled': // [AUTO_FOCUS_UI_ENHANCEMENT]
+                if (parts.length >= 2) {
+                  const reason = parts[1];
+                  console.log('AutoFocusCancelled:', reason);
+                  this.callShowMessageBox(reason, 'info');
+                }
+                break;
+
+              case 'AutoFocusStarted': // [AUTO_FOCUS_UI_ENHANCEMENT]
+                if (parts.length >= 2) {
+                  const message = parts[1];
+                  console.log('AutoFocusStarted:', message);
+                  this.$bus.$emit('StartAutoFocus');
+                }
+                break;
+
+              case 'AutoFocusEnded': // [AUTO_FOCUS_UI_ENHANCEMENT]
+                if (parts.length >= 2) {
+                  const message = parts[1];
+                  console.log('AutoFocusEnded:', message);
+                  this.$bus.$emit('EndAutoFocus');
+                }
+                break;
               default:
                 console.warn('未处理命令: ', data.message);
                 break;
@@ -2527,12 +2675,15 @@ export default {
       this.sendMessage('Vue_Command', 'getLastSelectDevice'); // 获取上一次选择的设备
       this.sendMessage('Vue_Command', 'getMainCameraParameters'); // 获取主相机参数
       this.sendMessage('Vue_Command', 'getMountParameters'); // 获取赤道仪UI信息
+      this.sendMessage('Vue_Command', 'getFocuserParameters'); // 获取焦距器参数
       this.RecalibratePolarAxis(); // 重新校准极轴
       this.sendMessage('Vue_Command', 'getStagingSolveResult'); // 获取定标结果
       this.sendMessage('Vue_Command', 'getFocuserLoopingState'); // 获取焦距器循环状态
+      
       this.sendMessage('Vue_Command', 'getStagingScheduleData'); // 获取定标计划数据
       this.sendMessage('Vue_Command', 'getStagingSolveResult'); // 获取定标结果
       this.sendMessage('Vue_Command', 'getGPIOsStatus'); // 获取GPIO状态
+
       // this.sendMessage('Vue_Command', 'getStagingImage'); // 获取最后拍摄的图像
       // this.sendMessage('Vue_Command', 'getPolarAlignmentState'); // 获取极轴对齐状态
       this.sendMessage('Vue_Command', 'loadSDKVersionAndUSBSerialPath'); // 获取SDK版本和USB序列号路径
@@ -3131,6 +3282,24 @@ export default {
       const IntValue = parseInt(value);
       this.SendConsoleLogMsg('Sync Focuser Step:' + IntValue, 'info');
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'SyncFocuserStep:' + IntValue);
+    },
+    MinLimitSet(payload) {
+      const [signal, value] = payload.split(':'); // 拆分信号和值
+      const IntValue = parseInt(value);
+      this.SendConsoleLogMsg('Min Limit:' + IntValue, 'info');
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'MinLimit:' + IntValue);
+    },
+    MaxLimitSet(payload) {
+      const [signal, value] = payload.split(':'); // 拆分信号和值
+      const IntValue = parseInt(value);
+      this.SendConsoleLogMsg('Max Limit:' + IntValue, 'info');
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'MaxLimit:' + IntValue);
+    },
+    BacklashSet(payload) {
+      const [signal, value] = payload.split(':'); // 拆分信号和值
+      const IntValue = parseInt(value);
+      this.SendConsoleLogMsg('Backlash:' + IntValue, 'info');
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'Backlash:' + IntValue);
     },
 
     GotoThenSolve(payload) {
@@ -7184,6 +7353,35 @@ export default {
       this.calibrationInfo.calibrationStep = 0;
       this.calibrationInfo.calibrationMessage = '';
       console.log('App: Calibration ended');
+    },// 自动对焦相关方法 - [AUTO_FOCUS_UI_ENHANCEMENT]
+    startAutoFocusProcess() {
+      this.autoFocusInfo.isRunning = true;
+      this.autoFocusInfo.state = 'running';
+      this.autoFocusInfo.step = 0;
+      this.autoFocusInfo.message = this.$t('Preparing to start auto focus...');
+      console.log('App: Auto focus started:', this.autoFocusInfo);
+    },
+
+    updateAutoFocusStep(step, message) {
+      try {
+        
+        this.autoFocusInfo.step = step;
+        this.autoFocusInfo.message = message;
+        if (step === 0) {
+          this.autoFocusInfo.isRunning = true;
+        }
+        console.log('App: Auto focus info updated:', this.autoFocusInfo);
+      } catch (error) {
+        console.error('Error in updateAutoFocusStep:', error);
+      }
+    },
+
+    endAutoFocus() {
+      this.autoFocusInfo.isRunning = false;
+      this.autoFocusInfo.state = 'idle';
+      this.autoFocusInfo.step = 0;
+      this.autoFocusInfo.message = '';
+      console.log('App: Auto focus ended');
     },
   },
   computed: {
