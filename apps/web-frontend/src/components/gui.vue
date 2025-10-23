@@ -32,11 +32,11 @@
       </transition>
     </div>
     <observing-panel></observing-panel>
-    <template v-for="(item, i) in pluginsGuiComponents" :key="i">
-      <component :is="item"></component>
+    <template v-for="(item, i) in pluginsGuiComponents">
+      <component :is="item" :key="i"></component>
     </template>
-    <template v-for="(item, i) in dialogs" :key="i + pluginsGuiComponents.length">
-      <component :is="item"></component>
+    <template v-for="(item, i) in dialogs">
+      <component :is="item" :key="i + pluginsGuiComponents.length"></component>
     </template>
     <selected-object-info
       style="position: absolute; top: 48px; left: 0px; width: 350px; max-width: calc(100vw - 12px); margin: 6px"
