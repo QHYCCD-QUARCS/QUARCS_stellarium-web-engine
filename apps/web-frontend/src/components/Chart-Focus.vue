@@ -100,7 +100,7 @@ export default {
       quadraticParams: null, // { a,b,c,x0? }
       // 二次拟合结果显示（合并新增功能）
       quadraticResult: {
-        show: true,
+        show: false,
         a: '0.000000',
         b: '0.000000',
         c: '0.000000',
