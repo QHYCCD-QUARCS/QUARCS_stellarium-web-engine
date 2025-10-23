@@ -543,6 +543,13 @@ export default {
       if (this.chartData1_pos.length > 0) {
         minPos = Math.min(...this.chartData1_pos.map(p => p[0]));
       }
+      // 通过顶点位置 bestPosition 反推拟合时的原点偏移 originX：
+      // 若拟合形式为 y = a*(x-originX)^2 + b*(x-originX) + c，则顶点在 x = originX - b/(2a)
+      // 故 originX = bestPosition + b/(2a)
+      let originX = minPos;
+      if (isFinite(a) && Math.abs(a) > 1e-12 && isFinite(b) && isFinite(bestPosition)) {
+        originX = bestPosition + b / (2 * a);
+      }
       let startX, endX, stepSize;
       if (this.chartData1_pos.length > 0) {
         const dataMinX = Math.min(...this.chartData1_pos.map(p => p[0]));
@@ -567,7 +574,7 @@ export default {
 
       const curve = [];
       for (let x = startX; x <= endX; x += stepSize) {
-        const rx = x - minPos;
+        const rx = x - originX;
         const y = a * rx * rx + b * rx + c;
         if (isFinite(y) && y >= 0) curve.push([x, y]);
       }
@@ -577,7 +584,7 @@ export default {
       for (let off = -fineRange; off <= fineRange; off += fineStep) {
         const x = bestPosition + off;
         if (x >= startX && x <= endX) {
-          const rx = x - minPos;
+          const rx = x - originX;
           const y = a * rx * rx + b * rx + c;
           if (isFinite(y) && y >= 0) curve.push([x, y]);
         }
@@ -599,6 +606,7 @@ export default {
       const samples = Math.max(2, Math.min(400, Math.ceil(span / 50))); // 根据范围自适应采样密度
       const step = span / samples || 1;
       const data = [];
+      // 通过 x0(centerX) 作为拟合原点：y = a*(x-x0)^2 + b*(x-x0) + c
       for (let x = start; x <= end; x += step) {
         const t = x - centerX;
         const y = a * t * t + b * t + c;
