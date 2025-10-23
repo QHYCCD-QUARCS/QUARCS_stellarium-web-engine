@@ -140,7 +140,7 @@ export default {
     this.$bus.$on('FocusPosition', this.changeRange_x);
     // 合并：启用后端拟合显示
     this.$bus.$on('fitQuadraticCurve', this.fitQuadraticCurve);
-    this.$bus.$on('fitQuadraticCurve_minPoint', this.fitQuadraticCurve_minPoint);
+    // this.$bus.$on('fitQuadraticCurve_minPoint', this.fitQuadraticCurve_minPoint);
 
     this.$bus.$on('ClearfitQuadraticCurve', this.clearChartData2);
     this.$bus.$on('ClearAllData', this.ClearAllData);
@@ -343,7 +343,8 @@ export default {
             itemStyle: {
               color: 'red'
             },
-            symbolSize: 4
+            symbolSize: 4,
+            z: 10
           },
           !this.isTimeMode ? {
             name: 'Dec',
@@ -355,7 +356,8 @@ export default {
             lineStyle: {
               width: 1
             },
-            symbolSize: 0
+            symbolSize: 0,
+            z: 3
           } : null,
           !this.isTimeMode ? {
             name: 'minPoint',
@@ -364,7 +366,8 @@ export default {
             itemStyle: {
               color: 'rgba(75, 155, 250, 0.7)'
             },
-            symbolSize: 4
+            symbolSize: 4,
+            z: 11
           } : null,
           !this.isTimeMode ? {
             name: 'xMinLine',
@@ -373,6 +376,7 @@ export default {
               [this.x_min, this.yAxis_min],
               [this.x_min, y_max]
             ],
+            z: 5,
             lineStyle: {
               color: 'red',
               width: 1
@@ -386,6 +390,7 @@ export default {
               [this.x_max, this.yAxis_min],
               [this.x_max, y_max]
             ],
+            z: 5,
             lineStyle: {
               color: 'red',
               width: 1
@@ -399,6 +404,7 @@ export default {
               [this.currentX, this.yAxis_min],
               [this.currentX, y_max]
             ],
+            z: 6,
             lineStyle: {
               color: 'green',
               width: 1
@@ -655,7 +661,7 @@ export default {
     changeRange_x(current, target) {
       this.xAxis_min = Number(current) - 3000;
       this.xAxis_max = Number(current) + 3000;
-      this.currentX = current;
+      this.currentX = Number(current);
       
       this.scheduleRender(this.xAxis_min, this.xAxis_max);
     },
