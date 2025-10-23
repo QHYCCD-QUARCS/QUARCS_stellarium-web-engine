@@ -12,36 +12,38 @@
       @touchend="endDrag"
     ></div>
     
-
+    <!-- 对焦结果状态框（使用全局弹层，附加到 body，避免被图表容器裁剪） -->
+    <v-dialog v-model="quadraticResult.show" attach="body" max-width="460" overlay-color="black" overlay-opacity="0.25" persistent>
+      <v-scale-transition>
+        <v-card class="focus-status-card">
+          <v-card-title class="focus-header">
+            <div class="header-left">
+              <v-icon small color="#33DA79">mdi-check-circle</v-icon>
+              <span class="header-title">{{ $t('Focus.status') }}</span>
+            </div>
+            <v-btn icon small class="close-btn" @click="closePanel">
+              <v-icon>mdi-close</v-icon>
+            </v-btn>
+          </v-card-title>
+          <v-divider class="divider"></v-divider>
+          <v-card-text class="focus-content">
+            <div class="focus-row">
+              <span class="label">{{ $t('Focus.bestPosition') }}</span>
+              <span class="value">{{ getBestPositionDisplay() }}</span>
+            </div>
+            <div class="focus-row">
+              <span class="label">{{ $t('Focus.minHFR') }}</span>
+              <span class="value">{{ quadraticResult.minHFR }}</span>
+            </div>
+            <div class="focus-row">
+              <span class="label">{{ $t('Focus.dataPoints') }}</span>
+              <span class="value">{{ validDataPointCount }}</span>
+            </div>
+          </v-card-text>
+        </v-card>
+      </v-scale-transition>
+    </v-dialog>
   </div>
-      <!-- 对焦结果状态框（移入根节点内部，保持单一根元素） -->
-      <div class="focus-result-panel" v-if="quadraticResult && quadraticResult.show">
-      <div class="panel-header">
-        <div class="header-left">
-          <div class="status-icon success">
-            <i class="icon-check">✓</i>
-          </div>
-          <div class="panel-title">{{ $t('Focus.status') }}</div>
-        </div>
-        <div class="close-button" @click="closePanel">
-          <i class="icon-close">×</i>
-        </div>
-      </div>
-      <div class="panel-content">
-        <div class="status-row">
-          <span class="label">{{ $t('Focus.bestPosition') }}</span>
-          <span class="value">{{ getBestPositionDisplay() }}</span>
-        </div>
-        <div class="status-row">
-          <span class="label">{{ $t('Focus.minHFR') }}</span>
-          <span class="value">{{ quadraticResult.minHFR }}</span>
-        </div>
-        <div class="status-row">
-          <span class="label">{{ $t('Focus.dataPoints') }}</span>
-          <span class="value">{{ validDataPointCount }}</span>
-        </div>
-      </div>
-    </div>
 </template>
 
 <script>
@@ -98,7 +100,7 @@ export default {
       quadraticParams: null, // { a,b,c,x0? }
       // 二次拟合结果显示（合并新增功能）
       quadraticResult: {
-        show: false,
+        show: true,
         a: '0.000000',
         b: '0.000000',
         c: '0.000000',
@@ -771,5 +773,66 @@ export default {
   cursor: pointer;
   font-size: 18px;
   line-height: 1;
+}
+
+/* 美化后的焦点状态卡片样式 */
+.focus-status-card {
+  background: linear-gradient(145deg, rgba(55, 55, 55, 0.95), rgba(65, 65, 65, 0.95));
+  backdrop-filter: blur(6px);
+  border-radius: 12px !important;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.05);
+  color: #EDEFF2;
+}
+
+.focus-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px !important;
+}
+.focus-header .header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.focus-header .header-title {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+.close-btn {
+  opacity: 0.85;
+}
+.close-btn:hover { opacity: 1; }
+
+.divider {
+  opacity: 0.15;
+}
+
+.focus-content {
+  padding: 12px 14px 16px 14px !important;
+}
+.focus-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+}
+.focus-row + .focus-row {
+  border-top: 1px dashed rgba(255, 255, 255, 0.08);
+}
+.label {
+  color: #C9D1D9;
+  opacity: 0.9;
+  font-size: 14px;
+}
+.value {
+  color: #FFFFFF;
+  font-weight: 600;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 18px;
+  letter-spacing: 0.2px;
+  font-variant-numeric: tabular-nums;
 }
 </style>
