@@ -7,7 +7,7 @@
 
     <div class="buttons-container">
 
-      <button :class="LoopExpSwitchBtnClass" :style="{ animationDuration: ExpTime + 'ms' }" @touchend="LoopExpSwitch">
+      <button :class="LoopExpSwitchBtnClass" :style="{ animationDuration: ExpTime + 'ms' }" @click="LoopExpSwitch" @touchend.prevent="LoopExpSwitch">
         <div style="display: flex; justify-content: center; align-items: center;">
           <img src="@/assets/images/svg/ui/GuiderLoopExp.svg" height="20px" style="min-height: 20px; pointer-events: none;"></img>
         </div>
@@ -21,7 +21,7 @@
         </div>
       </button>
 
-      <button class="btn-Style" @touchend="ExpTimeSwitch">
+      <button class="btn-Style" @click="ExpTimeSwitch" @touchend.prevent="ExpTimeSwitch">
         <span v-if="ExpTime === 1000">
           <div style="display: flex; justify-content: center; align-items: center;">
             <img src="@/assets/images/svg/ui/Exp-1000.svg" height="25px" style="min-height: 25px; pointer-events: none;"></img>
@@ -39,13 +39,13 @@
         </span>
       </button>
 
-      <button class="btn-Style" @touchend="DataClear">
+      <button class="btn-Style" @click="DataClear" @touchend.prevent="DataClear">
         <div style="display: flex; justify-content: center; align-items: center;">
           <img src="@/assets/images/svg/ui/delete.svg" height="20px" style="min-height: 20px; pointer-events: none;"></img>
         </div>
       </button>
 
-      <button class="btn-Style" @touchend="RangeSwitch">
+      <button class="btn-Style" @click="RangeSwitch" @touchend.prevent="RangeSwitch">
         <div style="display: flex; justify-content: center; align-items: center;">
           <img src="@/assets/images/svg/ui/suofang.svg" height="20px" style="min-height: 20px; pointer-events: none;"></img>
         </div>

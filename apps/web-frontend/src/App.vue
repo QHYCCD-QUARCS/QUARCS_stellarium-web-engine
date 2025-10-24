@@ -7134,6 +7134,12 @@ export default {
         this.SendConsoleLogMsg('Image is being transmitted, current processing is slow, skipping one frame.', 'warning');
         return;
       }
+      if (this.isDownloadingImageName == "" || this.isDownloadingImageName == null) {
+        this.SendConsoleLogMsg('isDownloadingImageName is empty or null', 'error');
+        // 终止循环拍摄
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'FocusLoopShooting:false');
+        return;
+      }
       this.isProcessingImage = true;
       const imagePath = 'img/' + fileName;
       // 创建一个AbortController实例来取消fetch请求
