@@ -833,6 +833,7 @@ export default {
   box-sizing: border-box;
 }
 
+.btn-loop-shooting:active,
 .btn-Auto:active,
 .btn-Left:active,
 .btn-Right:active,
@@ -959,16 +960,19 @@ export default {
 }
 
 .btn-loop-shooting {
+  width: 30px;
+  height: 30px;
+
+  user-select: none;
   background-color: rgba(64, 64, 64, 0.5);
-  /* 默认背景色 */
   backdrop-filter: blur(5px);
   border: none;
-  border-radius: 5px;
-  padding: 5px 10px;
+  border-radius: 50%;
+  box-sizing: border-box;
 }
 
 .active-loop {
-  background-color: green;
+  background-color: rgb(40, 71, 40);
   /* 激活时的背景色 */
 }
 

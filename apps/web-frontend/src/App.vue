@@ -2678,14 +2678,14 @@ export default {
       this.sendMessage('Vue_Command', 'getFocuserParameters'); // 获取焦距器参数
       this.RecalibratePolarAxis(); // 重新校准极轴
       this.sendMessage('Vue_Command', 'getStagingSolveResult'); // 获取定标结果
-      this.sendMessage('Vue_Command', 'getFocuserLoopingState'); // 获取焦距器循环状态
+      // this.sendMessage('Vue_Command', 'getFocuserLoopingState'); // 获取焦距器循环状态,弃用
       
       this.sendMessage('Vue_Command', 'getStagingScheduleData'); // 获取定标计划数据
       this.sendMessage('Vue_Command', 'getStagingSolveResult'); // 获取定标结果
       this.sendMessage('Vue_Command', 'getGPIOsStatus'); // 获取GPIO状态
 
-      // this.sendMessage('Vue_Command', 'getStagingImage'); // 获取最后拍摄的图像
-      // this.sendMessage('Vue_Command', 'getPolarAlignmentState'); // 获取极轴对齐状态
+      // this.sendMessage('Vue_Command', 'getStagingImage'); // 获取最后拍摄的图像,弃用
+      // this.sendMessage('Vue_Command', 'getPolarAlignmentState'); // 获取极轴对齐状态,更换位置
       this.sendMessage('Vue_Command', 'loadSDKVersionAndUSBSerialPath'); // 获取SDK版本和USB序列号路径
 
 
