@@ -532,7 +532,7 @@
       class="calibration-info-box">
       <div class="calibration-content">
         <div class="calibration-title">{{ $t('Focuser Travel Calibration') }}</div>
-        <div class="calibration-message">{{ calibrationInfo.calibrationMessage }}</div>
+        <div class="calibration-message">{{ $t(calibrationInfo.calibrationMessage) }}</div>
         <div class="calibration-progress">{{ $t('Step') }} {{ calibrationInfo.calibrationStep }}/3</div>
       </div>
     </div>
@@ -542,7 +542,7 @@
       class="calibration-info-box">
       <div class="calibration-content">
         <div class="calibration-title">{{ $t('Auto Focus') }}</div>
-        <div class="calibration-message">{{ autoFocusInfo.message }}</div>
+        <div class="calibration-message">{{ $t(autoFocusInfo.message) }}</div>
         <div class="calibration-progress">{{ $t('Step') }} {{ autoFocusInfo.step }}/3</div>
       </div>
     </div>
@@ -1373,14 +1373,7 @@ export default {
                 }
                 break;
 
-              case 'AutoFocusStepChanged': // [AUTO_FOCUS_UI_ENHANCEMENT]
-                if (parts.length >= 3) {
-                  const step = parts[1];
-                  const description = parts[2];
-                  console.log('AutoFocusStepChanged:', step, description);
-                  this.$bus.$emit('UpdateAutoFocusStep', step, description);
-                }
-                break;
+            
 
               case 'addMinPointData_Point':
                 if (parts.length === 3) {
@@ -7388,7 +7381,7 @@ export default {
       this.calibrationInfo.isCalibrating = true;
       this.calibrationInfo.calibrationState = 'running';
       this.calibrationInfo.calibrationStep = 0;
-      this.calibrationInfo.calibrationMessage = this.$t('Preparing to start focuser travel calibration...');
+      this.calibrationInfo.calibrationMessage = 'Preparing to start focuser travel calibration...';
       console.log('App: Calibration started:', this.calibrationInfo);
     },
 
@@ -7397,7 +7390,7 @@ export default {
         this.calibrationInfo.calibrationStep = step;
         // 如果消息是国际化键，则翻译它
         if (message && typeof message === 'string') {
-          this.calibrationInfo.calibrationMessage = this.$t(message);
+          this.calibrationInfo.calibrationMessage = message;
         } else {
           this.calibrationInfo.calibrationMessage = message;
         }
@@ -7426,16 +7419,19 @@ export default {
       this.autoFocusInfo.step = 0;
       this.autoFocusInfo.message = this.$t('Preparing to start auto focus...');
       console.log('App: Auto focus started:', this.autoFocusInfo);
+      
+      // 自动对焦开始时禁用拍摄按键
+      this.$bus.$emit('disableCaptureButton', true);
     },
 
     updateAutoFocusStep(step, message) {
       try {
 
         this.autoFocusInfo.step = step;
-        this.autoFocusInfo.message = this.$t(message);
-        if (step === 0) {
-          this.autoFocusInfo.isRunning = true;
-        }
+        this.autoFocusInfo.message = message;
+        this.autoFocusInfo.isRunning = true;
+        // 自动对焦开始时禁用拍摄按键
+        this.$bus.$emit('disableCaptureButton', true);
         console.log('App: Auto focus info updated:', this.autoFocusInfo);
       } catch (error) {
         console.error('Error in updateAutoFocusStep:', error);
@@ -7448,6 +7444,9 @@ export default {
       this.autoFocusInfo.step = 0;
       this.autoFocusInfo.message = '';
       console.log('App: Auto focus ended');
+      
+      // 自动对焦结束时启用拍摄按键
+      this.$bus.$emit('disableCaptureButton', false);
     },
   },
   computed: {

@@ -435,5 +435,7 @@
   "Please observe if the camera has started shooting the full image. If it has started shooting, please wait for the shooting to complete": "请观察相机是否开始拍摄全图，如果已开始拍摄，请等待拍摄完成",
   "Coarse adjustment in progress, please observe if the focuser has started moving. If it has started moving, please wait for the coarse adjustment to complete": "正在进行粗调，请观察电调是否开始移动，如果已开始移动，请等待粗调完成",
   "Fine adjustment in progress, please observe if the focuser has started moving. If it has started moving, please wait for the fine adjustment to complete": "正在进行精调，请观察电调是否开始移动，如果已开始移动，请等待精调完成",
-  "Are you sure you want to start auto focus?": "您确定要开始自动对焦吗？"
+  "Are you sure you want to start auto focus?": "您确定要开始自动对焦吗？",
+  "The button is disabled, please wait for the auto focus to finish.": "按钮已禁用，请等待自动对焦完成。"
+
 }

@@ -125,6 +125,7 @@ export default {
   methods: {
     handleMouseDown() {
       if (this.isButtonDisabled) {
+        this.$bus.$emit('showMsgBox', this.$t('The button is disabled, please wait for the auto focus to finish.'), 'warning');
         return; 
       }
       this.mousePressTimestamp = Date.now();
@@ -141,6 +142,9 @@ export default {
     },
 
     handleMouseUp() {
+      if (this.isButtonDisabled) {
+        return; 
+      }
       clearTimeout(this.longPressTimer);
 
       cancelAnimationFrame(this.longPressAnimationRequest);
