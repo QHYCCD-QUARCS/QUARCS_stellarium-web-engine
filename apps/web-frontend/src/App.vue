@@ -22,6 +22,7 @@
           style="position: absolute; top: 50px; max-height: calc(100% - 95px); overflow-y: auto;"
           class="params-container">
 
+          <!-- 设备未连接状态 -->
           <div v-show="!DeviceIsConnected" style="text-align: center;">
             <span style="display: inline-block; font-size: 15px; color: rgba(255, 255, 255, 0.5); user-select: none;">
               {{ $t('Device Connection') }}
@@ -58,7 +59,9 @@
               </v-col>
             </v-row>
           </div>
+          <!-- 设备未连接状态 -->
 
+          <!-- 设备连接状态 -->
           <div v-show="DeviceIsConnected" v-for="(item, index) in CurrentConfigItems()" :key="index"
             class="config-item">
             <!-- 标题，仅在第一个项目显示 -->
@@ -128,6 +131,7 @@
               </div>
             </v-card-text>
           </div>
+          <!-- 设备连接状态 -->
 
           <div v-show="DeviceIsConnected"
             style="text-align: center; position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px;">
@@ -139,108 +143,103 @@
           </div>
 
         </div>
+      
+      </div>
 
-        <div v-show="isOpenPowerPage">
-          <span
-            style="position: absolute; top: 0px; left: 50%; transform: translateX(-50%); font-size: 26px; color: rgba(255, 255, 255, 0.5); user-select: none; white-space: nowrap; ">
-            {{ $t('Power Management') }}
-            <v-divider></v-divider>
-          </span>
+      <!-- 电源管理页面 -->
+      <div v-show="isOpenPowerPage">
+        <span
+          style="position: absolute; top: 0px; left: 50%; transform: translateX(-50%); font-size: 26px; color: rgba(255, 255, 255, 0.5); user-select: none; white-space: nowrap; ">
+          {{ $t('Power Management') }}
+          <v-divider></v-divider>
+        </span>
 
-          <div style="position: absolute; top: 50px; max-height: calc(100% - 50px); width: 200px; overflow-y: auto;">
-            <v-list dense>
+        <div style="position: absolute; top: 50px; max-height: calc(100% - 50px); width: 200px; overflow-y: auto;">
+          <v-list dense>
+            <v-list-item @click.stop="SwitchOutPutPower(1, OutPutPower_1_ON)"
+              :style="{ height: '36px', marginBottom: '10px' }">
+              <v-list-item-icon style="margin-right: 10px;">
+                <div style="display: flex; justify-content: center; align-items: center;">
+                  <img src="@/assets/images/svg/ui/OutPutPower.svg" height="30px"
+                    style="min-height: 30px; pointer-events: none;"></img>
+                </div>
+              </v-list-item-icon>
+              <v-list-item-content>
+                <v-list-item-title>
+                  <span>
+                    <div :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('OutPut Power 1') }}
+                    </div>
+                    <div :style="{ fontSize: '7px' }" :class="{ 'connected-device': OutPutPower_1_ON }">{{OutPutPower_1_ON ? '[ON]' : '[OFF]' }}</div>
+                  </span>
+                </v-list-item-title>
 
-              <v-list-item @click.stop="SwitchOutPutPower(1, OutPutPower_1_ON)"
-                :style="{ height: '36px', marginBottom: '10px' }">
-                <v-list-item-icon style="margin-right: 10px;">
-                  <div style="display: flex; justify-content: center; align-items: center;">
-                    <img src="@/assets/images/svg/ui/OutPutPower.svg" height="30px"
-                      style="min-height: 30px; pointer-events: none;"></img>
-                  </div>
-                </v-list-item-icon>
-                <v-list-item-content>
-                  <v-list-item-title>
-                    <span>
-                      <div :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('OutPut Power 1') }}
-                      </div>
-                      <div :style="{ fontSize: '7px' }" :class="{ 'connected-device': OutPutPower_1_ON }">{{
-                        OutPutPower_1_ON ?
-                          '[ON]' : '[OFF]' }}</div>
-                    </span>
-                  </v-list-item-title>
+              </v-list-item-content>
+            </v-list-item>
 
-                </v-list-item-content>
-              </v-list-item>
+            <v-list-item @click.stop="SwitchOutPutPower(2, OutPutPower_2_ON)"
+              :style="{ height: '36px', marginBottom: '10px' }">
+              <v-list-item-icon style="margin-right: 10px;">
+                <div style="display: flex; justify-content: center; align-items: center;">
+                  <img src="@/assets/images/svg/ui/OutPutPower.svg" height="30px"
+                    style="min-height: 30px; pointer-events: none;"></img>
+                </div>
+              </v-list-item-icon>
+              <v-list-item-content>
+                <v-list-item-title>
+                  <span>
+                    <div :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('OutPut Power 2') }}
+                    </div>
+                    <div :style="{ fontSize: '7px' }" :class="{ 'connected-device': OutPutPower_2_ON }">{{OutPutPower_2_ON ?'[ON]' : '[OFF]' }}</div>
+                  </span>
+                </v-list-item-title>
 
-              <v-list-item @click.stop="SwitchOutPutPower(2, OutPutPower_2_ON)"
-                :style="{ height: '36px', marginBottom: '10px' }">
-                <v-list-item-icon style="margin-right: 10px;">
-                  <div style="display: flex; justify-content: center; align-items: center;">
-                    <img src="@/assets/images/svg/ui/OutPutPower.svg" height="30px"
-                      style="min-height: 30px; pointer-events: none;"></img>
-                  </div>
-                </v-list-item-icon>
-                <v-list-item-content>
-                  <v-list-item-title>
-                    <span>
-                      <div :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('OutPut Power 2') }}
-                      </div>
-                      <div :style="{ fontSize: '7px' }" :class="{ 'connected-device': OutPutPower_2_ON }">{{
-                        OutPutPower_2_ON ?
-                          '[ON]' : '[OFF]' }}</div>
-                    </span>
-                  </v-list-item-title>
+              </v-list-item-content>
+            </v-list-item>
 
-                </v-list-item-content>
-              </v-list-item>
+            <v-divider :style="{ marginBottom: '10px' }"></v-divider>
 
-              <v-divider :style="{ marginBottom: '10px' }"></v-divider>
+            <v-list-item @click.stop="RestartRaspberryPi()" :style="{ height: '36px', marginBottom: '10px' }">
+              <v-list-item-icon style="margin-right: 10px;">
+                <div style="display: flex; justify-content: center; align-items: center;">
+                  <img src="@/assets/images/svg/ui/Reboot.svg" height="30px"
+                    style="min-height: 30px; pointer-events: none;"></img>
+                </div>
+              </v-list-item-icon>
+              <v-list-item-content>
+                <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Restart')}}</v-list-item-title>
+              </v-list-item-content>
+            </v-list-item>
 
-              <v-list-item @click.stop="RestartRaspberryPi()" :style="{ height: '36px', marginBottom: '10px' }">
-                <v-list-item-icon style="margin-right: 10px;">
-                  <div style="display: flex; justify-content: center; align-items: center;">
-                    <img src="@/assets/images/svg/ui/Reboot.svg" height="30px"
-                      style="min-height: 30px; pointer-events: none;"></img>
-                  </div>
-                </v-list-item-icon>
-                <v-list-item-content>
-                  <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Restart')
-                  }}</v-list-item-title>
-                </v-list-item-content>
-              </v-list-item>
+            <v-list-item @click.stop="ShutdownRaspberryPi()" :style="{ height: '36px', marginBottom: '10px' }">
+              <v-list-item-icon style="margin-right: 10px;">
+                <div style="display: flex; justify-content: center; align-items: center;">
+                  <img src="@/assets/images/svg/ui/PowerOFF.svg" height="30px"
+                    style="min-height: 30px; pointer-events: none;"></img>
+                </div>
+              </v-list-item-icon>
+              <v-list-item-content>
+                <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Shut Down')}}</v-list-item-title>
+              </v-list-item-content>
+            </v-list-item>
+            <!-- 强制更新 -->
+            <v-list-item @click.stop="ForceUpdate()" :style="{ height: '36px', marginBottom: '10px' }">
+              <v-list-item-icon style="margin-right: 10px;">
+                <div style="display: flex; justify-content: center; align-items: center;">
+                  <img src="@/assets/images/svg/ui/PowerOFF.svg" height="30px"
+                    style="min-height: 30px; pointer-events: none;"></img>
+                </div>
+              </v-list-item-icon>
+              <v-list-item-content>
+                <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Force Update')}}</v-list-item-title>
+              </v-list-item-content>
+            </v-list-item>
 
-              <v-list-item @click.stop="ShutdownRaspberryPi()" :style="{ height: '36px', marginBottom: '10px' }">
-                <v-list-item-icon style="margin-right: 10px;">
-                  <div style="display: flex; justify-content: center; align-items: center;">
-                    <img src="@/assets/images/svg/ui/PowerOFF.svg" height="30px"
-                      style="min-height: 30px; pointer-events: none;"></img>
-                  </div>
-                </v-list-item-icon>
-                <v-list-item-content>
-                  <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Shut Down')
-                  }}</v-list-item-title>
-                </v-list-item-content>
-              </v-list-item>
-              <!-- 强制更新 -->
-              <v-list-item @click.stop="ForceUpdate()" :style="{ height: '36px', marginBottom: '10px' }">
-                <v-list-item-icon style="margin-right: 10px;">
-                  <div style="display: flex; justify-content: center; align-items: center;">
-                    <img src="@/assets/images/svg/ui/PowerOFF.svg" height="30px"
-                      style="min-height: 30px; pointer-events: none;"></img>
-                  </div>
-                </v-list-item-icon>
-                <v-list-item-content>
-                  <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Force Update')
-                  }}</v-list-item-title>
-                </v-list-item-content>
-              </v-list-item>
-
-            </v-list>
-          </div>
-
+          </v-list>
         </div>
 
       </div>
+      <!-- 电源管理页面 -->
+
 
     </v-navigation-drawer>
 
@@ -281,7 +280,7 @@
             </v-list-item-icon>
             <v-list-item-content>
               <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Quit')
-                }}</v-list-item-title>
+              }}</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
 
@@ -295,7 +294,7 @@
             </v-list-item-icon>
             <v-list-item-content>
               <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('General Settings')
-                }}</v-list-item-title>
+              }}</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
 
@@ -309,7 +308,7 @@
             </v-list-item-icon>
             <v-list-item-content>
               <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Power Management')
-                }}</v-list-item-title>
+              }}</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
 
@@ -409,7 +408,7 @@
             </v-list-item-icon>
             <v-list-item-content>
               <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Image Files')
-                }}</v-list-item-title>
+              }}</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
 
@@ -423,7 +422,7 @@
             </v-list-item-icon>
             <v-list-item-content>
               <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Logs')
-                }}</v-list-item-title>
+              }}</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
 
@@ -474,7 +473,7 @@
             </v-list-item-icon>
             <v-list-item-content>
               <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Data Credits')
-                }}</v-list-item-title>
+              }}</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
 
@@ -629,13 +628,13 @@ export default {
       MainCameraGainMax: 0,
 
       devices: [
-        { name: '导星镜', driverType: 'Guider', type: 'CCDs', ListNum: "1", isget: false, device: '', BaudRate: 9600, driverName: '', usbSerialPath: '', sdkVersion: '',isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_Guider' },
-        { name: '主相机', driverType: 'MainCamera', type: 'CCDs', ListNum: "20", isget: false, device: '', BaudRate: 9600, driverName: '', usbSerialPath: '', sdkVersion: '',isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_MainCamera' },
-        { name: '赤道仪', driverType: 'Mount', type: 'Telescopes', ListNum: "0", isget: false, device: '', BaudRate: 9600, driverName: '', usbSerialPath: '', sdkVersion: '',isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_Mount' },
+        { name: '导星镜', driverType: 'Guider', type: 'CCDs', ListNum: "1", isget: false, device: '', BaudRate: 9600, driverName: '', usbSerialPath: '', sdkVersion: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_Guider' },
+        { name: '主相机', driverType: 'MainCamera', type: 'CCDs', ListNum: "20", isget: false, device: '', BaudRate: 9600, driverName: '', usbSerialPath: '', sdkVersion: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_MainCamera' },
+        { name: '赤道仪', driverType: 'Mount', type: 'Telescopes', ListNum: "0", isget: false, device: '', BaudRate: 9600, driverName: '', usbSerialPath: '', sdkVersion: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_Mount' },
         { name: '望远镜', driverType: 'Telescopes', device: '', isConnected: true },
-        { name: '电动调焦器', driverType: 'Focuser', type: 'Focusers', ListNum: "22", isget: false, device: '', BaudRate: 9600, driverName: '', usbSerialPath: '', sdkVersion: '',isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_Focuser' },
-        { name: '电子极轴镜', driverType: 'PoleCamera', type: 'CCDs', ListNum: "2", isget: false, device: '', BaudRate: 9600, driverName: '', usbSerialPath: '', sdkVersion: '',isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_PoleCamera' },
-        { name: '滤镜轮', driverType: 'CFW', type: 'Filter Wheels', ListNum: "21", isget: false, device: '', BaudRate: 9600, driverName: '', usbSerialPath: '', sdkVersion: '',isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_CFW' },
+        { name: '电动调焦器', driverType: 'Focuser', type: 'Focusers', ListNum: "22", isget: false, device: '', BaudRate: 9600, driverName: '', usbSerialPath: '', sdkVersion: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_Focuser' },
+        { name: '电子极轴镜', driverType: 'PoleCamera', type: 'CCDs', ListNum: "2", isget: false, device: '', BaudRate: 9600, driverName: '', usbSerialPath: '', sdkVersion: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_PoleCamera' },
+        { name: '滤镜轮', driverType: 'CFW', type: 'Filter Wheels', ListNum: "21", isget: false, device: '', BaudRate: 9600, driverName: '', usbSerialPath: '', sdkVersion: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_CFW' },
       ],
 
       // Changing the label name also requires changing the emit signal name
@@ -2324,7 +2323,7 @@ export default {
                   }
                 }
                 break;
-              
+
               case 'FlipStatus':
                 if (parts.length === 2) {
                   if (this.$bus && this.$bus.$emit) {
@@ -2460,10 +2459,10 @@ export default {
                 }
                 break;
               case 'updateAutoFocuserState':
-                if (parts.length === 2 ) {
+                if (parts.length === 2) {
                   const autoFocusState = parts[1];
                   this.$bus.$emit('updateAutoFocuserState', autoFocusState == 'true'); // 更新自动对焦按钮状态
-                  
+
                 }
                 break;
               case 'AutoFocusConfirm': // [AUTO_FOCUS_UI_ENHANCEMENT]
@@ -2712,7 +2711,7 @@ export default {
       this.RecalibratePolarAxis(); // 重新校准极轴
       this.sendMessage('Vue_Command', 'getStagingSolveResult'); // 获取定标结果
       // this.sendMessage('Vue_Command', 'getFocuserLoopingState'); // 获取焦距器循环状态,弃用
-      
+
       this.sendMessage('Vue_Command', 'getStagingScheduleData'); // 获取定标计划数据
       this.sendMessage('Vue_Command', 'getStagingSolveResult'); // 获取定标结果
       this.sendMessage('Vue_Command', 'getGPIOsStatus'); // 获取GPIO状态
@@ -3046,10 +3045,10 @@ export default {
       this.sendMessage('Vue_Command', 'loadSelectedDriverList');
       this.sendMessage('Vue_Command', 'loadBindDeviceList');
       this.sendMessage('Vue_Command', 'loadBindDeviceTypeList');
-      
+
     },
     ReturnCurrentConnectedDevices() {
-      this.$bus.$emit('sendCurrentConnectedDevices',this.devices);
+      this.$bus.$emit('sendCurrentConnectedDevices', this.devices);
     },
 
     OpenIamgeFolder() {
@@ -3364,7 +3363,7 @@ export default {
         fill: "#00BFFF",          // 蓝色填充：当前位置
         fillOpacity: 0.3          // 填充不透明度（半透明）
       }
-      this.$bus.$emit('drawCalibrationPointPolygon', coordinates, currentColor,'Current_Position');
+      this.$bus.$emit('drawCalibrationPointPolygon', coordinates, currentColor, 'Current_Position');
     },
     AutoFlipSet(payload) {
       const [signal, value] = payload.split(':'); // 拆分信号和值
@@ -5432,7 +5431,7 @@ export default {
         console.warn('glTestCircle 未初始化，跳过位置更新');
         return;
       }
-      
+
       let mm = glTestCircle.pos;
       this.vec3_from_sphe(Ra_degree, Dec_degree, mm);
       glTestCircle.pos = mm;
@@ -5441,13 +5440,13 @@ export default {
 
     UpdateTelescopeStatus(status) {
       this.$bus.$emit('MountStatus', status);
-      
+
       // 添加安全检查
       if (!glTestCircle) {
         console.warn('glTestCircle 未初始化，跳过状态更新');
         return;
       }
-      
+
       if (status === 'Moving') {
         glTestCircle.color = [1, 0, 0, 0.25];
         glTestCircle.border_color = [1, 0, 0, 1];
@@ -7239,7 +7238,7 @@ export default {
 
             } else {
               targetImg8 = this.applyStretchAndGain(src, this.lastImageProcessParams.analysis, 'gray', this.lastImageProcessParams.CFA, this.lastImageProcessParams.blackLevel, this.lastImageProcessParams.whiteLevel);
-     
+
             }
             time1 = performance.now();
             this.SendConsoleLogMsg('applyStretchAndGain时间: ' + (time1 - time2).toFixed(0) + 'ms', 'info');
@@ -7331,7 +7330,7 @@ export default {
             this.ROI_x = parseFloat(parameters[parameter]);
           } else if (parameter == 'ROI_y') {
             this.ROI_y = parseFloat(parameters[parameter]);
-          } 
+          }
           else {
             console.error(`未找到参数：${parameter}`);
           }
@@ -7431,7 +7430,7 @@ export default {
 
     updateAutoFocusStep(step, message) {
       try {
-        
+
         this.autoFocusInfo.step = step;
         this.autoFocusInfo.message = this.$t(message);
         if (step === 0) {
