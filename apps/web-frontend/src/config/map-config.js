@@ -9,7 +9,7 @@ export const MapConfig = {
     // 离线瓦片的可用级别范围
     offline: {
       min: 0,      // 最小缩放级别
-      max: 6,      // 最大缩放级别
+      max: 8,      // 最大缩放级别
       default: 3   // 默认缩放级别
     },
     

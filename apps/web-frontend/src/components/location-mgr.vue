@@ -128,7 +128,7 @@ this.$refs.locationManager.centerMapAt(51.5074, -0.1278, 12, false)
             </v-container>
           </v-card-title>
           <div style="height: 375px">
-            <l-map class="black--text" ref="myMap" :center="mapCenter" :zoom="defaultZoom" style="width: 100%; height: 375px;" :options="{zoomControl: false, minZoom: effectiveMinZoom, maxZoom: effectiveMaxZoom}">
+            <l-map class="black--text" ref="myMap" :center="mapCenter" :zoom="defaultZoom" style="width: 100%; height: 375px;" :options="{zoomControl: false, minZoom: effectiveMinZoom, maxZoom: effectiveMaxZoom, worldCopyJump: true}">
               <l-control-zoom position="topright"></l-control-zoom>
               <l-tile-layer :url="url" attribution='&copy; <a target="_blank" rel="noopener" href="http://osm.org/copyright">OpenStreetMap</a> contributors'></l-tile-layer>
               <l-marker :key="loc.id || 'marker-' + index"
@@ -430,13 +430,16 @@ export default {
     updateMapPosition: function (lat, lng, options = {}) {
       console.log('收到位置更新信号:', lat, lng, options)
       
-      // 验证输入参数
+      // 验证输入参数（经度允许超界，后续归一化）
       if (typeof lat !== 'number' || typeof lng !== 'number' || 
           isNaN(lat) || isNaN(lng) || 
-          lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+          lat < -90 || lat > 90) {
         console.error('无效的位置坐标:', { lat, lng })
         return false
       }
+
+      // 经度标准化，处理环世界拖拽
+      const normLng = this.normalizeLongitude(lng)
       
       // 默认选项
       const defaultOptions = {
@@ -455,13 +458,13 @@ export default {
           // 使用动画平滑移动
           const map = this.$refs.myMap.mapObject
           const targetZoom = config.zoom || map.getZoom()
-          map.flyTo([lat, lng], targetZoom, {
+          map.flyTo([lat, normLng], targetZoom, {
             duration: 1.5,  // 动画时长（秒）
             easeLinearity: 0.1
           })
         } else {
           // 直接设置地图中心
-          this.mapCenter = [lat, lng]
+          this.mapCenter = [lat, normLng]
           
           // 如果指定了缩放级别，设置缩放
           if (config.zoom && this.$refs.myMap && this.$refs.myMap.mapObject) {
@@ -475,11 +478,11 @@ export default {
         if (config.updateMarker) {
           const newLocation = {
             lat: lat,
-            lng: lng,
+            lng: normLng,
             accuracy: config.accuracy,
             short_name: config.fetchAddress ? this.$t('locationMgr.fetchingLocationInfo') : this.$t('locationMgr.newLocation'),
             country: config.fetchAddress ? this.$t('locationMgr.pleaseWait') : this.$t('locationMgr.unknown'),
-            street_address: `${this.$t('locationMgr.coordinates')}: ${lat.toFixed(6)}, ${lng.toFixed(6)}`
+            street_address: `${this.$t('locationMgr.coordinates')}: ${lat.toFixed(6)}, ${normLng.toFixed(6)}`
           }
           
           // 根据当前模式更新位置
@@ -494,12 +497,12 @@ export default {
           
           // 获取地址信息
           if (config.fetchAddress) {
-            this.requestLocationInfo(lat, lng)
+            this.requestLocationInfo(lat, normLng)
           }
         }
         
         // 触发位置更新事件
-        this.$emit('mapPositionUpdated', { lat, lng, options: config })
+        this.$emit('mapPositionUpdated', { lat, lng: normLng, options: config })
         
         console.log('地图位置更新成功:', { lat, lng, config })
         return true
@@ -768,8 +771,8 @@ export default {
         return false
       }
       
-      // 检查经纬度范围
-      if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      // 检查纬度范围（经度允许超界，后续归一化处理）
+      if (lat < -90 || lat > 90) {
         console.debug('位置验证: 坐标超出有效范围', { lat, lng })
         return false
       }
@@ -799,7 +802,7 @@ export default {
       
       const sanitized = {
         lat: Math.max(-90, Math.min(90, lat)),     // 确保纬度在有效范围内
-        lng: Math.max(-180, Math.min(180, lng)),   // 确保经度在有效范围内
+        lng: this.normalizeLongitude(lng),   // 经度标准化到[-180,180)
         accuracy: parseFloat(location.accuracy) || 100,
         short_name: location.short_name || this.$t('locationMgr.unknownLocation'),
         country: location.country || this.$t('locationMgr.unknownCountry'),
@@ -817,6 +820,13 @@ export default {
       
       return sanitized
     },
+    // 将经度归一化到[-180, 180)
+    normalizeLongitude: function (lng) {
+      const x = parseFloat(lng)
+      if (isNaN(x)) return lng
+      return ((((x + 180) % 360) + 360) % 360) - 180
+    },
+
     fixLeafletIcons: function () {
       // 修复Leaflet图标问题
       L.Icon.Default.imagePath = 'https://unpkg.com/leaflet@1.7.1/dist/images/'
@@ -1114,7 +1124,7 @@ export default {
         return { region: this.$t('locationMgr.japan'), country: this.$t('locationMgr.japan'), city: this.$t('locationMgr.unknownCity'), state: this.$t('locationMgr.unknownPrefecture') }
       } else if (lat >= 33.0 && lat <= 38.6 && lng >= 124.6 && lng <= 130.9) {
         return { region: this.$t('locationMgr.korea'), country: this.$t('locationMgr.korea'), city: this.$t('locationMgr.unknownCity'), state: this.$t('locationMgr.unknownProvince') }
-      } else if (lat >= 36.0 && lat <= 71.2 && lng >= -11.0 && lng <= 32.0) {
+      } else if (lat >= 36.0 && lat <= 71.2 && lng >= -30.0 && lng <= 32.0) {
         return { region: this.$t('locationMgr.europe'), country: this.$t('locationMgr.europe'), city: this.$t('locationMgr.unknownCity'), state: this.$t('locationMgr.unknownRegion') }
       }
       
@@ -1129,7 +1139,7 @@ export default {
             return { region: this.$t('locationMgr.asia'), country: this.$t('locationMgr.asia'), city: this.$t('locationMgr.unknownCity'), state: this.$t('locationMgr.unknownRegion') }
           }
         }
-      } else if (lat >= -55 && lat <= 37 && lng >= -20 && lng <= 55) {
+      } else if (lat >= -55 && lat <= 37 && lng >= -30 && lng <= 55) {
         return { region: this.$t('locationMgr.africa'), country: this.$t('locationMgr.africa'), city: this.$t('locationMgr.unknownCity'), state: this.$t('locationMgr.unknownRegion') }
       }
       
@@ -1445,11 +1455,9 @@ export default {
     
     // 拖拽结束事件
     dragEnd: function (event) {
-      const newPos = {
-        lat: event.target._latlng.lat,
-        lng: event.target._latlng.lng,
-        accuracy: 0
-      }
+      const lat = event.target._latlng.lat
+      const lng = this.normalizeLongitude(event.target._latlng.lng)
+      const newPos = { lat, lng, accuracy: 0 }
       
       console.log('拖拽结束，新位置:', newPos.lat.toFixed(6), newPos.lng.toFixed(6))
       
@@ -1503,7 +1511,7 @@ export default {
         return false
       }
       
-      return this.updateMapPosition(locationObj.lat, locationObj.lng, {
+      return this.updateMapPosition(locationObj.lat, this.normalizeLongitude(locationObj.lng), {
         animate: animate,
         updateMarker: true,
         fetchAddress: false,  // 已知位置通常不需要重新获取地址

@@ -1815,7 +1815,7 @@ export default {
                   }
 
                   this.$bus.$emit('DrawCalibrationPointPolygon', pointCoordinates, pointColor,
-                    `Calibration_Point_${index + 1}`, `校准点${index + 1}`, "#FFD700")
+                    `Calibration_Point_${index + 1}`)
                 })
               }
 
@@ -1829,7 +1829,7 @@ export default {
               }
 
               this.$bus.$emit('DrawCalibrationPointPolygon', currentCoordinates, currentColor,
-                'Current_Position', '当前位置', "#00BFFF")
+                'Current_Position')
 
               // 绘制目标点（绿色圆形）
               const targetColor = {
@@ -1898,7 +1898,7 @@ export default {
           const labelColor = "#FFFFFF"
 
           this.addLog(this.$t('Sending Draw Calibration Event', [pointNumber]), 'info')
-          this.$bus.$emit('DrawCalibrationPointPolygon', coordinates, color, `Calibration_${pointNumber}`, label, labelColor)
+          this.$bus.$emit('DrawCalibrationPointPolygon', coordinates, color, `Calibration_${pointNumber}`)
 
         } catch (error) {
           this.addLog(this.$t('Error Drawing Calibration Point', [error.message]), 'error')
@@ -1942,7 +1942,7 @@ export default {
             }
 
             this.$bus.$emit('DrawCalibrationPointPolygon', currentCoordinates, currentColor,
-              'Current_Position', '当前位置', "#00BFFF")
+              'Current_Position')
           }
 
         } catch (error) {

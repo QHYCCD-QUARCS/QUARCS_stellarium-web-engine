@@ -663,6 +663,7 @@ export default {
       MountConfigItems: [
         { driverType: 'Mount', label: 'Flip ETA', value: '00:00:00', displayValue: '00:00:00', inputType: 'tip' },
         { driverType: 'Mount', label: 'GotoThenSolve', value: false, inputType: 'switch' },
+        { driverType: 'Mount', label: 'SolveCurrentPosition', value: false, inputType: 'switch' },
         // { driverType: 'Mount', label: 'AutoFlip', value: false, inputType: 'switch' },
 
       ],
@@ -673,9 +674,9 @@ export default {
       ],
 
       FocuserConfigItems: [
+        { driverType: 'Focuser', num: 2, label: 'Min Limit', value: '', inputType: 'tip' },
+        { driverType: 'Focuser', num: 2, label: 'Max Limit', value: '', inputType: 'tip' },
         { driverType: 'Focuser', num: 2, label: 'Sync Focuser Step', value: '', inputType: 'text' },
-        { driverType: 'Focuser', num: 2, label: 'Min Limit', value: '', inputType: 'number' },
-        { driverType: 'Focuser', num: 2, label: 'Max Limit', value: '', inputType: 'number' },
         { driverType: 'Focuser', num: 2, label: 'Backlash', value: '', inputType: 'number' },
       ],
 
@@ -911,6 +912,7 @@ export default {
     this.$bus.$on('Max Limit', this.MaxLimitSet);
     this.$bus.$on('Backlash', this.BacklashSet);
     this.$bus.$on('GotoThenSolve', this.GotoThenSolve);
+    this.$bus.$on('SolveCurrentPosition', this.SolveCurrentPosition);
     this.$bus.$on('AutoFlip', this.AutoFlipSet);
     this.$bus.$on('WestMinutesPastMeridian', this.WestMinutesPastMeridianSet);
     this.$bus.$on('EastMinutesPastMeridian', this.EastMinutesPastMeridianSet);
@@ -2222,7 +2224,7 @@ export default {
                 break;
               case 'PolarAlignmentState':
                 if (parts.length === 5) {
-                  const isRunning = parts[1];
+                  const isRunning = parts[1] == 'true';
                   const state = parts[2];
                   const message = parts[3];
                   const percentage = parts[4];
@@ -2380,6 +2382,28 @@ export default {
                 }
                 break;
 
+              case 'SolveCurrentPosition':
+                if (parts.length >= 2) {
+                  this.MountConfigItems.find(i => i.label === 'SolveCurrentPosition').value = false;
+                  if (parts[1] === 'succeeded') {
+                    const RA_Degree = parts[2];
+                    const DEC_Degree = parts[3];
+                    const RA_0 = parts[4];
+                    const DEC_0 = parts[5];
+                    const RA_1 = parts[6];
+                    const DEC_1 = parts[7];
+                    const RA_2 = parts[8];
+                    const DEC_2 = parts[9];
+                    const RA_3 = parts[10];
+                    const DEC_3 = parts[11];
+                    this.SolveCurrentPositionSuccess(RA_Degree, DEC_Degree, RA_0, DEC_0, RA_1, DEC_1, RA_2, DEC_2, RA_3, DEC_3);
+                  }
+                  else if (parts[1] === 'failed') {
+                    this.callShowMessageBox('Solve Current Position failed', 'error');
+                  }
+                }
+                break;
+
               case 'addFwhmNow':
                 if (parts.length >= 2) {
                   const fwhm = parseFloat(parts[1]);
@@ -2480,6 +2504,15 @@ export default {
                   const message = parts[1];
                   console.log('AutoFocusEnded:', message);
                   this.$bus.$emit('EndAutoFocus');
+                }
+                break;
+              case 'StartAutoPolarAlignmentStatus':
+                if (parts.length >= 3) {
+                  const status = parts[1];
+                  const message = parts[2];
+                  this.$bus.$emit('PolarAlignmentIsRunning', status == 'true');
+                  console.log('StartAutoPolarAlignmentStatus:', status, message);
+                  this.callShowMessageBox(message, status == 'true' ? 'info' : 'error');
                 }
                 break;
               default:
@@ -3308,7 +3341,31 @@ export default {
       this.SendConsoleLogMsg('Goto Then Solve:' + BooleanValue, 'info');
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'GotoThenSolve:' + BooleanValue);
     },
+    SolveCurrentPosition(payload) {
+      const [signal, value] = payload.split(':'); // 拆分信号和值
+      const BooleanValue = Boolean(value);
+      this.SendConsoleLogMsg('Solve Current Position:' + BooleanValue, 'info');
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'SolveCurrentPosition:' + BooleanValue);
+    },
 
+    SolveCurrentPositionSuccess(RA_Degree, DEC_Degree, RA_0, DEC_0, RA_1, DEC_1, RA_2, DEC_2, RA_3, DEC_3) {
+      this.callShowMessageBox('Solve Current Position Success: RA: ' + RA_Degree + '°, DEC: ' + DEC_Degree + '°', 'info');
+      // 绘制当前位置
+      const coordinates = [
+        { ra: RA_0, dec: DEC_0 },     // 右上角
+        { ra: RA_1, dec: DEC_1 },     // 左上角
+        { ra: RA_2, dec: DEC_2 },     // 左下角
+        { ra: RA_3, dec: DEC_3 },     // 右下角
+        { ra: RA_0, dec: DEC_0 }      // 回到右上角（闭合多边形）
+      ]
+      const currentColor = {
+        stroke: "#00BFFF",        // 蓝色边框：当前位置
+        strokeOpacity: 1,         // 边框不透明度
+        fill: "#00BFFF",          // 蓝色填充：当前位置
+        fillOpacity: 0.3          // 填充不透明度（半透明）
+      }
+      this.$bus.$emit('drawCalibrationPointPolygon', coordinates, currentColor,'Current_Position');
+    },
     AutoFlipSet(payload) {
       const [signal, value] = payload.split(':'); // 拆分信号和值
       const BooleanValue = Boolean(value);
@@ -7261,7 +7318,11 @@ export default {
       for (const parameter in parameters) {
         const item = this.MainCameraConfigItems.find(item => item.label === parameter);
         if (item) {
-          item.value = parameters[parameter];
+          if (parameter == 'Temperature') {
+            item.value = parseInt(parameters[parameter]);
+          } else {
+            item.value = parameters[parameter];
+          }
         } else {
           if (parameter == 'RedBoxSize') {
             this.$bus.$emit('setRedBoxSideLength', parameters[parameter]);
