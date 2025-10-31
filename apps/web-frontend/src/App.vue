@@ -2469,6 +2469,9 @@ export default {
                 if (parts.length === 2) {
                   const bytes = parts[1];
                   this.$bus.$emit('Box_Space', bytes);
+                  if (bytes < 1024 * 1024 * 1024) {
+                    this.callShowMessageBox(this.$t('Box space is less than 1GB, please clear the cache'), 'warning');
+                  }
                 }
                 break;
               case 'ClearLogs':

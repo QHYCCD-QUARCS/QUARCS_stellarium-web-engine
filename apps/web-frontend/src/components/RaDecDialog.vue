@@ -9,7 +9,7 @@
       eager
     >
       <v-card>
-        <v-card-title class="text-h5">输入目标坐标</v-card-title>
+        <v-card-title class="text-h5">{{ this.$t('Input Target Coordinates') }}</v-card-title>
   
         <v-card-text>
           <v-form v-model="valid" ref="form" lazy-validation>
@@ -46,7 +46,7 @@
             <!-- DEC -->
             <v-text-field
               v-model="decStr"
-              label="DEC（度）"
+              :label="this.$t('DEC(°)')"
               :type="isDesktop ? 'number' : 'text'"
               :step="anyStep"
               :min="minDEC"
@@ -62,14 +62,14 @@
           </v-form>
   
           <div class="text-caption mt-2" style="opacity:.7">
-            RA 支持小时(0–24h)或度(0–360°)两种输入；DEC 默认为度(−90°–90°)。
+            {{ this.$t('RA supports hours (0-24h) or degrees (0-360°) input; DEC defaults to degrees (0°-90°).') }}
           </div>
         </v-card-text>
   
         <v-card-actions>
           <v-spacer />
-          <v-btn text @click="onCancel">取消</v-btn>
-          <v-btn color="primary" :disabled="!valid" @click="onOK">确定</v-btn>
+          <v-btn text @click="onCancel">{{ this.$t('Cancel') }}</v-btn>
+          <v-btn color="primary" :disabled="!valid" @click="onOK">{{ this.$t('Confirm') }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -137,7 +137,7 @@
   
       // RA 标签与范围（随模式切换）
       raLabel () {
-        return this.raMode === 'h' ? 'RA（小时）' : 'RA（度）'
+        return this.raMode === 'h' ? this.$t('RA(h)') : this.$t('RA(°)')
       },
       minRAc () {
         return this.raMode === 'h' ? this.minRA : 0
@@ -161,21 +161,21 @@
   
       // -------- 校验规则 --------
       requiredRule (v) {
-        return (v !== '' && v !== null && v !== undefined) || '必填'
+        return (v !== '' && v !== null && v !== undefined) || this.$t('Required')
       },
       numberRule (v) {
-        return !Number.isNaN(this.toNumber(v)) || '请输入数字'
+        return !Number.isNaN(this.toNumber(v)) || this.$t('Please enter a number')
       },
       raRangeRuleDynamic (v) {
         const n = this.toNumber(v)
         if (this.raMode === 'h') {
-          return (n >= this.minRA && n <= this.maxRA) || `RA 范围 ${this.minRA} ~ ${this.maxRA} 小时`
+          return (n >= this.minRA && n <= this.maxRA) || this.$t('RA range {0} ~ {1} hours', [this.minRA, this.maxRA])
         }
         return (n >= 0 && n <= 360) || 'RA 范围 0 ~ 360 度'
       },
       decRangeRule (v) {
         const n = this.toNumber(v)
-        return (n >= this.minDEC && n <= this.maxDEC) || `DEC 范围 ${this.minDEC} ~ ${this.maxDEC} 度`
+        return (n >= this.minDEC && n <= this.maxDEC) || this.$t('DEC range {0} ~ {1} degrees', [this.minDEC, this.maxDEC])
       },
   
       // -------- 键盘过滤 --------
