@@ -597,7 +597,8 @@ export default {
       networkDisconnected: false, // 添加网络连接状态
 
       QTClientVersion: 'Not connected',
-      VueClientVersion: process.env.VUE_APP_VERSION,
+      // VueClientVersion: process.env.VUE_APP_VERSION,
+      VueClientVersion: '20251030', // 手动指定版本号
 
       // 校准信息对象
       calibrationInfo: {
