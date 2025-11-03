@@ -2654,7 +2654,7 @@ export default {
   position: fixed;
   inset: 0;
   background: black;
-  z-index: 10002 !important;
+  z-index: 2000 !important;
   pointer-events: auto;
 }
 .trajectory-overlay canvas {
@@ -2685,7 +2685,7 @@ export default {
 
 .trajectory-window {
   position: fixed;
-  z-index: 10002 !important;
+  z-index: 2000 !important;
   background: rgba(18,18,18,0.95);
   border: 1px solid rgba(255,255,255,0.12);
   border-radius: 8px;
@@ -2742,7 +2742,7 @@ export default {
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
   backdrop-filter: blur(10px);
-  z-index: 1000;
+  z-index: 2000;
   cursor: move;
   user-select: none;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
@@ -2886,7 +2886,7 @@ export default {
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
   backdrop-filter: blur(10px);
-  z-index: 1000;
+  z-index: 2000;
   cursor: move;
   user-select: none;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);

@@ -2741,6 +2741,11 @@ export default {
       this.$bus.$emit('Vue_Command', 'localMessage'); // 获取位置信息
       this.$store.commit('toggleBool', 'showLocationDialog');
 
+      // 打开地图对话框时，关闭任务计划表和时间控制器
+      if (this.$store.state.showLocationDialog) {
+        this.$bus.$emit('closeScheduleAndDateTimePicker');
+      }
+
       this.$bus.$emit('ResetTime');
     },
 
@@ -8221,7 +8226,7 @@ body,
   border: 2px solid rgba(255, 165, 0, 0.8);
   border-radius: 15px;
   padding: 25px;
-  z-index: 10001;
+  z-index: 1000;
   min-width: 350px;
   max-width: 450px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);

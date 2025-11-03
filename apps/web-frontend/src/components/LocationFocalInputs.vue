@@ -112,7 +112,7 @@ export default {
 <style scoped>
 .location-inputs {
     pointer-events: auto;
-    z-index: 1000;
+    z-index: 300;
     max-width: 100px;
 }
 
@@ -148,7 +148,7 @@ export default {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    z-index: 2000;
+    z-index: 1500;
     background-color: rgba(0, 0, 0, 0.8);
     padding: 25px;
     border-radius: 12px;

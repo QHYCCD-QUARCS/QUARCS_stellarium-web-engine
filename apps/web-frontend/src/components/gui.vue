@@ -39,7 +39,8 @@
       <component :is="item" :key="i + pluginsGuiComponents.length"></component>
     </template>
     <selected-object-info
-      style="position: absolute; top: 48px; left: 0px; width: 350px; max-width: calc(100vw - 12px); margin: 6px"
+      v-show="isStellariumMode"
+      style="position: absolute; top: 48px; left: 0px; width: 350px; max-width: calc(100vw - 12px); margin: 6px; z-index: 100"
       class="get-click"></selected-object-info>
 
     <!-- <transition name="RightBtn">
@@ -224,9 +225,9 @@
 
     <RPIHotspotDialog v-show="ShowRPIHotspotDialog" />
 
-    <SchedulePanel v-show="ShowSchedulePanel" class="get-click" style="position: absolute;" />
+    <SchedulePanel v-show="ShowSchedulePanel" class="get-click" style="position: absolute; z-index: 200;" />
     <ScheduleKeyBoard v-show="ShowSchedulePanel" />
-    <ScheduleList v-show="ShowSchedulePanel" class="get-click" style="position: absolute;" />
+    <ScheduleList v-show="ShowSchedulePanel" class="get-click" style="position: absolute; z-index: 200;" />
 
     <v-dialog v-model="ConfirmDialog" width="220" persistent>
       <v-expand-x-transition>
@@ -546,6 +547,7 @@ export default {
     this.$bus.$on('time-selected', this.handleExpTimeSelected);
     // this.$bus.$on('cfw-selected', this.handleCFWSelected);
     this.$bus.$on('toggleSchedulePanel', this.toggleSchedulePanel);
+    this.$bus.$on('closeScheduleAndDateTimePicker', this.closeScheduleAndDateTimePicker);
     this.$bus.$on('MountPanelClose', this.toggleFloatingBox);
     this.$bus.$on('toggleHistogramPanel', this.toggleHistogramPanel);
     this.$bus.$on('toggleFocuserPanel', this.toggleFocuserPanel);
@@ -644,9 +646,26 @@ export default {
       this.ShowSchedulePanel = !this.ShowSchedulePanel;
     },
 
+    closeScheduleAndDateTimePicker() {
+      // 关闭任务计划表和时间控制器
+      if (this.ShowSchedulePanel) {
+        this.ShowSchedulePanel = false;
+      }
+      if (this.ShowDateTimePicker) {
+        this.ShowDateTimePicker = false;
+      }
+    },
+
     toggleImageManagerPanel() {
       this.ShowImageManagerPanel = !this.ShowImageManagerPanel;
       if (this.ShowImageManagerPanel) {
+        // 打开文件管理时，关闭任务计划表和时间控制器
+        if (this.ShowSchedulePanel) {
+          this.ShowSchedulePanel = false;
+        }
+        if (this.ShowDateTimePicker) {
+          this.ShowDateTimePicker = false;
+        }
         this.$bus.$emit('calculateTotalPage');
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'ShowAllImageFolder');
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'USBCheck');
@@ -655,10 +674,28 @@ export default {
 
     toggleDeviceAllocationPanel() {
       this.ShowDeviceAllocationPanel = !this.ShowDeviceAllocationPanel;
+      if (this.ShowDeviceAllocationPanel) {
+        // 打开设备管理时，关闭任务计划表和时间控制器
+        if (this.ShowSchedulePanel) {
+          this.ShowSchedulePanel = false;
+        }
+        if (this.ShowDateTimePicker) {
+          this.ShowDateTimePicker = false;
+        }
+      }
     },
 
     toggleINDIDebugDialog() {
       this.ShowINDIDebugDialog = !this.ShowINDIDebugDialog;
+      if (this.ShowINDIDebugDialog) {
+        // 打开INDI调试对话框时，关闭任务计划表和时间控制器
+        if (this.ShowSchedulePanel) {
+          this.ShowSchedulePanel = false;
+        }
+        if (this.ShowDateTimePicker) {
+          this.ShowDateTimePicker = false;
+        }
+      }
     },
 
     toggleRPIHotspotDialog() {
@@ -1023,6 +1060,16 @@ export default {
         this.$bus.$emit('HideTargetSearch');
 
         this.showPHD2BoxAndCross = false;
+
+        // 清除星图选择的对象，避免信息框在其他画布显示
+        try {
+          if (this.$stel && this.$stel.core) {
+            this.$stel.core.selection = 0;
+          }
+        } catch (e) {
+          // $stel可能不存在，忽略错误
+        }
+        this.$store.commit('setSelectedObject', 0);
       }
       else if (this.CurrentMainPage === 'MainCamera') {
         this.CurrentMainPage = 'GuiderCamera';
@@ -1041,6 +1088,16 @@ export default {
         this.showFocuserPanel = false;
         this.showRedBox = false;
         this.showPHD2BoxAndCross = true;
+
+        // 清除星图选择的对象，避免信息框在其他画布显示
+        try {
+          if (this.$stel && this.$stel.core) {
+            this.$stel.core.selection = 0;
+          }
+        } catch (e) {
+          // $stel可能不存在，忽略错误
+        }
+        this.$store.commit('setSelectedObject', 0);
       }
       else if (this.CurrentMainPage === 'GuiderCamera') {
         this.CurrentMainPage = 'Stel';
@@ -1171,6 +1228,14 @@ export default {
       this.showRedBox = false;
       this.showPHD2BoxAndCross = false;
       this.isShowHideUi = false;
+
+      // 打开自动极轴校准时，关闭任务计划表和时间控制器
+      if (this.ShowSchedulePanel) {
+        this.ShowSchedulePanel = false;
+      }
+      if (this.ShowDateTimePicker) {
+        this.ShowDateTimePicker = false;
+      }
 
       // this.$bus.$emit('ShowTargetSearch');
       document.removeEventListener('click', this.handleTouchOrMouseDown);

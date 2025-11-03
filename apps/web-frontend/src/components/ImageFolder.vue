@@ -383,7 +383,7 @@ export default {
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.8);
 
-  z-index: 9999;
+  z-index: 850;
 }
 
 .ImageFolder-Pressing {

@@ -1,5 +1,5 @@
 <template>
-  <div class="schedule-keyboard" :style="{ bottom: '0px', right: '100px', left: BoardLeft + 'px', height: '50px' }">
+  <div class="schedule-keyboard" :style="{ bottom: '0px', right: '100px', left: BoardLeft + 'px', height: '50px', zIndex: 200 }">
     <button v-for="button in modeButtons" :key="button.value" @click="handleButtonClick(button)">
       {{ button.label }}
     </button>

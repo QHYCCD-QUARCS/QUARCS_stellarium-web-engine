@@ -783,7 +783,7 @@ export default {
   left: 0;
   width: 100vw;
   height: 100vh;
-  z-index: 9998;
+  z-index: 800;
   backdrop-filter: blur(20px); 
 }
 

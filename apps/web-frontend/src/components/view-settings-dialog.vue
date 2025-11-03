@@ -352,7 +352,7 @@ export default {
   max-height: 60vh;
   overflow-y: auto;
 }
-.qs-menu { z-index: 2000 !important; }
+.qs-menu { z-index: 1500 !important; }
 .qs-tabs {
   margin-bottom: 8px;
 }

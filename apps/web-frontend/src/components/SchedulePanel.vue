@@ -1,5 +1,5 @@
 <template>
-  <div class="chart-panel" :style="{ left: PanelLeft + 'px', right: '100px', top: '40px', bottom: '50px' }">
+  <div class="chart-panel" :style="{ left: PanelLeft + 'px', right: '100px', top: '40px', bottom: '50px', zIndex: 200 }">
   
     <ScheduleTable v-show="showTabel"></ScheduleTable>
 

@@ -51,7 +51,7 @@ export default {
   },
   computed: {
     listStyle: function () {
-      return this.floatingList ? 'position: absolute; z-index: 1000; margin-top: 8px' : ''
+      return this.floatingList ? 'position: absolute; z-index: 300; margin-top: 8px' : ''
     },
     showList: function () {
       return this.searchText !== ''

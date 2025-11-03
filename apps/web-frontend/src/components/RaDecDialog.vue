@@ -234,7 +234,7 @@
   <style>
   /* 让弹窗层级比其他元素高（attach 到 body 后这里是全局样式） */
   .v-dialog__content.radec-dialog {
-    z-index: 12000 !important;
+    z-index: 1800 !important;
   }
   
   /* 可选：遮罩透明度 */

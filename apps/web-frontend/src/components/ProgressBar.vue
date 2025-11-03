@@ -38,7 +38,7 @@ export default {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  z-index: 999;
+  z-index: 500;
   background: rgba(0, 0, 0, 0.7);
   padding: 20px;
   border-radius: 8px;

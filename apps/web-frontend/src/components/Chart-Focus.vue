@@ -762,7 +762,7 @@ export default {
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
-  z-index: 10000;
+  z-index: 1000;
   background-color: rgba(64, 64, 64, 0.9);
   backdrop-filter: blur(5px);
   border-radius: 10px;

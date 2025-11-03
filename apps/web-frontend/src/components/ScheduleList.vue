@@ -252,7 +252,8 @@ export default {
   background-color: rgba(128, 128, 128, 0.5);
   backdrop-filter: blur(5px);
   border-radius: 5px;
-  overflow: hidden;                                                                                                                                               
+  overflow: hidden;
+  z-index: 200;
 }
 
 .list-container {
