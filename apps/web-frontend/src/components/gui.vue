@@ -348,6 +348,7 @@ import DataCreditsDialog from '@/components/data-credits-dialog.vue'
 import ViewSettingsDialog from '@/components/view-settings-dialog.vue'
 import PlanetsVisibility from '@/components/planets-visibility.vue'
 import LocationDialog from '@/components/location-dialog.vue'
+import USBFilesDialog from '@/components/USBFilesDialog.vue'
 import ObservingPanel from '@/components/observing-panel.vue'
 
 import MountControlPanel from '@/components/MountControlPanel.vue'
@@ -1518,7 +1519,8 @@ export default {
         'data-credits-dialog',
         'view-settings-dialog',
         'planets-visibility',
-        'location-dialog'
+        'location-dialog',
+        'u-s-b-files-dialog'
       ]
       for (const i in this.$stellariumWebPlugins()) {
         const plugin = this.$stellariumWebPlugins()[i]
@@ -1590,6 +1592,7 @@ export default {
     PlanetsVisibility,
     SelectedObjectInfo,
     LocationDialog,
+    USBFilesDialog,
     ProgressBars,
     ObservingPanel,
     MountControlPanel,
