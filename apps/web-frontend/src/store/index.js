@@ -78,6 +78,7 @@ const createStore = () => {
       showDeviceSettingsDialog_MainCamera: false,
       showDeviceSettingsDialog_Mount: false,
       showDeviceSettingsDialog_PoleCamera: false,
+      showUSBFilesDialog: false,
       
     },
     mutations: {

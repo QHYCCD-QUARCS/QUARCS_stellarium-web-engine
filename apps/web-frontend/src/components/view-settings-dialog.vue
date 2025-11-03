@@ -85,7 +85,7 @@
       <v-tab-item>
         <div class="qs-pane">
           <div class="qs-narrow">
-            <div class="qs-section">
+            <div class="qs-section qs-usb-section">
               <div class="qs-subheader">{{ $t('USB Drive') }}</div>
               <div class="qs-field">
                 <span class="qs-inline-label">{{ $t('Name') }}</span>
@@ -94,6 +94,9 @@
               <div class="qs-field">
                 <span class="qs-inline-label">{{ $t('Free Space') }}</span>
                 <span>{{ usbInfo.spaceFormatted }}</span>
+              </div>
+              <div class="qs-usb-button-container">
+                <v-btn small text @click="openUSBBrowser" :disabled="usbInfo.name === '—'">{{ $t('View USB Files') }}</v-btn>
               </div>
             </div>
 
@@ -218,6 +221,11 @@ export default {
       // 统一刷新 USB 与盒子可用空间
       this.refreshUSB();
       this.refreshBoxSpace();
+    },
+    openUSBBrowser() {
+      // 打开USB文件浏览器
+      this.$store.state.showUSBFilesDialog = true;
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'GetUSBFiles');
     },
     onSendCurrentConnectedDevices(payload) {
       // 接收来自 App.vue 的完整设备列表，并更新本地 devices 列表
@@ -413,6 +421,8 @@ export default {
 .qs-list .v-list-item__subtitle { color: rgba(255, 255, 255, 0.85); font-weight: 400; }
 .qs-divider { opacity: 0.3; margin: 6px 0; }
 .qs-actions { display: flex; gap: 6px; justify-content: flex-end; margin-top: 6px; }
+.qs-usb-section { position: relative; }
+.qs-usb-button-container { display: flex; justify-content: flex-end; margin-top: 8px; }
 .qs-narrow { margin: 0 auto; width: 95%; max-width: clamp(520px, 80%, 900px); }
 /* 桌面端保证对话框最小宽度，避免英文标签被截断；小屏自动回落 */
 .qs-settings-card { min-width: 660px; }

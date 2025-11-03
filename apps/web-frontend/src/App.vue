@@ -658,6 +658,7 @@ export default {
         { driverType: 'MainCamera', label: 'Temperature', value: '', inputType: 'select', selectValue: [5, 0, -5, -10, -15, -20, -25] },
         { driverType: 'MainCamera', label: 'Gain', value: '', inputType: 'slider', inputMin: 0, inputMax: 0, inputStep: 1 },
         { driverType: 'MainCamera', label: 'Offset', value: '', inputType: 'slider', inputMin: 0, inputMax: 0, inputStep: 1 },
+        { driverType: 'MainCamera', label: 'Auto Save', value: false, inputType: 'switch' },
       ],
 
       MountConfigItems: [
@@ -913,6 +914,7 @@ export default {
     this.$bus.$on('Backlash', this.BacklashSet);
     this.$bus.$on('GotoThenSolve', this.GotoThenSolve);
     this.$bus.$on('SolveCurrentPosition', this.SolveCurrentPosition);
+    this.$bus.$on('Auto Save', this.AutoSave);
     this.$bus.$on('AutoFlip', this.AutoFlipSet);
     this.$bus.$on('WestMinutesPastMeridian', this.WestMinutesPastMeridianSet);
     this.$bus.$on('EastMinutesPastMeridian', this.EastMinutesPastMeridianSet);
@@ -1589,6 +1591,26 @@ export default {
                   this.SendConsoleLogMsg('USB space:' + USBdata[1], 'info');
 
                   this.$bus.$emit('USB_Name_Sapce', USBdata[0], USBdata[1]);
+                }
+                break;
+
+              case 'USBFilesList':
+                try {
+                  // 从消息中提取JSON部分（跳过 "USBFilesList:" 前缀）
+                  const colonIndex = data.message.indexOf(':');
+                  if (colonIndex === -1 || colonIndex >= data.message.length - 1) {
+                    console.error('USBFilesList: no JSON data found, message:', data.message);
+                    this.$bus.$emit('USBFilesList', { error: 'Invalid message format', path: '', files: [] });
+                  } else {
+                    const jsonString = data.message.substring(colonIndex + 1);
+                    console.log('USBFilesList jsonString:', jsonString);
+                    const jsonData = JSON.parse(jsonString);
+                    this.$bus.$emit('USBFilesList', jsonData);
+                  }
+                } catch (e) {
+                  console.error('USBFilesList parse error:', e);
+                  console.error('USBFilesList full message:', data.message);
+                  this.$bus.$emit('USBFilesList', { error: 'Failed to parse file list: ' + e.message, path: '', files: [] });
                 }
                 break;
 
@@ -3339,6 +3361,13 @@ export default {
       const BooleanValue = Boolean(value);
       this.SendConsoleLogMsg('Solve Current Position:' + BooleanValue, 'info');
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'SolveCurrentPosition:' + BooleanValue);
+    },
+
+    AutoSave(payload) {
+      const [signal, value] = payload.split(':'); // 拆分信号和值
+      const BooleanValue = (value === 'true' || value === true);
+      this.SendConsoleLogMsg('Auto Save:' + BooleanValue, 'info');
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'SetMainCameraAutoSave:' + BooleanValue);
     },
 
     SolveCurrentPositionSuccess(RA_Degree, DEC_Degree, RA_0, DEC_0, RA_1, DEC_1, RA_2, DEC_2, RA_3, DEC_3) {
@@ -7324,8 +7353,12 @@ export default {
             this.ROI_x = parseFloat(parameters[parameter]);
           } else if (parameter == 'ROI_y') {
             this.ROI_y = parseFloat(parameters[parameter]);
-          }
-          else {
+          }else if (parameter == 'AutoSave') {
+            const item = this.MainCameraConfigItems.find(item => item.label === 'Auto Save');
+            if (item) {
+              item.value = parameters[parameter] === 'true' || parameters[parameter] === true;
+            }
+          }else {
             console.error(`未找到参数：${parameter}`);
           }
         }
