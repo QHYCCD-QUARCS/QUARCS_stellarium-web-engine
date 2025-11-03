@@ -90,6 +90,7 @@ export default {
       cfwButtonsDisabled: false,
 
       ExpTimes: ['1ms', '10ms', '100ms', '1s', '5s', '10s', '30s', '60s', '120s','300s','600s'],
+      ExpTimeNum: 11, // 默认曝光时间数量
       // CFWs: ['Null', 'L', 'R', 'G', 'B', 'Ha', 'OIIII', 'SII'],
       CFWs: ['Null'],
 
@@ -146,6 +147,10 @@ export default {
     this.$bus.$on('CFWConnected', this.CFWConnected);
 
     this.$bus.$on('MainCameraTemperature', this.MainCameraTemperature);
+
+    this.$bus.$on('setSelfExposureTime', this.setSelfExposureTime);
+
+    this.$bus.$emit('getSelfExposureTime');  // 初始化完成后获取自定义曝光时间
   },
   mounted: function () {
     // this.CurrentExpTimeList();
@@ -164,7 +169,7 @@ export default {
         } else {
           this.currentExpTimeIndex = 0;
         }
-      } else {
+      } else if (direction === 'minus') {
         if (this.currentExpTimeIndex > 0) {
           this.currentExpTimeIndex--;
         } else {
@@ -281,6 +286,7 @@ export default {
       {
         this.ExpTimes[i] = parts[i];
       }
+
       // this.CurrentExpTimeList();
     },
 
@@ -327,6 +333,24 @@ export default {
     MainCameraTemperature(value) {
       this.CameraTemperature = value + '°';
     },
+
+    setSelfExposureTime(time) {
+      if (time != 0 && time != null && time != undefined && time != '' && typeof time === 'number') {
+        if (this.ExpTimes.length > this.ExpTimeNum) {
+          this.ExpTimes.pop();
+        }
+        if (time > 1000)
+        {
+          this.ExpTimes.push((time/1000) + 's');
+        }
+        else
+        {
+          this.ExpTimes.push(time + 'ms');
+        }
+        this.handleExpTimeButtonClick('null');  // 重新同步曝光时间
+      }
+    },
+
 
     CFWConnected(num) {
       if(num === 0){

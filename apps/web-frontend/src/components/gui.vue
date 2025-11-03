@@ -354,7 +354,7 @@ import MountControlPanel from '@/components/MountControlPanel.vue'
 
 import MessageBox from "@/components/MessageBox.vue";
 
-import ExpTimeBtnBar from "@/components/ExpTimeBtnBar.vue";
+
 import CFWSelectBtnBar from "@/components/CFWSelectBtnBar.vue";
 
 import CircularProgressButton from '@/components/CircularButton.vue';
@@ -1068,29 +1068,40 @@ export default {
     },
 
     handleExpTimeSelected(time) {
-      console.log('QHYCCD | ExpTimeSelected: ', time);
-      // 根据需要处理选择的时间
-      const match = time.match(/(\d+)([a-zA-Z]+)/);
+      console.log('QHYCCD | ExpTimeSelected:', time);
+
+      // 匹配数字（整数或小数）+ 单位（字母或汉字）
+      const match = time.trim().match(/^([\d.]+)\s*([a-zA-Z\u4e00-\u9fa5]+)?$/);
 
       if (match) {
-        const numericPart = parseInt(match[1], 10); // 将匹配到的数字部分转换为整数
-        const unitPart = match[2].toLowerCase(); // 获取单位部分，并将其转换为小写
+        const numericPart = parseFloat(match[1]);  // 支持小数
+        const unitPart = (match[2] || 'ms').toLowerCase(); // 默认单位 ms
 
-        let convertedTime = numericPart; // 默认情况下，将数字部分保持不变
+        let convertedTime = numericPart;
 
-        if (unitPart === 's') {
-          convertedTime *= 1000; // 如果单位是秒(s)，则将数字乘以1000
+        // 支持的单位：s、秒、ms、毫秒
+        if (unitPart === 's' || unitPart === '秒') {
+          convertedTime *= 1000;  // 秒转毫秒
         }
+
+        // 强制最小曝光时间为 1ms
+        if (convertedTime < 1) {
+          convertedTime = 1;
+        }
+
+        // 向上取整到整数毫秒
+        convertedTime = Math.round(convertedTime);
 
         console.log('Numeric part:', numericPart);
         console.log('Unit part:', unitPart);
-        console.log('Converted time:', convertedTime);
+        console.log('Converted time (ms):', convertedTime);
 
-        // this.$refs.CaptureBtn.SetDuration(convertedTime);
+        // 发送事件
         this.$bus.$emit('SetExpTime', convertedTime);
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'setExposureTime:' + convertedTime);
+
       } else {
-        console.log('No numeric part found in time:', time);
+        console.warn('Invalid exposure time format:', time);
       }
     },
 
@@ -1521,7 +1532,6 @@ export default {
     ObservingPanel,
     MountControlPanel,
     MessageBox,
-    ExpTimeBtnBar,
     CFWSelectBtnBar,
     CircularProgressButton,
     ChartComponent,

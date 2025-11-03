@@ -129,6 +129,31 @@
                   {{ formatTipValue(item) }}
                 </div>
               </div>
+
+              <!-- 按钮类型 -->
+              <div v-if="item.inputType === 'button'" class="button-field">
+                <v-btn
+                  class="config-btn"
+                  color="primary"
+                  variant="tonal"
+                  rounded="xl"
+                  size="large"
+                  density="comfortable"
+                  block
+                  :loading="!!item._disabled"
+                  :disabled="!!item._disabled"
+                  @click="onButtonPress(item)"
+                >
+                  <template v-if="item._disabled" #loader>
+                    <v-progress-circular indeterminate size="18" width="2" />
+                  </template>
+                  {{ item._disabled
+                      ? (item.buttonTextWhenDisabled || item.buttonText || item.label)
+                      : (item.buttonText || item.label) }}
+                </v-btn>
+              </div>
+
+
             </v-card-text>
           </div>
           <!-- 设备连接状态 -->
@@ -547,6 +572,16 @@
       </div>
     </div>
 
+    <RaDecDialog
+      v-model="showRaDecDialog"
+      :defaultRA="12"
+      :defaultDEC="-30"
+      :minRA="0" :maxRA="24"
+      :minDEC="0" :maxDEC="90"
+      @confirm="onRaDecDialogConfirm"
+      @cancel="onRaDecDialogCancel" 
+    />
+
   </v-app>
 </template>
 <script>
@@ -559,6 +594,7 @@ import BackgroundImage from '@/assets/images/svg/ui/Background.svg';
 import ErrorImage from '@/assets/images/svg/ui/errorImage.svg';
 import ProgressBar from '@/components/ProgressBar.vue';
 import MeridianFlipNotifier from '@/components/MeridianFlipNotifier.vue';
+import RaDecDialog from '@/components/RaDecDialog.vue';
 
 let glTestCircle;
 let glLayer;
@@ -658,15 +694,16 @@ export default {
         { driverType: 'MainCamera', label: 'Temperature', value: '', inputType: 'select', selectValue: [5, 0, -5, -10, -15, -20, -25] },
         { driverType: 'MainCamera', label: 'Gain', value: '', inputType: 'slider', inputMin: 0, inputMax: 0, inputStep: 1 },
         { driverType: 'MainCamera', label: 'Offset', value: '', inputType: 'slider', inputMin: 0, inputMax: 0, inputStep: 1 },
+
+        { driverType: 'MainCamera', num: 1, label: 'Self Exposure Time (ms)', value: 0, inputType: 'number' },
         { driverType: 'MainCamera', label: 'Auto Save', value: false, inputType: 'switch' },
       ],
 
       MountConfigItems: [
         { driverType: 'Mount', label: 'Flip ETA', value: '00:00:00', displayValue: '00:00:00', inputType: 'tip' },
         { driverType: 'Mount', label: 'GotoThenSolve', value: false, inputType: 'switch' },
-        { driverType: 'Mount', label: 'SolveCurrentPosition', value: false, inputType: 'switch' },
-        // { driverType: 'Mount', label: 'AutoFlip', value: false, inputType: 'switch' },
-
+        { driverType: 'Mount', label: 'SolveCurrentPosition', inputType: 'button', buttonText: 'SolveCurrentPosition', buttonTextWhenDisabled: 'Solving...', isDisabled: false },
+        {driverType: 'Mount',label: 'Goto', inputType: 'button', buttonText: 'Goto', buttonTextWhenDisabled: 'Goto (Busy)', _disabled: false,},
       ],
 
 
@@ -877,6 +914,8 @@ export default {
         lutG: null,
         lutB: null
       },
+
+      showRaDecDialog: false, // 控制是否显示设置GOTO目标对话框
     }
   },
   components: {
@@ -884,6 +923,7 @@ export default {
     GuiLoader,
     ProgressBar,
     MeridianFlipNotifier,
+    RaDecDialog,
     // MessageBox,
   },
   created() {
@@ -898,6 +938,8 @@ export default {
     this.$bus.$on('Gain', this.GainSet);
     this.$bus.$on('Offset', this.OffsetSet);
     this.$bus.$on('ImageCFA', this.ImageCFASet);
+    this.$bus.$on('Self Exposure Time (ms)', this.SelfExposureTimeSet);
+    this.$bus.$on('getSelfExposureTime', this.getSelfExposureTime);
     // this.$bus.$on('MainCameraCFA', this.ImageCFASet);
     this.$bus.$on('Temperature', this.CameraTemperatureSet);
     this.$bus.$on('Focal Length (mm)', this.FocalLengthSet);
@@ -912,6 +954,9 @@ export default {
     this.$bus.$on('Min Limit', this.MinLimitSet);
     this.$bus.$on('Max Limit', this.MaxLimitSet);
     this.$bus.$on('Backlash', this.BacklashSet);
+    this.$bus.$on('GotoThenSolve', this.GotoThenSolve);    // 切换GOTO后是否解析的信号
+    this.$bus.$on('SolveCurrentPosition', this.SolveCurrentPosition);  // 实现解析当前位置的信号
+    this.$bus.$on('Goto', this.Goto);
     this.$bus.$on('GotoThenSolve', this.GotoThenSolve);
     this.$bus.$on('SolveCurrentPosition', this.SolveCurrentPosition);
     this.$bus.$on('Auto Save', this.AutoSave);
@@ -964,6 +1009,21 @@ export default {
 
   },
   methods: {
+    onButtonPress(item) {
+      // 禁用按钮
+      this.$set(item, '_disabled', true);
+
+      // 可选：更新文字或发送事件
+      this.handleConfigChange(item.label, true);
+    },
+
+    reEnableButton(label) {
+      const item = this.MountConfigItems.find(item => item.label === label);
+      if (item) {
+        this.$set(item, '_disabled', false);
+      }
+      // this.handleConfigChange(item.label, false);
+    },
     // 是否允许小数：step 不是整数，或显式允许
     allowsDecimal(item) {
       const step = item.step ?? 1;
@@ -2412,9 +2472,11 @@ export default {
                     const RA_3 = parts[10];
                     const DEC_3 = parts[11];
                     this.SolveCurrentPositionSuccess(RA_Degree, DEC_Degree, RA_0, DEC_0, RA_1, DEC_1, RA_2, DEC_2, RA_3, DEC_3);
+                    this.reEnableButton('SolveCurrentPosition');
                   }
                   else if (parts[1] === 'failed') {
                     this.callShowMessageBox('Solve Current Position failed', 'error');
+                    this.reEnableButton('SolveCurrentPosition');
                   }
                 }
                 break;
@@ -2431,6 +2493,9 @@ export default {
                 if (parts.length === 2) {
                   const bytes = parts[1];
                   this.$bus.$emit('Box_Space', bytes);
+                  if (bytes < 1024 * 1024 * 1024) {
+                    this.callShowMessageBox(this.$t('Box space is less than 1GB, please clear the cache'), 'warning');
+                  }
                 }
                 break;
               case 'ClearLogs':
@@ -2528,6 +2593,17 @@ export default {
                   this.$bus.$emit('PolarAlignmentIsRunning', status == 'true');
                   console.log('StartAutoPolarAlignmentStatus:', status, message);
                   this.callShowMessageBox(message, status == 'true' ? 'info' : 'error');
+                }
+                break;
+              case 'MountOnlyGotoSuccess':
+                this.reEnableButton('Goto');
+                this.callShowMessageBox('Mount Only Goto Success', 'info');
+                break;
+              case 'MountOnlyGotoFailed':
+                if (parts.length === 2) {
+                  const message = parts[1];
+                  this.callShowMessageBox(message, 'error');
+                  this.reEnableButton('Goto');
                 }
                 break;
               default:
@@ -3237,6 +3313,24 @@ export default {
       }
     },
 
+    SelfExposureTimeSet(payload) {
+      const [signal, value] = payload.split(':'); // 拆分信号和值
+      const IntValue = parseInt(value); // 将值转换为 Int 类型
+      if (IntValue <= 0) {
+        this.callShowMessageBox('Self Exposure Time must be greater than 0', 'error');
+        return;
+      }
+      this.SendConsoleLogMsg('Self Exposure Time is set to:' + IntValue, 'info');
+      this.sendMessage('Vue_Command', 'Self Exposure Time (ms):' + IntValue);
+      this.$bus.$emit('setSelfExposureTime', IntValue);
+    },
+    getSelfExposureTime() {
+      const item = this.MainCameraConfigItems.find(item => item.label === 'Self Exposure Time (ms)');
+      if (item) {
+        this.$bus.$emit('setSelfExposureTime', parseInt(item.value));
+      }
+    },
+
     CameraTemperatureSet(payload) {
       const [signal, value] = payload.split(':'); // 拆分信号和值
       const IntValue = parseInt(value); // 将值转换为 Int 类型
@@ -3370,6 +3464,19 @@ export default {
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'SetMainCameraAutoSave:' + BooleanValue);
     },
 
+    Goto(payload) {
+      this.showRaDecDialog = true;
+      console.log('Goto 显示RA-DEC对话框');
+    },
+    onRaDecDialogConfirm({ ra, dec, raMode }) {
+      this.showRaDecDialog = false;
+      this.SendConsoleLogMsg('Goto:' + ra + ',' + dec, 'info');
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'Goto:' + ra + ':' + dec);
+    },
+    onRaDecDialogCancel() {
+      this.showRaDecDialog = false;
+      this.reEnableButton('Goto');
+    },
     SolveCurrentPositionSuccess(RA_Degree, DEC_Degree, RA_0, DEC_0, RA_1, DEC_1, RA_2, DEC_2, RA_3, DEC_3) {
       this.callShowMessageBox('Solve Current Position Success: RA: ' + RA_Degree + '°, DEC: ' + DEC_Degree + '°', 'info');
       // 绘制当前位置
@@ -7353,7 +7460,14 @@ export default {
             this.ROI_x = parseFloat(parameters[parameter]);
           } else if (parameter == 'ROI_y') {
             this.ROI_y = parseFloat(parameters[parameter]);
-          }else if (parameter == 'AutoSave') {
+          }else if (parameter == 'SelfExposureTime(ms)') {
+            item = this.MainCameraConfigItems.find(item => item.label === 'Self Exposure Time (ms)');
+            if (item) {
+              item.value = parseInt(parameters[parameter]);
+            }
+            this.$bus.$emit('setSelfExposureTime',parseInt(parameters[parameter]));
+          }
+          else if (parameter == 'AutoSave') {
             const item = this.MainCameraConfigItems.find(item => item.label === 'Auto Save');
             if (item) {
               item.value = parameters[parameter] === 'true' || parameters[parameter] === true;
@@ -7407,7 +7521,7 @@ export default {
         this.$bus.$emit(label, label + ':' + value);
       } else if (value == '' && label === 'Focal Length (mm)') {
         this.SendConsoleLogMsg(label + 'is NULL', 'info');
-        this.$bus.$emit(item.label, item.label + ':');
+        // this.$bus.$emit(item.label, item.label + ':');
       }
     },
     // 校准相关方法
@@ -7868,11 +7982,42 @@ body,
   padding-right: 400px;
 }
 
-.v-btn {
+/* .v-btn {
   margin-left: 8px;
   margin-right: 8px;
   margin-top: 6px;
   margin-bottom: 6px;
+} */
+
+/* 仅作用于配置面板里的按钮 */
+.config-btn {
+  text-transform: none;     /* 不要全大写 */
+  letter-spacing: 0;
+  font-weight: 600;
+  font-size: 1.4rem;        /* 根是 10px，这里约 14px，更易读 */
+  min-height: 40px;         /* 触达面积 */
+  padding-inline: 14px;
+  margin: 8px 0;            /* 局部间距，替代全局 .v-btn margin */
+  backdrop-filter: blur(2px);
+}
+
+/* 深色侧栏里更柔和的“微浮起” */
+.config-btn.v-btn--variant-tonal {
+  box-shadow: 0 2px 6px rgba(0,0,0,.25);
+}
+
+/* 悬停/按下反馈 */
+.config-btn:hover {
+  transform: translateY(-1px);
+}
+.config-btn:active {
+  transform: translateY(0);
+}
+
+/* 禁用时稍降对比，避免像“块砖头” */
+.config-btn.v-btn--disabled {
+  opacity: .8;
+  box-shadow: none;
 }
 
 .v-application--wrap {
@@ -8144,5 +8289,23 @@ body,
   color: #FFA500;
   font-weight: bold;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.config-btn {
+  text-transform: none;      /* 取消全大写 */
+  letter-spacing: 0;         /* 去掉过大的字间距 */
+  font-weight: 600;          /* 更稳重一些 */
+  min-height: 40px;          /* 提高可触达性 */
+  backdrop-filter: blur(2px);
+}
+
+/* 在深色侧栏里更融洽的“微浮起”效果 */
+.config-btn.v-btn--variant-tonal {
+  box-shadow: 0 2px 6px rgba(0,0,0,.25);
+}
+
+/* 按下的反馈 */
+.config-btn:active {
+  transform: translateY(1px);
 }
 </style>

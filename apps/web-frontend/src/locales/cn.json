@@ -440,6 +440,16 @@
   "Coarse adjustment in progress, please observe if the focuser has started moving. If it has started moving, please wait for the coarse adjustment to complete": "正在进行粗调，请观察电调是否开始移动，如果已开始移动，请等待粗调完成",
   "Fine adjustment in progress, please observe if the focuser has started moving. If it has started moving, please wait for the fine adjustment to complete": "正在进行精调，请观察电调是否开始移动，如果已开始移动，请等待精调完成",
   "Are you sure you want to start auto focus?": "您确定要开始自动对焦吗？",
-  "The button is disabled, please wait for the auto focus to finish.": "按钮已禁用，请等待自动对焦完成。"
-
+  "The button is disabled, please wait for the auto focus to finish.": "按钮已禁用，请等待自动对焦完成。",
+  "Input Target Coordinates": "输入目标坐标",
+  "DEC(°)": "DEC(°)",
+  "RA supports hours (0-24h) or degrees (0-360°) input; DEC defaults to degrees (0°-90°).": "RA 支持小时(0-24h)或度(0-360°)两种输入; DEC 默认为度(0°-90°)。",
+  "Cancel": "取消",
+  "RA(h)": "RA(h)",
+  "RA(°)": "RA(°)",
+  "Required": "必填",
+  "Please enter a number": "请输入数字",
+  "RA range {0} ~ {1} hours": "RA 范围 {0} ~ {1} 小时",
+  "DEC range {0} ~ {1} degrees": "DEC 范围 {0} ~ {1} 度",
+  "Box space is less than 1GB, please clear the cache": "盒空间小于1GB，请清除缓存"
 }
