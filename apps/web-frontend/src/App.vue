@@ -13,13 +13,13 @@
 
       <div v-show="isOpenDevicePage">
         <span
-          style="position: absolute; top: 0px; left: 50%; transform: translateX(-50%); font-size: 30px; color: rgba(255, 255, 255, 0.5); user-select: none;">
+          style="position: absolute; top: 0px; left: 50%; transform: translateX(-50%); font-size: clamp(14px, 4vw, 30px); color: rgba(255, 255, 255, 0.5); user-select: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 190px; display: inline-block;">
           {{ $t(CurrentDriverType) }}
-          <v-divider></v-divider>
+          <v-divider style="margin-top: 2px;"></v-divider>
         </span>
 
         <div :style="{ width: DeviceIsConnected ? '200px' : '200px' }"
-          style="position: absolute; top: 50px; max-height: calc(100% - 95px); overflow-y: auto;"
+          style="position: absolute; top: 60px; max-height: calc(100% - 105px); overflow-y: auto;"
           class="params-container">
 
           <!-- 设备未连接状态 -->
