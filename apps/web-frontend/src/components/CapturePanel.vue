@@ -348,6 +348,11 @@ export default {
           this.ExpTimes.push(time + 'ms');
         }
         this.handleExpTimeButtonClick('null');  // 重新同步曝光时间
+      }else{
+        if (this.ExpTimes.length > this.ExpTimeNum) {
+          this.ExpTimes.pop();
+        }
+        this.handleExpTimeButtonClick('null');  // 重新同步曝光时间
       }
     },
 

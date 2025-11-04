@@ -81,6 +81,34 @@
       <div v-if="isImageFolderOpen" class="overlay"></div>
     </transition>
 
+    <!-- U盘选择对话框 -->
+    <transition name="fade">
+      <div v-if="showUSBSelectDialog" class="usb-select-overlay" @click="closeUSBSelectDialog">
+        <div class="usb-select-dialog" @click.stop>
+          <div class="usb-select-header">
+            <span class="usb-select-title">{{ $t('Select USB Drive') }}</span>
+            <button class="usb-select-close" @click="closeUSBSelectDialog">
+              <v-icon color="rgba(255, 255, 255, 0.7)">mdi-close</v-icon>
+            </button>
+          </div>
+          <div class="usb-select-content">
+            <div 
+              v-for="usb in USBList" 
+              :key="usb.name" 
+              class="usb-select-item"
+              @click="selectUSB(usb.name)"
+            >
+              <div class="usb-item-info">
+                <div class="usb-item-name">{{ usb.name }}</div>
+                <div class="usb-item-space">{{ $t('Free Space') }}: {{ formatSpace(usb.space) }}</div>
+              </div>
+              <v-icon color="rgba(75, 155, 250)">mdi-chevron-right</v-icon>
+            </div>
+          </div>
+        </div>
+      </div>
+    </transition>
+
   </div>
   </transition>
 </template>
@@ -139,6 +167,9 @@ export default {
       USB_Info: '',
       isUSBWarning: true,
       isImageFolderOpen: false,
+      USBList: [], // 存储所有U盘信息 [{name: 'USB1', space: 1000000}, ...]
+      showUSBSelectDialog: false, // 是否显示U盘选择对话框
+      selectedUSBName: '', // 选中的U盘名
     };
   },
   created() {
@@ -147,6 +178,7 @@ export default {
     this.$bus.$on('ShowAllImageFolder', this.updateImageFolders);
     this.$bus.$on('USB_Name_Sapce', this.updateUSBdata);
     this.$bus.$on('ImageFolderOpen', this.ImageFolderOpen);
+    this.$bus.$on('ClearUSBList', this.clearUSBList);
   },
   methods: {
     nextPage() {
@@ -237,6 +269,21 @@ export default {
     },
     MoveFileToUSB() {
       this.DeleteBtnSelect = false;
+      
+      // 检查U盘数量
+      if (this.USBList.length === 0) {
+        console.log('No USB drive available');
+        return;
+      } else if (this.USBList.length === 1) {
+        // 单个U盘，直接发送
+        this.sendMoveFileToUSB(this.USBList[0].name);
+      } else {
+        // 多个U盘，显示选择对话框
+        this.showUSBSelectDialog = true;
+      }
+    },
+    
+    sendMoveFileToUSB(usbName) {
       if(this.isCaptureFile)
       {
         this.FoldersName = 'CaptureImage';
@@ -245,11 +292,23 @@ export default {
       {
         this.FoldersName = 'ScheduleImage';
       }
-      const moveFolders = this.imageFolders.filter(folder => folder.isSelected); // 被删除的文件夹
-      const resultString = this.convertImageDataToString(moveFolders)
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'MoveFileToUSB:'+this.FoldersName+resultString);
-      console.log('move folders:', moveFolders)
-      this.$bus.$emit('SendConsoleLogMsg', 'Move folders:'+moveFolders, 'info');
+      const moveFolders = this.imageFolders.filter(folder => folder.isSelected);
+      const resultString = this.convertImageDataToString(moveFolders);
+      // 在消息中包含U盘名
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'MoveFileToUSB:'+this.FoldersName+resultString+':'+usbName);
+      console.log('move folders:', moveFolders, 'to USB:', usbName);
+      this.$bus.$emit('SendConsoleLogMsg', 'Move folders:'+moveFolders+' to USB:'+usbName, 'info');
+    },
+    
+    selectUSB(usbName) {
+      this.selectedUSBName = usbName;
+      this.sendMoveFileToUSB(usbName);
+      this.closeUSBSelectDialog();
+    },
+    
+    closeUSBSelectDialog() {
+      this.showUSBSelectDialog = false;
+      this.selectedUSBName = '';
     },
 
     updateImageFolders(CaptureImageFoldersString, ScheduleImageFoldersString) {
@@ -333,17 +392,45 @@ export default {
       {
         this.isUSBWarning = true;
         this.USB_Info = 'No USB Drive Detected';
-      }
-      else if (Name === 'Multiple')
-      {
-        this.isUSBWarning = true;
-        this.USB_Info = 'Multiple USB drives detected, please remove excess USB drives';
+        this.USBList = [];
       }
       else {
-        const USB_Name = Name;
-        const USB_Space = this.formatSpace(Space);
-        this.USB_Info = 'USB Drive: ' + USB_Name + '  ' + '  ' + '  ' + '  ' + 'Free Space: ' + USB_Space;
+        // 检查U盘是否已存在于列表中
+        const existingIndex = this.USBList.findIndex(usb => usb.name === Name);
+        if (existingIndex === -1) {
+          // 添加新的U盘信息
+          this.USBList.push({
+            name: Name,
+            space: parseInt(Space) || 0
+          });
+        } else {
+          // 更新已存在的U盘信息
+          this.USBList[existingIndex].space = parseInt(Space) || 0;
+        }
+        
+        // 更新显示信息
+        this.updateUSBInfo();
+      }
+    },
+    
+    clearUSBList() {
+      this.USBList = [];
+    },
+    
+    updateUSBInfo() {
+      if (this.USBList.length === 0) {
+        this.isUSBWarning = true;
+        this.USB_Info = 'No USB Drive Detected';
+      } else if (this.USBList.length === 1) {
+        // 单个U盘
+        const usb = this.USBList[0];
+        const USB_Space = this.formatSpace(usb.space);
+        this.USB_Info = 'USB Drive: ' + usb.name + '  ' + '  ' + '  ' + '  ' + 'Free Space: ' + USB_Space;
         this.isUSBWarning = false;
+      } else {
+        // 多个U盘
+        this.isUSBWarning = true;
+        this.USB_Info = 'Multiple USB drives detected, please remove excess USB drives';
       }
     },
 
@@ -811,6 +898,121 @@ export default {
 
 .overlay-leave-active {
   animation: hideOverlayAnimation 0.3s forwards;
+}
+
+/* U盘选择对话框样式 */
+.usb-select-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1000;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  backdrop-filter: blur(5px);
+}
+
+.usb-select-dialog {
+  background-color: rgba(40, 40, 40, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  min-width: 400px;
+  max-width: 600px;
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.usb-select-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.usb-select-title {
+  font-size: 18px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+  user-select: none;
+}
+
+.usb-select-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background-color 0.2s;
+}
+
+.usb-select-close:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.usb-select-close:active {
+  transform: scale(0.95);
+}
+
+.usb-select-content {
+  padding: 10px;
+  overflow-y: auto;
+  max-height: calc(70vh - 80px);
+}
+
+.usb-select-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px;
+  margin: 5px 0;
+  border-radius: 8px;
+  background-color: rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  transition: all 0.2s;
+  user-select: none;
+}
+
+.usb-select-item:hover {
+  background-color: rgba(75, 155, 250, 0.2);
+  transform: translateX(5px);
+}
+
+.usb-select-item:active {
+  transform: translateX(3px) scale(0.98);
+}
+
+.usb-item-info {
+  flex: 1;
+}
+
+.usb-item-name {
+  font-size: 16px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+  margin-bottom: 5px;
+}
+
+.usb-item-space {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.3s;
+}
+
+.fade-enter, .fade-leave-to {
+  opacity: 0;
 }
 
 </style>

@@ -84,19 +84,40 @@
 
       <v-tab-item>
         <div class="qs-pane">
-          <div class="qs-narrow">
+            <div class="qs-narrow">
             <div class="qs-section qs-usb-section">
               <div class="qs-subheader">{{ $t('USB Drive') }}</div>
-              <div class="qs-field">
+              <div v-if="usbList.length === 0" class="qs-field">
                 <span class="qs-inline-label">{{ $t('Name') }}</span>
-                <span>{{ usbInfo.name }}</span>
+                <span>—</span>
               </div>
-              <div class="qs-field">
-                <span class="qs-inline-label">{{ $t('Free Space') }}</span>
-                <span>{{ usbInfo.spaceFormatted }}</span>
+              <div v-else-if="usbList.length === 1" class="qs-usb-single">
+                <div class="qs-field">
+                  <span class="qs-inline-label">{{ $t('Name') }}</span>
+                  <span>{{ usbList[0].name }}</span>
+                </div>
+                <div class="qs-field">
+                  <span class="qs-inline-label">{{ $t('Free Space') }}</span>
+                  <span>{{ usbList[0].spaceFormatted }}</span>
+                </div>
+                <div class="qs-usb-button-container">
+                  <v-btn small text @click="openUSBBrowser(usbList[0].name)">{{ $t('View USB Files') }}</v-btn>
+                </div>
               </div>
-              <div class="qs-usb-button-container">
-                <v-btn small text @click="openUSBBrowser" :disabled="usbInfo.name === '—'">{{ $t('View USB Files') }}</v-btn>
+              <div v-else class="qs-usb-multiple">
+                <div class="qs-field">
+                  <span class="qs-inline-label">{{ $t('Status') }}</span>
+                  <span style="color: rgba(255, 165, 0, 0.9);">{{ $t('Multiple USB drives detected') }}</span>
+                </div>
+                <div class="qs-usb-list">
+                  <div v-for="usb in usbList" :key="usb.name" class="qs-usb-item">
+                    <div class="qs-usb-item-info">
+                      <div class="qs-usb-item-name">{{ usb.name }}</div>
+                      <div class="qs-usb-item-space">{{ $t('Free Space') }}: {{ usb.spaceFormatted }}</div>
+                    </div>
+                    <v-btn small text @click="openUSBBrowser(usb.name)">{{ $t('View Files') }}</v-btn>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -141,7 +162,7 @@ export default {
         { text: 'English', value: 'en' },
         { text: 'Simplified Chinese', value: 'cn' }
       ],
-      usbInfo: { name: '—', space: 0, spaceFormatted: '—' },
+      usbList: [], // 存储所有U盘信息 [{name: 'USB1', space: 1000000, spaceFormatted: '1.00 GB'}, ...]
       boxInfo: { space: 0, spaceFormatted: '—' },
       usbSerialPath: '—',
       devices:[],
@@ -154,6 +175,7 @@ export default {
     this.$bus.$on('sendCurrentConnectedDevices', this.onSendCurrentConnectedDevices);
     this.$bus.$on('DeviceConnectSuccess', this.onDeviceConnectSuccess);
     this.$bus.$on('USB_Name_Sapce', this.onUSBInfo);
+    this.$bus.$on('ClearUSBList', this.clearUSBList);
     this.$bus.$on('Box_Space', this.onBoxSpace);
 
     this.refreshDevices();
@@ -195,10 +217,32 @@ export default {
       this.$bus.$emit('GetCurrentConnectedDevices');
     },
     onUSBInfo(name, space) {
-      this.usbInfo.name = name;
+      if (name === 'Null') {
+        this.usbList = [];
+        return;
+      }
+      
+      // 检查U盘是否已存在于列表中
+      const existingIndex = this.usbList.findIndex(usb => usb.name === name);
       const bytes = Number(space) || 0;
-      this.usbInfo.space = bytes;
-      this.usbInfo.spaceFormatted = this.formatBytes(bytes);
+      const spaceFormatted = this.formatBytes(bytes);
+      
+      if (existingIndex === -1) {
+        // 添加新的U盘信息
+        this.usbList.push({
+          name: name,
+          space: bytes,
+          spaceFormatted: spaceFormatted
+        });
+      } else {
+        // 更新已存在的U盘信息
+        this.usbList[existingIndex].space = bytes;
+        this.usbList[existingIndex].spaceFormatted = spaceFormatted;
+      }
+    },
+    
+    clearUSBList() {
+      this.usbList = [];
     },
     refreshUSB() {
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'USBCheck');
@@ -222,10 +266,13 @@ export default {
       this.refreshUSB();
       this.refreshBoxSpace();
     },
-    openUSBBrowser() {
+    openUSBBrowser(usbName = null) {
       // 打开USB文件浏览器
+      // 如果指定了U盘名，传递给文件浏览器
       this.$store.state.showUSBFilesDialog = true;
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'GetUSBFiles');
+      this.$store.state.selectedUSBName = usbName; // 存储选中的U盘名
+      const command = usbName ? `GetUSBFiles:${usbName}` : 'GetUSBFiles';
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', command);
     },
     onSendCurrentConnectedDevices(payload) {
       // 接收来自 App.vue 的完整设备列表，并更新本地 devices 列表
@@ -423,6 +470,30 @@ export default {
 .qs-actions { display: flex; gap: 6px; justify-content: flex-end; margin-top: 6px; }
 .qs-usb-section { position: relative; }
 .qs-usb-button-container { display: flex; justify-content: flex-end; margin-top: 8px; }
+.qs-usb-list { margin-top: 12px; }
+.qs-usb-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  margin: 6px 0;
+  border-radius: 6px;
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.qs-usb-item-info {
+  flex: 1;
+}
+.qs-usb-item-name {
+  font-size: 15px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+  margin-bottom: 4px;
+}
+.qs-usb-item-space {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+}
 .qs-narrow { margin: 0 auto; width: 95%; max-width: clamp(520px, 80%, 900px); }
 /* 桌面端保证对话框最小宽度，避免英文标签被截断；小屏自动回落 */
 .qs-settings-card { min-width: 660px; }

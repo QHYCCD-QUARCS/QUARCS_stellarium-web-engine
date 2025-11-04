@@ -9,18 +9,32 @@
 <template>
   <v-app>
     <v-navigation-drawer v-model="drawer_2" ref="Drawer_2" app absolute temporary :width="DeviceIsConnected ? 200 : 200"
+      class="submenu-navigation-drawer"
       style="left: 170px; backdrop-filter: blur(5px); background-color: rgba(0, 0, 0, 0.1);">
 
-      <div v-show="isOpenDevicePage">
+      <div v-show="isOpenDevicePage" style="position: relative; width: 200px; height: 100%; display: flex; flex-direction: column;">
         <span
-          style="position: absolute; top: 0px; left: 50%; transform: translateX(-50%); font-size: clamp(14px, 4vw, 30px); color: rgba(255, 255, 255, 0.5); user-select: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 190px; display: inline-block;">
+          style="position: absolute; top: 0px; left: 50%; transform: translateX(-50%); font-size: clamp(14px, 4vw, 30px); color: rgba(255, 255, 255, 0.5); user-select: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 190px; display: inline-block; z-index: 1;">
           {{ $t(CurrentDriverType) }}
           <v-divider style="margin-top: 2px;"></v-divider>
         </span>
 
-        <div :style="{ width: DeviceIsConnected ? '200px' : '200px' }"
-          style="position: absolute; top: 60px; max-height: calc(100% - 105px); overflow-y: auto;"
-          class="params-container">
+        <div :style="{ 
+          width: DeviceIsConnected ? '200px' : '200px',
+          position: 'absolute',
+          top: '60px',
+          bottom: DeviceIsConnected ? '60px' : '10px',
+          left: 0,
+          right: 0,
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          paddingRight: '5px',
+          paddingBottom: '80px',
+          paddingLeft: '5px',
+          boxSizing: 'border-box'
+        }"
+          class="params-container"
+          style="-ms-overflow-style: none; scrollbar-width: none;">
 
           <!-- 设备未连接状态 -->
           <div v-show="!DeviceIsConnected" style="text-align: center;">
@@ -72,12 +86,12 @@
             <!-- 配置项卡片内容 -->
             <v-card-text>
               <!-- 文本输入类型 -->
-              <v-text-field v-if="item.inputType === 'text'" v-model="item.value" :label="item.label"
+              <v-text-field v-if="item.inputType === 'text'" v-model="item.value" :label="$t(item.label)"
                 @input="handleConfigChange(item.label, item.value)" class="config-input">
               </v-text-field>
 
               <!-- 数字输入类型 -->
-              <v-text-field v-if="item.inputType === 'number'" v-model="item.value" :label="item.label"
+              <v-text-field v-if="item.inputType === 'number'" v-model="item.value" :label="$t(item.label)"
                 :type="isDesktop ? 'number' : 'text'" :min="item.min" :max="item.max"
                 :step="item.step !== undefined && item.step !== null ? item.step : 1" :rules="numberRules(item)"
                 :inputmode="isMobile ? getInputMode(item) : ''" :pattern="isMobile ? getPattern(item) : ''"
@@ -87,7 +101,7 @@
               <!-- 滑动条类型 -->
               <div v-if="item.inputType === 'slider'" class="slider-container">
                 <span class="slider-label">
-                  {{ item.label }}: {{ item.value }}
+                  {{ $t(item.label) }}: {{ item.value }}
                 </span>
                 <div>
                   <!-- 减小按钮 -->
@@ -113,18 +127,18 @@
               </div>
 
               <!-- 选择框类型 -->
-              <v-select v-if="item.inputType === 'select'" v-model="item.value" :label="item.label"
+              <v-select v-if="item.inputType === 'select'" v-model="item.value" :label="$t(item.label)"
                 @change="handleConfigChange(item.label, item.value)" :items="item.selectValue" class="config-input">
               </v-select>
 
               <!-- 开关类型 -->
-              <v-switch v-if="item.inputType === 'switch'" v-model="item.value" :label="item.label"
+              <v-switch v-if="item.inputType === 'switch'" v-model="item.value" :label="$t(item.label)"
                 @change="handleConfigChange(item.label, item.value)" class="config-switch">
               </v-switch>
 
               <!-- 提示信息类型（只读） -->
               <div v-if="item.inputType === 'tip'" class="tip-field">
-                <div class="tip-label">{{ item.label }}</div>
+                <div class="tip-label">{{ $t(item.label) }}</div>
                 <div class="tip-value" :title="formatTipTitle(item)">
                   {{ formatTipValue(item) }}
                 </div>
@@ -148,8 +162,8 @@
                     <v-progress-circular indeterminate size="18" width="2" />
                   </template>
                   {{ item._disabled
-                      ? (item.buttonTextWhenDisabled || item.buttonText || item.label)
-                      : (item.buttonText || item.label) }}
+                      ? (item.buttonTextWhenDisabled ? $t(item.buttonTextWhenDisabled) : (item.buttonText ? $t(item.buttonText) : $t(item.label)))
+                      : (item.buttonText ? $t(item.buttonText) : $t(item.label)) }}
                 </v-btn>
               </div>
 
@@ -157,16 +171,20 @@
             </v-card-text>
           </div>
           <!-- 设备连接状态 -->
+          
+          <!-- 底部占位，确保最后一个参数可以完全显示 -->
+          <div v-show="DeviceIsConnected" style="height: 5px; flex-shrink: 0;"></div>
 
-          <div v-show="DeviceIsConnected"
-            style="text-align: center; position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px;">
-            <button @click="disconnectDriver" class="btn-confirm" style="display: inline-block; background-color: red;">
-              <div style="display: flex; justify-content: center; align-items: center;">
-                <v-icon color="white">mdi-link-off</v-icon>
-              </div>
-            </button>
-          </div>
+        </div>
 
+        <!-- 断开按钮 - 固定在底部，不受滚动影响 -->
+        <div v-show="DeviceIsConnected"
+          style="position: absolute; bottom: 10px; left: 0; right: 0; text-align: center; display: flex; justify-content: center; gap: 10px; z-index: 2;">
+          <button @click="disconnectDriver" class="btn-confirm" style="display: inline-block; background-color: red;">
+            <div style="display: flex; justify-content: center; align-items: center;">
+              <v-icon color="white">mdi-link-off</v-icon>
+            </div>
+          </button>
         </div>
       
       </div>
@@ -269,6 +287,7 @@
     </v-navigation-drawer>
 
     <v-navigation-drawer v-model="nav" app :stateless="drawer_2" temporary width="170"
+      class="menu-navigation-drawer"
       style="backdrop-filter: blur(5px); background-color: rgba(0, 0, 0, 0.1);">
       <v-layout column fill-height>
         <v-list dense>
@@ -679,24 +698,30 @@ export default {
         { driverType: 'Guider', label: 'Guider Focal Length (mm)', value: '', inputType: 'text' },
         { driverType: 'Guider', label: 'Multi Star Guider', value: false, inputType: 'switch' },
         // { driverType: 'Guider', label: 'Guider Pixel size', value: '', inputType: 'text'},
-        { driverType: 'Guider', label: 'Guider Gain', value: '', inputType: 'slider', inputMin: 0, inputMax: 100, inputStep: 1 },
-        { driverType: 'Guider', label: 'Calibration step (ms)', value: '', inputType: 'text' },
-        { driverType: 'Guider', label: 'Ra Aggression', value: '', inputType: 'slider', inputMin: 0, inputMax: 100, inputStep: 1 },
-        { driverType: 'Guider', label: 'Dec Aggression', value: '', inputType: 'slider', inputMin: 0, inputMax: 100, inputStep: 1 },
+        // { driverType: 'Guider', label: 'Guider Gain', value: '', inputType: 'slider', inputMin: 0, inputMax: 100, inputStep: 1 },
+        // { driverType: 'Guider', label: 'Calibration step (ms)', value: '', inputType: 'text' },
+        // { driverType: 'Guider', label: 'Ra Aggression', value: '', inputType: 'slider', inputMin: 0, inputMax: 100, inputStep: 1 },
+        // { driverType: 'Guider', label: 'Dec Aggression', value: '', inputType: 'slider', inputMin: 0, inputMax: 100, inputStep: 1 },
 
       ],
 
       MainCameraConfigItems: [
         // vue处理参数
-        { driverType: 'MainCamera', label: 'ImageCFA', value: '', inputType: 'select', selectValue: ['GR', 'GB', 'BG', 'RGGB', 'null'] },
+        { driverType: 'MainCamera', label: 'ImageCFA', value: 'null', inputType: 'select', selectValue: ['GR', 'GB', 'BG', 'RGGB', 'null'] },
         // 硬件处理参数
         { driverType: 'MainCamera', label: 'Binning', value: '', inputType: 'slider', inputMin: 1, inputMax: 16, inputStep: 1 },
-        { driverType: 'MainCamera', label: 'Temperature', value: '', inputType: 'select', selectValue: [5, 0, -5, -10, -15, -20, -25] },
+        { driverType: 'MainCamera', label: 'Temperature', value: '-5', inputType: 'select', selectValue: [5, 0, -5, -10, -15, -20, -25] },
         { driverType: 'MainCamera', label: 'Gain', value: '', inputType: 'slider', inputMin: 0, inputMax: 0, inputStep: 1 },
         { driverType: 'MainCamera', label: 'Offset', value: '', inputType: 'slider', inputMin: 0, inputMax: 0, inputStep: 1 },
 
-        { driverType: 'MainCamera', num: 1, label: 'Self Exposure Time (ms)', value: 0, inputType: 'number' },
-        { driverType: 'MainCamera', label: 'Auto Save', value: false, inputType: 'switch' },
+        { driverType: 'MainCamera', num: 1, label: 'Self Exposure Time (ms)', value: 0, inputType: 'number' }, // 自曝光时间
+        
+        { driverType: 'MainCamera', label: 'Auto Save', value: false, inputType: 'switch' }, // 自动保存
+        { driverType: 'MainCamera', label: 'Save Folder', value: 'default', inputType: 'select' ,selectValue: ['default']}, // 保存文件夹
+        // 循环拍摄
+        // { driverType: 'MainCamera', label: 'Exposuer delay', value: 0, inputType: 'number' }, // 循环拍摄间隔时间
+        // { driverType: 'MainCamera', label: 'Loop Capture', value: false, inputType: 'switch' },  // 循环拍摄
+
       ],
 
       MountConfigItems: [
@@ -784,6 +809,9 @@ export default {
 
       mainCameraSizeX: 0,
       mainCameraSizeY: 0,
+
+      showImageSizeX: 0,
+      showImageSizeY: 0,
 
       ImageProportion: 0,
 
@@ -933,15 +961,15 @@ export default {
     this.$bus.$on('HandleHistogramNum', this.applyHistStretch);
     this.$bus.$on('ImageGainR', this.ImageGainSet);
     this.$bus.$on('ImageGainB', this.ImageGainSet);
-    this.$bus.$on('Offset', this.ImageOffsetSet);
-    this.$bus.$on('Binning', this.BinningSet);
-    this.$bus.$on('Gain', this.GainSet);
-    this.$bus.$on('Offset', this.OffsetSet);
-    this.$bus.$on('ImageCFA', this.ImageCFASet);
-    this.$bus.$on('Self Exposure Time (ms)', this.SelfExposureTimeSet);
+    // this.$bus.$on('Offset', this.ImageOffsetSet);
+    // this.$bus.$on('Binning', this.BinningSet);
+    // this.$bus.$on('Gain', this.GainSet);
+    // this.$bus.$on('Offset', this.OffsetSet);
+    // this.$bus.$on('ImageCFA', this.ImageCFASet);
+    // this.$bus.$on('Self Exposure Time (ms)', this.SelfExposureTimeSet);
     this.$bus.$on('getSelfExposureTime', this.getSelfExposureTime);
     // this.$bus.$on('MainCameraCFA', this.ImageCFASet);
-    this.$bus.$on('Temperature', this.CameraTemperatureSet);
+    // this.$bus.$on('Temperature', this.CameraTemperatureSet);
     this.$bus.$on('Focal Length (mm)', this.FocalLengthSet);
     this.$bus.$on('Guider Focal Length (mm)', this.GuiderFocalLengthSet);
     this.$bus.$on('Multi Star Guider', this.MultiStarGuiderSet);
@@ -956,10 +984,10 @@ export default {
     this.$bus.$on('Backlash', this.BacklashSet);
     this.$bus.$on('GotoThenSolve', this.GotoThenSolve);    // 切换GOTO后是否解析的信号
     this.$bus.$on('SolveCurrentPosition', this.SolveCurrentPosition);  // 实现解析当前位置的信号
+    this.$bus.$on('Loop Capture', this.LoopCapture);
     this.$bus.$on('Goto', this.Goto);
-    this.$bus.$on('GotoThenSolve', this.GotoThenSolve);
-    this.$bus.$on('SolveCurrentPosition', this.SolveCurrentPosition);
-    this.$bus.$on('Auto Save', this.AutoSave);
+    // this.$bus.$on('Auto Save', this.AutoSave);
+    // this.$bus.$on('Save Folder', this.SaveFolderSet);
     this.$bus.$on('AutoFlip', this.AutoFlipSet);
     this.$bus.$on('WestMinutesPastMeridian', this.WestMinutesPastMeridianSet);
     this.$bus.$on('EastMinutesPastMeridian', this.EastMinutesPastMeridianSet);
@@ -1327,8 +1355,12 @@ export default {
                 break;
 
               case 'SaveBinSuccess':
-                if (parts.length === 2) {
+                if (parts.length === 4) {
                   const fileName = parts[1];
+                  const showImageSizeX = parseInt(parts[2]);
+                  const showImageSizeY = parseInt(parts[3]);
+                  this.showImageSizeX = showImageSizeX;
+                  this.showImageSizeY = showImageSizeY;
                   this.readBinFile('img/' + fileName);
                   this.DetectedStarsFinish = false;
                 }
@@ -1643,14 +1675,51 @@ export default {
 
 
               case 'USBCheck':
+                // 首先发送清空信号
+                this.$bus.$emit('ClearUSBList');
+                const item = this.MainCameraConfigItems.find(item => item.label === 'Save Folder');
+                item.selectValue = ['default'];
+                
+                // 处理U盘信息：单个或多个U盘都通过相同方式处理
+                // parts[0] = 'USBCheck'
+                // parts[1] 如果是 'Multiple'，则 parts[2] 开始是U盘列表，格式为 'Name1,Space1:Name2,Space2:...'
+                // 否则 parts[1] 是单个U盘信息，格式为 'Name,Space'
                 if (parts.length === 2) {
+                  // 单个U盘
                   const USBdata = parts[1].split(',');
-                  console.log('USB name: ', USBdata[0]);
-                  console.log('USB space: ', USBdata[1]);
-                  this.SendConsoleLogMsg('USB name:' + USBdata[0], 'info');
-                  this.SendConsoleLogMsg('USB space:' + USBdata[1], 'info');
+                  if (USBdata.length >= 2 && USBdata[0] !== 'Null' && USBdata[0] !== 'Multiple') {
+                    console.log('USB name: ', USBdata[0]);
+                    console.log('USB space: ', USBdata[1]);
+                    this.SendConsoleLogMsg('USB name:' + USBdata[0], 'info');
+                    this.SendConsoleLogMsg('USB space:' + USBdata[1], 'info');
 
-                  this.$bus.$emit('USB_Name_Sapce', USBdata[0], USBdata[1]);
+                    this.$bus.$emit('USB_Name_Sapce', USBdata[0], USBdata[1]);
+                    const item = this.MainCameraConfigItems.find(item => item.label === 'Save Folder');
+                    if (item && !item.selectValue.includes(USBdata[0])) {
+                      item.selectValue.push(USBdata[0]);
+                    }
+                  }
+                } else if (parts.length >= 3) {
+                  // 多个U盘：从 parts[1] 开始（如果是 Multiple，则从 parts[2] 开始）
+                  let startIndex = 1;
+                  if (parts[1] === 'Multiple') {
+                    startIndex = 2;
+                  }
+                  for(let i = startIndex; i < parts.length; i++) {
+                    const USBdata = parts[i].split(',');
+                    if (USBdata.length >= 2 && USBdata[0] !== 'Null') {
+                      console.log('USB name: ', USBdata[0]);
+                      console.log('USB space: ', USBdata[1]);
+                      this.SendConsoleLogMsg('USB name:' + USBdata[0], 'info');
+                      this.SendConsoleLogMsg('USB space:' + USBdata[1], 'info');
+
+                      this.$bus.$emit('USB_Name_Sapce', USBdata[0], USBdata[1]);
+                      const item = this.MainCameraConfigItems.find(item => item.label === 'Save Folder');
+                      if (item && !item.selectValue.includes(USBdata[0])) {
+                        item.selectValue.push(USBdata[0]);
+                      }
+                    }
+                  }
                 }
                 break;
 
@@ -1856,7 +1925,55 @@ export default {
                     this.callShowMessageBox(this.$t('Image saved successfully'), 'success');
                   } else if (status === 'Null') {
                     this.callShowMessageBox(this.$t('No images to save'), 'error');
+                  } else if (status === 'USB-NoSpace'){
+                    this.callShowMessageBox(this.$t('There is not enough space on the USB drive. Please clean up the USB drive or replace it. The current save failed.'), 'error');
+                  } else if (status === 'NoSpace'){
+                    this.callShowMessageBox(this.$t('There is not enough space on the local storage. Please clean up the storage or free up space.'), 'error');
+                  } else if (status === 'USB-ReadOnly'){
+                    this.callShowMessageBox(this.$t('USB drive is read-only. Please check the USB drive.'), 'error');
+                  } else if (status === 'Failed'){
+                    this.callShowMessageBox(this.$t('Failed to save image.'), 'error');
+                  } else if (status === 'USB-NotAvailable'){
+                    this.callShowMessageBox(this.$t('USB not available. Please check the USB drive.'), 'error');
+                    // 当前不可利用,重置为默认路径
+                    const item = this.MainCameraConfigItems.find(item => item.label === 'Save Folder');
+                    if (item) {
+                      item.selectValue = ['default'];
+                      item.value = 'default';
+                    }
+                    this.$bus.$emit('AppSendMessage', 'Vue_Command', 'SetMainCameraSaveFolder:default');
+                    this.$bus.$emit('AppSendMessage', 'Vue_Command', 'USBCheck');
                   }
+                }
+                break;
+
+              case 'getUSBFail':
+                if (parts.length >= 2) {
+                  const errorMsg = parts.slice(1).join(':'); // 获取完整的错误消息
+                  
+                  // 处理包含动态内容的消息
+                  let translatedMsg = errorMsg;
+                  
+                  // 匹配 "Failed to get filesystem information for X, error: Y"
+                  const fsInfoMatch = errorMsg.match(/^Failed to get filesystem information for (.+), error: (.+)$/);
+                  if (fsInfoMatch) {
+                    translatedMsg = this.$t('Failed to get filesystem information for {0}, error: {1}', [fsInfoMatch[1], fsInfoMatch[2]]);
+                  }
+                  // 匹配 "Not enough storage space! Required: X MB, Available: Y MB"
+                  else {
+                    const spaceMatch = errorMsg.match(/^Not enough storage space! Required: (.+?) MB, Available: (.+?) MB$/);
+                    if (spaceMatch) {
+                      translatedMsg = this.$t('Not enough storage space! Required: {0} MB, Available: {1} MB', [spaceMatch[1], spaceMatch[2]]);
+                    }
+                    // 尝试直接翻译
+                    else {
+                      const translation = this.$t(errorMsg);
+                      // 如果翻译结果和原消息相同，说明没有找到翻译，使用原消息
+                      translatedMsg = translation !== errorMsg ? translation : errorMsg;
+                    }
+                  }
+                  
+                  this.callShowMessageBox(translatedMsg, 'error');
                 }
                 break;
 
@@ -2816,6 +2933,7 @@ export default {
       // this.sendMessage('Vue_Command', 'getStagingImage'); // 获取最后拍摄的图像,弃用
       // this.sendMessage('Vue_Command', 'getPolarAlignmentState'); // 获取极轴对齐状态,更换位置
       this.sendMessage('Vue_Command', 'loadSDKVersionAndUSBSerialPath'); // 获取SDK版本和USB序列号路径
+      this.sendMessage('Vue_Command', 'USBCheck'); // 检查USB状态
 
 
       this.disconnectTimeoutTriggered = false;
@@ -3254,46 +3372,45 @@ export default {
       }
     },
 
-    ImageOffsetSet(payload) {
-      const [signal, value] = payload.split(':'); // 拆分信号和值
-      const doubleValue = parseFloat(value); // 将值转换为 double 类型
+    // ImageOffsetSet(payload) {
+    //   const [signal, value] = payload.split(':'); // 拆分信号和值
+    //   const doubleValue = parseFloat(value); // 将值转换为 double 类型
 
-      this.ImageOffset = doubleValue;
-      console.log('Image Offset is set to:', doubleValue);
-      this.SendConsoleLogMsg('Image Offset is set to:' + doubleValue, 'info');
-      this.sendMessage('Vue_Command', 'ImageOffset:' + doubleValue);
-    },
+    //   this.ImageOffset = doubleValue;
+    //   console.log('Image Offset is set to:', doubleValue);
+    //   this.SendConsoleLogMsg('Image Offset is set to:' + doubleValue, 'info');
+    //   this.sendMessage('Vue_Command', 'ImageOffset:' + doubleValue);
+    // },
 
-    BinningSet(payload) {
-      const [signal, value] = payload.split(':'); // 拆分信号和值
-      const IntValue = parseInt(value); // 将值转换为 Int 类型
-      this.cameraBin = IntValue;
-      console.log('Image Binning is set to:', IntValue);
-      this.SendConsoleLogMsg('Image Binning is set to:' + IntValue, 'info');
-      this.sendMessage('Vue_Command', 'SetBinning:' + IntValue);
-      this.$bus.$emit('SetBinningNum', IntValue);
-    },
+    // BinningSet(payload) {
+    //   const [signal, value] = payload.split(':'); // 拆分信号和值
+    //   const IntValue = parseInt(value); // 将值转换为 Int 类型
+    //   this.cameraBin = IntValue;
+    //   console.log('Image Binning is set to:', IntValue);
+    //   this.SendConsoleLogMsg('Image Binning is set to:' + IntValue, 'info');
+    //   this.sendMessage('Vue_Command', 'SetBinning:' + IntValue);
+    //   this.$bus.$emit('SetBinningNum', IntValue);
+    // },
 
-    GainSet(payload) {
-      const [signal, value] = payload.split(':'); // 拆分信号和值
-      const IntValue = parseInt(value); // 将值转换为 Int 类型
+    // GainSet(payload) {
+    //   const [signal, value] = payload.split(':'); // 拆分信号和值
+    //   const IntValue = parseInt(value); // 将值转换为 Int 类型
 
-      console.log('Camera Gain is set to:', IntValue);
-      this.SendConsoleLogMsg('Camera Gain is set to:' + IntValue, 'info');
-      this.sendMessage('Vue_Command', 'SetCameraGain:' + IntValue);
-    },
+    //   console.log('Camera Gain is set to:', IntValue);
+    //   this.SendConsoleLogMsg('Camera Gain is set to:' + IntValue, 'info');
+    //   this.sendMessage('Vue_Command', 'SetCameraGain:' + IntValue);
+    // },
 
-    OffsetSet(payload) {
-      const [signal, value] = payload.split(':'); // 拆分信号和值
-      const IntValue = parseInt(value); // 将值转换为 Int 类型
+    // OffsetSet(payload) {
+    //   const [signal, value] = payload.split(':'); // 拆分信号和值
+    //   const IntValue = parseInt(value); // 将值转换为 Int 类型
 
-      console.log('Camera Offset is set to:', IntValue);
-      this.SendConsoleLogMsg('Camera Offset is set to:' + IntValue, 'info');
-      this.sendMessage('Vue_Command', 'SetCameraOffset:' + IntValue);
-    },
+    //   console.log('Camera Offset is set to:', IntValue);
+    //   this.SendConsoleLogMsg('Camera Offset is set to:' + IntValue, 'info');
+    //   this.sendMessage('Vue_Command', 'SetCameraOffset:' + IntValue);
+    // },
 
-    ImageCFASet(payload) {
-      const [signal, value] = payload.split(':'); // 拆分信号和值
+    ImageCFASet(value) {
 
       // if (['GR', 'GB', 'BG', 'RGGB','null'].includes(value)) {
       if (['GR', 'GB', 'BG', 'RG', 'GRBG', 'GBRG', 'BGGR', 'RGGB', 'null', ''].includes(value)) {
@@ -3318,17 +3435,18 @@ export default {
       }
     },
 
-    SelfExposureTimeSet(payload) {
-      const [signal, value] = payload.split(':'); // 拆分信号和值
-      const IntValue = parseInt(value); // 将值转换为 Int 类型
-      if (IntValue <= 0) {
-        this.callShowMessageBox('Self Exposure Time must be greater than 0', 'error');
-        return;
-      }
-      this.SendConsoleLogMsg('Self Exposure Time is set to:' + IntValue, 'info');
-      this.sendMessage('Vue_Command', 'Self Exposure Time (ms):' + IntValue);
-      this.$bus.$emit('setSelfExposureTime', IntValue);
-    },
+    // SelfExposureTimeSet(payload) {
+    //   const [signal, value] = payload.split(':'); // 拆分信号和值
+    //   const IntValue = parseInt(value); // 将值转换为 Int 类型
+    //   if (IntValue <= 0) {
+    //     this.callShowMessageBox('Self Exposure Time must be greater than 0', 'error');
+    //     this.$bus.$emit('setSelfExposureTime', 0);
+    //     return;
+    //   }
+    //   this.SendConsoleLogMsg('Self Exposure Time is set to:' + IntValue, 'info');
+    //   this.sendMessage('Vue_Command', 'Self Exposure Time (ms):' + IntValue);
+    //   this.$bus.$emit('setSelfExposureTime', IntValue);
+    // },
     getSelfExposureTime() {
       const item = this.MainCameraConfigItems.find(item => item.label === 'Self Exposure Time (ms)');
       if (item) {
@@ -3336,14 +3454,14 @@ export default {
       }
     },
 
-    CameraTemperatureSet(payload) {
-      const [signal, value] = payload.split(':'); // 拆分信号和值
-      const IntValue = parseInt(value); // 将值转换为 Int 类型
+    // CameraTemperatureSet(payload) {
+    //   const [signal, value] = payload.split(':'); // 拆分信号和值
+    //   const IntValue = parseInt(value); // 将值转换为 Int 类型
 
-      console.log('Camera Temperature is set to:', IntValue);
-      this.SendConsoleLogMsg('Camera Temperature is set to:' + IntValue, 'info');
-      this.sendMessage('Vue_Command', 'SetCameraTemperature:' + IntValue);
-    },
+    //   console.log('Camera Temperature is set to:', IntValue);
+    //   this.SendConsoleLogMsg('Camera Temperature is set to:' + IntValue, 'info');
+    //   this.sendMessage('Vue_Command', 'SetCameraTemperature:' + IntValue);
+    // },
 
     FocalLengthSet(payload) {
       const [signal, value] = payload.split(':'); // 拆分信号和值
@@ -3462,12 +3580,25 @@ export default {
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'SolveCurrentPosition:' + BooleanValue);
     },
 
-    AutoSave(payload) {
+    LoopCapture(payload) {
       const [signal, value] = payload.split(':'); // 拆分信号和值
-      const BooleanValue = (value === 'true' || value === true);
-      this.SendConsoleLogMsg('Auto Save:' + BooleanValue, 'info');
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'SetMainCameraAutoSave:' + BooleanValue);
+      const BooleanValue = Boolean(value);
+      this.SendConsoleLogMsg('Loop Capture:' + BooleanValue, 'info');
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'LoopCapture:' + BooleanValue);
     },
+
+    // AutoSave(payload) {
+    //   const [signal, value] = payload.split(':'); // 拆分信号和值
+    //   const BooleanValue = (value === 'true' || value === true);
+    //   this.SendConsoleLogMsg('Auto Save:' + BooleanValue, 'info');
+    //   this.$bus.$emit('AppSendMessage', 'Vue_Command', 'SetMainCameraAutoSave:' + BooleanValue);
+    // },
+    // SaveFolderSet(payload) {
+    //   const [signal, value] = payload.split(':'); // 拆分信号和值
+    //   const StringValue = String(value);
+    //   this.SendConsoleLogMsg('Save Folder:' + StringValue, 'info');
+    //   this.$bus.$emit('AppSendMessage', 'Vue_Command', 'SetMainCameraSaveFolder:' + StringValue);
+    // },
 
     Goto(payload) {
       this.showRaDecDialog = true;
@@ -3531,8 +3662,11 @@ export default {
       while (this.isDownloadingImage) {
         await new Promise(resolve => setTimeout(resolve, 1000));
         if (!this.isWaitingLogged) {
-          this.SendConsoleLogMsg('The image is already being processed. Please wait for the previous process to complete.', 'warning');
-          this.isWaitingLogged = true; // 确保只记录一次等待信息
+          this.SendConsoleLogMsg(
+            'The image is already being processed. Please wait for the previous process to complete.',
+            'warning'
+          );
+          this.isWaitingLogged = true;
         }
       }
 
@@ -3541,19 +3675,29 @@ export default {
         return;
       }
 
+      // ===== Watchdog 配置 =====
+      const TIMEOUT_MS = 5000;           // 5 秒无数据即判超时
+      let watchdog = null;               // 定时器句柄
+      const kickWatchdog = (onTimeout) => {
+        if (watchdog) clearTimeout(watchdog);
+        watchdog = setTimeout(onTimeout, TIMEOUT_MS);
+      };
+      const clearWatchdog = () => { if (watchdog) { clearTimeout(watchdog); watchdog = null; } };
+
       this.isDownloadingImage = true;
-      this.isWaitingLogged = false; // 重置等待日志标志
+      this.isWaitingLogged = false;
       this.SendConsoleLogMsg('CaptureTestTime | Read image(' + fileName + ') data start.', 'info');
 
       const startTime = new Date();
+      const controller = new AbortController();
+
       try {
-        // Check if the fileName is valid
         if (!fileName || typeof fileName !== 'string') {
           throw new Error('Invalid file name provided');
         }
 
-        // Fetch with progress tracking
-        const response = await fetch(fileName, { cache: 'no-store' });
+        // fetch 可被 watchdog 中断
+        const response = await fetch(fileName, { cache: 'no-store', signal: controller.signal });
         if (!response.ok) {
           throw new Error(`Network response was not ok. Status: ${response.status}`);
         }
@@ -3569,43 +3713,73 @@ export default {
         }
 
         let loaded = 0;
+        const reader = response.body?.getReader();
+        if (!reader) {
+          throw new Error('Readable stream is not available on response.body');
+        }
 
-        const reader = response.body.getReader();
+        // 首次启动 watchdog：如果 5 秒内拿不到首个 chunk，就中止
+        kickWatchdog(() => {
+          this.SendConsoleLogMsg('Download stalled for >5s (no data). Aborting...', 'error');
+          controller.abort(new DOMException('Inactivity timeout', 'AbortError'));
+        });
+
         const stream = new ReadableStream({
-          start: (controller) => {
-            const push = () => {
+          start: (controllerRS) => {
+            const pump = () => {
               reader.read().then(({ done, value }) => {
                 if (done) {
-                  controller.close();
+                  controllerRS.close();
                   return;
                 }
+                // 收到数据：重置 watchdog
+                kickWatchdog(() => {
+                  this.SendConsoleLogMsg('Download stalled for >5s (no progress). Aborting...', 'error');
+                  controller.abort(new DOMException('Inactivity timeout', 'AbortError'));
+                });
+
                 loaded += value.byteLength;
                 const percent = (loaded / total) * 100;
                 if (Math.round(percent) % 10 === 0) {
-                  // this.SendConsoleLogMsg(`Progress: ${Math.round(percent)}%`, 'info');
                   this.updateCaptureImageProgress(Math.round(percent));
                 }
-                // this.SendConsoleLogMsg(`当前进度: ${Math.round(percent)}%`, 'info');
-                controller.enqueue(value);
-                push();
+                controllerRS.enqueue(value);
+                pump();
               }).catch(error => {
                 console.error('Stream reading error:', error);
                 this.SendConsoleLogMsg('Stream reading error: ' + error.message, 'error');
-                controller.error(error);
+                controllerRS.error(error);
               });
             };
-            push();
+            pump();
+          },
+          cancel: (reason) => {
+            // 取消时也清 watchdog
+            clearWatchdog();
           }
         });
 
         const newResponse = new Response(stream);
         const blob = await newResponse.blob();
 
-        // FileReader with progress tracking
-        const fileReader = new FileReader();
-        fileReader.onload = () => {
-          this.ImageArrayBuffer = fileReader.result;
+        // 下载结束，先清 watchdog
+        clearWatchdog();
 
+        // 若实际字节数 < Content-Length，判定为异常提前结束
+        if (blob.size < total) {
+          throw new Error(`Download ended prematurely: received ${blob.size} / ${total} bytes`);
+        }
+
+        // FileReader 路径
+        const fileReader = new FileReader();
+        const done = await new Promise((resolve, reject) => {
+          fileReader.onload = () => resolve(true);
+          fileReader.onerror = (e) => reject(new Error('FileReader error: ' + (e?.message || 'Unknown')));
+          fileReader.readAsArrayBuffer(blob);
+        });
+
+        if (done) {
+          this.ImageArrayBuffer = fileReader.result;
           const endTime = new Date();
           const elapsedTime = endTime.getTime() - startTime.getTime();
           this.SendConsoleLogMsg('CaptureTestTime | Read image data end: ' + elapsedTime + ' ms', 'info');
@@ -3614,134 +3788,29 @@ export default {
           }
           this.isDownloadingImageName = fileName;
           this.processImage(this.ImageArrayBuffer);
-        };
-
-        fileReader.onerror = (error) => {
-          console.error('FileReader error:', error);
-          this.SendConsoleLogMsg('FileReader error: ' + error.message, 'error');
-        };
-
-        fileReader.readAsArrayBuffer(blob);
+        }
       } catch (error) {
         console.error('There was a problem with the fetch operation:', error);
         this.SendConsoleLogMsg('There was a problem with the fetch operation: ' + error.message, 'error');
 
-        // 下载失败，重试
+        // 失败重试
         if (retryCount > 0) {
-          console.log('Retrying download...');
           this.SendConsoleLogMsg('Retrying download...', 'warning');
           this.isDownloadingImage = false;
           this.updateCaptureImageProgress(100);
           await this.readBinFile(fileName, retryCount - 1);
+          return; // 避免 finally 里再次改状态后继续往下
         } else {
           this.SendConsoleLogMsg('Max retries reached. Download failed.', 'error');
+          this.updateCaptureImageProgress(100);
         }
       } finally {
-        this.isDownloadingImage = false; // 确保在任何情况下都重置状态
+        clearWatchdog();
+        this.isDownloadingImage = false; // 无论如何都复位
       }
     },
 
 
-    // async readBinFile(fileName, retryCount = 1) {
-    //   while (this.isDownloadingImage) {
-    //     await new Promise(resolve => setTimeout(resolve, 1000));
-    //     if (!this.isWaitingLogged) {
-    //       this.SendConsoleLogMsg('The image is already being processed. Please wait for the previous process to complete.', 'warning');
-    //       this.isWaitingLogged = true; // 确保只记录一次等待信息
-    //     }
-    //   }
-
-    //   if (this.isDownloadingImageName === fileName) {
-    //     this.SendConsoleLogMsg('The image(' + fileName + ') is already processed.', 'info');
-    //     return;
-    //   }
-
-    //   this.isDownloadingImage = true;
-    //   this.isWaitingLogged = false; // 重置等待日志标志
-    //   this.SendConsoleLogMsg('CaptureTestTime | Read image(' + fileName + ') data start.', 'info');
-
-    //   const startTime = new Date();
-    //   try {
-    //     // Fetch with progress tracking
-    //     const response = await fetch(fileName);
-    //     if (!response.ok) {
-    //       throw new Error('Network response was not ok');
-    //     }
-
-    //     const contentLength = response.headers.get('content-length');
-    //     if (!contentLength) {
-    //       throw new Error('Content-Length header is missing');
-    //     }
-
-    //     const total = parseInt(contentLength, 10);
-    //     let loaded = 0;
-
-    //     const reader = response.body.getReader();
-    //     const stream = new ReadableStream({
-    //       start: (controller) => {
-    //         const push = () => {
-    //           reader.read().then(({ done, value }) => {
-    //             if (done) {
-    //               controller.close();
-    //               return;
-    //             }
-    //             loaded += value.byteLength;
-    //             const percent = (loaded / total) * 100;
-    //             if (Math.round(percent) % 10 === 0) {
-    //               this.SendConsoleLogMsg(`Progress: ${Math.round(percent)}%`,'info');
-    //               this.updateCaptureImageProgress(Math.round(percent));
-    //             }
-    //             controller.enqueue(value);
-    //             push();
-    //           }).catch(error => {
-    //             console.error('Stream reading error:', error);
-    //             controller.error(error);
-    //           });
-    //         };
-    //         push();
-    //       }
-    //     });
-
-    //     const newResponse = new Response(stream);
-    //     const blob = await newResponse.blob();
-
-    //     // FileReader with progress tracking
-    //     const fileReader = new FileReader();
-    //     fileReader.onload = () => {
-    //       this.ImageArrayBuffer = fileReader.result;
-
-    //       const endTime = new Date();
-    //       const elapsedTime = endTime.getTime() - startTime.getTime();
-    //       this.SendConsoleLogMsg('CaptureTestTime | Read image data end: ' + elapsedTime + ' ms', 'info');
-    //       if (!this.isPolarAxisMode) {
-    //         this.callShowMessageBox(`Read image data end: '${elapsedTime}' ms.`, 'info');
-    //       }
-    //       this.isDownloadingImageName = fileName;
-    //       this.processImage(this.ImageArrayBuffer);
-    //     };
-
-    //     fileReader.onerror = (error) => {
-    //       console.error('FileReader error:', error);
-    //       this.SendConsoleLogMsg('FileReader error:' + error, 'error');
-    //     };
-
-    //     fileReader.readAsArrayBuffer(blob);
-    //   } catch (error) {
-    //     console.error('There was a problem with the fetch operation:', error);
-    //     this.SendConsoleLogMsg('There was a problem with the fetch operation:' + error, 'error');
-
-    //     // 下载失败，重试
-    //     if (retryCount > 0) {
-    //       console.log('Retrying download...');
-    //       this.SendConsoleLogMsg('Retrying download...', 'warning');
-    //       this.isDownloadingImage = false;
-    //       this.updateCaptureImageProgress(100);
-    //       await this.readBinFile(fileName, retryCount - 1);
-    //     }
-    //   } finally {
-    //     this.isDownloadingImage = false; // 确保在任何情况下都重置状态
-    //   }
-    // },
 
     updateCaptureImageProgress(num) {
       this.$bus.$emit('ShowCaptureImageProgress', num);
@@ -3775,12 +3844,12 @@ export default {
         }
         let uintArray = new Uint16Array(imgArray);
 
-        if (uintArray.length != parseInt(this.mainCameraSizeY) * parseInt(this.mainCameraSizeX)) {
+        if (uintArray.length != parseInt(this.showImageSizeY) * parseInt(this.showImageSizeX)) {
           throw new Error("Image size mismatch");
         }
         // 创建Mat对象
         await processAsync(() => {
-          mat = new cv.Mat(parseInt(this.mainCameraSizeY), parseInt(this.mainCameraSizeX), cv.CV_16UC1);
+          mat = new cv.Mat(parseInt(this.showImageSizeY), parseInt(this.showImageSizeX), cv.CV_16UC1);
           mat.data16U.set(uintArray);
           this.progressValue = 10;
           this.progressDescription = this.$i18n.locale === 'cn' ? '创建Mat对象...' : 'Creating Mat object...';
@@ -4499,360 +4568,6 @@ export default {
 
       return { lutR, lutG, lutB };
     },
-    // checkImageData(img) {
-    //   // 检查是否为 cv.Mat 类型
-    //   if (!(img instanceof cv.Mat)) {
-    //     this.SendConsoleLogMsg('The image is not a valid cv.Mat object.', 'error');
-    //     return false;
-    //   }
-
-    //   // 检查图像是否为空
-    //   if (img.empty()) {
-    //     this.SendConsoleLogMsg('The image is empty.', 'error');
-    //     return false;
-    //   }
-
-    //   // 检查图像深度是否为 8 位或 16 位
-    //   const depth = img.type() & cv.CV_MAT_DEPTH_MASK;
-    //   if (depth !== cv.CV_8U && depth !== cv.CV_16U) {
-    //     this.SendConsoleLogMsg('The image depth is not 8-bit or 16-bit.', 'error');
-    //     return false;
-    //   }
-
-    //   // 检查图像尺寸是否合理
-    //   if (img.rows <= 0 || img.cols <= 0) {
-    //     this.SendConsoleLogMsg('The image dimensions are not valid.', 'error');
-    //     return false;
-    //   }
-
-    //   // 检查图像数据是否超出范围或全为0
-    //   const data = img.data;
-    //   let isAllZero = true;
-    //   const maxValue = depth === cv.CV_8U ? 255 : 65535;
-
-    //   for (let i = 0; i < data.length; i++) {
-    //     if (data[i] < 0 || data[i] > maxValue) {
-    //       this.SendConsoleLogMsg('The image data contains out-of-range values.', 'error');
-    //       return false;
-    //     }
-    //     if (data[i] !== 0) {
-    //       isAllZero = false;
-    //     }
-    //   }
-
-    //   if (isAllZero) {
-    //     this.SendConsoleLogMsg('The image data is all zero.', 'error');
-    //     return false;
-    //   }
-    //   return true;
-    // },
-
-
-    // processImage(imgArray) {
-    //   this.progressValue = 0;
-    //   try {
-    //     if (!(imgArray instanceof ArrayBuffer) && !ArrayBuffer.isView(imgArray)) {
-    //       throw new Error("Input must be ArrayBuffer or TypedArray");
-    //     }
-    //     const totalStartTime = new Date(); // 总开始时间
-
-    //     this.SendConsoleLogMsg('CaptureTestTime | Process image data start.', 'info');
-    //     const startTime = new Date();
-    //     let img_bit = -1;
-    //     let uintArray;
-    //     if (imgArray.byteLength === this.mainCameraSizeX * this.mainCameraSizeY * 2 ){
-    //       uintArray = new Uint16Array(imgArray);
-    //       img_bit = 16;
-    //     }else if(imgArray.byteLength === this.mainCameraSizeX * this.mainCameraSizeY){
-    //       uintArray = new Uint8Array(imgArray);
-    //       img_bit = 8;
-    //     }else{
-    //       this.SendConsoleLogMsg(`Image data is underfind bit`, 'error');
-    //       return;
-    //     }
-
-    //     this.SendConsoleLogMsg(`Image data detected as ${img_bit}-bit.`, 'info');
-
-
-
-    //     // 设置画布宽高常量
-    //     const canvasWidth = parseInt(this.mainCameraSizeX);
-    //     const canvasHeight = parseInt(this.mainCameraSizeY);
-
-    //     // 获取原始画布和修改后的画布以及对应上下文
-    //     const modifiedCanvas = document.getElementById('mainCamera-canvas');
-    //     const modifiedCtx = modifiedCanvas.getContext('2d');
-
-
-
-    //     modifiedCanvas.width = canvasWidth;
-    //     modifiedCanvas.height = canvasHeight;
-
-    //     let mat;
-    //     if (img_bit === 16){
-    //       mat = new cv.Mat(canvasHeight, canvasWidth, cv.CV_16UC1);
-    //       mat.data16U.set(uintArray);
-    //     }else{
-    //       mat = new cv.Mat(canvasHeight, canvasWidth, cv.CV_8UC1);
-    //       mat.data.set(uintArray);
-    //     }
-    //     this.progressValue = 10;
-
-    //     const matEndTime = new Date(); // mat 结束时间
-    //     this.SendConsoleLogMsg('CaptureTestTime | Mat creation time: ' + (matEndTime.getTime() - startTime.getTime()) + ' ms', 'info');
-
-    //     // 用户自定义参数
-    //     let gainR = this.ImageGainR;
-    //     let gainB = this.ImageGainB;
-    //     let offset = this.ImageOffset;
-    //     let CFA = this.ImageCFA;
-    //     let mode = 1;
-
-    //     // 参数
-    //     let B = 0;
-    //     let W = 65535;
-    //     let cvmode = 0;
-
-    //     const { blackLevel, whiteLevel } = this.GetAutoStretch(uintArray, mode, img_bit);
-    //     B = blackLevel;
-    //     W = whiteLevel;
-    //     this.progressValue = 30;
-    //     const GetAutoStretchEndTime = new Date(); // GetAutoStretch 结束时间
-    //     this.SendConsoleLogMsg('CaptureTestTime | GetAutoStretch time: ' + (GetAutoStretchEndTime.getTime() - matEndTime.getTime()) + ' ms', 'info');
-
-    //     // 根据CFA设置颜色转换模式
-    //     if (CFA === 'GR') {
-    //       cvmode = cv.COLOR_BayerGR2RGBA;
-    //     } else if (CFA === 'GB') {
-    //       cvmode = cv.COLOR_BayerGB2RGBA;
-    //     } else if (CFA === 'BG') {
-    //       cvmode = cv.COLOR_BayerBG2RGBA;
-    //     } else if (CFA === 'RGGB') {
-    //       cvmode = cv.COLOR_BayerRG2RGBA;
-    //     }else{
-    //       cvmode = cv.COLOR_GRAY2RGBA
-    //     }
-
-    //     // 对目标图像进行颜色转换
-    //     let dst = new cv.Mat();
-
-    //     try {
-    //       cv.cvtColor(mat, dst, cvmode);
-    //     } catch (error) {
-    //       this.handleError('cvtColor 出错', 'cvtColor', error);
-    //       mat.delete();
-    //       return;
-    //     }
-
-    //     this.progressValue = 50;
-
-    //     const cvtColorEndTime = new Date(); // cvtColor 结束时间
-    //     this.SendConsoleLogMsg('CaptureTestTime | cvtColor time: ' + (cvtColorEndTime.getTime() - GetAutoStretchEndTime.getTime()) + ' ms', 'info');
-
-    //     mat.delete();
-
-    //     // 调整图像大小
-    //     // cv.resize(dst, resizeImg, new cv.Size(this.CanvasWidth, this.CanvasHeight), 0, 0, cv.INTER_LINEAR);
-    //     // dst.delete();
-
-    //     // let originalImg8 = this.Bit16To8_Stretch(resizeImg, B, W);
-    //     // resizeImg.delete();
-
-    //     let resizeImg = new cv.Mat(); // 用来存储调整后的图像
-    //     if (this.isPolarAxisMode) {
-    //       this.progressValue = 0;
-    //       // 调整图像大小
-    //       cv.resize(dst, resizeImg, new cv.Size(this.CanvasWidth, this.CanvasHeight), 0, 0, cv.INTER_LINEAR);
-    //       dst.delete();
-
-    //       let originalImg8;
-    //       if (img_bit === 16){
-    //         originalImg8 = this.Bit16To8_Stretch(resizeImg, B, W);
-    //       }else{
-    //         originalImg8 = resizeImg;
-    //       }
-
-    //       resizeImg.delete();
-
-    //       const Bit16To8_StretchEndTime = new Date(); // Bit16To8_Stretch 结束时间
-    //       this.SendConsoleLogMsg('CaptureTestTime | Bit16To8_Stretch time: ' + (Bit16To8_StretchEndTime.getTime() - GetAutoStretchEndTime.getTime()) + ' ms', 'info');
-
-    //       let targetImg8 = this.ImageSoftAWB(originalImg8, gainR, gainB, offset);
-    //       this.$bus.$emit('showSolveImage', targetImg8);
-
-    //       const ImageSoftAWBEndTime = new Date(); // ImageSoftAWB 结束时间
-    //       this.SendConsoleLogMsg('CaptureTestTime | ImageSoftAWB time: ' + (ImageSoftAWBEndTime.getTime() - Bit16To8_StretchEndTime.getTime()) + ' ms', 'info');
-    //     } else {
-    //       modifiedCtx.clearRect(0, 0, modifiedCanvas.width, modifiedCanvas.height);
-    //       cv.resize(dst, resizeImg, new cv.Size(this.CanvasWidth, this.CanvasHeight), 0, 0, cv.INTER_LINEAR);
-    //       this.progressValue = 70;
-    //       let originalResizeImg8 = this.Bit16To8_Stretch(resizeImg, B, W);
-    //       this.OriginalImage = new ImageData(new Uint8ClampedArray(originalResizeImg8.data), originalResizeImg8.cols, originalResizeImg8.rows);
-    //       resizeImg.delete();
-    //       originalResizeImg8.delete();
-    //       console.log('dst.data.length: ', dst.data.length);
-    //       console.log('dst.cols: ', dst.cols);
-    //       console.log('dst.rows: ', dst.rows);
-    //       let originalImg8 = this.Bit16To8_Stretch(dst, B, W);
-    //       dst.delete();
-    //       this.progressValue = 80;
-
-    //       const Bit16To8_StretchEndTime = new Date(); // Bit16To8_Stretch 结束时间
-    //       this.SendConsoleLogMsg('CaptureTestTime | Bit16To8_Stretch time: ' + (Bit16To8_StretchEndTime.getTime() - GetAutoStretchEndTime.getTime()) + ' ms', 'info');
-
-    //       // let targetImg8 = this.ImageSoftAWB(originalImg8, gainR, gainB, offset);
-
-    //       // const ImageSoftAWBEndTime = new Date(); // ImageSoftAWB 结束时间
-    //       // this.SendConsoleLogMsg('CaptureTestTime | ImageSoftAWB time: ' + (ImageSoftAWBEndTime.getTime() - Bit16To8_StretchEndTime.getTime()) + ' ms', 'info');
-
-    //       // originalImg8.delete();
-
-    //       this.lastImageProcessParams = {
-    //         gainR: gainR,
-    //         gainB: gainB,
-    //         offset: offset,
-    //         CFA: CFA,
-    //         mode: mode,
-    //         B: B,
-    //         W: W,
-    //         cvmode: cvmode,
-    //       };
-
-    //       modifiedCanvas.width = this.CanvasWidth;
-    //       modifiedCanvas.height = this.CanvasHeight;
-    //       let colorData = new ImageData(new Uint8ClampedArray(originalImg8.data), originalImg8.cols, originalImg8.rows);
-    //       originalImg8.delete();
-    //       this.drawImgData = colorData;
-    //       this.progressValue = 90;
-    //       // 设置缓冲画布宽高
-    //       this.bufferCanvas.width = colorData.width;
-    //       this.bufferCanvas.height = colorData.height;
-    //       // 绘制缓存画布图像
-    //       this.bufferCtx.putImageData(colorData, 0, 0);
-    //       // 绘制主画布图像
-    //       this.drawImageData();
-    //       this.progressValue = 100;
-    //       const DrawImageDataEndTime = new Date(); // DrawImageData 结束时间
-    //       this.SendConsoleLogMsg('CaptureTestTime | DrawImageData time: ' + (DrawImageDataEndTime.getTime() - Bit16To8_StretchEndTime.getTime()) + ' ms', 'info');
-
-    //       const endTime = new Date();
-    //       const elapsedTime = endTime.getTime() - startTime.getTime();
-    //       this.SendConsoleLogMsg('CaptureTestTime | Process image data end:' + elapsedTime + ' milliseconds', 'info');
-
-    //       const totalEndTime = new Date(); // 总结束时间
-    //       this.SendConsoleLogMsg('CaptureTestTime | Total process image data time: ' + (totalEndTime.getTime() - totalStartTime.getTime()) + ' ms', 'info');
-
-    //       this.$bus.$emit('showCaptureImage');
-    //       this.MakeHistogram(colorData);
-    //       this.histogramImage = colorData;
-
-    //       const checkDetectedStarsFinish = () => {
-    //         if (this.DetectedStarsFinish) {
-    //           this.detectStarsImg = this.DrawDetectStars(targetImg8, this.DetectedStarsList);
-    //           targetImg8.delete();
-    //           clearInterval(intervalId);
-    //         }
-    //       };
-
-    //       const intervalId = setInterval(checkDetectedStarsFinish, 1000);
-    //     }
-
-    //     // if (this.isNotDrawStars) {
-    //     //   this.drawImageData(this.drawImgData);
-    //     // } else {
-    //     //   if (this.detectStarsImg != null) {
-    //     //     this.drawImageData(this.detectStarsImg);
-    //     //   } else {
-    //     //     this.drawImageData(this.drawImgData);
-    //     //   }
-    //     // }
-
-    //     // const windowWidth = window.innerWidth;
-    //     // const windowHeight = window.innerHeight;
-
-    //     // const minTranslateX = this.imageWidth - this.CanvasWidth;
-    //     // const minTranslateY = this.imageHeight - this.CanvasHeight;
-
-    //     // 计算初始的 ScaleImageSize_X 和 ScaleImageSize_Y
-    //     // this.ScaleImageSize_X = Math.floor(minTranslateX / this.CanvasWidth * windowWidth + windowWidth);
-    //     // this.ScaleImageSize_Y = Math.floor(minTranslateY / this.CanvasHeight * windowHeight + windowHeight);
-
-    //     // this.$bus.$emit('ScaleImageSize', this.ScaleImageSize_X, this.ScaleImageSize_Y);
-
-    //   } catch (error) {
-    //     this.handleError('Process image data error', 'processImage', error);
-    //     if (mat) {
-    //       mat.delete();
-    //     }
-    //     if (resizeImg) {
-    //       resizeImg.delete();
-    //     }
-    //     if (originalImg8) {
-    //       originalImg8.delete();
-    //     }
-    //     if (targetImg8) {
-    //       targetImg8.delete();
-    //     }
-    //   }
-    // },
-
-    // histogramStretch(imageData, min, max) {
-    //   const startTime = new Date();
-    //   // Convert ImageData to cv.Mat
-    //   const image = cv.matFromImageData(imageData);
-    //   let Time1 = new Date();
-    //   this.SendConsoleLogMsg('histogramStretch | 转换图像数据时间: ' + (Time1.getTime() - startTime.getTime()) + ' ms', 'info');
-    //   // Perform the histogram stretch
-    //   const channels = new cv.MatVector();
-    //   cv.split(image, channels); // Split channels (BGR) into separate Mat objects
-    //   let Time2 = new Date();
-    //   this.SendConsoleLogMsg('histogramStretch | 分割通道时间: ' + (Time2.getTime() - Time1.getTime()) + ' ms', 'info');
-    //   // Calculate alpha and beta for each channel
-    //   let alpha = 255.0 / (max - min);
-    //   let beta = -min * alpha;
-
-    //   if (alpha < 0) {
-    //     alpha = 0;
-    //     beta = 0;
-    //   } else if (alpha > 255) {
-    //     alpha = 255;
-    //     beta = 0;
-    //   }
-    //   Time1 = new Date();
-    //   this.SendConsoleLogMsg('histogramStretch | 计算alpha和beta时间: ' + (Time1.getTime() - Time2.getTime()) + ' ms', 'info');
-    //   // Iterate over each channel and apply histogram stretching
-    //   for (let i = 0; i < channels.size(); i++) {
-    //     let channel = channels.get(i);
-
-
-    //     // Apply histogram stretching to the channel
-    //     channel.convertTo(channel, -1, alpha, beta);
-
-    //     // Release the memory of channel
-    //     channel.delete();
-    //   }
-    //   Time2 = new Date();
-    //   this.SendConsoleLogMsg('histogramStretch | 各通道拉伸时间: ' + (Time2.getTime() - Time1.getTime()) + ' ms', 'info');
-    //   // Merge the channels back into a single image
-    //   const stretchImage = new cv.Mat();
-    //   cv.merge(channels, stretchImage);
-    //   Time1 = new Date();
-    //   this.SendConsoleLogMsg('histogramStretch | 合并通道时间: ' + (Time1.getTime() - Time2.getTime()) + ' ms', 'info');
-    //   // Release the memory of channels and MatVector
-    //   channels.delete();
-
-    //   // Convert cv.Mat back to ImageData
-    //   const stretchedImageData = new ImageData(new Uint8ClampedArray(stretchImage.data), stretchImage.cols, stretchImage.rows);
-    //   Time2 = new Date();
-    //   this.SendConsoleLogMsg('histogramStretch | 转换图像数据时间: ' + (Time2.getTime() - Time1.getTime()) + ' ms', 'info');
-    //   // Clean up
-    //   image.delete();
-    //   stretchImage.delete();
-    //   Time1 = new Date();
-    //   this.SendConsoleLogMsg('histogramStretch | 释放内存时间: ' + (Time1.getTime() - Time2.getTime()) + ' ms', 'info');
-    //   this.SendConsoleLogMsg('histogramStretch | 总时间: ' + (Time1.getTime() - startTime.getTime()) + ' ms', 'info');
-    //   return stretchedImageData;
-    // },
 
     histogramStretch(imageData, min, max) {
       if (max < min) {
@@ -7521,12 +7236,40 @@ export default {
     handleConfigChange(label, value) {
       console.log(`配置已更改: ${label} = ${value}`);
       if (value !== '') {
-        // console.log(item.label, item.value);
-        this.SendConsoleLogMsg(label + ':' + value, 'info');
-        this.$bus.$emit(label, label + ':' + value);
-      } else if (value == '' && label === 'Focal Length (mm)') {
+        // 主相机参数更改处理
+        if (label === 'ImageCFA') {
+          this.ImageCFASet(value);
+        }else if (label === 'Binning') {
+          this.cameraBin = parseInt(value);
+          this.sendMessage('Vue_Command', 'SetBinning:' + this.cameraBin);
+          this.$bus.$emit('SetBinningNum', this.cameraBin);
+        }else if (label === 'Temperature') {
+          this.sendMessage('Vue_Command', 'SetCameraTemperature:' + parseInt(value));
+        }else if (label === 'Gain') {
+          this.sendMessage('Vue_Command', 'SetCameraGain:' + parseInt(value));
+        }else if (label === 'Offset') {
+          this.cameraOffset = parseFloat(value);
+          this.sendMessage('Vue_Command', 'ImageOffset:' + this.cameraOffset);
+        }else if (label === 'Self Exposure Time (ms)') {
+          let IntValue = parseInt(value); // 将值转换为 Int 类型
+          if (IntValue <= 0) {
+            this.callShowMessageBox('Self Exposure Time must be greater than 0', 'error');
+            IntValue = 0;
+            this.$bus.$emit('setSelfExposureTime', 0);  
+          }
+          this.SendConsoleLogMsg('Self Exposure Time is set to:' + IntValue, 'info');
+          this.sendMessage('Vue_Command', 'Self Exposure Time (ms):' + IntValue);
+          this.$bus.$emit('setSelfExposureTime', IntValue);
+        }else if (label === 'Auto Save') {
+          this.sendMessage('Vue_Command', 'SetMainCameraAutoSave:' + (value === 'true' || value === true));
+        }else if (label === 'Save Folder') {
+          this.sendMessage('Vue_Command', 'SetMainCameraSaveFolder:' + StringValue);
+        }else{
+          this.SendConsoleLogMsg(label + ':' + value, 'info');
+          this.$bus.$emit(label, label + ':' + value);
+        }
+      }else{
         this.SendConsoleLogMsg(label + 'is NULL', 'info');
-        // this.$bus.$emit(item.label, item.label + ':');
       }
     },
     // 校准相关方法
@@ -8221,34 +7964,211 @@ body,
   scrollbar-color: rgba(255, 255, 255, 0.3) rgba(0, 0, 0, 0.1);
 }
 
-/* 参数容器滚动条样式 */
+/* 参数容器滚动条样式 - 隐藏滚动条但保留滚动功能 */
 .params-container {
   overflow-y: auto;
+  overflow-x: hidden;
   height: 100%;
+  /* Firefox - 隐藏滚动条 */
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important; /* IE和Edge */
 }
 
+/* Webkit浏览器 - 完全隐藏滚动条 */
 .params-container::-webkit-scrollbar {
-  width: 6px;
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+  visibility: hidden !important;
 }
 
 .params-container::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.1);
-  border-radius: 3px;
+  display: none !important;
+  background: transparent !important;
+  visibility: hidden !important;
 }
 
 .params-container::-webkit-scrollbar-thumb {
-  background: white;
-  border-radius: 3px;
+  display: none !important;
+  background: transparent !important;
+  visibility: hidden !important;
 }
 
-.params-container::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.8);
-}
+/* 菜单栏导航抽屉滚动条样式 - 桌面端专用，隐藏滚动条但保留滚动功能 */
+@media (hover: hover) and (pointer: fine) {
+  /* 桌面端浏览器 */
+  .menu-navigation-drawer,
+  .menu-navigation-drawer * {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+  }
 
-/* Firefox滚动条样式 */
-.params-container {
-  scrollbar-width: thin;
-  scrollbar-color: white rgba(0, 0, 0, 0.1);
+  .menu-navigation-drawer >>> .v-navigation-drawer__content,
+  .menu-navigation-drawer >>> .v-list,
+  .menu-navigation-drawer >>> .v-layout,
+  .menu-navigation-drawer /deep/ .v-navigation-drawer__content,
+  .menu-navigation-drawer /deep/ .v-list,
+  .menu-navigation-drawer /deep/ .v-layout {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+  }
+
+  .menu-navigation-drawer >>> .v-navigation-drawer__content::-webkit-scrollbar,
+  .menu-navigation-drawer >>> .v-list::-webkit-scrollbar,
+  .menu-navigation-drawer >>> .v-layout::-webkit-scrollbar,
+  .menu-navigation-drawer /deep/ .v-navigation-drawer__content::-webkit-scrollbar,
+  .menu-navigation-drawer /deep/ .v-list::-webkit-scrollbar,
+  .menu-navigation-drawer /deep/ .v-layout::-webkit-scrollbar,
+  .menu-navigation-drawer *::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    background: transparent !important;
+    visibility: hidden !important;
+  }
+
+  .menu-navigation-drawer >>> .v-navigation-drawer__content::-webkit-scrollbar-track,
+  .menu-navigation-drawer >>> .v-list::-webkit-scrollbar-track,
+  .menu-navigation-drawer >>> .v-layout::-webkit-scrollbar-track,
+  .menu-navigation-drawer /deep/ .v-navigation-drawer__content::-webkit-scrollbar-track,
+  .menu-navigation-drawer /deep/ .v-list::-webkit-scrollbar-track,
+  .menu-navigation-drawer /deep/ .v-layout::-webkit-scrollbar-track,
+  .menu-navigation-drawer *::-webkit-scrollbar-track {
+    display: none !important;
+    background: transparent !important;
+    visibility: hidden !important;
+  }
+
+  .menu-navigation-drawer >>> .v-navigation-drawer__content::-webkit-scrollbar-thumb,
+  .menu-navigation-drawer >>> .v-list::-webkit-scrollbar-thumb,
+  .menu-navigation-drawer >>> .v-layout::-webkit-scrollbar-thumb,
+  .menu-navigation-drawer /deep/ .v-navigation-drawer__content::-webkit-scrollbar-thumb,
+  .menu-navigation-drawer /deep/ .v-list::-webkit-scrollbar-thumb,
+  .menu-navigation-drawer /deep/ .v-layout::-webkit-scrollbar-thumb,
+  .menu-navigation-drawer *::-webkit-scrollbar-thumb {
+    display: none !important;
+    background: transparent !important;
+    visibility: hidden !important;
+  }
+
+  /* 全局选择器 - 确保覆盖所有情况 */
+  .v-navigation-drawer.menu-navigation-drawer .v-navigation-drawer__content,
+  .v-navigation-drawer.menu-navigation-drawer .v-list,
+  .v-navigation-drawer.menu-navigation-drawer .v-layout {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+  }
+
+  .v-navigation-drawer.menu-navigation-drawer .v-navigation-drawer__content::-webkit-scrollbar,
+  .v-navigation-drawer.menu-navigation-drawer .v-list::-webkit-scrollbar,
+  .v-navigation-drawer.menu-navigation-drawer .v-layout::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    background: transparent !important;
+    visibility: hidden !important;
+  }
+
+  .v-navigation-drawer.menu-navigation-drawer .v-navigation-drawer__content::-webkit-scrollbar-track,
+  .v-navigation-drawer.menu-navigation-drawer .v-list::-webkit-scrollbar-track,
+  .v-navigation-drawer.menu-navigation-drawer .v-layout::-webkit-scrollbar-track {
+    display: none !important;
+    background: transparent !important;
+    visibility: hidden !important;
+  }
+
+  .v-navigation-drawer.menu-navigation-drawer .v-navigation-drawer__content::-webkit-scrollbar-thumb,
+  .v-navigation-drawer.menu-navigation-drawer .v-list::-webkit-scrollbar-thumb,
+  .v-navigation-drawer.menu-navigation-drawer .v-layout::-webkit-scrollbar-thumb {
+    display: none !important;
+    background: transparent !important;
+    visibility: hidden !important;
+  }
+
+  /* 子菜单导航抽屉滚动条样式 - 隐藏滚动条但保留滚动功能 */
+  .submenu-navigation-drawer,
+  .submenu-navigation-drawer * {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+  }
+
+  .submenu-navigation-drawer >>> .v-navigation-drawer__content,
+  .submenu-navigation-drawer >>> .params-container,
+  .submenu-navigation-drawer /deep/ .v-navigation-drawer__content,
+  .submenu-navigation-drawer /deep/ .params-container {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+  }
+
+  .submenu-navigation-drawer >>> .v-navigation-drawer__content::-webkit-scrollbar,
+  .submenu-navigation-drawer >>> .params-container::-webkit-scrollbar,
+  .submenu-navigation-drawer /deep/ .v-navigation-drawer__content::-webkit-scrollbar,
+  .submenu-navigation-drawer /deep/ .params-container::-webkit-scrollbar,
+  .submenu-navigation-drawer *::-webkit-scrollbar,
+  .submenu-navigation-drawer .params-container::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    background: transparent !important;
+    visibility: hidden !important;
+  }
+
+  .submenu-navigation-drawer >>> .v-navigation-drawer__content::-webkit-scrollbar-track,
+  .submenu-navigation-drawer >>> .params-container::-webkit-scrollbar-track,
+  .submenu-navigation-drawer /deep/ .v-navigation-drawer__content::-webkit-scrollbar-track,
+  .submenu-navigation-drawer /deep/ .params-container::-webkit-scrollbar-track,
+  .submenu-navigation-drawer *::-webkit-scrollbar-track,
+  .submenu-navigation-drawer .params-container::-webkit-scrollbar-track {
+    display: none !important;
+    background: transparent !important;
+    visibility: hidden !important;
+  }
+
+  .submenu-navigation-drawer >>> .v-navigation-drawer__content::-webkit-scrollbar-thumb,
+  .submenu-navigation-drawer >>> .params-container::-webkit-scrollbar-thumb,
+  .submenu-navigation-drawer /deep/ .v-navigation-drawer__content::-webkit-scrollbar-thumb,
+  .submenu-navigation-drawer /deep/ .params-container::-webkit-scrollbar-thumb,
+  .submenu-navigation-drawer *::-webkit-scrollbar-thumb,
+  .submenu-navigation-drawer .params-container::-webkit-scrollbar-thumb {
+    display: none !important;
+    background: transparent !important;
+    visibility: hidden !important;
+  }
+
+  /* 全局选择器 - 确保覆盖子菜单所有情况 */
+  .v-navigation-drawer.submenu-navigation-drawer .v-navigation-drawer__content,
+  .v-navigation-drawer.submenu-navigation-drawer .params-container,
+  .v-navigation-drawer.submenu-navigation-drawer * {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+  }
+
+  .v-navigation-drawer.submenu-navigation-drawer .v-navigation-drawer__content::-webkit-scrollbar,
+  .v-navigation-drawer.submenu-navigation-drawer .params-container::-webkit-scrollbar,
+  .v-navigation-drawer.submenu-navigation-drawer *::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    background: transparent !important;
+    visibility: hidden !important;
+  }
+
+  .v-navigation-drawer.submenu-navigation-drawer .v-navigation-drawer__content::-webkit-scrollbar-track,
+  .v-navigation-drawer.submenu-navigation-drawer .params-container::-webkit-scrollbar-track,
+  .v-navigation-drawer.submenu-navigation-drawer *::-webkit-scrollbar-track {
+    display: none !important;
+    background: transparent !important;
+    visibility: hidden !important;
+  }
+
+  .v-navigation-drawer.submenu-navigation-drawer .v-navigation-drawer__content::-webkit-scrollbar-thumb,
+  .v-navigation-drawer.submenu-navigation-drawer .params-container::-webkit-scrollbar-thumb,
+  .v-navigation-drawer.submenu-navigation-drawer *::-webkit-scrollbar-thumb {
+    display: none !important;
+    background: transparent !important;
+    visibility: hidden !important;
+  }
 }
 
 /* 校准信息显示框样式 */

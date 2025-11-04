@@ -18,7 +18,7 @@
               <v-btn small text @click="navigateUp" :disabled="!canNavigateUp">
                 <v-icon small>mdi-arrow-up</v-icon>
               </v-btn>
-              <span style="color: rgba(255,255,255,0.8); font-family: monospace; font-size: 14px; word-break: break-all;">{{ currentPath }}</span>
+              <span style="color: rgba(255,255,255,0.8); font-family: monospace; font-size: 14px; word-break: break-all;">{{ currentPath || '/' }}</span>
             </div>
           </div>
           <v-list dark class="qs-list" style="background: transparent;">
@@ -66,7 +66,8 @@ export default {
       error: null,
       currentPath: '',
       fileList: [],
-      pathStack: []
+      pathStack: [],
+      currentUSBName: null // 当前浏览的U盘名
     }
   },
   computed: {
@@ -83,9 +84,19 @@ export default {
   watch: {
     '$store.state.showUSBFilesDialog'(newVal) {
       if (newVal) {
+        // 获取选中的U盘名
+        this.currentUSBName = this.$store.state.selectedUSBName;
         this.loadUSBFiles();
       } else {
         this.reset();
+      }
+    },
+    '$store.state.selectedUSBName'(newVal) {
+      // 如果U盘名改变，重新加载文件列表
+      if (this.$store.state.showUSBFilesDialog) {
+        this.currentUSBName = newVal;
+        this.reset();
+        this.loadUSBFiles();
       }
     }
   },
@@ -96,7 +107,19 @@ export default {
     loadUSBFiles(path = '') {
       this.loading = true;
       this.error = null;
-      const command = path ? `GetUSBFiles:${path}` : 'GetUSBFiles';
+      
+      // U盘名是必需的
+      if (!this.currentUSBName) {
+        this.loading = false;
+        this.error = 'USB name is required';
+        return;
+      }
+      
+      // 构建命令：GetUSBFiles:usb_name:relativePath
+      // 两个参数都是必需的，根目录使用空字符串作为相对路径
+      const relativePath = path || '';
+      const command = `GetUSBFiles:${this.currentUSBName}:${relativePath}`;
+      
       this.$bus.$emit('AppSendMessage', 'Vue_Command', command);
     },
     onUSBFilesList(data) {
@@ -135,7 +158,7 @@ export default {
     navigateUp() {
       if (this.pathStack.length > 0) {
         const parentPath = this.pathStack.pop();
-        // 如果返回到根目录，传递空字符串
+        // 如果返回到根目录，使用空字符串作为相对路径
         const pathToLoad = (parentPath === '/' || parentPath === '') ? '' : (parentPath.startsWith('/') ? parentPath.substring(1) : parentPath);
         this.loadUSBFiles(pathToLoad);
       }
@@ -146,6 +169,7 @@ export default {
       this.currentPath = '';
       this.fileList = [];
       this.pathStack = [];
+      // 不清空 currentUSBName，保持当前选中的U盘
     },
     formatFileSize(bytes) {
       if (!bytes || bytes === 0) return '';
