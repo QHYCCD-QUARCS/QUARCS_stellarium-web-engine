@@ -584,6 +584,7 @@ export default {
     this.$bus.$on('FocalLength', this.FocalLengthSet);
     this.$bus.$on('SetBinningNum', this.SetBinningNum);
     this.$bus.$on('ShowDSLRsSetup', this.ShowDSLRsSetup);
+    this.$bus.$on('ReloadShowDSLRsSetup', this.ReloadShowDSLRsSetup);
     this.$bus.$on('ShowPositionInfo', this.ShowPositionInfo);
     this.$bus.$on('ParseInfoEmitted', this.addParsingProgress);
     this.$bus.$on('setParsingProgress', this.setParsingProgress);
@@ -1388,6 +1389,16 @@ export default {
     ShowDSLRsSetup(name) {
       this.DSLRCameraName = name;
       this.DSLRsSetupDialog = true;
+      console.log('Show DSLR Setup:', name);
+    },
+
+    ReloadShowDSLRsSetup(name, sizeX, sizeY, pixelSize) {
+      this.DSLRCameraName = name;
+      this.DSLRCameraWidth = sizeX;
+      this.DSLRCameraHeight = sizeY;
+      this.DSLRCameraPixelPitch = pixelSize;
+      this.DSLRsSetupDialog = true;
+      console.log('Reload Show DSLR Setup:', name, sizeX, sizeY, pixelSize);
     },
 
     ConfirmDSLRsSetup(width, height, pixelPitch) {

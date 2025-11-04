@@ -1999,6 +1999,13 @@ export default {
                   const Name = parts[1];
                   this.$bus.$emit('ShowDSLRsSetup', Name);
                 }
+                if (parts.length === 5) {
+                  const Name = parts[1];
+                  const SizeX = parts[2];
+                  const SizeY = parts[3];
+                  const PixelSize = parts[4];
+                  this.$bus.$emit('ReloadShowDSLRsSetup', Name, SizeX, SizeY, PixelSize);
+                }
                 break;
 
               case 'ConfigureRecovery':
