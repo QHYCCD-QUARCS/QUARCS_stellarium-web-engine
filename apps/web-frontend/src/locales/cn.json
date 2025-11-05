@@ -116,6 +116,7 @@
   "No USB Drive Detected": "未检测到USB驱动器",
   "Multiple USB drives detected": "检测到多个USB驱动器",
   "Multiple USB drives detected, please remove excess USB drives": "检测到多个USB驱动器,请移除多余的USB驱动器",
+  "Multiple USB drives detected, please select the USB drive to move the files": "检测到多个USB驱动器,请选择要移动文件的USB驱动器",
   "View Files": "查看文件",
   "Status": "状态",
   "Shoot Time": "拍摄时间",

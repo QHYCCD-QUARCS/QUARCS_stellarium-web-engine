@@ -430,7 +430,7 @@ export default {
       } else {
         // 多个U盘
         this.isUSBWarning = true;
-        this.USB_Info = 'Multiple USB drives detected, please remove excess USB drives';
+        this.USB_Info = 'Multiple USB drives detected, please select the USB drive to move the files';
       }
     },
 
