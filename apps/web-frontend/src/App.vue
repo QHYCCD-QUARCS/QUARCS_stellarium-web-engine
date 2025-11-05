@@ -717,7 +717,7 @@ export default {
         { driverType: 'MainCamera', num: 1, label: 'Self Exposure Time (ms)', value: 0, inputType: 'number' }, // 自曝光时间
         
         { driverType: 'MainCamera', label: 'Auto Save', value: false, inputType: 'switch' }, // 自动保存
-        { driverType: 'MainCamera', label: 'Save Folder', value: 'default', inputType: 'select' ,selectValue: ['default']}, // 保存文件夹
+        { driverType: 'MainCamera', label: 'Save Folder', value: 'local', inputType: 'select' ,selectValue: ['local']}, // 保存文件夹
         // 循环拍摄
         // { driverType: 'MainCamera', label: 'Exposuer delay', value: 0, inputType: 'number' }, // 循环拍摄间隔时间
         // { driverType: 'MainCamera', label: 'Loop Capture', value: false, inputType: 'switch' },  // 循环拍摄
@@ -1678,7 +1678,7 @@ export default {
                 // 首先发送清空信号
                 this.$bus.$emit('ClearUSBList');
                 const item = this.MainCameraConfigItems.find(item => item.label === 'Save Folder');
-                item.selectValue = ['default'];
+                item.selectValue = ['local'];
                 
                 // 处理U盘信息：单个或多个U盘都通过相同方式处理
                 // parts[0] = 'USBCheck'
@@ -1938,10 +1938,10 @@ export default {
                     // 当前不可利用,重置为默认路径
                     const item = this.MainCameraConfigItems.find(item => item.label === 'Save Folder');
                     if (item) {
-                      item.selectValue = ['default'];
-                      item.value = 'default';
+                      item.selectValue = ['local'];
+                      item.value = 'local';
                     }
-                    this.$bus.$emit('AppSendMessage', 'Vue_Command', 'SetMainCameraSaveFolder:default');
+                    this.$bus.$emit('AppSendMessage', 'Vue_Command', 'SetMainCameraSaveFolder:local');
                     this.$bus.$emit('AppSendMessage', 'Vue_Command', 'USBCheck');
                   }
                 }
@@ -7270,7 +7270,7 @@ export default {
         }else if (label === 'Auto Save') {
           this.sendMessage('Vue_Command', 'SetMainCameraAutoSave:' + (value === 'true' || value === true));
         }else if (label === 'Save Folder') {
-          this.sendMessage('Vue_Command', 'SetMainCameraSaveFolder:' + StringValue);
+          this.sendMessage('Vue_Command', 'SetMainCameraSaveFolder:' + value);
         }else{
           this.SendConsoleLogMsg(label + ':' + value, 'info');
           this.$bus.$emit(label, label + ':' + value);
