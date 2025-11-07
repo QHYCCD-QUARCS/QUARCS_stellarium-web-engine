@@ -717,6 +717,7 @@ export default {
         { driverType: 'MainCamera', num: 1, label: 'Self Exposure Time (ms)', value: 0, inputType: 'number' }, // 自曝光时间
         
         { driverType: 'MainCamera', label: 'Auto Save', value: false, inputType: 'switch' }, // 自动保存
+        { driverType: 'MainCamera', label: 'Save Failed Parse', value: false, inputType: 'switch' }, // 保存解析失败图片
         { driverType: 'MainCamera', label: 'Save Folder', value: 'local', inputType: 'select' ,selectValue: ['local']}, // 保存文件夹
         // 循环拍摄
         // { driverType: 'MainCamera', label: 'Exposuer delay', value: 0, inputType: 'number' }, // 循环拍摄间隔时间
@@ -1661,8 +1662,12 @@ export default {
 
 
               case 'ShowAllImageFolder':
-                if (parts.length === 3) {
-                  this.$bus.$emit('ShowAllImageFolder', parts[1], parts[2]);
+                if (parts.length >= 3) {
+                  // parts[1] = CaptureImage{...}
+                  // parts[2] = ScheduleImage{...}
+                  // parts[3] = SolveFailedImage{...} (如果存在)
+                  const solveFailedImageString = parts.length >= 4 ? parts[3] : 'SolveFailedImage{}';
+                  this.$bus.$emit('ShowAllImageFolder', parts[1], parts[2], solveFailedImageString);
                 }
                 break;
 
@@ -1813,6 +1818,11 @@ export default {
                 this.callShowMessageBox('Solve image faild...', 'error');
                 this.$bus.$emit("ImageSolveFinished", false);
                 this.$bus.$emit('setParsingProgress', false);
+                this.$bus.$emit('MountOperationComplete', 'solve');
+                break;
+
+              case 'FocalLengthError':
+                this.callShowMessageBox('焦距未设置，请先设置焦距后再进行解析同步', 'error');
                 this.$bus.$emit('MountOperationComplete', 'solve');
                 break;
 
@@ -7199,6 +7209,12 @@ export default {
             if (item) {
               item.value = parameters[parameter] === 'true' || parameters[parameter] === true;
             }
+          }
+          else if (parameter == 'SaveFailedParse') {
+            const item = this.MainCameraConfigItems.find(item => item.label === 'Save Failed Parse');
+            if (item) {
+              item.value = parameters[parameter] === 'true' || parameters[parameter] === true;
+            }
           }else {
             console.error(`未找到参数：${parameter}`);
           }
@@ -7269,6 +7285,8 @@ export default {
           this.$bus.$emit('setSelfExposureTime', IntValue);
         }else if (label === 'Auto Save') {
           this.sendMessage('Vue_Command', 'SetMainCameraAutoSave:' + (value === 'true' || value === true));
+        }else if (label === 'Save Failed Parse') {
+          this.sendMessage('Vue_Command', 'SetMainCameraSaveFailedParse:' + (value === 'true' || value === true));
         }else if (label === 'Save Folder') {
           this.sendMessage('Vue_Command', 'SetMainCameraSaveFolder:' + value);
         }else{
