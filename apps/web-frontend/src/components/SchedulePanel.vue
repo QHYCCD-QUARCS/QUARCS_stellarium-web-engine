@@ -12,9 +12,10 @@
       </span>
     </button>
 
-    <button class="additional-btn" @click="PlaySchedule" :style="{ left: '0px', width: '50px', height: BtnHeight + 'px', top: '45px' }"><v-icon>mdi-play</v-icon></button>
-    <button class="additional-btn" @click="StopSchedule" :style="{ left: '0px', width: '50px', height: BtnHeight + 'px', top: BtnTop1 + 'px',}"><v-icon>mdi-pause</v-icon></button>
-    <button class="additional-btn" :style="{ left: '0px', width: '50px', height: BtnHeight + 'px', top: BtnTop2 + 'px',}">Save</button>
+    <button class="additional-btn" @click="toggleSchedule" :style="{ left: '0px', width: '50px', height: BtnHeight + 'px', top: '45px' }">
+      <v-icon>{{ isScheduleRunning ? 'mdi-pause' : 'mdi-play' }}</v-icon>
+    </button>
+    <button class="additional-btn" :style="{ left: '0px', width: '50px', height: BtnHeight + 'px', top: BtnTop1 + 'px',}">Save</button>
     <button class="additional-btn" :style="{ left: '0px', width: '50px', height: BtnHeight + 'px', bottom: '0px' }">Load</button>
    
   </div>
@@ -34,6 +35,7 @@ export default {
       BtnTop2: 0,
 
       PanelLeft: 0,
+      isScheduleRunning: false, // 计划任务表运行状态
 
     };
   },
@@ -63,8 +65,10 @@ export default {
     },
     setBtnHeight() {
       const Height = window.innerHeight;
-      this.BtnHeight = (Height - 130) / 4 -5;
-      this.BtnTop1 = 50 + this.BtnHeight;
+      // 现在只有3个按钮（开始/停止切换、Save、Load），所以除以3
+      this.BtnHeight = (Height - 130) / 3 -5;
+      // Save按钮位置：开始/停止按钮下方，加上按钮高度和5px间距
+      this.BtnTop1 = 45 + this.BtnHeight + 5;
       this.BtnTop2 = 55 + this.BtnHeight * 2;
 
       const Width = window.innerWidth;
@@ -73,11 +77,16 @@ export default {
       this.isExpanded = false;
       this.showTabel = false;
     },
-    PlaySchedule() {
-      this.$bus.$emit('getTableData', true);
-    },
-    StopSchedule() {
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'StopSchedule');
+    toggleSchedule() {
+      if (this.isScheduleRunning) {
+        // 如果正在运行，则停止
+        this.isScheduleRunning = false;
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'StopSchedule');
+      } else {
+        // 如果未运行，则开始
+        this.isScheduleRunning = true;
+        this.$bus.$emit('getTableData', true);
+      }
     },
 
     
