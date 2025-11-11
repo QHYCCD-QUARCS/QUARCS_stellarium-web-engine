@@ -21,10 +21,9 @@
       <table>
         <tbody class="scrollable-body">
           <tr v-for="row in numberOfRows" :key="row" :class="{ selected: isSelectedRow(row) }">
-            <td v-for="column in numberOfColumns" :key="column" :class="{ 'selected-cell': isSelected(row, column), 'radec-cell': column === 2 }"
+            <td v-for="column in numberOfColumns" :key="column" :class="{ 'selected-cell': isSelected(row, column) }"
               @click="selectCell(row, column)">
-              <span v-if="column === 2" v-html="formatRaDec(cellValues[`${row}-${column}`])"></span>
-              <span v-else>{{ cellValues[`${row}-${column}`] || '' }}</span>
+              {{ cellValues[`${row}-${column}`] || '' }}
             </td>
           </tr>
         </tbody>
@@ -482,41 +481,9 @@ export default {
       if (this.selectedRow !== null && this.selectedColumn !== null) {
         const key = `${this.selectedRow}-${this.selectedColumn + 1}`;
         if (this.selectedColumn === 1) {
-          // 将Ra和Dec分两行显示
-          const formatted = this.formatRaDecForStorage(RaDec);
-          this.cellValues[key] = formatted;
+          this.cellValues[key] = ' ' + RaDec;
         }
       }
-    },
-
-    formatRaDec(value) {
-      if (!value || value.trim() === '') {
-        return '';
-      }
-      // 如果已经包含换行符，直接返回
-      if (value.includes('\n') || value.includes('<br')) {
-        return value.replace(/\n/g, '<br>');
-      }
-      // 解析Ra:和Dec:格式（支持大小写）
-      const raMatch = value.match(/[Rr][Aa]:([^,]+)/);
-      const decMatch = value.match(/[Dd][Ee][Cc]:(.+)/);
-      if (raMatch && decMatch) {
-        return `Ra:${raMatch[1].trim()}<br>Dec:${decMatch[1].trim()}`;
-      }
-      return value;
-    },
-
-    formatRaDecForStorage(value) {
-      if (!value || value.trim() === '') {
-        return '';
-      }
-      // 解析Ra:和Dec:格式，用换行符分隔（支持大小写）
-      const raMatch = value.match(/[Rr][Aa]:([^,]+)/);
-      const decMatch = value.match(/[Dd][Ee][Cc]:(.+)/);
-      if (raMatch && decMatch) {
-        return `Ra:${raMatch[1].trim()}\nDec:${decMatch[1].trim()}`;
-      }
-      return value;
     },
 
     setMaxHeight() {
@@ -609,13 +576,6 @@ td {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-td.radec-cell {
-  white-space: normal;
-  line-height: 1.2;
-  padding: 4px;
-  vertical-align: middle;
 }
 
 th {
