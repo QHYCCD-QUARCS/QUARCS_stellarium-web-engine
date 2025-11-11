@@ -653,7 +653,7 @@ export default {
 
       QTClientVersion: 'Not connected',
       // VueClientVersion: process.env.VUE_APP_VERSION,
-      VueClientVersion: '20251030', // 手动指定版本号
+      VueClientVersion: '20251111', // 手动指定版本号
 
       // 校准信息对象
       calibrationInfo: {
