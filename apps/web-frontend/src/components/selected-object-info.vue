@@ -359,10 +359,27 @@ export default {
       this.$bus.$emit('SendConsoleLogMsg', 'SelectedObject:' + Name, 'info');
       this.$bus.$emit('insertObjName',Name);
 
-      // Math.floor(this.TargetRa * 100) / 100;
-      // Math.floor(this.TargetDec * 100) / 100;
+      // 格式化Ra/Dec为时分秒和度分秒格式
+      const formatInt = function (num, padLen) {
+        const pad = new Array(1 + padLen).join('0')
+        return (pad + num).slice(-pad.length)
+      }
+      
+      // 格式化赤经为时分秒格式（纯文本）
+      const formatRAText = (a) => {
+        const raf = this.$stel.a2tf(a, 1)
+        return formatInt(raf.hours, 2) + 'h ' + formatInt(raf.minutes, 2) + 'm ' + formatInt(raf.seconds, 2) + '.' + raf.fraction + 's'
+      }
+      
+      // 格式化赤纬为度分秒格式（纯文本）
+      const formatDecText = (a) => {
+        const raf = this.$stel.a2af(a, 1)
+        return raf.sign + formatInt(raf.degrees, 2) + '° ' + formatInt(raf.arcminutes, 2) + '\' ' + formatInt(raf.arcseconds, 2) + '.' + raf.fraction + '"'
+      }
 
-      this.$bus.$emit('TargetRaDec','Ra:' + Math.floor(this.TargetRa * 1000000) / 1000000 + ',' + 'Dec:' + Math.floor(this.TargetDec * 1000000) / 1000000);
+      const raText = formatRAText(this.TargetRa)
+      const decText = formatDecText(this.TargetDec)
+      this.$bus.$emit('TargetRaDec', 'Ra:' + raText + ',Dec:' + decText);
     },
     MountGoto: function () {
       this.$bus.$emit('MountGoto');
