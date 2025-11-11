@@ -12,6 +12,7 @@
           <th>{{ $t('Reps') }}</th>
           <th>{{ $t('Type') }}</th>
           <th>{{ $t('Refocus') }}</th>
+          <th>{{ $t('Exp Delay') }}</th>
           <!-- <th>进度</th> -->
         </tr>
       </thead>
@@ -20,9 +21,10 @@
       <table>
         <tbody class="scrollable-body">
           <tr v-for="row in numberOfRows" :key="row" :class="{ selected: isSelectedRow(row) }">
-            <td v-for="column in numberOfColumns" :key="column" :class="{ 'selected-cell': isSelected(row, column) }"
+            <td v-for="column in numberOfColumns" :key="column" :class="{ 'selected-cell': isSelected(row, column), 'radec-cell': column === 2 }"
               @click="selectCell(row, column)">
-              {{ cellValues[`${row}-${column}`] || '' }}
+              <span v-if="column === 2" v-html="formatRaDec(cellValues[`${row}-${column}`])"></span>
+              <span v-else>{{ cellValues[`${row}-${column}`] || '' }}</span>
             </td>
           </tr>
         </tbody>
@@ -41,7 +43,7 @@ export default {
       selectedColumn: null,
       selectedCellValue: '', // 新增选中单元格内容的变量
       numberOfRows: 8,
-      numberOfColumns: 8,
+      numberOfColumns: 9,
       cellValues: {},
       tableData: [],
       
@@ -54,6 +56,7 @@ export default {
         6: '1',
         7: 'Light',
         8: 'OFF',
+        9: '0 s',
       },
     };
   },
@@ -135,6 +138,10 @@ export default {
       else if(column === 8)
       {
         this.$bus.$emit('KeyBoardMode','Focus');
+      }
+      else if(column === 9)
+      {
+        this.$bus.$emit('KeyBoardMode','ExpDelay');
       }
 
       this.getTableData(false);
@@ -307,6 +314,9 @@ export default {
           } else if (j === 9) {
             key = `${i}-${8}`;
             this.cellValues[key] = colData[j];
+          } else if (j === 10) {
+            key = `${i}-${9}`;
+            this.cellValues[key] = colData[j];
           }
         }
       }
@@ -422,6 +432,32 @@ export default {
             // 如果 text 是 "s"，且现有文本包含 "s"，则将 "s" 修改为 "ms"
             this.cellValues[key] = currentValue.replace('s', 'ms');
           } 
+        } else if (this.selectedColumn === 9) {
+          const currentValue = this.cellValues[key] || '';
+          if (!isNaN(text)) {
+            // 如果 text 是数字，则将数字插入到现有文本中空格前的数字后面
+            const spaceIndex = currentValue.indexOf(' ');
+            if (spaceIndex !== -1) {
+              this.cellValues[key] = currentValue.slice(0, spaceIndex) + text + currentValue.slice(spaceIndex);
+            } else {
+              this.cellValues[key] += text;
+            }
+          } else if (text === 'Delete') {
+            // 如果 text 为 "Delete"，则删除空格前的数字部分的最后一位
+            const spaceIndex = currentValue.indexOf(' ');
+            if (spaceIndex !== -1) {
+              const numberPart = currentValue.slice(0, spaceIndex);
+              if (numberPart.length > 0) {
+                this.cellValues[key] = numberPart.slice(0, -1) + currentValue.slice(spaceIndex);
+              }
+            }
+          } else if (text === 's/ms' && currentValue.includes('ms')) {
+            // 如果 text 是 "ms"，且现有文本包含 "ms"，则将 "ms" 修改为 "s"
+            this.cellValues[key] = currentValue.replace('ms', 's');
+          } else if (text === 's/ms' && currentValue.includes('s')) {
+            // 如果 text 是 "s"，且现有文本包含 "s"，则将 "s" 修改为 "ms"
+            this.cellValues[key] = currentValue.replace('s', 'ms');
+          } 
         } else if (text === 'Delete') {
           // 如果 text 为 "Delete"，则删除单元格现有内容的最后一位
           this.cellValues[key] = (this.cellValues[key] || '').slice(0, -1);
@@ -446,9 +482,41 @@ export default {
       if (this.selectedRow !== null && this.selectedColumn !== null) {
         const key = `${this.selectedRow}-${this.selectedColumn + 1}`;
         if (this.selectedColumn === 1) {
-          this.cellValues[key] = ' ' + RaDec;
+          // 将Ra和Dec分两行显示
+          const formatted = this.formatRaDecForStorage(RaDec);
+          this.cellValues[key] = formatted;
         }
       }
+    },
+
+    formatRaDec(value) {
+      if (!value || value.trim() === '') {
+        return '';
+      }
+      // 如果已经包含换行符，直接返回
+      if (value.includes('\n') || value.includes('<br')) {
+        return value.replace(/\n/g, '<br>');
+      }
+      // 解析Ra:和Dec:格式（支持大小写）
+      const raMatch = value.match(/[Rr][Aa]:([^,]+)/);
+      const decMatch = value.match(/[Dd][Ee][Cc]:(.+)/);
+      if (raMatch && decMatch) {
+        return `Ra:${raMatch[1].trim()}<br>Dec:${decMatch[1].trim()}`;
+      }
+      return value;
+    },
+
+    formatRaDecForStorage(value) {
+      if (!value || value.trim() === '') {
+        return '';
+      }
+      // 解析Ra:和Dec:格式，用换行符分隔（支持大小写）
+      const raMatch = value.match(/[Rr][Aa]:([^,]+)/);
+      const decMatch = value.match(/[Dd][Ee][Cc]:(.+)/);
+      if (raMatch && decMatch) {
+        return `Ra:${raMatch[1].trim()}\nDec:${decMatch[1].trim()}`;
+      }
+      return value;
     },
 
     setMaxHeight() {
@@ -479,6 +547,7 @@ export default {
         6: '1',
         7: 'Light',
         8: 'OFF',
+        9: '0 s',
       };
       for (let column = 1; column <= this.numberOfColumns; column++) {
         const key = `${this.numberOfRows}-${column}`;
@@ -540,6 +609,13 @@ td {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+td.radec-cell {
+  white-space: normal;
+  line-height: 1.2;
+  padding: 4px;
+  vertical-align: middle;
 }
 
 th {

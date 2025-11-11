@@ -26,9 +26,9 @@
         </span>
       </button>
 
-      <span class="custom-button ImageFileTip no-select" @click="ImageFileSwitch"> {{ $t(ImageFile) }} </span>
+      <span class="custom-button ImageFileTip ImageFileTip-fixed no-select" @click="ImageFileSwitch"> {{ $t(ImageFile) }} </span>
 
-      <button class="custom-button btn-ImageFileSwitch no-select" :class="{ 'btn-ImageFileSwitch-1': isCaptureFile, 'btn-ImageFileSwitch-2': !isCaptureFile }" @click="ImageFileSwitch"> 
+      <button class="custom-button btn-ImageFileSwitch btn-ImageFileSwitch-fixed no-select" @click="ImageFileSwitch"> 
         <!-- <div style="display: flex; justify-content: center; align-items: center;">
           <img src="@/assets/images/svg/ui/USB Flash Drive.svg" height="20px" style="min-height: 20px"></img>
         </div> -->
@@ -135,6 +135,8 @@ export default {
       isNoFolders: true,
       ImageFile: 'Capture Image',
       isCaptureFile: true,
+      fileTypeIndex: 0, // 0: CaptureImage, 1: ScheduleImage, 2: SolveFailedImage
+      previousFileTypeIndex: 0, // 记录上一个状态，用于动画
       FoldersName: 'CaptureImage',
       Position: [
         { top: '10%', left: '2.5%' },
@@ -162,8 +164,10 @@ export default {
       ],
       CaptureImageFolders: [],
       ScheduleImageFolders: [],
+      SolveFailedImageFolders: [],
       CaptureImageFoldersString_LastTime: '', 
-      ScheduleImageFoldersString_LastTime: '', 
+      ScheduleImageFoldersString_LastTime: '',
+      SolveFailedImageFoldersString_LastTime: '', 
       USB_Info: '',
       isUSBWarning: true,
       isImageFolderOpen: false,
@@ -222,29 +226,50 @@ export default {
     },
 
     ImageFileSwitch() {
-      if(this.ImageFile === 'Capture Image')
-      {
+      // 记录上一个状态
+      this.previousFileTypeIndex = this.fileTypeIndex;
+      
+      // 循环切换：Capture Image -> Schedule Image -> Solve Failed Image -> Capture Image
+      if(this.fileTypeIndex === 0) {
+        // 从 Capture Image 切换到 Schedule Image
+        this.fileTypeIndex = 1;
         this.isCaptureFile = false;
         this.ImageFile = 'Schedule Image';
         this.imageFolders = this.ScheduleImageFolders;
+        this.FoldersName = 'ScheduleImage';
       }
-      else 
-      {
+      else if(this.fileTypeIndex === 1) {
+        // 从 Schedule Image 切换到 Solve Failed Image
+        this.fileTypeIndex = 2;
+        this.isCaptureFile = false;
+        this.ImageFile = 'Solve Failed Image';
+        this.imageFolders = this.SolveFailedImageFolders;
+        this.FoldersName = 'solveFailedImage';
+      }
+      else {
+        // 从 Solve Failed Image 切换回 Capture Image
+        this.fileTypeIndex = 0;
         this.isCaptureFile = true;
         this.ImageFile = 'Capture Image';
         this.imageFolders = this.CaptureImageFolders;
+        this.FoldersName = 'CaptureImage';
       }
     },
 
     DeleteFolders() {
       this.DeleteBtnSelect = false;
-      if(this.isCaptureFile)
+      // 根据当前文件类型设置 FoldersName
+      if(this.fileTypeIndex === 0)
       {
         this.FoldersName = 'CaptureImage';
       }
-      else
+      else if(this.fileTypeIndex === 1)
       {
         this.FoldersName = 'ScheduleImage';
+      }
+      else
+      {
+        this.FoldersName = 'solveFailedImage';
       }
       const deletedFolders = this.imageFolders.filter(folder => folder.isSelected); // 被删除的文件夹
       const resultString = this.convertImageDataToString(deletedFolders)
@@ -284,13 +309,18 @@ export default {
     },
     
     sendMoveFileToUSB(usbName) {
-      if(this.isCaptureFile)
+      // 根据当前文件类型设置 FoldersName
+      if(this.fileTypeIndex === 0)
       {
         this.FoldersName = 'CaptureImage';
       }
-      else
+      else if(this.fileTypeIndex === 1)
       {
         this.FoldersName = 'ScheduleImage';
+      }
+      else
+      {
+        this.FoldersName = 'solveFailedImage';
       }
       const moveFolders = this.imageFolders.filter(folder => folder.isSelected);
       const resultString = this.convertImageDataToString(moveFolders);
@@ -311,9 +341,10 @@ export default {
       this.selectedUSBName = '';
     },
 
-    updateImageFolders(CaptureImageFoldersString, ScheduleImageFoldersString) {
+    updateImageFolders(CaptureImageFoldersString, ScheduleImageFoldersString, SolveFailedImageFoldersString) {
       if (this.CaptureImageFoldersString_LastTime === CaptureImageFoldersString && 
-          this.ScheduleImageFoldersString_LastTime === ScheduleImageFoldersString) 
+          this.ScheduleImageFoldersString_LastTime === ScheduleImageFoldersString &&
+          this.SolveFailedImageFoldersString_LastTime === SolveFailedImageFoldersString) 
       {
         console.log('ImageFolders no update');
       } 
@@ -322,11 +353,14 @@ export default {
         this.imageFolders=[];
         this.CaptureImageFolders=[];
         this.ScheduleImageFolders=[];
+        this.SolveFailedImageFolders=[];
         this.CaptureImageFoldersString_LastTime = CaptureImageFoldersString;
         this.ScheduleImageFoldersString_LastTime = ScheduleImageFoldersString;
-        const parsedData = this.parseImageData(CaptureImageFoldersString, ScheduleImageFoldersString)
+        this.SolveFailedImageFoldersString_LastTime = SolveFailedImageFoldersString;
+        const parsedData = this.parseImageData(CaptureImageFoldersString, ScheduleImageFoldersString, SolveFailedImageFoldersString)
         console.log('Capture Image Foladers:', parsedData.CaptureFolderList);
         console.log('Schedule Image Foladers:', parsedData.ScheduleFolderList);
+        console.log('Solve Failed Image Foladers:', parsedData.SolveFailedFolderList);
 
         // 按照imageDate（时间）排序parsedData.captureSaveImageList
         parsedData.CaptureFolderList.sort((a, b) => {
@@ -348,13 +382,28 @@ export default {
           this.ScheduleImageFolders.push(item);
         });
 
-        if(this.isCaptureFile)
+        // 按照imageDate（时间）排序parsedData.SolveFailedFolderList
+        parsedData.SolveFailedFolderList.sort((a, b) => {
+          // 假设imageDate为数字格式
+          return parseFloat(a.imageDate) - parseFloat(b.imageDate);
+        });
+        // 将排序后的parsedData.SolveFailedFolderList中的元素依次复制到imageFolders中
+        parsedData.SolveFailedFolderList.forEach(item => {
+          this.SolveFailedImageFolders.push(item);
+        });
+
+        // 根据当前文件类型显示对应的文件夹列表
+        if(this.fileTypeIndex === 0)
         {
           this.imageFolders = this.CaptureImageFolders;
         }
-        else
+        else if(this.fileTypeIndex === 1)
         {
           this.imageFolders = this.ScheduleImageFolders;
+        }
+        else
+        {
+          this.imageFolders = this.SolveFailedImageFolders;
         }
         
         this.calculateTotalPage();
@@ -362,15 +411,18 @@ export default {
       }
     },
     
-    parseImageData(CaptureImageFoldersString, ScheduleImageFoldersString) {
+    parseImageData(CaptureImageFoldersString, ScheduleImageFoldersString, SolveFailedImageFoldersString) {
       const CaptureFolders = CaptureImageFoldersString.split('{');
       const ScheduleFolders = ScheduleImageFoldersString.split('{');
+      const SolveFailedFolders = SolveFailedImageFoldersString.split('{');
 
-      const CaptureFolder = CaptureFolders[1].split(';');
-      const ScheduleFolder = ScheduleFolders[1].split(';');
+      const CaptureFolder = CaptureFolders.length > 1 ? CaptureFolders[1].split(';') : [];
+      const ScheduleFolder = ScheduleFolders.length > 1 ? ScheduleFolders[1].split(';') : [];
+      const SolveFailedFolder = SolveFailedFolders.length > 1 ? SolveFailedFolders[1].split(';') : [];
 
       const CaptureFolderList = [];
       const ScheduleFolderList = [];
+      const SolveFailedFolderList = [];
 
       for(let i = 0; i < (CaptureFolder.length - 1); i++) {
         CaptureFolderList.push({imageDate: CaptureFolder[i], imageName: '', isSelected: false });
@@ -381,9 +433,14 @@ export default {
         ScheduleFolderList.push({imageDate: Data[0], imageName: '('+Data[1], isSelected: false });
       }
 
+      for(let i = 0; i < (SolveFailedFolder.length - 1); i++) {
+        SolveFailedFolderList.push({imageDate: SolveFailedFolder[i], imageName: '', isSelected: false });
+      }
+
       return {
         CaptureFolderList,
-        ScheduleFolderList
+        ScheduleFolderList,
+        SolveFailedFolderList
       };
     },
 
@@ -451,13 +508,17 @@ export default {
       console.log('ImageFolderOpen:'+value);
       if(value === 'true') {
         this.isImageFolderOpen = true;
-        if(this.isCaptureFile)
+        if(this.fileTypeIndex === 0)
         {
           this.$bus.$emit('currentFolderType', 'CaptureImage');
         }
-        else
+        else if(this.fileTypeIndex === 1)
         {
           this.$bus.$emit('currentFolderType', 'ScheduleImage');
+        }
+        else
+        {
+          this.$bus.$emit('currentFolderType', 'solveFailedImage');
         }
       } else {
         this.isImageFolderOpen = false;
@@ -703,8 +764,6 @@ export default {
 .ImageFileTip {
   position:absolute;
   bottom: 30px;
-  right: calc(65% - 35px);
-
   width: 155px;
   height: 35px;
 
@@ -724,10 +783,15 @@ export default {
   text-align: center;
 }
 
-.btn-ImageFileSwitch-1 {
+.ImageFileTip-fixed {
+  left: calc(25% + 40px);
+  animation: none !important;
+}
+
+.btn-ImageFileSwitch-fixed {
   position:absolute;
   bottom: 30px;
-  left: 35%;
+  left: 25%;
 
   width: 35px;
   height: 35px;
@@ -738,48 +802,8 @@ export default {
   border-radius: 50%;
   box-sizing: border-box;
   border: none;
-
-  animation: showImageFileAnimation 0.3s forwards;
-}
-
-@keyframes showImageFileAnimation {
-  from {
-    left: 35%;
-    transform: rotate(360deg);
-  }
-  to {
-    left: calc(35% - 120px);
-    transform: rotate(0deg);
-  }
-}
-
-.btn-ImageFileSwitch-2 {
-  position:absolute;
-  bottom: 30px;
-  left: 35%;
-
-  width: 35px;
-  height: 35px;
-
-  user-select: none;
-  background-color: rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(5px);
-  border-radius: 50%;
-  box-sizing: border-box;
-  border: none;
-
-  animation: hideImageFileAnimation 0.3s forwards;
-}
-
-@keyframes hideImageFileAnimation {
-  from {
-    left: calc(35% - 120px);
-    transform: rotate(0deg);
-  }
-  to {
-    left: 35%;
-    transform: rotate(360deg);
-  }
+  animation: none !important;
+  transform: none !important;
 }
 
 .btn-close {
