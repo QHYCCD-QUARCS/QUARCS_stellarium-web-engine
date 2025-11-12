@@ -153,47 +153,54 @@
         </div>
       </button>
 
-      <button v-show="isShowImage && isShowHideUi" @click="hideCaptureUI" class="get-click btn-UISwitch">
-        <div style="display: flex; justify-content: center; align-items: center;">
-          <img src="@/assets/images/svg/ui/UI_Hide.svg" height="20px"
-            style="min-height: 20px; pointer-events: none;"></img>
-        </div>
-      </button>
-
-      <button v-show="!isShowImage && isShowHideUi" @click="showCaptureUI" class="get-click btn-ShowUISwitch">
-        <div style="display: flex; justify-content: center; align-items: center;">
-          <img src="@/assets/images/svg/ui/UI_Show.svg" height="20px" style="min-height: 20px; pointer-events: none;">
-        </div>
-      </button>
-
-      <button :disabled="loadingOriginalImage" v-show="isCaptureMode" @click="getOriginalImage"
-        class="get-click btn-OriginalImage">
-        <template v-if="!loadingOriginalImage">
+      <!-- 可自适应布局的按钮组：隐藏按钮、原图按钮、缩放按钮 -->
+      <div 
+        class="adaptive-buttons-container" 
+        :class="{ 'buttons-grid': scaleButtonsOverlap, 'buttons-vertical': !scaleButtonsOverlap }"
+        :style="scaleButtonsOverlap ? { marginTop: scaleButtonsMarginTop + 'px' } : {}"
+      >
+        <button v-show="isShowImage && isShowHideUi" @click="hideCaptureUI" class="get-click btn-UISwitch">
           <div style="display: flex; justify-content: center; align-items: center;">
-            <img src="@/assets/images/svg/ui/OriginalImage.svg" height="20px"
+            <img src="@/assets/images/svg/ui/UI_Hide.svg" height="20px"
               style="min-height: 20px; pointer-events: none;"></img>
           </div>
-        </template>
-        <template v-else>
-          <div class="progress-spinner">
-            <v-progress-circular indeterminate color="white" size="20"></v-progress-circular>
+        </button>
+
+        <button v-show="!isShowImage && isShowHideUi" @click="showCaptureUI" class="get-click btn-ShowUISwitch">
+          <div style="display: flex; justify-content: center; align-items: center;">
+            <img src="@/assets/images/svg/ui/UI_Show.svg" height="20px" style="min-height: 20px; pointer-events: none;">
           </div>
-        </template>
-      </button>
+        </button>
 
-      <button v-show="isShowScaleChange" @click="ScaleChange('+')" class="get-click btn-ScaleAdd">
-        <div style="display: flex; justify-content: center; align-items: center;">
-          <img src="@/assets/images/svg/ui/ScaleAdd.svg" height="20px"
-            style="min-height: 20px; pointer-events: none;"></img>
-        </div>
-      </button>
+        <button :disabled="loadingOriginalImage" v-show="isCaptureMode" @click="getOriginalImage"
+          class="get-click btn-OriginalImage">
+          <template v-if="!loadingOriginalImage">
+            <div style="display: flex; justify-content: center; align-items: center;">
+              <img src="@/assets/images/svg/ui/OriginalImage.svg" height="20px"
+                style="min-height: 20px; pointer-events: none;"></img>
+            </div>
+          </template>
+          <template v-else>
+            <div class="progress-spinner">
+              <v-progress-circular indeterminate color="white" size="20"></v-progress-circular>
+            </div>
+          </template>
+        </button>
 
-      <button v-show="isShowScaleChange" @click="ScaleChange('-')" class="get-click btn-ScaleSub">
-        <div style="display: flex; justify-content: center; align-items: center;">
-          <img src="@/assets/images/svg/ui/ScaleSub.svg" height="20px"
-            style="min-height: 20px; pointer-events: none;"></img>
-        </div>
-      </button>
+        <button v-show="isShowScaleChange && isShowImage" @click="ScaleChange('+')" class="get-click btn-ScaleAdd">
+          <div style="display: flex; justify-content: center; align-items: center;">
+            <img src="@/assets/images/svg/ui/ScaleAdd.svg" height="20px"
+              style="min-height: 20px; pointer-events: none;"></img>
+          </div>
+        </button>
+
+        <button v-show="isShowScaleChange && isShowImage" @click="ScaleChange('-')" class="get-click btn-ScaleSub">
+          <div style="display: flex; justify-content: center; align-items: center;">
+            <img src="@/assets/images/svg/ui/ScaleSub.svg" height="20px"
+              style="min-height: 20px; pointer-events: none;"></img>
+          </div>
+        </button>
+      </div>
     </div>
 
     <transition name="ToolBar">
@@ -514,6 +521,8 @@ export default {
       showParsingProgress: false,  // 控制解析进度文本框的显示
       parsingProgressList: [],     // 存储解析进度的列表
       isShowScaleChange: false,
+      scaleButtonsOverlap: false, // 缩放按钮是否与CapturePanel重合
+      scaleButtonsMarginTop: 0, // 缩放按钮向上移动的距离
 
       previousState: {        // 保存隐藏时的ui状态
         isShowImage: false,
@@ -599,6 +608,9 @@ export default {
     this.$bus.$on('closeUpdateDialog', this.closeUpdateDialog);
   },
   mounted() {
+    // 根据屏幕分辨率高度判断布局，立即执行（不需要等待DOM渲染）
+    this.checkScaleButtonsOverlap();
+    
     // this.resizeRedBox(1920, 1080);
     // this.$bus.$emit('syncROI_length');
   },
@@ -762,6 +774,7 @@ export default {
       this.showFocuserPanel = false;
       this.showHistogramPanel = false;
       this.showChartsPanel = false;
+      this.isShowScaleChange = false;
       if (isShowequatorial_jnow) {
         this.$stel.core.lines.equatorial_jnow.visible = true;
         // this.showMountSwitch = true;
@@ -1502,6 +1515,62 @@ export default {
     ScaleChange(type) {
       this.$bus.$emit('ScaleChange', type);
     },
+    checkScaleButtonsOverlap() {
+      // 根据屏幕分辨率高度来判断布局
+      const screenHeight = window.innerHeight;
+      
+      // 如果屏幕高度较小（例如小于800px），使用田字分布以避免与CapturePanel重合
+      // 如果屏幕高度较大，使用竖直排列
+      // 可以根据实际需要调整这个阈值
+      const heightThreshold = 700; // 高度阈值，小于此值使用田字分布
+      
+      this.scaleButtonsOverlap = screenHeight < heightThreshold;
+      
+      // 如果使用田字分布，计算需要向上移动的距离
+      if (this.scaleButtonsOverlap) {
+        // CapturePanel高度约200px，位于底部
+        // 按钮容器在top: 65px，4个按钮竖直排列时高度约170px (4*35 + 3*10)
+        // 如果屏幕高度较小，需要向上移动以避免与CapturePanel重合
+        const buttonContainerTop = 65;
+        const buttonContainerHeight = 4 * 35 + 3 * 10; // 竖直排列时的高度
+        const buttonContainerBottom = buttonContainerTop + buttonContainerHeight;
+        
+        // CapturePanel在底部，高度约200px
+        const capturePanelHeight = 200;
+        const capturePanelTop = screenHeight - capturePanelHeight - 10; // bottom: 10px
+        
+        // 如果按钮容器底部会与CapturePanel顶部重合，需要向上移动
+        if (buttonContainerBottom > capturePanelTop - 20) { // 20px间距
+          const overlapDistance = buttonContainerBottom - (capturePanelTop - 20);
+          const requiredMove = overlapDistance + capturePanelHeight + 20;
+          
+          // 限制移动距离，确保按钮不会移出可视区域
+          const minTop = 65;
+          const maxMove = buttonContainerTop - minTop;
+          
+          // 计算新的margin-top（负值表示向上移动）
+          let newMarginTop = -Math.min(requiredMove, maxMove);
+          
+          // 确保不会移出可视区域太多（最多向上移动250px）
+          if (newMarginTop < -250) {
+            newMarginTop = -250;
+          }
+          
+          this.scaleButtonsMarginTop = newMarginTop;
+        } else {
+          this.scaleButtonsMarginTop = 0;
+        }
+      } else {
+        this.scaleButtonsMarginTop = 0;
+      }
+      
+      console.log('按钮布局初始化（根据分辨率）:', {
+        screenHeight,
+        heightThreshold,
+        scaleButtonsOverlap: this.scaleButtonsOverlap,
+        scaleButtonsMarginTop: this.scaleButtonsMarginTop
+      });
+    },
 
     setScale(scale) {
       this.Scale = scale;
@@ -2137,5 +2206,35 @@ export default {
 .left-button-container button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* 自适应按钮容器 */
+.adaptive-buttons-container {
+  display: flex;
+  gap: 10px;
+}
+
+/* 竖直显示（默认）- 所有按钮垂直排列 */
+.buttons-vertical {
+  flex-direction: column;
+}
+
+/* 田字分布（2x2网格）- 当与CapturePanel重合时使用 */
+.buttons-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 35px); /* 2列，每列35px */
+  grid-template-rows: repeat(2, 35px); /* 2行，每行35px */
+  gap: 10px;
+  width: 80px; /* 2列宽度(35px * 2) + gap(10px) */
+  /* margin-top通过内联样式动态设置 */
+  position: relative;
+  z-index: 11; /* 确保在CapturePanel之上 */
+  transition: margin-top 0.3s ease; /* 平滑过渡 */
+}
+
+.buttons-grid button {
+  width: 35px;
+  height: 35px;
+  margin: 0; /* 清除默认margin */
 }
 </style>
