@@ -1569,6 +1569,11 @@ export default {
                 }
                 break;
 
+              case 'ScheduleComplete':
+                // 计划任务完成，通知前端重置按钮状态
+                this.$bus.$emit('ScheduleComplete');
+                break;
+
               case 'ExpTimeList':
                 if (parts.length === 2) {
                   this.$bus.$emit('initExpTimeList', parts[1]);
