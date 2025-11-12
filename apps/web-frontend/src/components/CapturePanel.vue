@@ -1,6 +1,10 @@
 <template>
   <transition name="panel">
   <div class="capture-panel" :style="{ bottom: bottom + 'px', left: left + 'px', width: width + 'px', height: height + 'px' }">
+    <span style="position: absolute; top: 4%; left: 50%; transform: translate(-50%, -50%); font-size: 10px; color: rgba(255, 255, 255, 0.5); user-select: none;"> 
+      {{ CameraTemperature }}
+    </span>
+
     <div class="Direction-Btn">
         <button class="ExpTime-minus no-select" @click="handleExpTimeButtonClick('minus')">
           <span class="ExpTime-minus-icon"> <v-icon>mdi-menu-up</v-icon> </span>
@@ -85,21 +89,34 @@ export default {
       currentCFWIndex: 0,
       cfwButtonsDisabled: false,
 
-      ExpTimes: ['1ms', '10ms', '100ms', '1s', '5s', '10s', '30s', '60s', '120s'],
+      ExpTimes: ['1ms', '10ms', '100ms', '1s', '5s', '10s', '30s', '60s', '120s','300s','600s'],
+      ExpTimeNum: 11, // 默认曝光时间数量
       // CFWs: ['Null', 'L', 'R', 'G', 'B', 'Ha', 'OIIII', 'SII'],
       CFWs: ['Null'],
+
+      CFWConnect: false,
+
+      CameraTemperature: '',
+
+      // 按钮状态
+      btnSaveStatus: false, // 保存按钮状态
+      btnCaptureStatus: false, // 拍照按钮状态
+      btnFocusStatus: false, // 聚焦按钮状态
+      btnHistStatus: false, // 直方图按钮状态
+      btnExpTimeStatus: false, // 曝光时间按钮状态
+      btnCFWStatus: false, // 滤光片按钮状态
     };
   },
   created() {
-    this.$bus.$on('ExpTime [1]', this.ModifyExpTimeList);
-    this.$bus.$on('ExpTime [2]', this.ModifyExpTimeList);
-    this.$bus.$on('ExpTime [3]', this.ModifyExpTimeList);
-    this.$bus.$on('ExpTime [4]', this.ModifyExpTimeList);
-    this.$bus.$on('ExpTime [5]', this.ModifyExpTimeList);
-    this.$bus.$on('ExpTime [6]', this.ModifyExpTimeList);
-    this.$bus.$on('ExpTime [7]', this.ModifyExpTimeList);
-    this.$bus.$on('ExpTime [8]', this.ModifyExpTimeList);
-    this.$bus.$on('ExpTime [9]', this.ModifyExpTimeList);
+    // this.$bus.$on('ExpTime [1]', this.ModifyExpTimeList);
+    // this.$bus.$on('ExpTime [2]', this.ModifyExpTimeList);
+    // this.$bus.$on('ExpTime [3]', this.ModifyExpTimeList);
+    // this.$bus.$on('ExpTime [4]', this.ModifyExpTimeList);
+    // this.$bus.$on('ExpTime [5]', this.ModifyExpTimeList);
+    // this.$bus.$on('ExpTime [6]', this.ModifyExpTimeList);
+    // this.$bus.$on('ExpTime [7]', this.ModifyExpTimeList);
+    // this.$bus.$on('ExpTime [8]', this.ModifyExpTimeList);
+    // this.$bus.$on('ExpTime [9]', this.ModifyExpTimeList);
 
     // this.$bus.$on('CFW [1]', this.ModifyCFWList);
     // this.$bus.$on('CFW [2]', this.ModifyCFWList);
@@ -126,21 +143,33 @@ export default {
     this.$bus.$on('initCFWList', this.initCFWList);
 
     this.$bus.$on('MainCameraStatus',this.MainCameraStatus);
+
+    this.$bus.$on('CFWConnected', this.CFWConnected);
+
+    this.$bus.$on('MainCameraTemperature', this.MainCameraTemperature);
+
+    this.$bus.$on('setSelfExposureTime', this.setSelfExposureTime);
+
+    this.$bus.$emit('getSelfExposureTime');  // 初始化完成后获取自定义曝光时间
   },
   mounted: function () {
-    this.CurrentExpTimeList();
-    this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getExpTimeList');
+    // this.CurrentExpTimeList();
+    // this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getExpTimeList');
 
   },
   methods: {
     handleExpTimeButtonClick(direction) {
+      if(this.btnExpTimeStatus) {
+        return;
+      }
+      this.btnExpTimeStatus = true;
       if (direction === 'plus') {
         if (this.currentExpTimeIndex < this.ExpTimes.length - 1) {
           this.currentExpTimeIndex++;
         } else {
           this.currentExpTimeIndex = 0;
         }
-      } else {
+      } else if (direction === 'minus') {
         if (this.currentExpTimeIndex > 0) {
           this.currentExpTimeIndex--;
         } else {
@@ -150,39 +179,64 @@ export default {
       // console.log('handleExpTimeButtonClick: ',this.ExpTimes[this.currentExpTimeIndex]);
       // this.$refs.expTimeContent.innerText = this.ExpTimes[this.currentExpTimeIndex];
       this.$bus.$emit('time-selected', this.ExpTimes[this.currentExpTimeIndex]);
+      this.btnExpTimeStatus = false;
     },
 
     handleCFWButtonClick(direction) {
-      if (direction === 'plus') {
-        if (this.currentCFWIndex < this.CFWs.length - 1) {
-          this.currentCFWIndex++;
-        } else {
-          this.currentCFWIndex = 0;
-        }
-      } else {
-        if (this.currentCFWIndex > 0) {
-          this.currentCFWIndex--;
-        } else {
-          this.currentCFWIndex = this.CFWs.length - 1;
-        }
+      if(this.btnCFWStatus) {
+        return;
       }
-      // console.log('handleMouseDownCFW: ',this.CFWs[this.currentCFWIndex]);
-      // this.$refs.CFWContent.innerText = this.CFWs[this.currentCFWIndex];
-      // this.$bus.$emit('cfw-selected', this.currentCFWIndex);
-      console.log('QHYCCD | CFWSelected: ', (this.currentCFWIndex+1));
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'SetCFWPosition:' + (this.currentCFWIndex+1));
-      this.cfwButtonsDisabled = true;
+      this.btnCFWStatus = true;
+      if(this.CFWConnect) {
+        if (direction === 'plus') {
+          if (this.currentCFWIndex < this.CFWs.length - 1) {
+            this.currentCFWIndex++;
+          } else {
+            this.currentCFWIndex = 0;
+          }
+        } else {
+          if (this.currentCFWIndex > 0) {
+            this.currentCFWIndex--;
+          } else {
+            this.currentCFWIndex = this.CFWs.length - 1;
+          }
+        }
+        // console.log('handleMouseDownCFW: ',this.CFWs[this.currentCFWIndex]);
+        // this.$refs.CFWContent.innerText = this.CFWs[this.currentCFWIndex];
+        // this.$bus.$emit('cfw-selected', this.currentCFWIndex);
+        console.log('QHYCCD | CFWSelected: ', (this.currentCFWIndex+1));
+        this.$bus.$emit('SendConsoleLogMsg', 'SetCFWPosition:' + (this.currentCFWIndex+1), 'info');
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'SetCFWPosition:' + (this.currentCFWIndex+1));
+        this.cfwButtonsDisabled = true;
+      } else {
+        this.$bus.$emit('showMsgBox', 'Please connect the Filter Wheels first.', 'error');
+      }
+      this.btnCFWStatus = false;
     },
 
     toggleFocuserPanel() {
+      if(this.btnFocusStatus) {
+        return;
+      }
+      this.btnFocusStatus = true;
       this.$bus.$emit('toggleFocuserPanel');
+      this.btnFocusStatus = false;
     },
     toggleHistogramPanel() {
+      if(this.btnHistStatus) {
+        return;
+      }
+      this.btnHistStatus = true;
       this.$bus.$emit('toggleHistogramPanel');
+      this.btnHistStatus = false;
     },
     CaptureImageSave() {
+      if(this.btnSaveStatus) {
+        return;
+      }
+      this.btnSaveStatus = true;
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'CaptureImageSave');
-      // this.$bus.$emit('mainCanvasZoom');
+      this.btnSaveStatus = false;
     },
 
     CurrentExpTimeList() {
@@ -232,7 +286,8 @@ export default {
       {
         this.ExpTimes[i] = parts[i];
       }
-      this.CurrentExpTimeList();
+
+      // this.CurrentExpTimeList();
     },
 
     CurrentCFWList() {
@@ -251,6 +306,7 @@ export default {
 
     SetCFWPositionSuccess(num) {
       console.log('Set CFW Position Success: ', num);
+      this.$bus.$emit('SendConsoleLogMsg', 'Set CFW Position Success:' + num, 'info');
       this.cfwButtonsDisabled = false;
     },
 
@@ -273,6 +329,43 @@ export default {
         this.isIDLE = true;
       }
     },
+
+    MainCameraTemperature(value) {
+      this.CameraTemperature = value + '°';
+    },
+
+    setSelfExposureTime(time) {
+      if (time != 0 && time != null && time != undefined && time != '' && typeof time === 'number') {
+        if (this.ExpTimes.length > this.ExpTimeNum) {
+          this.ExpTimes.pop();
+        }
+        if (time > 1000)
+        {
+          this.ExpTimes.push((time/1000) + 's');
+        }
+        else
+        {
+          this.ExpTimes.push(time + 'ms');
+        }
+        this.handleExpTimeButtonClick('null');  // 重新同步曝光时间
+      }else{
+        if (this.ExpTimes.length > this.ExpTimeNum) {
+          this.ExpTimes.pop();
+        }
+        this.handleExpTimeButtonClick('null');  // 重新同步曝光时间
+      }
+    },
+
+
+    CFWConnected(num) {
+      if(num === 0){
+        this.CFWConnect = false;
+      } else {
+        this.CFWConnect = true;
+      }
+      console.log('CFW is Connected: ', num);
+      this.$bus.$emit('SendConsoleLogMsg', 'CFW is Connected:' + num, 'info');
+    }
     
   },
   computed: {

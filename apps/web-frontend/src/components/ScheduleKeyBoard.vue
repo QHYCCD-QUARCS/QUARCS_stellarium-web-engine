@@ -1,5 +1,5 @@
 <template>
-  <div class="schedule-keyboard" :style="{ bottom: '0px', right: '100px', left: BoardLeft + 'px', height: '50px' }">
+  <div class="schedule-keyboard" :style="{ bottom: '0px', right: '100px', left: BoardLeft + 'px', height: '50px', zIndex: 200 }">
     <button v-for="button in modeButtons" :key="button.value" @click="handleButtonClick(button)">
       {{ button.label }}
     </button>
@@ -109,6 +109,21 @@ export default {
           return [
             { label: 'ON', value: 'ON' },
             { label: 'OFF', value: 'OFF' },
+          ];
+        case 'ExpDelay':
+          return [
+            { label: 's/ms', value: 's/ms' },
+            { label: '1', value: '1' },
+            { label: '2', value: '2' },
+            { label: '3', value: '3' },
+            { label: '4', value: '4' },
+            { label: '5', value: '5' },
+            { label: '6', value: '6' },
+            { label: '7', value: '7' },
+            { label: '8', value: '8' },
+            { label: '9', value: '9' },
+            { label: '0', value: '0' },
+            { label: 'Delete', value: 'Delete' }
           ];
         default:
           return [];

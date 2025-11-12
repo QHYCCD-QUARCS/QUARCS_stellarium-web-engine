@@ -26,3 +26,8 @@ stellarium-web.includes
 stellarium-web.creator.user
 stellarium-web.cflags
 stellarium-web.cxxflags
+
+
+# cache files
+node_modules/.cache/
+.sconsign.dblite

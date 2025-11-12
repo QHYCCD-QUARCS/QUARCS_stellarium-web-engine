@@ -23,18 +23,23 @@ export default {
       // 新滑块的数据
       secondPositionX: 190,
       secondDragging: false,
-      secondStartPositionX: 0,
+      secondStartPositionX: 65535,
     };
   },
   created() {
     this.$bus.$on('toggleHistogramPanel', this.setMaxWidth);
     this.$bus.$on('ChangeDialPosition', this.ChangeDialPosition);
   },
+  mounted() {
+    window.addEventListener('resize', this.setMaxWidth);
+  },
+  beforeDestroy() {
+    window.removeEventListener('resize', this.setMaxWidth);
+  },
   methods: {
     setMaxWidth() {
       const Width = window.innerWidth;
-      this.width = Width - 350;
-      this.secondPositionX = this.width;
+      this.width = Math.min(Width - 350, 490);
     },
     startDrag(event) {
       event.preventDefault(); // 阻止默认触摸事件
@@ -66,7 +71,7 @@ export default {
       
       const HistMin = this.mappedWidth(this.positionX);
       const HistMax = this.mappedWidth(this.secondPositionX);
-      console.log("Hist Num:", HistMin, HistMax);
+      console.log("Hist Num:", HistMin, HistMax, "(16-bit range)");
       this.$bus.$emit('HandleHistogramNum', HistMin, HistMax);
     },
 
@@ -99,7 +104,7 @@ export default {
 
       const HistMin = this.mappedWidth(this.positionX);
       const HistMax = this.mappedWidth(this.secondPositionX);
-      console.log("Hist Num:", HistMin, HistMax);
+      console.log("Hist Num:", HistMin, HistMax, "(16-bit range)");
       this.$bus.$emit('HandleHistogramNum', HistMin, HistMax);
     },
     
@@ -115,15 +120,15 @@ export default {
       if (this.secondDragging) {
         const clientX = event.touches ? event.touches[0].clientX : event.clientX;
         const newSecondPositionX = clientX - this.secondStartPositionX;
-
-        this.secondStartPositionX = Math.max(this.positionX, Math.min(newSecondPositionX, this.width));
-        this.secondStartPositionX = Math.max(this.DialWidth, Math.min(newSecondPositionX, this.width));
-
-        if (this.secondStartPositionX - this.positionX < this.DialWidth) {
-          this.positionX = this.secondStartPositionX - this.DialWidth;
+        
+        // 关键修复：更新正确的变量，使用一次赋值
+        this.secondPositionX = Math.max(this.positionX + this.DialWidth, 
+                                  Math.min(newSecondPositionX, this.width));
+        
+        // 保持最小间距
+        if (this.secondPositionX - this.positionX < this.DialWidth) {
+          this.positionX = this.secondPositionX - this.DialWidth;
         }
-
-        // console.log("Width:", this.width, "PositionX:", this.positionX, "SecondPositionX:", this.secondPositionX);
       }
     },
     stopSecondDrag() {
@@ -133,21 +138,21 @@ export default {
       
       const HistMin = this.mappedWidth(this.positionX);
       const HistMax = this.mappedWidth(this.secondPositionX);
-      console.log("Hist Num:", HistMin, HistMax);
+      console.log("Hist Num:", HistMin, HistMax, "(16-bit range)");
       this.$bus.$emit('HandleHistogramNum', HistMin, HistMax);
     },
 
     startSecondDragMobile(event) {
       event.preventDefault();
       this.secondDragging = true;
-      this.startsecondPositionX = event.touches[0].clientX - this.secondPositionX;
-      document.addEventListener("touchmove", this.onDragMobile);
-      document.addEventListener("touchend", this.stopDragMobile);
+      this.secondStartPositionX = event.touches[0].clientX - this.secondPositionX;
+      document.addEventListener("touchmove", this.onSecondDragMobile);
+      document.addEventListener("touchend", this.stopSecondDragMobile);
     },
     onSecondDragMobile(event) {
       if (this.secondDragging) {
         const clientX = event.touches[0].clientX;
-        const newSecondPositionX = clientX - this.startsecondPositionX;
+        const newSecondPositionX = clientX - this.secondStartPositionX;
         // 确保滑块在组件范围内
         this.secondPositionX = Math.max(this.positionX, Math.min(newSecondPositionX, this.width));
         this.secondPositionX = Math.max(this.DialWidth, Math.min(newSecondPositionX, this.width));
@@ -161,23 +166,23 @@ export default {
     },
     stopSecondDragMobile() {
       this.secondDragging = false;
-      document.removeEventListener("touchmove", this.onDragMobile);
-      document.removeEventListener("touchend", this.stopDragMobile);
+      document.removeEventListener("touchmove", this.onSecondDragMobile);
+      document.removeEventListener("touchend", this.stopSecondDragMobile);
 
       const HistMin = this.mappedWidth(this.positionX);
       const HistMax = this.mappedWidth(this.secondPositionX);
-      console.log("Hist Num:", HistMin, HistMax);
+      console.log("Hist Num:", HistMin, HistMax, "(16-bit range)");
       this.$bus.$emit('HandleHistogramNum', HistMin, HistMax);
     },
 
     ChangeDialPosition(min, max) {
-      this.positionX = Math.round((min / 255) * this.width);
-      this.secondPositionX = Math.round((max / 255) * this.width);
+      this.positionX = Math.round((min / 65535) * this.width);
+      this.secondPositionX = Math.round((max / 65535) * this.width);
     },
     
     mappedWidth(position) {
-      // 映射原始的 width 到 0-255 的范围
-      return Math.round((position / this.width) * 255);
+      // 映射原始的 width 到 0-65535 的范围(16位)
+      return Math.round((position / this.width) * 65535);
     },
   },
 };

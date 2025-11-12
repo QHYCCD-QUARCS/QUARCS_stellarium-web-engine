@@ -1,6 +1,15 @@
+const CopyWebpackPlugin = require('copy-webpack-plugin');
+const path = require('path');
+
 module.exports = {
   runtimeCompiler: true,
   publicPath: process.env.CDN_ENV ? process.env.CDN_ENV : '/',
+  productionSourceMap: true,
+
+  devServer: {
+    https: false,  // 禁用HTTPS
+    port: 8080
+  },
 
   chainWebpack: config => {
     // workaround taken from webpack/webpack#6642
@@ -15,26 +24,6 @@ module.exports = {
         .loader('file-loader')
         .options({name: '[name].[hash:8].[ext]', outputPath: 'js'})
         .end()
-    config.plugin('copy')
-    .tap(([pathConfigs]) => {
-      if (!pathConfigs || !pathConfigs[0]) {
-        // handle error or return early
-        return [pathConfigs];
-      }
-    
-      const to = pathConfigs[0] && pathConfigs[0].to; // 使用传统的条件检查
-      if (to) {
-        pathConfigs[0].force = true; // so the original `/public` folder keeps priority
-        // add other locations.
-        pathConfigs.unshift({
-          from: '../skydata',
-          to: to + '/skydata',
-        });
-      }
-    
-      return [pathConfigs];
-    })
-    
   },
 
   pluginOptions: {
@@ -49,6 +38,25 @@ module.exports = {
   configureWebpack: {
     optimization: {
       minimize: false
-    }
+    },
+    devtool: 'source-map',
+    plugins: [
+      new CopyWebpackPlugin([
+        // 复制瓦片数据
+        {
+          from: path.resolve(__dirname, '../../tile-server/tiles'),
+          to: 'tiles',
+          ignore: ['**/.DS_Store', '**/Thumbs.db']
+        },
+        // 复制skydata（如果存在）
+        {
+          from: path.resolve(__dirname, '../test-skydata'),
+          to: 'skydata',
+          ignore: ['**/.DS_Store']
+        }
+      ], {
+        copyUnmodified: true
+      })
+    ]
   }
 }

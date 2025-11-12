@@ -7,7 +7,7 @@
  * repository.
  */
 
-var highframeRate = true; // 默认低帧率
+var highframeRate = false; // 默认低帧率
 
 Module.afterInit(function() {
   if (!Module.canvas) return;

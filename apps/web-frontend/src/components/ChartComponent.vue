@@ -1,19 +1,19 @@
 <template>
 <transition name="panel">
-  <div class="chart-panel" :style="{ bottom: bottom + 'px', left: left + 'px', right: right + 'px', height: height + 'px' }">
+  <div class="chart-panel" :style="{ bottom: bottom + 'px', left: ComponentPadding + 'px', right: ComponentPadding + 'px', height: height + 'px' }">
     <LineChart ref="linechart" class="line-chart"/>
     
     <ScatterChart ref="scatterchart" class="scatter-chart"/>
 
     <div class="buttons-container">
 
-      <!-- <button :class="GuiderSwitchBtnClass" :style="{ animationDuration: ExpTime + 'ms' }" @touchend="GuiderSwitch">
+      <button :class="LoopExpSwitchBtnClass" :style="{ animationDuration: ExpTime + 'ms' }" @click="LoopExpSwitch" @touchend.prevent="LoopExpSwitch">
         <div style="display: flex; justify-content: center; align-items: center;">
-          <img src="@/assets/images/svg/ui/Guider.svg" height="20px" style="min-height: 20px; pointer-events: none;"></img>
+          <img src="@/assets/images/svg/ui/GuiderLoopExp.svg" height="20px" style="min-height: 20px; pointer-events: none;"></img>
         </div>
-      </button> -->
+      </button>
 
-      <button :class="GuiderSwitchBtnClass" :style="{ animationDuration: ExpTime + 'ms' }" 
+      <button class="btn-Style" :class="GuiderSwitchBtnClass"
         @mousedown="startPress" @mouseup="endPress"
         @touchstart="startPress" @touchend="endPress">
         <div style="display: flex; justify-content: center; align-items: center;">
@@ -21,7 +21,7 @@
         </div>
       </button>
 
-      <button class="btn-Style" @touchend="ExpTimeSwitch">
+      <button class="btn-Style" @click="ExpTimeSwitch" @touchend.prevent="ExpTimeSwitch">
         <span v-if="ExpTime === 1000">
           <div style="display: flex; justify-content: center; align-items: center;">
             <img src="@/assets/images/svg/ui/Exp-1000.svg" height="25px" style="min-height: 25px; pointer-events: none;"></img>
@@ -39,13 +39,13 @@
         </span>
       </button>
 
-      <button class="btn-Style" @touchend="DataClear">
+      <button class="btn-Style" @click="DataClear" @touchend.prevent="DataClear">
         <div style="display: flex; justify-content: center; align-items: center;">
           <img src="@/assets/images/svg/ui/delete.svg" height="20px" style="min-height: 20px; pointer-events: none;"></img>
         </div>
       </button>
 
-      <button class="btn-Style" @touchend="RangeSwitch">
+      <button class="btn-Style" @click="RangeSwitch" @touchend.prevent="RangeSwitch">
         <div style="display: flex; justify-content: center; align-items: center;">
           <img src="@/assets/images/svg/ui/suofang.svg" height="20px" style="min-height: 20px; pointer-events: none;"></img>
         </div>
@@ -66,17 +66,19 @@ export default {
   data() {
     return {
       bottom: 10,
-      left: 170,
-      right: 170,
+      ComponentPadding: 0,
       height: 90,
       ExpTime: 1000,
       isGuiding: false,
+      isLoopping: false,
       CurrentGuiderStatus: 'null',
 
       pressTimer: null,
       longPressThreshold: 1000,
       isLongPress: false, // 标记是否为长按
       canClick: true,
+
+      GuiderConnect: false,
 
     };
   },
@@ -86,18 +88,23 @@ export default {
   },
   created() {
     this.$bus.$on('GuiderSwitchStatus', this.GuiderSwitchStatus);
+    this.$bus.$on('GuiderLoopExpStatus', this.GuiderLoopExpStatus);
     this.$bus.$on('GuiderStatus', this.GuiderStatus);
+    this.$bus.$on('GuiderConnected', this.GuiderConnected);
   },
   mounted() {
-    this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getGuiderSwitchStatus');
+    this.updatePosition(); // 初始化位置
+    window.addEventListener('resize', this.updatePosition);
+  },
+  beforeDestroy() {
+    window.removeEventListener('resize', this.updatePosition);
   },
   computed: {
     GuiderSwitchBtnClass() {
+      if(!this.isGuiding) {
+        return 'btn-null';
+      } else {
         return [
-          {
-            'btn-Guider-true': this.isGuiding, 
-            'btn-Guider-false': !this.isGuiding, 
-          },
           {
             'btn-InGuiding': this.CurrentGuiderStatus === 'InGuiding',
             'btn-InCalibration': this.CurrentGuiderStatus === 'InCalibration',
@@ -105,9 +112,29 @@ export default {
             'btn-null': this.CurrentGuiderStatus === 'null',
           }
         ];
+      }
+    },
+    LoopExpSwitchBtnClass() {
+        return [
+          {
+            'btn-LoopExp-true': this.isLoopping, 
+            'btn-LoopExp-false': !this.isLoopping, 
+          },
+        ];
     }
   },
   methods: {
+    updatePosition() {
+      const screenWidth = window.innerWidth;
+      const halfWidth = screenWidth / 2 - 250;
+      this.ComponentPadding = Math.max(halfWidth, 170);
+      // console.log('Updated Padding:', this.ComponentPadding);
+
+      // 计算宽度
+      const newWidth = screenWidth - (this.ComponentPadding * 2);
+      // console.log('update LineChart Width:', newWidth);
+      this.$bus.$emit('updateLineChartWidth', newWidth);
+    },
     startPress() {
       this.isLongPress = false; // 重置长按标记
       this.pressTimer = setTimeout(() => {
@@ -143,7 +170,19 @@ export default {
     },
 
     GuiderSwitch() {
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'GuiderSwitch');
+      if(this.isLoopping) {
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'GuiderSwitch:'+!this.isGuiding);
+      } else {
+        this.$bus.$emit('showMsgBox', 'Please open the loop exposure first.', 'error');
+      }
+    },
+
+    LoopExpSwitch() {
+      if (this.GuiderConnect) {
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'GuiderLoopExpSwitch:' + !this.isLoopping);
+      } else {
+        this.$bus.$emit('showMsgBox', 'Please connect the Guider camera first.', 'error');
+      }
     },
 
     ExpTimeSwitch() {
@@ -168,6 +207,16 @@ export default {
       console.log('GuiderSwitchStatus:', this.isGuiding);
     },
 
+    GuiderLoopExpStatus(value) {
+      if(value === 'true') {
+        this.isLoopping = true;
+      } else {
+        this.isLoopping = false;
+        this.isGuiding = false;
+      }
+      console.log('GuiderLoopExpSwitchStatus:', this.isLoopping);
+    },
+
     GuiderStatus(status) {
       if(status === 'InGuiding') {
         this.CurrentGuiderStatus = 'InGuiding';
@@ -178,13 +227,24 @@ export default {
         this.$bus.$emit('showMsgBox', 'Lost guiding star target.', 'error');
       }
       console.log('GuiderStatus:', this.CurrentGuiderStatus);
+      this.$bus.$emit('SendConsoleLogMsg', 'GuiderStatus:' + this.CurrentGuiderStatus, 'info');
     },
     
     DataClear() {
       this.$bus.$emit('clearChartData');
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'clearGuiderData');
     },
     RangeSwitch() {
       this.$bus.$emit('ChartRangeSwitch');
+    },
+    GuiderConnected(num) {
+      if(num === 0){
+        this.GuiderConnect = false;
+        // this.$bus.$emit('showMsgBox', 'Guider is not connected.', 'error');
+      } else {
+        this.GuiderConnect = true;
+        // this.$bus.$emit('showMsgBox', 'Guider is connected.', 'info');
+      }
     },
   }
 }
@@ -198,7 +258,6 @@ export default {
   border-radius: 10px;
   border: 4px solid rgba(128, 128, 128, 0.5);
   box-sizing: border-box;
-  transition: width 0.2s ease;
 }
 
 @keyframes showPanelAnimation {
@@ -260,7 +319,7 @@ export default {
   box-sizing: border-box;
 }
 
-.btn-Guider-false {
+.btn-LoopExp-false {
   width: 30px;
   height: 30px; 
 
@@ -272,7 +331,7 @@ export default {
   box-sizing: border-box;
 }
 
-.btn-Guider-true {
+.btn-LoopExp-true {
   width: 30px;
   height: 30px; 
 
@@ -291,7 +350,7 @@ export default {
     transform: rotate(0deg);
   }
   to {
-    transform: rotate(90deg);
+    transform: rotate(-180deg);
   }
 }
 

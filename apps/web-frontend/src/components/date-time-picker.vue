@@ -7,17 +7,17 @@
 // repository.
 
 <template>
-  <v-card width="400" style="backdrop-filter: blur(5px); background-color: rgba(64, 64, 64, 0.5);">
+  <v-card width="400" style="backdrop-filter: blur(5px); background-color: rgba(64, 64, 64, 0.5);" class="dateTimePicker">
     <v-container>
       <v-row justify="space-between" no-gutters class="ma-3">
         <div>
-          <v-btn text icon class="up_down_bt" style="margin-left: 16px" @mousedown="incTime('years')" @touchstart.prevent="incTime('years')"><v-icon>mdi-menu-up</v-icon></v-btn>
-          <v-btn text icon class="up_down_bt" style="margin-left: 21px" @mousedown="incTime('months')" @touchstart.prevent="incTime('months')"><v-icon>mdi-menu-up</v-icon></v-btn>
-          <v-btn text icon class="up_down_bt" style="margin-left: 8px"  @mousedown="incTime('days')" @touchstart.prevent="incTime('days')"><v-icon>mdi-menu-up</v-icon></v-btn>
+          <v-btn text icon class="up_down_bt" style="margin-left: 16px" @mousedown="incTime('years')" @mouseup="synchronizeTime" @touchstart.prevent="incTime('years')" @touchend.prevent="synchronizeTime"><v-icon>mdi-menu-up</v-icon></v-btn>
+          <v-btn text icon class="up_down_bt" style="margin-left: 21px" @mousedown="incTime('months')" @mouseup="synchronizeTime" @touchstart.prevent="incTime('months')" @touchend.prevent="synchronizeTime"><v-icon>mdi-menu-up</v-icon></v-btn>
+          <v-btn text icon class="up_down_bt" style="margin-left: 8px"  @mousedown="incTime('days')" @mouseup="synchronizeTime" @touchstart.prevent="incTime('days')" @touchend.prevent="synchronizeTime  "><v-icon>mdi-menu-up</v-icon></v-btn>
           <h1>{{ date }}</h1>
-          <v-btn text icon class="up_down_bt" style="margin-left: 16px" @mousedown="decTime('years')" @touchstart.prevent="decTime('years')"><v-icon>mdi-menu-down</v-icon></v-btn>
-          <v-btn text icon class="up_down_bt" style="margin-left: 21px" @mousedown="decTime('months')" @touchstart.prevent="decTime('months')"><v-icon>mdi-menu-down</v-icon></v-btn>
-          <v-btn text icon class="up_down_bt" style="margin-left: 8px"  @mousedown="decTime('days')" @touchstart.prevent="decTime('days')"><v-icon>mdi-menu-down</v-icon></v-btn>
+          <v-btn text icon class="up_down_bt" style="margin-left: 16px" @mousedown="decTime('years')" @mouseup="synchronizeTime" @touchstart.prevent="decTime('years')" @touchend.prevent="synchronizeTime"><v-icon>mdi-menu-down</v-icon></v-btn>
+          <v-btn text icon class="up_down_bt" style="margin-left: 21px" @mousedown="decTime('months')" @mouseup="synchronizeTime" @touchstart.prevent="decTime('months')" @touchend.prevent="synchronizeTime  "><v-icon>mdi-menu-down</v-icon></v-btn>
+          <v-btn text icon class="up_down_bt" style="margin-left: 8px"  @mousedown="decTime('days')" @mouseup="synchronizeTime" @touchstart.prevent="decTime('days')" @touchend.prevent="synchronizeTime  "><v-icon>mdi-menu-down</v-icon></v-btn>
         </div>
         <div>
         <div>
@@ -38,13 +38,13 @@
         </div>
         </div>
         <div>
-          <v-btn text icon class="up_down_bt" @mousedown="incTime('hours')" @touchstart.prevent="incTime('hours')"><v-icon>mdi-menu-up</v-icon></v-btn>
-          <v-btn text icon class="up_down_bt ml-1" @mousedown="incTime('minutes')" @touchstart.prevent="incTime('minutes')"><v-icon>mdi-menu-up</v-icon></v-btn>
-          <v-btn text icon class="up_down_bt ml-1" @mousedown="incTime('seconds')" @touchstart.prevent="incTime('seconds')"><v-icon>mdi-menu-up</v-icon></v-btn>
+          <v-btn text icon class="up_down_bt" @mousedown="incTime('hours')" @mouseup="synchronizeTime" @touchstart.prevent="incTime('hours')" @touchend.prevent="synchronizeTime"><v-icon>mdi-menu-up</v-icon></v-btn>
+          <v-btn text icon class="up_down_bt ml-1" @mousedown="incTime('minutes')" @mouseup="synchronizeTime" @touchstart.prevent="incTime('minutes')" @touchend.prevent="synchronizeTime"><v-icon>mdi-menu-up</v-icon></v-btn>
+          <v-btn text icon class="up_down_bt ml-1" @mousedown="incTime('seconds')" @mouseup="synchronizeTime" @touchstart.prevent="incTime('seconds')" @touchend.prevent="synchronizeTime"><v-icon>mdi-menu-up</v-icon></v-btn>
           <h1 class="ml-2">{{ time }}</h1>
-          <v-btn text icon class="up_down_bt" @mousedown="decTime('hours')" @touchstart.prevent="decTime('hours')"><v-icon>mdi-menu-down</v-icon></v-btn>
-          <v-btn text icon class="up_down_bt ml-1" @mousedown="decTime('minutes')" @touchstart.prevent="decTime('minutes')"><v-icon>mdi-menu-down</v-icon></v-btn>
-          <v-btn text icon class="up_down_bt ml-1" @mousedown="decTime('seconds')" @touchstart.prevent="decTime('seconds')"><v-icon>mdi-menu-down</v-icon></v-btn>
+          <v-btn text icon class="up_down_bt" @mousedown="decTime('hours')" @mouseup="synchronizeTime" @touchstart.prevent="decTime('hours')" @touchend.prevent="synchronizeTime"><v-icon>mdi-menu-down</v-icon></v-btn>
+          <v-btn text icon class="up_down_bt ml-1" @mousedown="decTime('minutes')" @mouseup="synchronizeTime" @touchstart.prevent="decTime('minutes')" @touchend.prevent="synchronizeTime"><v-icon>mdi-menu-down</v-icon></v-btn>
+          <v-btn text icon class="up_down_bt ml-1" @mousedown="decTime('seconds')" @mouseup="synchronizeTime" @touchstart.prevent="decTime('seconds')" @touchend.prevent="synchronizeTime"><v-icon>mdi-menu-down</v-icon></v-btn>
         </div>
       </v-row>
     </v-container>
@@ -59,7 +59,9 @@
           <rect width="100%" height="100%" fill="url(#grad1)" />
         </svg>
       </div>
-      <v-slider min="0" max="1439" style="padding: 0px; width: 360px;" v-model="timeMinute" :hint="sliderHint" persistent-hint></v-slider>
+      <v-slider min="0" max="1439" style="padding: 0px; width: 360px;" v-model="timeMinute" :hint="sliderHint" persistent-hint 
+        @mouseup="synchronizeTime" @mouseleave="synchronizeTime" @touchend="synchronizeTime" @touchcancel="synchronizeTime">
+      </v-slider>
     </div>
   </v-card>
 </template>
@@ -145,11 +147,22 @@ export default {
       return this.isTimePaused ? 'mdi-play' : 'mdi-pause'
     }
   },
+  created() {
+    this.$bus.$on('ResetTime', this.resetTime);
+  },
   methods: {
     resetTime: function () {
+      console.log('Reset time')
       const m = Moment()
       m.local()
       this.$emit('input', m.format())
+      
+      // 直接使用新时间进行同步，避免响应式更新延迟
+      const newTime = m.format('HH:mm:ss')
+      const newDate = m.format('YYYY-MM-DD')
+      console.log('Synchronize time:', newTime)
+      console.log('Synchronize date:', newDate)
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'SynchronizeTime:' + newTime + ':' + newDate);
     },
     togglePauseTime: function () {
       this.$stel.core.time_speed = (this.$stel.core.time_speed === 0) ? 1 : 0
@@ -176,6 +189,11 @@ export default {
         clickTimeout = undefined
         nbClickRepeat = 0
       }
+    },
+    synchronizeTime: function () {
+      console.log('Synchronize time:', this.time)
+      console.log('Synchronize date:', this.date)
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'SynchronizeTime:' + this.time + ':' + this.date);
     },
     // 0 means 12:00, 720 means midnight, 1440 (=24*60) means 12:00 the day after
     timeMinuteRangeToUTC: function (tm) {
@@ -224,6 +242,7 @@ export default {
     window.addEventListener('touchend', function (event) {
       that.stopIncTime()
     })
+    this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getClientSettings')
   },
   watch: {
     sliderStartTime: function () {
@@ -242,5 +261,14 @@ export default {
   margin-top: -10px!important;
   margin-left: 0px;
   margin-right: 0px!important;
+}
+
+.dateTimePicker {
+  pointer-events: auto;
+  position: absolute;
+  
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
 }
 </style>

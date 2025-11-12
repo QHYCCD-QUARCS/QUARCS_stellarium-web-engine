@@ -190,9 +190,12 @@ export default {
       if (that.timer) clearInterval(that.timer)
       that.timer = setInterval(() => { that.items = that.computeItems() }, 1000)
 
-      swh.getSkySourceSummaryFromWikipedia(s).then(data => {
-        that.wikipediaData = data
-      }, reason => { })
+      const wikipediaPromise = swh.getSkySourceSummaryFromWikipedia(s)
+      if (wikipediaPromise && typeof wikipediaPromise.then === 'function') {
+        wikipediaPromise.then(data => {
+          that.wikipediaData = data
+        }, reason => { })
+      }
     },
     stelSelectionId: function (s) {
       if (!this.$stel.core.selection) {
@@ -353,6 +356,7 @@ export default {
     printName: function () {
       const Name = this.title;
       console.log('SelectedObject:', Name);
+      this.$bus.$emit('SendConsoleLogMsg', 'SelectedObject:' + Name, 'info');
       this.$bus.$emit('insertObjName',Name);
 
       // Math.floor(this.TargetRa * 100) / 100;
