@@ -44,6 +44,8 @@ export default {
   },
   created() {
     this.$bus.$on('toggleSchedulePanel', this.setBtnHeight);
+    // 监听计划任务完成事件，重置按钮状态
+    this.$bus.$on('ScheduleComplete', this.onScheduleComplete);
   },
   methods: {
     toggleMore() {
@@ -88,7 +90,10 @@ export default {
         this.$bus.$emit('getTableData', true);
       }
     },
-
+    onScheduleComplete() {
+      // 计划任务完成，重置按钮状态为未运行状态
+      this.isScheduleRunning = false;
+    },
     
   }
 }
