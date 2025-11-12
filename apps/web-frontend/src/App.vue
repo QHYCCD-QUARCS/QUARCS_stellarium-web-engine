@@ -91,11 +91,18 @@
               </v-text-field>
 
               <!-- 数字输入类型 -->
-              <v-text-field v-if="item.inputType === 'number'" v-model="item.value" :label="$t(item.label)"
+              <v-text-field v-if="item.inputType === 'number'" 
+                :value="isMobile && currentKeyboardItem === item ? keyboardInputValue : item.value"
+                :label="$t(item.label)"
                 :type="isDesktop ? 'number' : 'text'" :min="item.min" :max="item.max"
                 :step="item.step !== undefined && item.step !== null ? item.step : 1" :rules="numberRules(item)"
-                :inputmode="isMobile ? getInputMode(item) : ''" :pattern="isMobile ? getPattern(item) : ''"
-                enterkeyhint="done" @blur="onNumberCommit(item)" @keydown.enter.prevent="onNumberCommit(item)"
+                :inputmode="isMobile ? 'none' : ''" :readonly="isMobile"
+                enterkeyhint="done" 
+                @blur="isMobile ? handleNumberBlur(item) : onNumberCommit(item)" 
+                @keydown.enter.prevent="onNumberCommit(item)"
+                @focus="isMobile ? openNumberKeyboard(item, $event) : null"
+                @click="isMobile ? openNumberKeyboard(item, $event) : null"
+                @input="!isMobile ? (item.value = $event) : null"
                 class="config-input" />
 
               <!-- 滑动条类型 -->
@@ -601,6 +608,19 @@
       @cancel="onRaDecDialogCancel" 
     />
 
+    <!-- 数字键盘组件 -->
+    <NumberKeyboard
+      :visible="showNumberKeyboard"
+      :allow-decimal="currentKeyboardItem ? allowsDecimal(currentKeyboardItem) : false"
+      :allow-negative="currentKeyboardItem ? allowsNegative(currentKeyboardItem) : false"
+      :title="currentKeyboardItem ? $t(currentKeyboardItem.label) : ''"
+      :current-value="keyboardInputValue"
+      @input="handleKeyboardInput"
+      @backspace="handleKeyboardBackspace"
+      @confirm="handleKeyboardConfirm"
+      @close="closeNumberKeyboard"
+    />
+
   </v-app>
 </template>
 <script>
@@ -614,6 +634,7 @@ import ErrorImage from '@/assets/images/svg/ui/errorImage.svg';
 import ProgressBar from '@/components/ProgressBar.vue';
 import MeridianFlipNotifier from '@/components/MeridianFlipNotifier.vue';
 import RaDecDialog from '@/components/RaDecDialog.vue';
+import NumberKeyboard from '@/components/NumberKeyboard.vue';
 
 let glTestCircle;
 let glLayer;
@@ -945,6 +966,11 @@ export default {
       },
 
       showRaDecDialog: false, // 控制是否显示设置GOTO目标对话框
+
+      // 数字键盘相关状态
+      showNumberKeyboard: false,
+      currentKeyboardItem: null, // 当前正在编辑的配置项
+      keyboardInputValue: '', // 键盘输入的值
     }
   },
   components: {
@@ -953,6 +979,7 @@ export default {
     ProgressBar,
     MeridianFlipNotifier,
     RaDecDialog,
+    NumberKeyboard,
     // MessageBox,
   },
   created() {
@@ -1117,6 +1144,152 @@ export default {
       // 回写并通知
       item.value = v;
       this.handleConfigChange(item.label, v);
+    },
+
+    // 数字键盘相关方法
+    openNumberKeyboard(item, event) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      
+      // 如果点击的是同一个输入框，且键盘已打开，不处理
+      if (this.currentKeyboardItem === item && this.showNumberKeyboard) {
+        return;
+      }
+      
+      // 如果点击的是不同的输入框，直接切换
+      if (this.currentKeyboardItem !== item && this.showNumberKeyboard) {
+        // 先关闭当前键盘，应用当前输入的值
+        this.closeNumberKeyboard();
+        // 立即打开新键盘（不等待关闭动画）
+        this.$nextTick(() => {
+          this.currentKeyboardItem = item;
+          this.keyboardInputValue = String(item.value || '');
+          this.showNumberKeyboard = true;
+        });
+        return;
+      }
+      
+      // 阻止系统键盘弹出
+      if (event && event.target) {
+        event.target.blur();
+        // 减少延迟，加快响应速度
+        setTimeout(() => {
+          this.currentKeyboardItem = item;
+          this.keyboardInputValue = String(item.value || '');
+          this.showNumberKeyboard = true;
+        }, 30);
+      } else {
+        this.currentKeyboardItem = item;
+        this.keyboardInputValue = String(item.value || '');
+        this.showNumberKeyboard = true;
+      }
+    },
+
+    handleNumberBlur(item) {
+      // 在移动设备上，blur 事件可能由点击键盘外部触发
+      // 延迟处理，避免与键盘点击冲突
+      setTimeout(() => {
+        if (this.currentKeyboardItem === item && !this.showNumberKeyboard) {
+          // 键盘已关闭，应用输入的值
+          this.onNumberCommit(item);
+        }
+      }, 200);
+    },
+
+    closeNumberKeyboard() {
+      if (this.currentKeyboardItem) {
+        // 如果关闭时没有确认，应用输入的值
+        const item = this.currentKeyboardItem;
+        if (this.keyboardInputValue !== String(item.value || '')) {
+          const value = this._toNumber(this.keyboardInputValue);
+          if (Number.isFinite(value)) {
+            item.value = value;
+            this.onNumberCommit(item);
+          }
+        }
+      }
+      this.showNumberKeyboard = false;
+      // 减少延迟，加快响应
+      setTimeout(() => {
+        this.currentKeyboardItem = null;
+        this.keyboardInputValue = '';
+      }, 150);
+    },
+
+    handleKeyboardInput(key) {
+      if (!this.currentKeyboardItem) return;
+
+      let current = this.keyboardInputValue || '';
+
+      // 处理负号
+      if (key === '-') {
+        if (current.startsWith('-')) {
+          current = current.substring(1);
+        } else {
+          current = '-' + current;
+        }
+        this.keyboardInputValue = current;
+        return;
+      }
+
+      // 处理小数点
+      if (key === '.') {
+        if (current.includes('.')) {
+          return; // 已有小数点，不添加
+        }
+        if (current === '' || current === '-') {
+          current = current + '0.';
+        } else {
+          current = current + '.';
+        }
+        this.keyboardInputValue = current;
+        return;
+      }
+
+      // 处理数字
+      if (/[0-9]/.test(key)) {
+        // 如果当前是 '0'，替换为新数字
+        if (current === '0') {
+          current = key;
+        } else {
+          current = current + key;
+        }
+        this.keyboardInputValue = current;
+      }
+    },
+
+    handleKeyboardBackspace() {
+      if (!this.currentKeyboardItem) return;
+      let current = this.keyboardInputValue || '';
+      if (current.length > 0) {
+        this.keyboardInputValue = current.substring(0, current.length - 1);
+      }
+    },
+
+    handleKeyboardConfirm() {
+      if (!this.currentKeyboardItem) return;
+
+      const item = this.currentKeyboardItem;
+      let value = this.keyboardInputValue;
+
+      // 如果为空，保持原值或设为0
+      if (value === '' || value === '-') {
+        value = item.value || 0;
+      } else {
+        value = this._toNumber(value);
+        if (!Number.isFinite(value)) {
+          value = item.value || 0;
+        }
+      }
+
+      // 应用验证和限制
+      item.value = value;
+      this.onNumberCommit(item);
+
+      // 关闭键盘
+      this.closeNumberKeyboard();
     },
     checkMemoryUsage() {
       if (window.performance && window.performance.memory) {

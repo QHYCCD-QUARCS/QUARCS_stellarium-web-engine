@@ -11,10 +11,32 @@
   <v-container v-if="$store.state.showLocationDialog" class="secondary white--text">
     <v-row>
       <v-col cols="4">
-        <v-text-field v-model="manualLatitude" label="Latitude" placeholder="Enter latitude"></v-text-field>
+        <v-text-field 
+          :value="isMobile && currentKeyboardItem === 'manualLatitude' ? keyboardInputValue : manualLatitude"
+          label="Latitude" 
+          placeholder="Enter latitude"
+          :type="isDesktop ? 'number' : 'text'"
+          :inputmode="isMobile ? 'none' : ''"
+          :readonly="isMobile"
+          @input="!isMobile ? (manualLatitude = $event) : null"
+          @focus="isMobile ? openNumberKeyboard('manualLatitude', $event) : null"
+          @click="isMobile ? openNumberKeyboard('manualLatitude', $event) : null"
+          @blur="isMobile ? handleNumberBlur('manualLatitude') : null"
+        ></v-text-field>
       </v-col>
       <v-col cols="4">
-        <v-text-field v-model="manualLongitude" label="Longitude" placeholder="Enter longitude"></v-text-field>
+        <v-text-field 
+          :value="isMobile && currentKeyboardItem === 'manualLongitude' ? keyboardInputValue : manualLongitude"
+          label="Longitude" 
+          placeholder="Enter longitude"
+          :type="isDesktop ? 'number' : 'text'"
+          :inputmode="isMobile ? 'none' : ''"
+          :readonly="isMobile"
+          @input="!isMobile ? (manualLongitude = $event) : null"
+          @focus="isMobile ? openNumberKeyboard('manualLongitude', $event) : null"
+          @click="isMobile ? openNumberKeyboard('manualLongitude', $event) : null"
+          @blur="isMobile ? handleNumberBlur('manualLongitude') : null"
+        ></v-text-field>
       </v-col>
       <v-col cols="4">
         <v-spacer></v-spacer>
@@ -26,14 +48,31 @@
     </v-card>
     <location-mgr v-on:locationSelected="setLocation" :knownLocations="[]" :startLocation="$store.state.currentLocation" :realLocation="$store.state.autoDetectedLocation"></location-mgr>
     
+    <!-- 数字键盘组件 -->
+    <NumberKeyboard
+      :visible="showNumberKeyboard"
+      :allow-decimal="true"
+      :allow-negative="true"
+      :title="getKeyboardTitle()"
+      :current-value="keyboardInputValue"
+      @input="handleKeyboardInput"
+      @backspace="handleKeyboardBackspace"
+      @confirm="handleKeyboardConfirm"
+      @close="closeNumberKeyboard"
+    />
   </v-container>
 </v-dialog>
 </template>
 
 <script>
 import LocationMgr from '@/components/location-mgr.vue'
+import NumberKeyboard from '@/components/NumberKeyboard.vue'
 
 export default {
+  components: {
+    LocationMgr,
+    NumberKeyboard
+  },
   data: function () {
     return {
       useAutoLocation: true,
@@ -41,10 +80,26 @@ export default {
       manualLongitude: '',
       locationLat: '',
       locationLon: '',
+      // 数字键盘相关
+      showNumberKeyboard: false,
+      currentKeyboardItem: null,
+      keyboardInputValue: ''
     }
-
   },
   computed: {
+    isMobile() {
+      var ua = navigator.userAgent || '';
+      var touch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+      var uaDataMobile = null;
+      if (navigator.userAgentData && typeof navigator.userAgentData.mobile !== 'undefined') {
+        uaDataMobile = navigator.userAgentData.mobile;
+      }
+      var mobileLike = /Android|iPhone|iPad|iPod|Mobile|Tablet/i.test(ua);
+      return (uaDataMobile !== null ? uaDataMobile : mobileLike) && !!touch;
+    },
+    isDesktop() {
+      return !this.isMobile;
+    }
     // useAutoLocation: {
     //   get: function () {
     //     return this.$store.state.useAutoLocation
@@ -205,9 +260,133 @@ export default {
       } catch (error) {
         this.$bus.$emit('SendConsoleLogMsg', `位置处理错误: ${error.message}`, 'error');
       }
+    },
+    // 数字键盘相关方法
+    getKeyboardTitle() {
+      if (this.currentKeyboardItem === 'manualLatitude') {
+        return this.$t('latitude') || 'Latitude';
+      } else if (this.currentKeyboardItem === 'manualLongitude') {
+        return this.$t('longitude') || 'Longitude';
+      }
+      return '';
+    },
+    openNumberKeyboard(item, event) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      
+      // 如果点击的是同一个输入框，且键盘已打开，不处理
+      if (this.currentKeyboardItem === item && this.showNumberKeyboard) {
+        return;
+      }
+      
+      // 如果点击的是不同的输入框，直接切换
+      if (this.currentKeyboardItem !== item && this.showNumberKeyboard) {
+        this.closeNumberKeyboard();
+        this.$nextTick(() => {
+          this.currentKeyboardItem = item;
+          this.keyboardInputValue = String(this[item] || '');
+          this.showNumberKeyboard = true;
+        });
+        return;
+      }
+      
+      if (event && event.target) {
+        event.target.blur();
+        setTimeout(() => {
+          this.currentKeyboardItem = item;
+          this.keyboardInputValue = String(this[item] || '');
+          this.showNumberKeyboard = true;
+        }, 30);
+      } else {
+        this.currentKeyboardItem = item;
+        this.keyboardInputValue = String(this[item] || '');
+        this.showNumberKeyboard = true;
+      }
+    },
+    closeNumberKeyboard() {
+      if (this.currentKeyboardItem) {
+        const item = this.currentKeyboardItem;
+        if (this.keyboardInputValue !== String(this[item] || '')) {
+          const value = parseFloat(this.keyboardInputValue);
+          if (!isNaN(value)) {
+            this[item] = value;
+          }
+        }
+      }
+      this.showNumberKeyboard = false;
+      setTimeout(() => {
+        this.currentKeyboardItem = null;
+        this.keyboardInputValue = '';
+      }, 150);
+    },
+    handleKeyboardInput(key) {
+      if (!this.currentKeyboardItem) return;
+      let current = this.keyboardInputValue || '';
+      
+      if (key === '-') {
+        if (current.startsWith('-')) {
+          current = current.substring(1);
+        } else {
+          current = '-' + current;
+        }
+        this.keyboardInputValue = current;
+        return;
+      }
+      
+      if (key === '.') {
+        if (current.includes('.')) return;
+        if (current === '' || current === '-') {
+          current = current + '0.';
+        } else {
+          current = current + '.';
+        }
+        this.keyboardInputValue = current;
+        return;
+      }
+      
+      if (/[0-9]/.test(key)) {
+        if (current === '0') {
+          current = key;
+        } else {
+          current = current + key;
+        }
+        this.keyboardInputValue = current;
+      }
+    },
+    handleKeyboardBackspace() {
+      if (!this.currentKeyboardItem) return;
+      let current = this.keyboardInputValue || '';
+      if (current.length > 0) {
+        this.keyboardInputValue = current.substring(0, current.length - 1);
+      }
+    },
+    handleKeyboardConfirm() {
+      if (!this.currentKeyboardItem) return;
+      const item = this.currentKeyboardItem;
+      let value = this.keyboardInputValue;
+      
+      if (value === '' || value === '-') {
+        value = this[item] || 0;
+      } else {
+        value = parseFloat(value);
+        if (isNaN(value)) {
+          value = this[item] || 0;
+        }
+      }
+      
+      this[item] = value;
+      this.closeNumberKeyboard();
+    },
+    handleNumberBlur(item) {
+      setTimeout(() => {
+        if (this.currentKeyboardItem === item && !this.showNumberKeyboard) {
+          // 可以在这里添加验证逻辑
+        }
+      }, 200);
     }
   },
-  components: { LocationMgr },
   watch: {
     useAutoLocation: function (newVal, oldVal) {
       // 这个函数将在 useAutoLocation 改变时被调用
