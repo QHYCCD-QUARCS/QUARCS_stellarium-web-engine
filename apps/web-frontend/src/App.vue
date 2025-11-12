@@ -2657,6 +2657,15 @@ export default {
 
                 }
                 break;
+              case 'PolarAlignmentGuidanceStepProgress':
+                if (parts.length === 4) {
+                  const step = parseInt(parts[1]);
+                  const message = parts[2];
+                  const starCount = parseInt(parts[3]);
+                  console.log('PolarAlignmentGuidanceStepProgress: ', step, message, starCount);
+                  this.$bus.$emit('PolarAlignmentGuidanceStepProgress', step, message, starCount);
+                }
+                break;
 
               case 'focusMoveFailed':
                 if (parts.length === 2) {

@@ -498,5 +498,19 @@
   "Min Limit": "最小限制",
   "Max Limit": "最大限制",
   "Sync Focuser Step": "同步调焦器步数",
-  "Backlash": "回差"
+  "Backlash": "回差",
+  "Success": "成功",
+  "Failed": "失败",
+  "Waiting": "等待",
+  "Capturing": "拍摄",
+  "Checking": "检查",
+  "Solving": "解析",
+  "Calculating": "计算",
+  "Sending": "发送",
+  "Done": "完成",
+  "Processing": "处理中",
+  "Stars": "星点",
+  "Checking Stars": "检查星点",
+  "Sending Guidance": "发送指导",
+  "Waiting User": "等待用户"
 }
