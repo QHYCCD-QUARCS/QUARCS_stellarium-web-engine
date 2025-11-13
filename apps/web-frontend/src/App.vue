@@ -2927,6 +2927,18 @@ export default {
                   this.reEnableButton('Goto');
                 }
                 break;
+
+              // ===== PHD2 异常退出/重启 =====
+              case 'PHD2ClosedUnexpectedly':
+                // 后端格式: "PHD2ClosedUnexpectedly:是否重新启动PHD2?"
+                {
+                  const text = parts.length >= 2 ? parts.slice(1).join(':') : this.$t('PHD2 closed unexpectedly. Restart now?');
+                  this.ShowConfirmDialog('PHD2', text, 'RestartPHD2');
+                }
+                break;
+              case 'PHD2Restarting':
+                this.callShowMessageBox('Restarting PHD2...', 'info');
+                break;
               default:
                 console.warn('未处理命令: ', data.message);
                 break;

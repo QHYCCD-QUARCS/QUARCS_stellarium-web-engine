@@ -1387,6 +1387,9 @@ export default {
       } else if (this.ConfirmToDo === 'restartQtServer') {
         this.$bus.$emit('AppSendMessage', 'Process_Command_Return', 'restartQtServer');
         window.location.reload();
+      } else if (this.ConfirmToDo === 'RestartPHD2') {
+        // 前端确认重启 PHD2：通知后端执行重启流程
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'RestartPHD2');
       } else if (this.ConfirmToDo.startsWith('updateCurrentClient')) {
         this.$bus.$emit('AppSendMessage', 'Process_Command_Return', this.ConfirmToDo);
         this.showUpdateDialog = true;
