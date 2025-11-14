@@ -1715,6 +1715,9 @@ export default {
           this.addLog(this.$t('Error: Mount Not Connected'), 'error')
           return
         }
+        const camCheck = this.$canUseDevice('MainCamera', 'AutoPolarAlignment')
+        const mountCheck = this.$canUseDevice('Mount', 'AutoPolarAlignment')
+        if (!camCheck.allowed || !mountCheck.allowed) return
         if (this.isCalibrationRunning) {
           this.stopAutoCalibration()
           return
@@ -1730,6 +1733,7 @@ export default {
         }
         
         this.isCalibrationRunning = true
+        this.$startFeature(['MainCamera', 'Mount'], 'AutoPolarAlignment')
         this.resetCalibration()
         this.addLog(this.$t('Starting Auto Calibration'), 'info')
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'StartAutoPolarAlignment')
@@ -1738,6 +1742,7 @@ export default {
       stopAutoCalibration() {
         this.isCalibrationRunning = false
         this.addLog(this.$t('Auto Calibration Stopped'), 'warning')
+        this.$stopFeature(['MainCamera', 'Mount'], 'AutoPolarAlignment')
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'StopAutoPolarAlignment')
       },
       // ========================================
@@ -2297,6 +2302,8 @@ export default {
       updatePolarAlignmentIsRunning(isRunning) {
         this.isCalibrationRunning = isRunning
         this.hasAcceptUpdateMessage = true
+        if (isRunning) this.$startFeature(['MainCamera', 'Mount'], 'AutoPolarAlignment')
+        else this.$stopFeature(['MainCamera', 'Mount'], 'AutoPolarAlignment')
         if (!isRunning) {
           // 清除状态动画定时器
           if (this.guidanceStatusTimeout) {

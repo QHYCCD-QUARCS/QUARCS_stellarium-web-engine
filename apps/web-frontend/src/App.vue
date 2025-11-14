@@ -1060,6 +1060,42 @@ export default {
     this.$bus.$on('UpdateAutoFocusStep', this.updateAutoFocusStep);
     this.$bus.$on('EndAutoFocus', this.endAutoFocus);
 
+    // 曝光状态（页面刷新后由后端通知同步）
+    this.$bus.$on('CameraInExposuring', (state) => {
+      if (state === 'True') {
+        this.$startFeature(['MainCamera'], 'Capture');
+      } else {
+        this.$stopFeature(['MainCamera'], 'Capture');
+      }
+    });
+
+    // 设备连接状态同步到全局设备管理
+    this.$bus.$on('MainCameraConnected', (num) => {
+      const connected = num === 1;
+      this.$store.commit('device/SET_DEVICE_CONNECTED', { device: 'MainCamera', connected });
+      if (!connected) this.$store.commit('device/CLEAR_FEATURES', { device: 'MainCamera' });
+    });
+    this.$bus.$on('MountConnected', (num) => {
+      const connected = num === 1;
+      this.$store.commit('device/SET_DEVICE_CONNECTED', { device: 'Mount', connected });
+      if (!connected) this.$store.commit('device/CLEAR_FEATURES', { device: 'Mount' });
+    });
+    this.$bus.$on('FocuserConnected', (num) => {
+      const connected = num === 1;
+      this.$store.commit('device/SET_DEVICE_CONNECTED', { device: 'Focuser', connected });
+      if (!connected) this.$store.commit('device/CLEAR_FEATURES', { device: 'Focuser' });
+    });
+    this.$bus.$on('GuiderConnected', (num) => {
+      const connected = num === 1;
+      this.$store.commit('device/SET_DEVICE_CONNECTED', { device: 'GuiderCamera', connected });
+      if (!connected) this.$store.commit('device/CLEAR_FEATURES', { device: 'GuiderCamera' });
+    });
+    this.$bus.$on('CFWConnected', (num) => {
+      const connected = num === 1;
+      this.$store.commit('device/SET_DEVICE_CONNECTED', { device: 'CFW', connected });
+      if (!connected) this.$store.commit('device/CLEAR_FEATURES', { device: 'CFW' });
+    });
+
     this.memoryCheckInterval = setInterval(this.checkMemoryUsage, 30000);
 
 
@@ -2422,9 +2458,9 @@ export default {
                 }
                 break;
 
-              case 'LoopSolveImageFinished':
-                this.$bus.$emit('LoopSolveImageFinished');
-                break;
+              // case 'LoopSolveImageFinished':
+              //   this.$bus.$emit('LoopSolveImageFinished');
+              //   break;
 
               case 'disconnectDevicehasortherdevice':
                 if (parts.length === 2) {
@@ -3800,6 +3836,13 @@ export default {
       const [signal, value] = payload.split(':'); // 拆分信号和值
       const BooleanValue = Boolean(value);
       this.SendConsoleLogMsg('Loop Capture:' + BooleanValue, 'info');
+      if (BooleanValue) {
+        const check = this.$canUseDevice('MainCamera', 'CaptureLoop');
+        if (!check.allowed) return;
+        this.$startFeature(['MainCamera'], 'CaptureLoop');
+      } else {
+        this.$stopFeature(['MainCamera'], 'CaptureLoop');
+      }
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'LoopCapture:' + BooleanValue);
     },
 
@@ -3822,7 +3865,13 @@ export default {
     },
     onRaDecDialogConfirm({ ra, dec, raMode }) {
       this.showRaDecDialog = false;
+      const check = this.$canUseDevice('Mount', 'MountGoto');
+      if (!check.allowed) {
+        this.reEnableButton('Goto');
+        return;
+      }
       this.SendConsoleLogMsg('Goto:' + ra + ',' + dec, 'info');
+      this.$startFeature(['Mount'], 'MountGoto');
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'Goto:' + ra + ':' + dec);
     },
     onRaDecDialogCancel() {
@@ -7542,6 +7591,8 @@ export default {
       
       // 自动对焦开始时禁用拍摄按键
       this.$bus.$emit('disableCaptureButton', true);
+      // 同步设备占用（页面刷新后由后端通知触发）
+      this.$startFeature(['Focuser'], 'AutoFocus');
     },
 
     updateAutoFocusStep(step, message) {
@@ -7553,6 +7604,7 @@ export default {
         // 自动对焦开始时禁用拍摄按键
         this.$bus.$emit('disableCaptureButton', true);
         console.log('App: Auto focus info updated:', this.autoFocusInfo);
+        this.$startFeature(['Focuser'], 'AutoFocus');
       } catch (error) {
         console.error('Error in updateAutoFocusStep:', error);
       }
@@ -7567,6 +7619,7 @@ export default {
       
       // 自动对焦结束时启用拍摄按键
       this.$bus.$emit('disableCaptureButton', false);
+      this.$stopFeature(['Focuser'], 'AutoFocus');
     },
   },
   computed: {

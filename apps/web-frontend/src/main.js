@@ -146,6 +146,39 @@ Vue.prototype.$stellariumWebPlugins = function () {
 // 创建一个事件总线
 Vue.prototype.$bus = new Vue();
 
+// 全局设备使用检查与功能登记助手（统一 i18n 提示）
+Vue.prototype.$canUseDevice = function (device, feature) {
+  try {
+    const res = this.$store.getters['device/canUseDevice'](device, feature)
+    if (!res.allowed) {
+      // 友好化翻译 features 与 device
+      const params = Object.assign({}, res.reasonParams || {})
+      if (params && Array.isArray(params.featureKeys)) {
+        const featureNames = params.featureKeys.map(k => this.$t(`FeatureNames.${k}`))
+        params.features = featureNames.join('、')
+      }
+      if (params && params.deviceKey) {
+        params.device = this.$t(params.deviceKey)
+      }
+      const msg = this.$t(res.reasonKey, params)
+      this.$bus.$emit('showMsgBox', msg, 'warning')
+    }
+    return res
+  } catch (e) {
+    return { allowed: true }
+  }
+}
+Vue.prototype.$startFeature = function (devices, feature) {
+  try {
+    this.$store.dispatch('device/startFeature', { devices, feature })
+  } catch (e) {}
+}
+Vue.prototype.$stopFeature = function (devices, feature) {
+  try {
+    this.$store.dispatch('device/stopFeature', { devices, feature })
+  } catch (e) {}
+}
+
 /* eslint-disable no-new */
 new Vue({
   router,

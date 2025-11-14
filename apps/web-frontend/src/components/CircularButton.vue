@@ -125,7 +125,8 @@ export default {
   methods: {
     handleMouseDown() {
       if (this.isButtonDisabled) {
-        this.$bus.$emit('showMsgBox', this.$t('The button is disabled, please wait for the auto focus to finish.'), 'warning');
+        // 使用全局设备状态给出准确的阻塞原因（如 ROI 循环/极轴校准/解析等）
+        this.$canUseDevice('MainCamera', 'Capture');
         return; 
       }
       this.mousePressTimestamp = Date.now();
@@ -155,6 +156,8 @@ export default {
       if (elapsed < this.longPressThreshold) {
         // 处理点击逻辑
         if(this.MainCameraConnect) {
+          const check = this.$canUseDevice('MainCamera', 'Capture');
+          if (!check.allowed) return;
           this.animateProgress();
         } else {
           this.$bus.$emit('showMsgBox', 'Please connect the camera first.', 'error');
@@ -166,6 +169,7 @@ export default {
       if (this.isClicked) return; // 如果已点击，则退出方法
       console.log('执行点按，触发拍摄');
       this.animationDuration = this.CaptureExpTime;
+      this.$startFeature(['MainCamera'], 'Capture')
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'takeExposure:'+this.animationDuration);
       this.$bus.$emit('SendConsoleLogMsg', 'Take Exposure:'+this.animationDuration, 'info');
       this.isClicked = true;
@@ -190,6 +194,7 @@ export default {
     overProgress() {
       this.progress = 1;
       cancelAnimationFrame(this.animationRequest);
+      this.$stopFeature(['MainCamera'], 'Capture')
       // 延时2秒后重置进度
       setTimeout(() => {
         this.resetProgress();
@@ -220,6 +225,7 @@ export default {
           cancelAnimationFrame(this.longPressAnimationRequest);
           this.$bus.$emit('AppSendMessage', 'Vue_Command', 'abortExposure');
           this.$bus.$emit('SendConsoleLogMsg', 'Abort Exposure', 'info');
+          this.$stopFeature(['MainCamera'], 'Capture')
           // 延时2秒后重置进度
           setTimeout(() => {
             this.resetlongPressProgress();

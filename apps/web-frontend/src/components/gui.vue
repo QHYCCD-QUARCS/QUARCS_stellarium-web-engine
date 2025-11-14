@@ -597,7 +597,7 @@ export default {
     this.$bus.$on('ShowPositionInfo', this.ShowPositionInfo);
     this.$bus.$on('ParseInfoEmitted', this.addParsingProgress);
     this.$bus.$on('setParsingProgress', this.setParsingProgress);
-    this.$bus.$on('LoopSolveImageFinished', this.LoopSolveImageFinished);
+
     this.$bus.$on('setRedBoxPosition', this.setRedBoxPosition);
     this.$bus.$on('setRedBoxLength', this.setRedBoxLength);
     // this.$bus.$on('setOriginalRedBoxSideLength', this.setOriginalRedBoxLength);
@@ -1187,38 +1187,9 @@ export default {
       }
     },
 
-    SingleSolveImage() {
-      if (this.FocalLength === 0) {
-        this.showMessageBox('Please set Focal Length first.', 'error');
-        return;
-      }
 
-      if (this.loadingImageSolve) {
-        this.$bus.$emit('showMsgBox', 'Image solve is currently in progress.', 'warning');
-        this.ShowConfirmDialog('Confirm', 'Are you sure you want to cancel the shooting and analysis?', 'EndCaptureAndSolve');
-        this.$bus.$emit('setParsingProgress', false);
-      } else {
-        this.loadingImageSolve = true;
-        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'SolveImage:' + this.FocalLength);
-        this.$bus.$emit('setParsingProgress', true);
-      }
-    },
 
-    LoopSolveImage() {
-      if (this.PlateSolveInProgress) {
-        this.PlateSolveInProgress = false;
-        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'stopLoopSolveImage');
-        this.$bus.$emit('SendConsoleLogMsg', 'stop Loop SolveImage', 'info');
-        this.$bus.$emit('setParsingProgress', false);
-        this.setParsingProgress(false);
-      } else {
-        this.PlateSolveInProgress = true;
-        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'startLoopSolveImage:' + this.FocalLength);
-        this.$bus.$emit('SendConsoleLogMsg', 'start Loop SolveImage', 'info');
-        this.$bus.$emit('setParsingProgress', true);
-        this.setParsingProgress(true);
-      }
-    },
+
 
     CalibratePolarAxisMode() {
       this.lastMainPage = this.CurrentMainPage;
@@ -1314,28 +1285,9 @@ export default {
       this.showSingleSolveBtn = false;
     },
 
-    LoopSolveImageFinished() {
-      this.PlateSolveInProgress = false;
-      this.setParsingProgress(false);
-    },
 
-    RecalibratePolarAxis() {
-      this.currentPolarAxisStep = 1;
-      console.log('Recalibrate the polar axis');
-      this.$bus.$emit('SendConsoleLogMsg', 'Recalibrate the polar axis.', 'info');
-      this.showSingleSolveBtn = true;
-      this.$bus.$emit('RecalibratePolarAxis');
 
-      if (this.PlateSolveInProgress) {
-        this.PlateSolveInProgress = false;
-        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'stopLoopSolveImage');
-        this.$bus.$emit('SendConsoleLogMsg', 'stop Loop Solve Image', 'info');
-      }
 
-      this.DifferenceText = '';
-      this.TargetText = '';
-      this.CurrentText = '';
-    },
 
     ShowAzAltText(Az1, Alt1, Az2, Alt2) {
       this.DifferenceText = `${this.$t('Azimuth Offset')}: ${Az1.toFixed(3)}°, ${this.$t('Altitude Offset')}: ${Alt1.toFixed(3)}°`;
@@ -1378,6 +1330,7 @@ export default {
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'EndCaptureAndSolve');
         this.$bus.$emit('SendConsoleLogMsg', 'End Capture And Solve', 'info');
         this.loadingImageSolve = false;
+        this.$stopFeature(['MainCamera'], 'SolveSync');
       } else if (this.ConfirmToDo === 'RestartRaspberryPi') {
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'RestartRaspberryPi');
       } else if (this.ConfirmToDo === 'ShutdownRaspberryPi') {

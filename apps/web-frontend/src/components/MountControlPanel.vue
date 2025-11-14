@@ -225,6 +225,9 @@ export default {
         this.$bus.$emit('showMsgBox', '赤道仪未连接，无法执行操作', 'error');
         return;
       }
+      const check = this.$canUseDevice('Mount', 'MountManualMove');
+      if (!check.allowed) return;
+      this.$startFeature(['Mount'], 'MountManualMove');
       this.$bus.$emit('SendConsoleLogMsg', `Mount Move RA ${direction}`, 'info');
       if (direction === 'plus') {
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'MountMoveWest');
@@ -237,6 +240,9 @@ export default {
         this.$bus.$emit('showMsgBox', '赤道仪未连接，无法执行操作', 'error');
         return;
       }
+      const check = this.$canUseDevice('Mount', 'MountManualMove');
+      if (!check.allowed) return;
+      this.$startFeature(['Mount'], 'MountManualMove');
       this.$bus.$emit('SendConsoleLogMsg', `Mount Move DEC ${direction}`, 'info');
       if (direction === 'plus') {
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'MountMoveNorth');
@@ -252,6 +258,7 @@ export default {
       console.log('QHYCCD | 停止');
       this.$bus.$emit('SendConsoleLogMsg', 'Mount Move Abort', 'info');
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'MountMoveAbort');
+      this.$stopFeature(['Mount'], 'MountManualMove');
     },
 
     stopRA(direction) {
@@ -261,6 +268,7 @@ export default {
       }
       this.$bus.$emit('SendConsoleLogMsg', `Mount Stop RA ${direction}`, 'info');
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'MountMoveRAStop:' + direction);
+      this.$stopFeature(['Mount'], 'MountManualMove');
     },
 
     stopDEC(direction) {
@@ -270,45 +278,65 @@ export default {
       }
       this.$bus.$emit('SendConsoleLogMsg', `Mount Stop DEC ${direction}`, 'info');
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'MountMoveDECStop:' + direction);
+      this.$stopFeature(['Mount'], 'MountManualMove');
     },
 
     MountPark() {
+      const check = this.$canUseDevice('Mount', 'MountPark');
+      if (!check.allowed) return;
       console.log('QHYCCD | Park');
       this.isParkProcessing = true;
+      this.$startFeature(['Mount'], 'MountPark');
       this.$bus.$emit('SendConsoleLogMsg', 'Mount Park', 'info');
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'MountPark');
       // 处理状态将由MountOperationComplete信号结束
     },
     MountTrack() {
+      const check = this.$canUseDevice('Mount', 'MountTrack');
+      if (!check.allowed) return;
       console.log('QHYCCD | Truck');
       this.isTrackProcessing = true;
+      this.$startFeature(['Mount'], 'MountTrack');
       this.$bus.$emit('SendConsoleLogMsg', 'Mount Truck', 'info');
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'MountTrack');
       // 处理状态将由MountOperationComplete信号结束
     },
     MountHome() {
+      const check = this.$canUseDevice('Mount', 'MountHome');
+      if (!check.allowed) return;
       console.log('QHYCCD | Home');
       this.isHomeProcessing = true;
+      this.$startFeature(['Mount'], 'MountHome');
       this.$bus.$emit('SendConsoleLogMsg', 'Mount Home', 'info');
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'MountHome');
       // 1秒后自动结束动画
       setTimeout(() => {
         this.isHomeProcessing = false;
+        this.$stopFeature(['Mount'], 'MountHome');
       }, 1000);
     },
     MountSYNC() {
+      const check = this.$canUseDevice('Mount', 'MountSync');
+      if (!check.allowed) return;
       console.log('QHYCCD | SYNC');
       this.isSyncProcessing = true;
+      this.$startFeature(['Mount'], 'MountSync');
       this.$bus.$emit('SendConsoleLogMsg', 'Mount SYNC', 'info');
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'MountSYNC');
       // 1秒后自动结束动画
       setTimeout(() => {
         this.isSyncProcessing = false;
+        this.$stopFeature(['Mount'], 'MountSync');
       }, 1000);
     },
     SolveSYNC() {
+      // 解算通常需要主相机与赤道仪共同参与
+      const mountCheck = this.$canUseDevice('Mount', 'SolveSync');
+      const camCheck = this.$canUseDevice('MainCamera', 'SolveSync');
+      if (!mountCheck.allowed || !camCheck.allowed) return;
       console.log('QHYCCD | SolveSYNC');
       this.isSolveProcessing = true;
+      this.$startFeature(['Mount', 'MainCamera'], 'SolveSync');
       this.$bus.$emit('SendConsoleLogMsg', 'Mount Solve SYNC', 'info');
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'SolveSYNC');
       // 处理状态将由MountOperationComplete信号结束
@@ -318,15 +346,24 @@ export default {
       this.RaDec = value;
     },
     MountGoto() {
+      const check = this.$canUseDevice('Mount', 'MountGoto');
+      if (!check.allowed) return;
+      this.$startFeature(['Mount'], 'MountGoto');
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'MountGoto:' + this.RaDec);
     },
 
     MountStatus(status) {
-      if (status === 'Moving') {
+      this.mountStatusStr = status;
+      if (status === 'Moving' || status === 'Slewing') {
         this.isIDLE = false;
+        // 刷新后由后端持续状态维持占用，防止互斥提前结束
+        this.$startFeature(['Mount'], 'MountSlewing');
       }
       else {
         this.isIDLE = true;
+        this.$stopFeature(['Mount'], 'MountSlewing');
+        this.$stopFeature(['Mount'], 'MountManualMove');
+        this.$stopFeature(['Mount'], 'MountGoto');
       }
     },
 
@@ -347,6 +384,8 @@ export default {
         this.showErrorAnimation('speed');
         return;
       }
+      const check = this.$canUseDevice('Mount', 'MountSpeedSwitch');
+      if (!check.allowed) return;
       if (this.MountSpeed !== -1) {
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'MountSpeedSwitch');
       }else{
@@ -468,22 +507,27 @@ export default {
       switch(operation) {
         case 'park':
           this.isParkProcessing = false;
+          this.$stopFeature(['Mount'], 'MountPark');
           // this.$bus.$emit('showMsgBox', this.$t('park complete !'), 'success');
           break;
         case 'track':
           this.isTrackProcessing = false;
+          this.$stopFeature(['Mount'], 'MountTrack');
           // this.$bus.$emit('showMsgBox', this.$t('track complete !'), 'success');
           break;
         case 'home':
           this.isHomeProcessing = false;
+          this.$stopFeature(['Mount'], 'MountHome');
           // this.$bus.$emit('showMsgBox', this.$t('home complete !'), 'success');
           break;
         case 'sync':
           this.isSyncProcessing = false;
+          this.$stopFeature(['Mount'], 'MountSync');
           // this.$bus.$emit('showMsgBox', this.$t('sync complete !'), 'success');
           break;
         case 'solve':
           this.isSolveProcessing = false;
+          this.$stopFeature(['Mount', 'MainCamera'], 'SolveSync');
          // this.$bus.$emit('showMsgBox', this.$t('solve complete !'), 'success');
           break;
       }
