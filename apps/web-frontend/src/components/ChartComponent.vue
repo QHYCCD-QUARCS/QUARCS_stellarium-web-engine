@@ -91,6 +91,7 @@ export default {
     this.$bus.$on('GuiderLoopExpStatus', this.GuiderLoopExpStatus);
     this.$bus.$on('GuiderStatus', this.GuiderStatus);
     this.$bus.$on('GuiderConnected', this.GuiderConnected);
+    this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getGuiderStatus');
   },
   mounted() {
     this.updatePosition(); // 初始化位置
@@ -197,22 +198,31 @@ export default {
     },
 
     GuiderSwitchStatus(value) {
-      if(value === 'true') {
+      if(value === 'true' || value) {
         this.isGuiding = true;
+        // 若后端尚未返回细分状态，先以“校准中”显示为黄色
+        if (this.CurrentGuiderStatus !== 'InGuiding') {
+          this.CurrentGuiderStatus = 'InCalibration';
+        }
+        this.$startFeature(['GuiderCamera'], 'GuiderGuiding');
       } else {
         this.isGuiding = false;
         this.CurrentGuiderStatus = 'null';
         this.$bus.$emit('GuiderStop');
+        this.$stopFeature(['GuiderCamera'], 'GuiderGuiding');
       }
       console.log('GuiderSwitchStatus:', this.isGuiding);
     },
 
     GuiderLoopExpStatus(value) {
-      if(value === 'true') {
+      if(value === 'true' || value) {
         this.isLoopping = true;
+        this.$startFeature(['GuiderCamera'], 'GuiderLoop');
       } else {
         this.isLoopping = false;
         this.isGuiding = false;
+        this.$stopFeature(['GuiderCamera'], 'GuiderLoop');
+        this.$stopFeature(['GuiderCamera'], 'GuiderGuiding');
       }
       console.log('GuiderLoopExpSwitchStatus:', this.isLoopping);
     },

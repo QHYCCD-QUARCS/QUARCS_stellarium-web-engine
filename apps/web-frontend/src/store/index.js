@@ -9,6 +9,7 @@
 import Vue from 'vue'
 import Vuex from 'vuex'
 import _ from 'lodash'
+import device from './deviceManager'
 
 Vue.use(Vuex)
 
@@ -23,7 +24,10 @@ const createStore = () => {
   }
 
   return new Vuex.Store({
-    modules: pluginsModules,
+    modules: { 
+      ...pluginsModules,
+      device
+    },
 
     state: {
       stel: null,

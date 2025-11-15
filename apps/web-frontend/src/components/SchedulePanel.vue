@@ -83,16 +83,21 @@ export default {
       if (this.isScheduleRunning) {
         // 如果正在运行，则停止
         this.isScheduleRunning = false;
+        this.$stopFeature(['MainCamera'], 'ScheduleCapture');
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'StopSchedule');
       } else {
         // 如果未运行，则开始
+        const check = this.$canUseDevice('MainCamera', 'ScheduleCapture');
+        if (!check.allowed) return;
         this.isScheduleRunning = true;
+        this.$startFeature(['MainCamera'], 'ScheduleCapture');
         this.$bus.$emit('getTableData', true);
       }
     },
     onScheduleComplete() {
       // 计划任务完成，重置按钮状态为未运行状态
       this.isScheduleRunning = false;
+      this.$stopFeature(['MainCamera'], 'ScheduleCapture');
     },
     
   }

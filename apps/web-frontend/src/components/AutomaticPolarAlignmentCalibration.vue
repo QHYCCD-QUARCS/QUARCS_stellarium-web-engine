@@ -237,6 +237,28 @@
     </div>
   </div>
 
+  <!-- 指导调整阶段循环进度条（右下角，独立于控制面板） -->
+  <div v-if="visible" class="guidance-progress-indicator">
+    <div class="guidance-progress-circle" 
+         :class="[
+           `status-${guidanceStepStatus}`,
+           { 'animating': guidanceStep !== null && isCalibrationRunning && guidanceStepStatus === 'normal' },
+           { 'success-animation': guidanceStepStatus === 'success' },
+           { 'error-animation': guidanceStepStatus === 'error' }
+         ]">
+      <svg class="progress-svg" viewBox="0 0 100 100">
+        <circle class="progress-bg" cx="50" cy="50" r="45"></circle>
+        <circle class="progress-bar" cx="50" cy="50" r="45" 
+                :style="{ strokeDasharray: '283', strokeDashoffset: getProgressOffset() }"></circle>
+      </svg>
+      <div class="progress-content">
+        <v-icon class="step-icon">{{ getStepIcon(guidanceStep) }}</v-icon>
+        <div class="step-description">{{ getStepDescription(guidanceStep, guidanceStepStatus) }}</div>
+        <div v-if="guidanceStarCount >= 0" class="star-count">{{ guidanceStarCount }} {{ $t('Stars') }}</div>
+      </div>
+    </div>
+  </div>
+
   <!-- 轨迹画布：全屏模式 -->
   <div v-if="visible && showTrajectoryOverlay && overlayMode === 'fullscreen'" class="trajectory-overlay"
        @wheel.prevent="onOverlayWheel" @mousedown.stop @touchstart.stop>
@@ -441,6 +463,13 @@ export default {
       //   calculated: false
       // },
 
+      // === 指导调整阶段进度 ===
+      guidanceStep: null, // 当前步骤: 0=拍摄, 1=检查星点, 2=解析, 3=计算, 4=发送指导, 5=等待用户, 6=完成
+      guidanceStepMessage: '', // 当前步骤消息
+      guidanceStarCount: -1, // 识别的星点数量
+      guidanceStepStatus: 'normal', // 步骤状态: 'normal', 'success', 'error'
+      guidanceStatusTimeout: null, // 状态动画定时器
+
       // === 轨迹画布状态 ===
       showTrajectoryOverlay: false,
       overlayMode: 'fullscreen', // 'fullscreen' | 'windowed'
@@ -601,6 +630,9 @@ export default {
       // 监听自动校准状态
       this.$bus.$on('PolarAlignmentIsRunning', this.updatePolarAlignmentIsRunning)
 
+      // 监听指导调整阶段进度
+      this.$bus.$on('PolarAlignmentGuidanceStepProgress', this.updateGuidanceStepProgress)
+
       // 组件加载完成后，若尚未收到更新消息，则主动请求极轴对齐状态
       if (!this.hasAcceptUpdateMessage) {
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getPolarAlignmentState')
@@ -619,6 +651,7 @@ export default {
       this.$bus.$off('FieldDataUpdate', this.updateFieldData)
       this.$bus.$off('updateCardInfo', this.updateCardInfo)
       this.$bus.$off('PolarAlignmentIsRunning', this.updatePolarAlignmentIsRunning)
+      this.$bus.$off('PolarAlignmentGuidanceStepProgress', this.updateGuidanceStepProgress)
 
       // 清理拖动事件监听
       this.cleanupDragListeners()
@@ -631,6 +664,12 @@ export default {
 
       // 清理防抖定时器
       this.clearDebounceTimers()
+
+      // 清理状态动画定时器
+      if (this.guidanceStatusTimeout) {
+        clearTimeout(this.guidanceStatusTimeout)
+        this.guidanceStatusTimeout = null
+      }
 
       // 实现组件销毁逻辑
       this.cleanup()
@@ -1676,11 +1715,25 @@ export default {
           this.addLog(this.$t('Error: Mount Not Connected'), 'error')
           return
         }
+        const camCheck = this.$canUseDevice('MainCamera', 'AutoPolarAlignment')
+        const mountCheck = this.$canUseDevice('Mount', 'AutoPolarAlignment')
+        if (!camCheck.allowed || !mountCheck.allowed) return
         if (this.isCalibrationRunning) {
           this.stopAutoCalibration()
           return
         }
+        // 重置进度条状态
+        this.guidanceStep = null
+        this.guidanceStepMessage = ''
+        this.guidanceStarCount = -1
+        this.guidanceStepStatus = 'normal'
+        if (this.guidanceStatusTimeout) {
+          clearTimeout(this.guidanceStatusTimeout)
+          this.guidanceStatusTimeout = null
+        }
+        
         this.isCalibrationRunning = true
+        this.$startFeature(['MainCamera', 'Mount'], 'AutoPolarAlignment')
         this.resetCalibration()
         this.addLog(this.$t('Starting Auto Calibration'), 'info')
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'StartAutoPolarAlignment')
@@ -1689,6 +1742,7 @@ export default {
       stopAutoCalibration() {
         this.isCalibrationRunning = false
         this.addLog(this.$t('Auto Calibration Stopped'), 'warning')
+        this.$stopFeature(['MainCamera', 'Mount'], 'AutoPolarAlignment')
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'StopAutoPolarAlignment')
       },
       // ========================================
@@ -2248,6 +2302,133 @@ export default {
       updatePolarAlignmentIsRunning(isRunning) {
         this.isCalibrationRunning = isRunning
         this.hasAcceptUpdateMessage = true
+        if (isRunning) this.$startFeature(['MainCamera', 'Mount'], 'AutoPolarAlignment')
+        else this.$stopFeature(['MainCamera', 'Mount'], 'AutoPolarAlignment')
+        if (!isRunning) {
+          // 清除状态动画定时器
+          if (this.guidanceStatusTimeout) {
+            clearTimeout(this.guidanceStatusTimeout)
+            this.guidanceStatusTimeout = null
+          }
+          // 校准停止时重置指导调整阶段状态
+          this.guidanceStep = null
+          this.guidanceStepMessage = ''
+          this.guidanceStarCount = -1
+          this.guidanceStepStatus = 'normal'
+        }
+      },
+
+      updateGuidanceStepProgress(step, message, starCount) {
+        // 清除之前的状态动画定时器
+        if (this.guidanceStatusTimeout) {
+          clearTimeout(this.guidanceStatusTimeout)
+          this.guidanceStatusTimeout = null
+        }
+
+        this.guidanceStep = step
+        this.guidanceStepMessage = message
+        this.guidanceStarCount = starCount
+
+        // 根据消息内容判断状态
+        let status = 'normal'
+        if (message) {
+          let level = 'info'
+          if (message.includes('失败') || message.includes('错误') || message.includes('超时') || message.includes('无效')) {
+            level = 'error'
+            status = 'error'
+          } else if (message.includes('警告')) {
+            level = 'warning'
+            status = 'normal'
+          } else if (message.includes('成功') || message.includes('完成') || message.includes('良好')) {
+            level = 'success'
+            status = 'success'
+          }
+          this.addLog(message, level)
+        }
+
+        // 设置状态
+        this.guidanceStepStatus = status
+
+        // 如果是成功或失败状态，显示动画后恢复为normal
+        if (status === 'success' || status === 'error') {
+          this.guidanceStatusTimeout = setTimeout(() => {
+            this.guidanceStepStatus = 'normal'
+            this.guidanceStatusTimeout = null
+          }, 2000) // 2秒后恢复为normal状态
+        }
+      },
+
+      getGuidanceStepLabel(step) {
+        const labels = {
+          0: this.$t('Capturing'),
+          1: this.$t('Checking Stars'),
+          2: this.$t('Solving'),
+          3: this.$t('Calculating'),
+          4: this.$t('Sending Guidance'),
+          5: this.$t('Waiting User'),
+          6: this.$t('Completed')
+        }
+        return labels[step] || ''
+      },
+
+      getStepDescription(step, status) {
+        // 根据状态返回简短的描述文字
+        if (status === 'success') {
+          return this.$t('Success') // 成功
+        }
+        if (status === 'error') {
+          return this.$t('Failed') // 失败
+        }
+        if (step === null) {
+          return this.$t('Waiting') // 等待
+        }
+        // 根据步骤返回简短描述
+        const descriptions = {
+          0: this.$t('Capturing'), // 拍摄
+          1: this.$t('Checking'), // 检查
+          2: this.$t('Solving'), // 解析
+          3: this.$t('Calculating'), // 计算
+          4: this.$t('Sending'), // 发送
+          5: this.$t('Waiting'), // 等待
+          6: this.$t('Done') // 完成
+        }
+        return descriptions[step] || this.$t('Processing') // 处理中
+      },
+
+      getStepIcon(step) {
+        if (step === null) {
+          return 'mdi-compass-rose'
+        }
+        const icons = {
+          0: 'mdi-camera',
+          1: 'mdi-star',
+          2: 'mdi-cog',
+          3: 'mdi-calculator',
+          4: 'mdi-send',
+          5: 'mdi-clock-outline',
+          6: 'mdi-check-circle'
+        }
+        return icons[step] || 'mdi-circle'
+      },
+
+      getProgressOffset() {
+        // 如果不在调整阶段，显示空进度
+        if (this.guidanceStep === null || !this.isCalibrationRunning) {
+          return 283 // 完全隐藏进度条
+        }
+        // 根据步骤计算进度条偏移量（0-100%）
+        const stepProgress = {
+          0: 0,    // 拍摄: 0%
+          1: 20,   // 检查星点: 20%
+          2: 40,   // 解析: 40%
+          3: 60,   // 计算: 60%
+          4: 80,   // 发送指导: 80%
+          5: 90,   // 等待用户: 90%
+          6: 100   // 完成: 100%
+        }
+        const progress = stepProgress[this.guidanceStep] || 0
+        // strokeDashoffset = 周长 * (1 - progress/100)
+        return 283 * (1 - progress / 100)
       },
 
       // ========================================
@@ -4045,6 +4226,275 @@ export default {
   .log-timestamp {
     min-width: 50px;
   }
+}
+
+/* 指导调整阶段循环进度条样式 - 独立于控制面板，位于最高层 */
+.guidance-progress-indicator {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 99999; /* 确保在所有层之上，包括轨迹画布 */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  pointer-events: none; /* 不阻挡鼠标事件 */
+  width: 100px; /* 固定宽度，避免文字超出导致位置变动 */
+  max-width: 100px;
+}
+
+.guidance-progress-circle {
+  position: relative;
+  width: 100px;
+  height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0; /* 防止收缩 */
+}
+
+.progress-svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.progress-bg {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.1);
+  stroke-width: 6;
+}
+
+.progress-bar {
+  fill: none;
+  stroke-width: 5;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.3s ease, stroke 0.3s ease, opacity 0.3s ease;
+}
+
+/* 空闲状态 - 半透明灰白色 */
+.guidance-progress-circle:not(.status-success):not(.status-error):not(.animating) .progress-bar {
+  stroke: rgba(200, 200, 200, 0.5); /* 半透明灰白色 */
+  opacity: 0.5;
+}
+
+/* 有进度时 - 蓝色 */
+.guidance-progress-circle.animating .progress-bar {
+  stroke: #2196F3; /* 蓝色 */
+  opacity: 1;
+  animation: progressPulse 2s ease-in-out infinite;
+}
+
+@keyframes progressPulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* 成功状态动画 */
+.guidance-progress-circle.success-animation {
+  animation: successPulse 0.6s ease-in-out;
+}
+
+.guidance-progress-circle.status-success .progress-bar {
+  stroke: #4CAF50 !important; /* 绿色 */
+  stroke-width: 6;
+  opacity: 1;
+  animation: successRing 0.6s ease-in-out;
+}
+
+@keyframes successPulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes successRing {
+  0% {
+    stroke-width: 5;
+    opacity: 1;
+  }
+  50% {
+    stroke-width: 7;
+    opacity: 0.8;
+  }
+  100% {
+    stroke-width: 5;
+    opacity: 1;
+  }
+}
+
+/* 失败状态动画 */
+.guidance-progress-circle.error-animation {
+  animation: errorShake 0.5s ease-in-out;
+}
+
+.guidance-progress-circle.status-error .progress-bar {
+  stroke: #F44336 !important; /* 红色 */
+  stroke-width: 6;
+  opacity: 1;
+  animation: errorFlash 0.5s ease-in-out;
+}
+
+@keyframes errorShake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  10%, 30%, 50%, 70%, 90% {
+    transform: translateX(-5px);
+  }
+  20%, 40%, 60%, 80% {
+    transform: translateX(5px);
+  }
+}
+
+@keyframes errorFlash {
+  0%, 100% {
+    stroke-width: 5;
+    opacity: 1;
+  }
+  25%, 75% {
+    stroke-width: 7;
+    opacity: 0.5;
+  }
+  50% {
+    stroke-width: 6;
+    opacity: 0.8;
+  }
+}
+
+/* 移动端自适应 */
+@media (max-width: 768px) {
+  .guidance-progress-indicator {
+    width: 80px;
+    max-width: 80px;
+    bottom: 15px;
+    right: 15px;
+  }
+
+  .guidance-progress-circle {
+    width: 80px;
+    height: 80px;
+  }
+
+  .progress-svg {
+    width: 80px;
+    height: 80px;
+  }
+
+  .step-icon {
+    font-size: 20px;
+  }
+
+  .step-description {
+    font-size: 9px;
+    max-height: 1.8em; /* 移动端最多两行 */
+  }
+
+  .star-count {
+    font-size: 8px;
+  }
+
+  .progress-bar {
+    stroke-width: 4;
+  }
+}
+
+@media (max-width: 480px) {
+  .guidance-progress-indicator {
+    width: 70px;
+    max-width: 70px;
+    bottom: 10px;
+    right: 10px;
+  }
+
+  .guidance-progress-circle {
+    width: 70px;
+    height: 70px;
+  }
+
+  .progress-svg {
+    width: 70px;
+    height: 70px;
+  }
+
+  .step-icon {
+    font-size: 18px;
+  }
+
+  .step-description {
+    font-size: 8px;
+    max-height: 1.6em; /* 小屏幕最多两行 */
+  }
+
+  .star-count {
+    font-size: 7px;
+  }
+
+  .progress-bar {
+    stroke-width: 3;
+  }
+}
+
+.progress-content {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 100%;
+  padding: 0 4px;
+  box-sizing: border-box;
+  text-align: center;
+}
+
+.step-icon {
+  font-size: 24px;
+  color: #fff;
+  margin-bottom: 2px;
+  flex-shrink: 0;
+}
+
+.step-description {
+  font-size: 10px;
+  color: #fff;
+  text-align: center;
+  font-weight: 500;
+  white-space: normal; /* 允许换行 */
+  word-wrap: break-word; /* 允许单词内换行 */
+  overflow-wrap: break-word; /* 现代浏览器支持 */
+  width: 100%;
+  max-width: 100%;
+  line-height: 1.2;
+  min-height: 1.2em; /* 至少一行的高度 */
+  max-height: 2.4em; /* 最多两行的高度 */
+  overflow: hidden; /* 超出部分隐藏 */
+  display: block;
+  hyphens: auto; /* 自动断字 */
+}
+
+.star-count {
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.8);
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+  max-width: 100%;
 }
 
 @media (max-width: 480px) {

@@ -282,6 +282,8 @@ export default {
       
     },
     AutoFocus() {
+      const check = this.$canUseDevice('Focuser', 'AutoFocus');
+      if (!check.allowed) return;
       if (!this.FocuserIsConnected) {
         this.$bus.$emit('showMsgBox', 'Focuser is not connected!', 'warning');
         return;
@@ -296,8 +298,10 @@ export default {
         // console.log('QHYCCD | StopAutoFocus');
         this.$bus.$emit('SendConsoleLogMsg', 'StopAutoFocus', 'info');
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'StopAutoFocus');
+        this.$stopFeature(['Focuser'], 'AutoFocus')
       }else{
         this.inAutoFocus = true;
+        this.$startFeature(['Focuser'], 'AutoFocus')
         this.$bus.$emit('ShowConfirmDialog','Confirm', 'Are you sure you want to start auto focus?', 'startAutoFocus');
       }
  
@@ -369,7 +373,9 @@ export default {
         this.$bus.$emit('showMsgBox', 'Focuser is not connected!', 'warning');
         return;
       }
-      if (this.inAutoFocus) return;
+      // 互斥检查：与自动对焦互斥（同设备互斥由全局模块处理）
+      const check = this.$canUseDevice('Focuser', 'FocuserManualMove');
+      if (!check.allowed) return;
 
       // 记录按下时间与方向
       this.moveStartTime = new Date().getTime();
@@ -388,6 +394,8 @@ export default {
         if (!this.isPressing || this.longPressTriggered) return;
         this.longPressTriggered = true;
         this.$bus.$emit('FocusInProgress', true);
+        // 开始占用：手动移动
+        this.$startFeature(['Focuser'], 'FocuserManualMove');
         if (this.pressDirection === 'left') {
           this.$bus.$emit('SendConsoleLogMsg', 'Focus Left Move:' + this.MoveSteps, 'info');
           this.$bus.$emit('AppSendMessage', 'Vue_Command', 'focusMove:' + 'Left');
@@ -430,6 +438,8 @@ export default {
       this.$bus.$emit('FocusInProgress', false);
       this.longPressTriggered = false;
       this.pressDirection = '';
+      // 释放占用：手动移动
+      this.$stopFeature(['Focuser'], 'FocuserManualMove');
     },
 
     getFocuserMoveState() {
@@ -516,6 +526,8 @@ export default {
     active() { },
 
     toggleLoopShooting() {
+      const check = this.$canUseDevice('Focuser', 'FocuserROILoop');
+      if (!check.allowed) return;
       if (!this.currentMainCanvasHasImage) {
         this.$bus.$emit('showMsgBox', 'Please take a picture first!', 'warning');
         return;
@@ -525,10 +537,12 @@ export default {
       // this.$bus.$emit('setFocuserLoopingState', this.isLoopActive);
       this.$bus.$emit('disableCaptureButton', this.isLoopActive);
       if (this.isLoopActive) {
+        this.$startFeature(['Focuser'], 'FocuserROILoop')
         this.$bus.$emit('setFocuserState', 'selectstars'); // 设置焦距状态为选择星点
         this.$bus.$emit('setShowSelectStar', true);
         this.$bus.$emit('setFocusChartTimeMode', true); // 切换图表模式：时间轴模式
       } else {
+        this.$stopFeature(['Focuser'], 'FocuserROILoop')
         this.$bus.$emit('setFocuserState', 'setROI'); // 设置焦距状态为设置ROI区域
         this.$bus.$emit('setShowSelectStar', false);
         this.$bus.$emit('setFocusChartTimeMode', false)
@@ -547,11 +561,13 @@ export default {
         this.isLoopActive = true;
         this.$bus.$emit('setFocusChartTimeMode', true);
         this.$bus.$emit('setShowSelectStar', true);
+        this.$startFeature(['Focuser'], 'FocuserROILoop')
       }
       else {
         this.isLoopActive = false;
         this.$bus.$emit('setShowSelectStar', false);
         this.$bus.$emit('setFocusChartTimeMode', false)
+        this.$stopFeature(['Focuser'], 'FocuserROILoop')
       }
       this.$bus.$emit('disableCaptureButton', this.isLoopActive);
     },
