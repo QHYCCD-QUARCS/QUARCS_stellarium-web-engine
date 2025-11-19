@@ -2641,6 +2641,10 @@ export default {
                 this.callShowMessageBox('Main Camera is not connect', 'error');
                 this.$bus.$emit('MountOperationComplete', 'solve');
                 break;
+              case 'MountNotConnect':
+                this.callShowMessageBox('Mount is not connect', 'error');
+                this.$bus.$emit('MountOperationComplete', 'solve');
+                break;
               case 'ServerInitSuccess':
                 this.callShowMessageBox('Server init success', 'success');
                 window.location.reload();

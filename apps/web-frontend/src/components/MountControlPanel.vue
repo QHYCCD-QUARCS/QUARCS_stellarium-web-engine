@@ -296,7 +296,7 @@ export default {
       if (!check.allowed) return;
       console.log('QHYCCD | Truck');
       this.isTrackProcessing = true;
-      this.$startFeature(['Mount'], 'MountTrack');
+      // this.$startFeature(['Mount'], 'MountTrack');
       this.$bus.$emit('SendConsoleLogMsg', 'Mount Truck', 'info');
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'MountTrack');
       // 处理状态将由MountOperationComplete信号结束
@@ -512,7 +512,7 @@ export default {
           break;
         case 'track':
           this.isTrackProcessing = false;
-          this.$stopFeature(['Mount'], 'MountTrack');
+          // this.$stopFeature(['Mount'], 'MountTrack');
           // this.$bus.$emit('showMsgBox', this.$t('track complete !'), 'success');
           break;
         case 'home':

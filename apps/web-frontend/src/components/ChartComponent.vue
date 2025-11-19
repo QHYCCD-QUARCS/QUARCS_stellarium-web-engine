@@ -198,7 +198,7 @@ export default {
     },
 
     GuiderSwitchStatus(value) {
-      if(value === 'true' || value) {
+      if(value === 'true' || value === "true") {
         this.isGuiding = true;
         // 若后端尚未返回细分状态，先以“校准中”显示为黄色
         if (this.CurrentGuiderStatus !== 'InGuiding') {
@@ -215,7 +215,7 @@ export default {
     },
 
     GuiderLoopExpStatus(value) {
-      if(value === 'true' || value) {
+      if(value === 'true' || value === "true") {
         this.isLoopping = true;
         this.$startFeature(['GuiderCamera'], 'GuiderLoop');
       } else {
