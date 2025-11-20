@@ -4337,9 +4337,22 @@ export default {
       let blackLevel = Math.round(Math.max(0, mean - stdDev * a));
       let whiteLevel = Math.round(Math.min(maxValue, mean + stdDev * b));
 
-      // 确保 blackLevel < whiteLevel
-      if (blackLevel >= whiteLevel) {
-        blackLevel = whiteLevel - 1;
+      // 边界与退化保护：避免全黑或 std=0 时“全白”
+      if (!Number.isFinite(blackLevel) || !Number.isFinite(whiteLevel)) {
+        blackLevel = 0; whiteLevel = 1;
+      }
+      if (stdDev === 0 || whiteLevel <= blackLevel) {
+        if (mean <= 0) {               // 全黑
+          blackLevel = 0;
+          whiteLevel = 1;
+        } else if (mean >= maxValue) { // 全白饱和
+          blackLevel = maxValue - 1;
+          whiteLevel = maxValue;
+        } else {                       // 其它退化场景：给一个极小有效窗
+          blackLevel = Math.max(0, Math.floor(mean) - 1);
+          whiteLevel = Math.min(maxValue, blackLevel + 1);
+          if (whiteLevel <= blackLevel) whiteLevel = blackLevel + 1;
+        }
       }
 
       return { blackLevel, whiteLevel };
