@@ -537,12 +537,12 @@ export default {
       // this.$bus.$emit('setFocuserLoopingState', this.isLoopActive);
       this.$bus.$emit('disableCaptureButton', this.isLoopActive);
       if (this.isLoopActive) {
-        this.$startFeature(['Focuser'], 'FocuserROILoop')
+        this.$startFeature(['MainCamera'], 'FocuserROILoop')
         this.$bus.$emit('setFocuserState', 'selectstars'); // 设置焦距状态为选择星点
         this.$bus.$emit('setShowSelectStar', true);
         this.$bus.$emit('setFocusChartTimeMode', true); // 切换图表模式：时间轴模式
       } else {
-        this.$stopFeature(['Focuser'], 'FocuserROILoop')
+        this.$stopFeature(['MainCamera'], 'FocuserROILoop')
         this.$bus.$emit('setFocuserState', 'setROI'); // 设置焦距状态为设置ROI区域
         this.$bus.$emit('setShowSelectStar', false);
         this.$bus.$emit('setFocusChartTimeMode', false)
