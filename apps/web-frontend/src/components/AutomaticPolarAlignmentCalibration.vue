@@ -228,9 +228,16 @@
               <v-icon v-else>mdi-stop-circle</v-icon>
               <span>{{ isCalibrationRunning ? $t('Stop Calibration') : $t('Start Auto Calibration') }}</span>
             </button>
-
-
-
+            <!-- 临时测试按钮：模拟 Qt 端极轴校准数据 -->
+            <button
+              v-if="showTestButton"
+              class="action-btn"
+              style="margin-left: 8px;"
+              @click="runTestPolarAlignmentSimulation"
+            >
+              <v-icon>mdi-beaker</v-icon>
+              <span>Test Polar Alignment</span>
+            </button>
           </div>
         </div>
       </div>
@@ -495,8 +502,32 @@ export default {
       viewOffsetXPx: 0,
       viewOffsetYPx: 0,
       // 轨迹点合并容差（角分）
-      trajectoryMergeTolArcmin: 2.0,  // 轨迹点合并容差（角分）
+      trajectoryMergeTolArcmin: 2.0,  // 基础合并容差（角分）
+      trajectoryMergeTolPx: 6,        // 希望相邻轨迹点在屏幕上的最小像素间距（动态换算成角度）
       calibrationCircleArcmin: 1.0,  // 校准圆半径（角分）-- 约等于校准精度
+
+      // === 目标点多级精度圈（度 / 角分 / 角秒） ===
+      // 使用与你期望一致的 5 个“级别区间”来控制目标圈的内外半径：
+      // 1) 10°  -> 1°    : 外圈 10°，内圈 1°
+      // 2) 60'  -> 10'   : 外圈 60'，内圈 10'
+      // 3) 10'  -> 1'    : 外圈 10'，内圈 1'
+      // 4) 60\" -> 10\"  : 外圈 60\"，内圈 10\"
+      // 5) 10\" -> 1\"   : 外圈 10\"，内圈 1\"；进入 1\" 内时为绿色，否则为黄色
+      // alignmentScaleStage 记录当前所处的细分级别：
+      // 'deg_10_1' | 'arcmin_60_10' | 'arcmin_10_1' | 'arcsec_60_10' | 'arcsec_10_1'
+      alignmentScaleStage: 'deg_10_1',
+      outerRingDeg: 10,                  // 目标外圈半径（单位：度）
+      innerRingDeg: 1,                   // 目标内圈半径（单位：度，为 0 或 null 表示不绘制，逻辑用）
+      targetRingColor: '#FFD54F',        // 目标圈颜色：默认黄色，进入角秒级且 <1\" 时为绿色
+      alignmentCurrentDistanceDeg: null, // 当前与目标的角距离（度）
+
+      // 临时测试开关：控制是否在 UI 显示“模拟极轴校准”按钮
+      showTestButton: false,
+
+      // 测试模拟状态（前导下划线会触发 vue/no-reserved-keys，这里用普通名字）
+      testSimTimer: null,
+      testSimActive: false,
+      testPrevMergeTol: null,
 
       hasAcceptUpdateMessage: false, // 是否已经接受更新消息,防止由于组件加载顺序导致组件更新丢失
     }
@@ -1125,16 +1156,26 @@ export default {
       },
       worldForPoint(raDeg, decDeg, timeMsOrDate = null) {
         // 使用地平坐标（Az/Alt）绘制：世界坐标以“目标点”为原点
+        // 若当前经纬度未知，则退化为赤道坐标差值（ΔRA, ΔDEC）
         if (!this.targetRawPosition) return { x: 0, y: 0 }
         const loc = this.$store?.state?.currentLocation || {}
         const lat = Number(loc.lat)
         const lon = Number(loc.lng)
-        if (!Number.isFinite(lat) || !Number.isFinite(lon)) return { x: 0, y: 0 }
-        const t = (timeMsOrDate instanceof Date) ? timeMsOrDate : new Date(timeMsOrDate || Date.now())
-        const cur = this.equatorialToHorizontal(raDeg, decDeg, t, lat, lon)
-        const tgt = this.equatorialToHorizontal(this.targetRawPosition.ra, this.targetRawPosition.dec, t, lat, lon)
-        let dx = this.normalizeAzDelta(cur.az - tgt.az) // dAz（考虑 0/360 包裹）
-        let dy = cur.alt - tgt.alt                    // dAlt
+        // 在测试模拟阶段（testSimActive=true）时，强制走 RA/DEC 差值分支，
+        // 保证测试轨迹与我们设定的 20°/角分/角秒级别严格对应。
+        const hasLatLon = Number.isFinite(lat) && Number.isFinite(lon) && !this.testSimActive
+        let dx, dy
+        if (hasLatLon) {
+          const t = (timeMsOrDate instanceof Date) ? timeMsOrDate : new Date(timeMsOrDate || Date.now())
+          const cur = this.equatorialToHorizontal(raDeg, decDeg, t, lat, lon)
+          const tgt = this.equatorialToHorizontal(this.targetRawPosition.ra, this.targetRawPosition.dec, t, lat, lon)
+          dx = this.normalizeAzDelta(cur.az - tgt.az) // dAz（考虑 0/360 包裹）
+          dy = cur.alt - tgt.alt                      // dAlt
+        } else {
+          // 退化为 RA/DEC 差值，保证在无经纬度信息时仍然能正确绘制轨迹和比例尺
+          dx = this.normalizeRaDelta(raDeg - this.targetRawPosition.ra)
+          dy = decDeg - this.targetRawPosition.dec
+        }
         // 使用基于首点的展开锚点，避免跨 0/360 跳变
         if (this.raUnwrapAnchor != null) {
           while (dx - this.raUnwrapAnchor > 180) dx -= 360
@@ -1147,7 +1188,18 @@ export default {
         const loc = this.$store?.state?.currentLocation || {}
         const lat = Number(loc.lat)
         const lon = Number(loc.lng)
-        if (!Number.isFinite(lat) || !Number.isFinite(lon)) return []
+        const hasLatLon = Number.isFinite(lat) && Number.isFinite(lon) && !this.testSimActive
+
+        if (!hasLatLon) {
+          // 无经纬度：退化为 RA/DEC 差值序列，并进行 RA 展开
+          const dRaList = rawPoints.map(p => this.normalizeRaDelta(p.ra - this.targetRawPosition.ra))
+          const unwrapped = this.unwrapRaDeltaSequence(dRaList)
+          return rawPoints.map((p, i) => ({
+            x: unwrapped[i],
+            y: p.dec - this.targetRawPosition.dec
+          }))
+        }
+
         const times = rawPoints.map((p, idx) => {
           if (p.t) return new Date(p.t)
           if (idx > 0 && rawPoints[idx - 1].t) return new Date(rawPoints[idx - 1].t)
@@ -1173,10 +1225,20 @@ export default {
         const loc = this.$store?.state?.currentLocation || {}
         const lat = Number(loc.lat)
         const lon = Number(loc.lng)
-        if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null
+        const hasLatLon = Number.isFinite(lat) && Number.isFinite(lon) && !this.testSimActive
         const all = this.rawTrajectoryPoints
         const tA = new Date(all[all.length - 2].t || Date.now())
         const tB = new Date(all[all.length - 1].t || Date.now())
+
+        if (!hasLatLon) {
+          // 无经纬度：使用 RA/DEC 差值作为世界坐标
+          const dRaA = this.normalizeRaDelta(all[all.length - 2].ra - this.targetRawPosition.ra)
+          const dRaB = this.normalizeRaDelta(all[all.length - 1].ra - this.targetRawPosition.ra)
+          const A = { x: dRaA, y: all[all.length - 2].dec - this.targetRawPosition.dec }
+          const B = { x: dRaB, y: all[all.length - 1].dec - this.targetRawPosition.dec }
+          return { A, B }
+        }
+
         const tgtA = this.equatorialToHorizontal(this.targetRawPosition.ra, this.targetRawPosition.dec, tA, lat, lon)
         const tgtB = this.equatorialToHorizontal(this.targetRawPosition.ra, this.targetRawPosition.dec, tB, lat, lon)
         const curA = this.equatorialToHorizontal(all[all.length - 2].ra, all[all.length - 2].dec, tA, lat, lon)
@@ -1201,6 +1263,91 @@ export default {
         const y = h - padY - this.viewOffsetYPx - (wy - (this.viewMinWorldY || 0)) * this.currentPxPerDeg
         return { x, y }
       },
+      /**
+       * 根据当前点与目标点的角距离，更新目标点多级精度圈（度/角分/角秒）
+       * 并在跨越 1° 阈值（进入角分级）时清除旧轨迹、重置视图比例。
+       * @param {number} rawRaDeg - 当前赤经（度）
+       * @param {number} rawDecDeg - 当前赤纬（度）
+       * @param {number} timeMs - 时间戳（毫秒）
+       */
+      updateAlignmentRingsAndScale(rawRaDeg, rawDecDeg, timeMs = Date.now()) {
+        if (!this.targetRawPosition) return
+
+        // 计算当前与目标的角距离：直接复用世界坐标系，保证与轨迹绘制一致，
+        // 这样无论是真实 Alt/Az 还是测试用的 RA/DEC 差值，缩放与圈级切换都是连续的。
+        const world = this.worldForPoint(rawRaDeg, rawDecDeg, timeMs)
+        const rDeg = Math.hypot(world.x, world.y)
+
+        this.alignmentCurrentDistanceDeg = rDeg
+
+        // 阈值：10°、1°、10'、1'、10\"、1\"
+        const tenDeg = 10.0                 // 10°
+        const oneDeg = 1.0                  // 1°
+        const tenArcminDeg = 10.0 / 60.0    // 10'
+        const oneArcminDeg = 1.0 / 60.0     // 1'
+        const tenArcsecDeg = 10.0 / 3600.0  // 10\"
+        const oneArcsecDeg = 1.0 / 3600.0   // 1\"
+
+        // 判定当前所处“细分级别”
+        let newStage
+        if (rDeg >= oneDeg) {
+          // [10°, 1°]：度级（外 10°，内 1°）
+          newStage = 'deg_10_1'
+        } else if (rDeg >= tenArcminDeg) {
+          // [60', 10']：角分级（外 60'，内 10'）
+          newStage = 'arcmin_60_10'
+        } else if (rDeg > oneArcminDeg) {
+          // [10', 1']：角分级（外 10'，内 1'）
+          newStage = 'arcmin_10_1'
+        } else if (rDeg >= tenArcsecDeg) {
+          // [60\", 10\"]：角秒级（外 60\"，内 10\"）
+          newStage = 'arcsec_60_10'
+        } else {
+          // (10\", 0)：角秒级（外 10\"，内 1\"）
+          newStage = 'arcsec_10_1'
+        }
+
+        const prevStage = this.alignmentScaleStage || 'deg_10_1'
+        this.alignmentScaleStage = newStage
+
+        // 根据细分级别设置目标圈半径（单位：度）
+        if (newStage === 'deg_10_1') {
+          // 度级：外圈 10°，内圈 1°
+          this.outerRingDeg = 10.0
+          this.innerRingDeg = 1.0
+        } else if (newStage === 'arcmin_60_10') {
+          // 角分级：外圈 60' (=1°)，内圈 10'
+          this.outerRingDeg = 60.0 / 60.0      // 60' = 1°
+          this.innerRingDeg = 10.0 / 60.0      // 10'
+        } else if (newStage === 'arcmin_10_1') {
+          // 角分级：外圈 10'，内圈 1'
+          this.outerRingDeg = 10.0 / 60.0      // 10'
+          this.innerRingDeg = 1.0 / 60.0       // 1'
+        } else if (newStage === 'arcsec_60_10') {
+          // 角秒级：外圈 60\" (=1')，内圈 10\"
+          this.outerRingDeg = 60.0 / 3600.0    // 60\" = 1'
+          this.innerRingDeg = 10.0 / 3600.0    // 10\"
+        } else {
+          // 角秒级：外圈 10\"，内圈 1\"
+          this.outerRingDeg = 10.0 / 3600.0    // 10\"
+          this.innerRingDeg = 1.0 / 3600.0     // 1\"
+        }
+
+        // 每次“精度级别”发生变化时（degree ↔ arcmin ↔ arcsec），
+        // 都视为进入一个新的工作阶段：清除旧轨迹（保留最近两点）并重新计算比例尺。
+        // 使用已有的 clearOldTrajectory()：保留最近两点、重置视图映射锚点并立即重绘。
+        if (prevStage !== newStage && this.rawTrajectoryPoints && this.rawTrajectoryPoints.length > 2) {
+          this.clearOldTrajectory()
+        }
+
+        // 颜色：当偏差小于 60 角秒（1 角分）时，目标圈和标注全部改为绿色
+        const sixtyArcsecDeg = 60.0 / 3600.0  // 60" = 1'
+        if (rDeg <= sixtyArcsecDeg) {
+          this.targetRingColor = '#4CAF50' // 绿色 - 偏差小于 60 角秒
+        } else {
+          this.targetRingColor = '#FFD54F' // 黄色 - 偏差大于 60 角秒
+        }
+      },
       ensureViewMappingInitialized(seqWorld) {
         if (!seqWorld || seqWorld.length === 0) return
         if (this.currentPxPerDeg != null && this.viewMinWorldX != null) return
@@ -1211,24 +1358,45 @@ export default {
         const first = seqWorld[0]
         // 初始化展开锚点为首点 X（相对目标）
         this.raUnwrapAnchor = first.x
-        const minX = Math.min(0, first.x)
-        const maxX = Math.max(0, first.x)
-        const minY = Math.min(0, first.y)
-        const maxY = Math.max(0, first.y)
-        const spanX = Math.max(1e-6, maxX - minX)
-        const spanY = Math.max(1e-6, maxY - minY)
-        const scaleX = (w - 2 * padX) / spanX
-        const scaleY = (h - 2 * padY) / spanY
-        this.currentPxPerDeg = Math.max(5, Math.min(scaleX, scaleY))
-        this.viewMinWorldX = minX
-        this.viewMaxWorldX = maxX
-        this.viewMinWorldY = minY
-        this.viewMaxWorldY = maxY
-        // 初次视图内容居中：仅在初始化时设置一次偏移
-        const contentWpx = spanX * this.currentPxPerDeg
-        const contentHpx = spanY * this.currentPxPerDeg
-        this.viewOffsetXPx = Math.round(((w - 2 * padX) - contentWpx) / 2)
-        this.viewOffsetYPx = Math.round(((h - 2 * padY) - contentHpx) / 2)
+
+        // 统一思路：每个“级别”的外圈角半径由 alignmentScaleStage / outerRingDeg 决定，
+        // 在屏幕上占据大致固定比例；轨迹只是在这个固定外圈内收缩。
+        let radiusDeg = Number(this.outerRingDeg)
+        if (!Number.isFinite(radiusDeg) || radiusDeg <= 0) {
+          radiusDeg = this.getTargetRingDeg()
+        }
+        // 兜底：如果外圈半径仍然非法，则退化为基于数据的最大半径
+        if (!Number.isFinite(radiusDeg) || radiusDeg <= 0) {
+          let maxR = 0
+          for (const p of seqWorld) {
+            if (!p) continue
+            const rx = Number.isFinite(p.x) ? Math.abs(p.x) : 0
+            const ry = Number.isFinite(p.y) ? Math.abs(p.y) : 0
+            const r = Math.max(rx, ry)
+            if (r > maxR) maxR = r
+          }
+          radiusDeg = Math.max(maxR, 1e-3)
+        }
+
+        // 目标：外圈半径在屏幕内占据 ~45% 的可用尺寸（稍微放大一点，保证“近景感”）
+        const usableW = w - 2 * padX
+        const usableH = h - 2 * padY
+        const targetRadiusPx = Math.min(usableW, usableH) * 0.45
+        const pxPerDeg = targetRadiusPx / radiusDeg
+        this.currentPxPerDeg = pxPerDeg
+
+        // 视图世界边界：以 (0,0) 为中心的正方形 [-radiusDeg, radiusDeg]
+        this.viewMinWorldX = -radiusDeg
+        this.viewMaxWorldX = radiusDeg
+        this.viewMinWorldY = -radiusDeg
+        this.viewMaxWorldY = radiusDeg
+
+        // 初次视图内容居中：确保目标点 (0,0) 精确映射到画布中心
+        // 计算方式：centerX = padX + viewOffsetXPx + (0 - viewMinWorldX) * pxPerDeg
+        // 我们希望 centerX = padX + usableW/2，所以：
+        // viewOffsetXPx = usableW/2 - (0 - viewMinWorldX) * pxPerDeg = usableW/2 - radiusDeg * pxPerDeg
+        this.viewOffsetXPx = Math.round(usableW / 2 - radiusDeg * this.currentPxPerDeg)
+        this.viewOffsetYPx = Math.round(usableH / 2 - radiusDeg * this.currentPxPerDeg)
       },
       maybeExpandViewForPoint(wx, wy) {
         // 若点在当前屏幕内，则不更新比例尺；若越界，扩展边界并仅缩小比例尺
@@ -1239,23 +1407,35 @@ export default {
         const py = h - padY - this.viewOffsetYPx - (wy - this.viewMinWorldY) * this.currentPxPerDeg
         const inside = px >= padX && px <= (w - padX) && py >= padY && py <= (h - padY)
         if (inside) return
-        // 扩展世界边界到包含该点
-        const newMinX = Math.min(this.viewMinWorldX, wx)
-        const newMaxX = Math.max(this.viewMaxWorldX, wx)
-        const newMinY = Math.min(this.viewMinWorldY, wy)
-        const newMaxY = Math.max(this.viewMaxWorldY, wy)
-        const spanX = Math.max(1e-6, newMaxX - newMinX)
-        const spanY = Math.max(1e-6, newMaxY - newMinY)
+        // 扩展世界边界到包含该点，同时保持以 (0,0) 为中心对称
+        const halfX = Math.max(
+          1e-6,
+          Math.abs(this.viewMinWorldX),
+          Math.abs(this.viewMaxWorldX),
+          Math.abs(wx)
+        )
+        const halfY = Math.max(
+          1e-6,
+          Math.abs(this.viewMinWorldY),
+          Math.abs(this.viewMaxWorldY),
+          Math.abs(wy)
+        )
+        const spanX = halfX * 2
+        const spanY = halfY * 2
         const scaleX = (w - 2 * padX) / spanX
         const scaleY = (h - 2 * padY) / spanY
-        const candidate = Math.max(5, Math.min(scaleX, scaleY))
+        const candidate = Math.min(scaleX, scaleY)
         // 仅缩小
         this.currentPxPerDeg = this.currentPxPerDeg == null ? candidate : Math.min(this.currentPxPerDeg, candidate)
-        this.viewMinWorldX = newMinX
-        this.viewMaxWorldX = newMaxX
-        this.viewMinWorldY = newMinY
-        this.viewMaxWorldY = newMaxY
-        // 固定锚点：不再重算偏移，保持目标点屏幕位置恒定
+        this.viewMinWorldX = -halfX
+        this.viewMaxWorldX = halfX
+        this.viewMinWorldY = -halfY
+        this.viewMaxWorldY = halfY
+        // 重新计算偏移，确保目标点 (0,0) 始终在画布中心
+        const usableW = w - 2 * padX
+        const usableH = h - 2 * padY
+        this.viewOffsetXPx = Math.round(usableW / 2 - halfX * this.currentPxPerDeg)
+        this.viewOffsetYPx = Math.round(usableH / 2 - halfY * this.currentPxPerDeg)
       },
       drawTargetMarker(scaleOverride = null) {
         const canvas = this.$refs.trajectoryCanvas
@@ -1268,21 +1448,103 @@ export default {
         // 背景
         ctx.fillStyle = 'black'
         ctx.fillRect(0, 0, w, h)
-        // 目标圆环
+        // 目标圆环：始终只有“外圈 + 内圈”两级（但会根据 alignmentScaleStage 在 5 个级别间切换）
         const center = this.screenForWorld(0, 0)
-        const ringDeg = this.getTargetRingDeg()
         const scale = (scaleOverride != null ? scaleOverride : this.currentPxPerDeg) || 40
-        // 半径限制：不超出可见区域
-        const rPx = Math.max(6, Math.min(Math.min(w, h) * 0.45, ringDeg * scale))
-        ctx.strokeStyle = '#4CAF50'
+
+        // 将细分级别归并为基础单位级别：'degree' | 'arcmin' | 'arcsec'
+        const rawStage = this.alignmentScaleStage || 'deg_10_1'
+        let stage = 'degree'
+        if (rawStage.startsWith('arcmin')) stage = 'arcmin'
+        else if (rawStage.startsWith('arcsec')) stage = 'arcsec'
+
+        let outerDeg = Number(this.outerRingDeg)
+        let innerDeg = Number(this.innerRingDeg)
+        if (!Number.isFinite(outerDeg) || outerDeg <= 0) {
+          // 退化为视场半径
+          outerDeg = this.getTargetRingDeg()
+        }
+        if (!Number.isFinite(innerDeg) || innerDeg <= 0 || innerDeg >= outerDeg) {
+          innerDeg = 0
+        }
+
+        const color = this.targetRingColor || '#FFD54F'
+        ctx.strokeStyle = color
         ctx.lineWidth = 2
+
+        const maxRpx = Math.min(w, h) * 0.45
+        // 所有级别的外圈半径都严格由“角度 * 比例尺”决定，再夹在 [6, maxRpx] 范围内，
+        // 保证 10°/1°、60'/10'/1'、60\"/10\"/1\" 等几何位置与数值一致。
+        let outerPx = outerDeg * scale
+        outerPx = Math.max(6, Math.min(maxRpx, outerPx))
+
         ctx.beginPath()
-        ctx.arc(center.x, center.y, rPx, 0, Math.PI * 2)
+        ctx.arc(center.x, center.y, outerPx, 0, Math.PI * 2)
         ctx.stroke()
-        ctx.fillStyle = '#4CAF50'
+
+        let innerPx = 0
+        if (innerDeg > 0) {
+          innerPx = innerDeg * scale
+          innerPx = Math.max(4, Math.min(outerPx * 0.95, innerPx))
+          ctx.beginPath()
+          ctx.arc(center.x, center.y, innerPx, 0, Math.PI * 2)
+          ctx.stroke()
+        }
+
+        // 目标点：还原为外圈同色的实心小点（受比例尺影响的是外/内圈，不是这个点）
+        ctx.fillStyle = color
         ctx.beginPath()
         ctx.arc(center.x, center.y, 3, 0, Math.PI * 2)
         ctx.fill()
+
+        // 在目标位置的圈上标注当前外圈 / 内圈数值和当前偏差
+        ctx.fillStyle = color
+        ctx.font = '12px sans-serif'
+        ctx.textBaseline = 'middle'
+
+        let outerLabel = ''
+        let innerLabel = ''
+
+        if (stage === 'degree') {
+          outerLabel = `${outerDeg.toFixed(1)}°`
+          if (innerDeg > 0) innerLabel = `${innerDeg.toFixed(1)}°`
+        } else if (stage === 'arcmin') {
+          const outerArcmin = outerDeg * 60.0
+          outerLabel = `${outerArcmin.toFixed(0)}'`
+          if (innerDeg > 0) innerLabel = `${(innerDeg * 60.0).toFixed(1)}'`
+        } else if (stage === 'arcsec') {
+          const outerArcsec = outerDeg * 3600.0
+          outerLabel = `${outerArcsec.toFixed(0)}\"`
+          if (innerDeg > 0) innerLabel = `${(innerDeg * 3600.0).toFixed(1)}\"`
+        }
+
+        // 标注外圈半径数值（在外圈右侧）
+        if (outerLabel) {
+          ctx.fillText(outerLabel, center.x + outerPx + 8, center.y)
+        }
+        // 标注内圈半径数值（在内圈右上）
+        if (innerLabel && innerPx > 0) {
+          ctx.fillText(innerLabel, center.x + innerPx + 8, center.y - 14)
+        }
+
+        // 标注当前与目标的偏差（度 / 角分 / 角秒综合显示）
+        if (Number.isFinite(this.alignmentCurrentDistanceDeg)) {
+          const dDeg = this.alignmentCurrentDistanceDeg
+          const totalArcsec = dDeg * 3600.0
+          let distText
+          if (totalArcsec >= 3600) {
+            // >= 1 度
+            distText = `${dDeg.toFixed(2)}°`
+          } else if (totalArcsec >= 60) {
+            // [1', 1°)
+            const arcmin = dDeg * 60.0
+            distText = `${arcmin.toFixed(2)}'`
+          } else {
+            // < 1'
+            distText = `${totalArcsec.toFixed(2)}\"`
+          }
+          ctx.fillText(`Δ ${distText}`, center.x, center.y + (outerPx || 0) + 16)
+        }
         ctx.restore()
       },
       drawTargetAtCenter(ringDegOverride = null) {
@@ -1355,27 +1617,31 @@ export default {
       // === 轨迹点合并/追加（按 Alt/Az 容差） ===
       appendRawTrajectoryPoint(raDeg, decDeg, timeMs = Date.now()) {
         if (!Number.isFinite(raDeg) || !Number.isFinite(decDeg)) return
-        const loc = this.$store?.state?.currentLocation || {}
-        const lat = Number(loc.lat)
-        const lon = Number(loc.lng)
-        if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-          // 无法转换 Alt/Az，则直接追加
-          this.rawTrajectoryPoints.push({ ra: raDeg, dec: decDeg, t: timeMs })
-          return
+        // 动态合并容差：
+        // - 以“希望的最小像素间距 trajectoryMergeTolPx”为主，根据当前比例尺换算为角度；
+        // - 若当前还没有有效比例尺，则退化为固定角分（trajectoryMergeTolArcmin）。
+        let tolDeg = 0
+        const baseArcmin = Number(this.trajectoryMergeTolArcmin) || 0
+        if (Number.isFinite(this.currentPxPerDeg) && this.currentPxPerDeg > 0 && this.trajectoryMergeTolPx > 0) {
+          const byPixel = this.trajectoryMergeTolPx / this.currentPxPerDeg  // deg
+          const byArcmin = baseArcmin / 60.0
+          // 取两者较小值，避免在远距离时合并过猛
+          tolDeg = byArcmin > 0 ? Math.min(byPixel, byArcmin) : byPixel
+        } else {
+          tolDeg = baseArcmin / 60.0
         }
-        const t = new Date(timeMs)
-        // 计算当前点与上一点在 Alt/Az 上的距离
-        const curAltAz = this.equatorialToHorizontal(raDeg, decDeg, t, lat, lon)
-        const tolDeg = (Number(this.trajectoryMergeTolArcmin) || 0) / 60
         const last = this.rawTrajectoryPoints[this.rawTrajectoryPoints.length - 1]
         if (!last) {
           this.rawTrajectoryPoints.push({ ra: raDeg, dec: decDeg, t: timeMs })
           return
         }
-        const lastAltAz = this.equatorialToHorizontal(last.ra, last.dec, new Date(last.t || timeMs), lat, lon)
-        const dAz = this.normalizeAzDelta(curAltAz.az - lastAltAz.az)
-        const dAlt = curAltAz.alt - lastAltAz.alt
-        const sep = Math.hypot(dAz, dAlt)
+        // 使用与绘制相同的“世界坐标系”来计算轨迹点之间的距离，
+        // 保证合并容差是基于“最后一个实际绘制的点”的位置。
+        const curWorld = this.worldForPoint(raDeg, decDeg, timeMs)
+        const lastWorld = this.worldForPoint(last.ra, last.dec, last.t || timeMs)
+        const dWx = curWorld.x - lastWorld.x
+        const dWy = curWorld.y - lastWorld.y
+        const sep = Math.hypot(dWx, dWy)
         if (sep <= tolDeg) {
           // 合并：更新最后一点为当前值（保持时间最新）
           last.ra = raDeg
@@ -1584,7 +1850,8 @@ export default {
         const halfH = Math.max(50, (h / 2) - pixelPadding)
         // 让最远点落在中心到边界距离的 80% 处（留足可视余量）
         const margin = 0.8
-        let scale = Math.max(5, Math.min((halfW * margin) / (maxDx || 1e-6), (halfH * margin) / (maxDy || 1e-6)))
+        // 取消最小 scale 限制，让 autoFit 仅由内容决定
+        let scale = Math.min((halfW * margin) / (maxDx || 1e-6), (halfH * margin) / (maxDy || 1e-6))
         // 二次校验：按该比例转换一次，确保确实未越界，如越界再缩小比例
         const pad = pixelPadding
         const cxPx = w / 2, cyPx = h / 2
@@ -1632,13 +1899,25 @@ export default {
           ]
           fovWorld = corners.map(c => this.worldForPoint(c.ra, c.dec, timeRef))
         }
-        this.ensureViewMappingInitialized(worldSeq.concat(fovWorld))
+        // 为了让目标外圈始终完整显示，把当前外圈半径也纳入世界边界估算
+        const ringWorld = []
+        let outerDegForView = Number(this.outerRingDeg)
+        if (!Number.isFinite(outerDegForView) || outerDegForView <= 0) {
+          outerDegForView = this.getTargetRingDeg()
+        }
+        if (Number.isFinite(outerDegForView) && outerDegForView > 0) {
+          ringWorld.push({ x: outerDegForView, y: 0 })
+          ringWorld.push({ x: -outerDegForView, y: 0 })
+          ringWorld.push({ x: 0, y: outerDegForView })
+          ringWorld.push({ x: 0, y: -outerDegForView })
+        }
+        // 仅使用轨迹点 + 目标外圈来决定初始比例尺，避免 FoV 过大时把视图拉得太远
+        this.ensureViewMappingInitialized(worldSeq.concat(ringWorld))
         // 选择绘制的数据集：全屏=全部；窗口=最新三个，但保持展开锚点稳定
         const raw = this.overlayMode === 'windowed' ? rawAll.slice(-3) : rawAll
         const world = this.makeWorldSeq(raw)
         // 先走一遍更新比例/边界，不绘制，确保下游图元坐标系一致
         for (let i = 0; i < world.length; i++) this.maybeExpandViewForPoint(world[i].x, world[i].y)
-        for (let i = 0; i < fovWorld.length; i++) this.maybeExpandViewForPoint(fovWorld[i].x, fovWorld[i].y)
         // 再绘背景/目标环
         this.drawTargetMarker()
         // 绘制轨迹
@@ -1653,13 +1932,14 @@ export default {
             this.drawPoint(px, py, '#FFD54F')
             if (prevPt) this.drawArrow(prevPt.x, prevPt.y, px, py, '#FFD54F')
           } else {
-            // 当前位置以空心圆表示（半径约 1 角分）
-            const arcmin = (this.calibrationCircleArcmin || 1)
-            const rPx = Math.max(4, (arcmin / 60) * ((this.currentPxPerDeg || 40)))
+            // 当前位置：固定像素大小的蓝色空心圆圈（与比例尺无关）
+            const rPx = 6
             this.drawHollowCircle(px, py, rPx, '#00BFFF', 2)
-            // 圈住目标（目标在世界原点），当圆心到原点的距离小于半径时视为完成
+            // 完成判定仍然按角距离（默认 1 角分）来算，与显示半径解耦
+            const tolArcmin = (this.calibrationCircleArcmin || 1)
+            const tolDeg = tolArcmin / 60.0
             const rDeg = Math.hypot(world[i].x, world[i].y)
-            if (rDeg <= (arcmin / 60)) {
+            if (rDeg <= tolDeg) {
               if (!this.isPolarAligned) {
                 this.isPolarAligned = true
                 this.addLog(this.$t('Polar Alignment Completed'), 'success')
@@ -1745,6 +2025,100 @@ export default {
         this.$stopFeature(['MainCamera', 'Mount'], 'AutoPolarAlignment')
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'StopAutoPolarAlignment')
       },
+      /**
+       * 临时测试函数：在前端本地模拟一段极轴校准过程，
+       * 等价于 Qt 端通过 FieldDataUpdate 连续发送数据。
+       * 仅在开发环境（showTestButton 为 true）下暴露按钮触发。
+       */
+      runTestPolarAlignmentSimulation() {
+        // 若上一次测试仍在进行，先终止并恢复状态
+        if (this.testSimActive && this.testSimTimer) {
+          clearTimeout(this.testSimTimer)
+          this.testSimTimer = null
+          this.testSimActive = false
+          if (this.testPrevMergeTol != null) {
+            this.trajectoryMergeTolArcmin = this.testPrevMergeTol
+            this.testPrevMergeTol = null
+          }
+        }
+
+        if (!this.showTrajectoryOverlay) {
+          this.showTrajectoryOverlay = true
+        }
+        this.resetCalibration()
+
+        // 模拟：固定一个目标点（靠近极点附近），当前位置从偏差较大的地方逐步靠近
+        const targetRa = 0      // 度
+        const targetDec = 89    // 接近北极
+
+        // 简单设定一个视场框（随便给出一个小 FoV）
+        const baseRa = targetRa
+        const baseDec = targetDec
+
+        const makeFieldData = (curRa, curDec) => {
+          const fovSizeDeg = 1.0
+          return [
+            curRa, curDec,                             // 0,1: 当前中心
+            baseRa - fovSizeDeg, baseDec - fovSizeDeg, // 2,3
+            baseRa + fovSizeDeg, baseDec - fovSizeDeg, // 4,5
+            baseRa + fovSizeDeg, baseDec + fovSizeDeg, // 6,7
+            baseRa - fovSizeDeg, baseDec + fovSizeDeg, // 8,9
+            targetRa, targetDec,                       // 10,11: 目标
+            -1, -1,                                    // 12,13: fakePolar 占位
+            -1, -1                                     // 14,15: realPolar 占位
+          ]
+        }
+
+        // 构造一条按你描述的规则收敛的轨迹：
+        // 1) 从 20° 开始，每次减少 1°，直到 1°；
+        // 2) 当距离 < 1° 时，从 60' 开始，每次减少 5'（60'、55'、50'...5'）；
+        // 3) 进入角秒级后，从 60\" 开始，每次减少 5\"，直到 10\" 结束。
+        const steps = []
+
+        // 1) 度级：20° → 1°，步长 1°
+        for (let d = 20; d >= 1; d -= 1) {
+          steps.push({ ra: targetRa + d, dec: targetDec })
+        }
+
+        // 2) 角分级：60' → 5'，步长 5'
+        for (let m = 60; m >= 5; m -= 5) {
+          const offsetDeg = m / 60.0
+          steps.push({ ra: targetRa + offsetDeg, dec: targetDec })
+        }
+
+        // 3) 角秒级：60" → 10"，步长 5"
+        for (let s = 60; s >= 10; s -= 5) {
+          const offsetDeg = s / 3600.0
+          steps.push({ ra: targetRa + offsetDeg, dec: targetDec })
+        }
+
+        let idx = 0
+        const tick = () => {
+          if (idx >= steps.length) {
+            // 模拟结束后，恢复正常的点合并容差
+            if (this.testPrevMergeTol != null) {
+              this.trajectoryMergeTolArcmin = this.testPrevMergeTol
+              this.testPrevMergeTol = null
+            }
+            this.testSimActive = false
+            this.testSimTimer = null
+            return
+          }
+          const p = steps[idx++]
+          const payload = makeFieldData(p.ra, p.dec)
+          // 直接复用正常的数据处理逻辑（更新 fieldData / currentPosition / targetRawPosition 等）
+          this.updateFieldData(payload)
+          if (idx < steps.length) {
+            this.testSimTimer = setTimeout(tick, 500)
+          }
+        }
+
+        // 为了在模拟过程中看到完整轨迹，临时关闭轨迹点合并
+        this.testPrevMergeTol = this.trajectoryMergeTolArcmin
+        this.trajectoryMergeTolArcmin = 0
+        this.testSimActive = true
+        tick()
+      },
       // ========================================
       // 视场数据处理方法
       // ========================================
@@ -1794,12 +2168,23 @@ export default {
           if (data[10] !== -1 && data[11] !== -1) {
             if (!this.targetRawPosition || (this.targetRawPosition.ra !== data[10] || this.targetRawPosition.dec !== data[11])) {
               this.targetRawPosition = { ra: data[10], dec: data[11] }
+              // 目标点变化时，重置多级圈到“度级”初始状态
+              this.alignmentScaleStage = 'degree'
+              this.outerRingDeg = 10.0
+              this.innerRingDeg = 1.0
+              this.targetRingColor = '#FFD54F'
+              this.alignmentCurrentDistanceDeg = null
+              // 重置视图映射，后续由轨迹点重新驱动比例尺
+              this.resetViewMapping()
               // 重绘以目标点为中心
               if (this.showTrajectoryOverlay) this.redrawTrajectory()
             }
             const posChanged = !this.lastRawPosition || this.lastRawPosition.ra !== rawRa || this.lastRawPosition.dec !== rawDec
             if (posChanged) {
-              this.appendRawTrajectoryPoint(rawRa, rawDec, Date.now())
+              const nowMs = Date.now()
+              this.appendRawTrajectoryPoint(rawRa, rawDec, nowMs)
+              // 更新多级精度圈与可能的轨迹清理 / 比例重置
+              this.updateAlignmentRingsAndScale(rawRa, rawDec, nowMs)
               // 改为全量重绘（确保自适应比例包含所有点、并绘制视场框）
               if (this.showTrajectoryOverlay) this.redrawTrajectory()
               this.lastRawPosition = { ra: rawRa, dec: rawDec }
