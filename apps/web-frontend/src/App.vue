@@ -2560,6 +2560,52 @@ export default {
                 }
                 break;
 
+              case 'SchedulePresetList':
+                // 任务计划表预设名称列表：SchedulePresetList:name1;name2;name3
+                if (parts.length === 2) {
+                  const raw = parts[1] || '';
+                  const names = raw ? raw.split(';') : [];
+                  this.$bus.$emit('SchedulePresetList', names);
+                }
+                break;
+
+              case 'ScheduleStepState':
+                // 任务计划表细粒度步骤状态：
+                // ScheduleStepState:row:currentStep:loopDone:loopTotal:stepProgress
+                if (parts.length === 6) {
+                  const row = parseInt(parts[1]);
+                  const payload = {
+                    currentStep: parts[2],
+                    loopDone: parseInt(parts[3]),
+                    loopTotal: parseInt(parts[4]),
+                    stepProgress: parseInt(parts[5])
+                  };
+                  this.$bus.$emit('ScheduleStepState', row, payload);
+                }
+                break;
+
+              case 'ScheduleLoopState':
+                // 任务计划表循环次数专用状态：
+                // ScheduleLoopState:row:loopDone:loopTotal:progress
+                if (parts.length === 5) {
+                  const row = parseInt(parts[1]);
+                  const payload = {
+                    loopDone: parseInt(parts[2]),
+                    loopTotal: parseInt(parts[3]),
+                    progress: parseInt(parts[4])
+                  };
+                  this.$bus.$emit('ScheduleLoopState', row, payload);
+                }
+                break;
+
+              case 'ScheduleRunning':
+                // ScheduleRunning:true/false —— 后端显式告知当前任务计划运行状态
+                if (parts.length === 2) {
+                  const running = parts[1] === 'true';
+                  this.$bus.$emit('ScheduleRunning', running);
+                }
+                break;
+
               case 'TianWen':
                 if (parts.length === 4) {
                   const notice_type = parts[1];

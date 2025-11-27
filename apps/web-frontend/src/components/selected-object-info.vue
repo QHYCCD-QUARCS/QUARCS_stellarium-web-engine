@@ -102,6 +102,9 @@ export default {
       items: [],
       TargetRa: 0,
       TargetDec: 0,
+
+      // 是否处于“任务计划表从星图选择目标”模式，用于控制按钮显示为锁定而非 Goto
+      isScheduleTargetPickMode: false,
     }
   },
   computed: {
@@ -150,6 +153,8 @@ export default {
       return swh.iconForSkySource(this.selectedObject)
     },
     showPointToButton: function () {
+      // 在任务计划表选星模式下，始终显示“锁定”按钮，而不是 Goto
+      if (this.isScheduleTargetPickMode) return true
       if (!this.$store.state.stel.lock) return true
       if (this.$store.state.stel.lock !== this.$store.state.stel.selection) return true
       return false
@@ -395,6 +400,12 @@ export default {
       this.copied = document.execCommand('copy')
       window.getSelection().removeAllRanges()
       this.showShareLinkDialog = false
+    },
+    // 任务计划表请求“使用当前已选星点”时，直接复用现有逻辑，
+    // 将当前选中对象的名称和 Ra/Dec 通过事件总线回传给 SchedulePanel。
+    onUseCurrentSkySelectionForSchedule() {
+      if (!this.selectedObject) return;
+      this.printName();
     }
   },
   mounted: function () {
@@ -402,6 +413,22 @@ export default {
     window.addEventListener('mouseup', function (event) {
       that.stopZoom()
     })
+    if (this.$bus && this.$bus.$on) {
+      this.$bus.$on('UseCurrentSkySelectionForSchedule', this.onUseCurrentSkySelectionForSchedule);
+      this.$bus.$on('ScheduleTargetPickStart', () => {
+        this.isScheduleTargetPickMode = true;
+      });
+      this.$bus.$on('ScheduleTargetPickFinished', () => {
+        this.isScheduleTargetPickMode = false;
+      });
+    }
+  },
+  beforeDestroy() {
+    if (this.$bus && this.$bus.$off) {
+      this.$bus.$off('UseCurrentSkySelectionForSchedule', this.onUseCurrentSkySelectionForSchedule);
+      this.$bus.$off('ScheduleTargetPickStart');
+      this.$bus.$off('ScheduleTargetPickFinished');
+    }
   }
 }
 </script>

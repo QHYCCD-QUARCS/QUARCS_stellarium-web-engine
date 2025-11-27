@@ -215,6 +215,16 @@
       </div>
     </transition>
 
+    <!-- 任务计划表：从星图选择目标时的固定提示条 -->
+    <transition name="ToolBar">
+      <div
+        v-if="showScheduleTargetTip"
+        class="ScheduleTargetTip get-click"
+      >
+        {{ $t('Please select an object on the sky map, then use the lock button to apply it to the schedule.') }}
+      </div>
+    </transition>
+
     <!-- <button v-show="isCaptureMode" @click="calcWhiteBalanceGains" class="get-click btn-WhiteBalance">
     <div style="display: flex; justify-content: center; align-items: center;">
       <img src="@/assets/images/svg/ui/WhiteBalance.svg" height="20px" style="min-height: 20px"></img>
@@ -232,9 +242,12 @@
 
     <RPIHotspotDialog v-show="ShowRPIHotspotDialog" />
 
-    <SchedulePanel v-show="ShowSchedulePanel" class="get-click" style="position: absolute; z-index: 200;" />
-    <ScheduleKeyBoard v-show="ShowSchedulePanel" />
-    <ScheduleList v-show="ShowSchedulePanel" class="get-click" style="position: absolute; z-index: 200;" />
+    <!-- 统一后的任务计划表面板 -->
+    <SchedulePanel
+      v-show="ShowSchedulePanel"
+      class="get-click"
+      style="position: absolute; z-index: 200;"
+    />
 
     <v-dialog v-model="ConfirmDialog" width="220" persistent>
       <v-expand-x-transition>
@@ -374,9 +387,6 @@ import HistogramPanel from '@/components/HistogramPanel.vue';
 import FocuserPanel from '@/components/FocuserPanel.vue';
 
 import SchedulePanel from '@/components/SchedulePanel.vue';
-import ScheduleList from '@/components/ScheduleList.vue';
-
-import ScheduleKeyBoard from '@/components/ScheduleKeyBoard.vue';
 
 import CapturePanel from '@/components/CapturePanel.vue';
 
@@ -524,6 +534,12 @@ export default {
       scaleButtonsOverlap: false, // 缩放按钮是否与CapturePanel重合
       scaleButtonsMarginTop: 0, // 缩放按钮向上移动的距离
 
+      // 任务计划表：从星图选择目标时的上下文，用于结束后恢复原画布和面板状态
+      scheduleTargetPickContext: null,
+
+      // 任务计划表：从星图选择目标时，顶部的持久提示条
+      showScheduleTargetTip: false,
+
       previousState: {        // 保存隐藏时的ui状态
         isShowImage: false,
         showMountSwitch: false,
@@ -606,6 +622,10 @@ export default {
     this.$bus.$on('setScale', this.setScale);
     this.$bus.$on('reRunUpdate', this.reRunUpdate);   // 用于在更新失败后重新运行更新
     this.$bus.$on('closeUpdateDialog', this.closeUpdateDialog);
+
+    // 任务计划表：从星图选择目标
+    this.$bus.$on('ScheduleTargetPickStart', this.onScheduleTargetPickStart);
+    this.$bus.$on('ScheduleTargetPickFinished', this.onScheduleTargetPickFinished);
   },
   mounted() {
     // 根据屏幕分辨率高度判断布局，立即执行（不需要等待DOM渲染）
@@ -1348,10 +1368,21 @@ export default {
         this.showUpdateDialog = true;
       } else if (this.ConfirmToDo === 'StartCalibration') {
         this.$bus.$emit('StartCalibration');
-      }else if (this.ConfirmToDo === 'startAutoFocus') {
+      } else if (this.ConfirmToDo === 'startAutoFocus') {
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'AutoFocusConfirm:Yes');
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'ClearDataPoints');
         this.$bus.$emit('ClearAllData');
+      } else if (this.ConfirmToDo === 'DeleteSchedulePreset') {
+        // 删除当前选中的任务预设（名称通过 ConfirmDialogTitle 传入）
+        const name = this.ConfirmDialogTitle;
+        if (name) {
+          this.$bus.$emit(
+            'AppSendMessage',
+            'Vue_Command',
+            'deleteSchedulePreset:' + name
+          );
+          this.$bus.$emit('SchedulePresetDeleted', name);
+        }
       }
     },
 
@@ -1537,6 +1568,80 @@ export default {
     },
     closeUpdateDialog() {
       this.showUpdateDialog = false;
+    },
+
+    /**
+     * 任务计划表：从星图选择目标 —— 开始。
+     * 由 SchedulePanel 发出 ScheduleTargetPickStart 事件触发。
+     * 步骤：
+     * 1. 记录当前主画布与计划面板状态；
+     * 2. 调用 hideCaptureUI() 隐藏所有拍摄相关 UI；
+     * 3. 切换到星图画布，让用户在星图上选择目标。
+     */
+    onScheduleTargetPickStart() {
+      // 已经在选星模式中则忽略
+      if (this.scheduleTargetPickContext) return;
+
+      this.scheduleTargetPickContext = {
+        previousMainPage: this.CurrentMainPage,
+        previousShowSchedulePanel: this.ShowSchedulePanel
+      };
+
+      // 先保存并隐藏当前 UI
+      this.hideCaptureUI(false);
+
+      // 在星图模式下不需要“显示/隐藏界面”按钮，本次流程结束后由 showCaptureUI 自动恢复
+      this.isShowHideUi = false;
+
+      // 切换为星图模式
+      this.CurrentMainPage = 'Stel';
+      this.isStellariumMode = true;
+      this.isCaptureMode = false;
+      this.isGuiderMode = false;
+
+      // 显示星图画布
+      this.$bus.$emit('showCanvas', 'Stel');
+
+      // 顶部提示：引导用户在星图中选择目标（始终显示，直到成功选择）
+      this.showScheduleTargetTip = true;
+
+      // 关闭任务计划表和时间控制器
+      if (this.ShowSchedulePanel) {
+        this.ShowSchedulePanel = false;
+      }
+      if (this.ShowDateTimePicker) {
+        this.ShowDateTimePicker = false;
+      }
+    },
+
+    /**
+     * 任务计划表：从星图选择目标 —— 结束。
+     * 由 SchedulePanel 在收到 TargetRaDec 后发出 ScheduleTargetPickFinished 事件触发。
+     * 步骤：
+     * 1. 通过 showCaptureUI() 恢复之前保存的 UI 状态；
+     * 2. 恢复原主画布（Stel/MainCamera/GuiderCamera）；
+     * 3. 若进入前任务计划表是打开的，则重新显示。
+     */
+    onScheduleTargetPickFinished() {
+      if (!this.scheduleTargetPickContext) return;
+
+      const ctx = this.scheduleTargetPickContext;
+      this.scheduleTargetPickContext = null;
+
+      // 关闭顶部提示条
+      this.showScheduleTargetTip = false;
+
+      // 恢复之前保存的 UI
+      this.showCaptureUI();
+
+      // 恢复原主画布
+      this.CurrentMainPage = ctx.previousMainPage || 'Stel';
+      this.$bus.$emit('showCanvas', this.CurrentMainPage);
+
+      // 根据原状态决定是否重新打开任务计划表
+      if (ctx.previousShowSchedulePanel) {
+        this.ShowSchedulePanel = true;
+      }
     }
   },
   computed: {
@@ -1639,8 +1744,6 @@ export default {
     HistogramPanel,
     FocuserPanel,
     SchedulePanel,
-    ScheduleList,
-    ScheduleKeyBoard,
     CapturePanel,
     ImageManagerPanel,
     DeviceAllocationPanel,
@@ -1776,6 +1879,22 @@ export default {
   user-select: none;
   background-color: rgba(64, 64, 64, 0);
   border-radius: 3px;
+}
+
+.ScheduleTargetTip {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 60%;
+  padding: 6px 12px;
+  border-radius: 6px;
+  background-color: rgba(0, 0, 0, 0.75);
+  color: #ffffff;
+  font-size: 11px;
+  text-align: center;
+  z-index: 210;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
 }
 
 .btn-WhiteBalance {
