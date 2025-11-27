@@ -248,24 +248,63 @@
       class="get-click"
       style="position: absolute; z-index: 200;"
     />
+    <SchedulePanel v-show="ShowSchedulePanel" class="get-click" style="position: absolute; z-index: 200;" />
+    <ScheduleKeyBoard v-show="ShowSchedulePanel" />
+    <ScheduleList v-show="ShowSchedulePanel" class="get-click" style="position: absolute; z-index: 200;" />
 
-    <v-dialog v-model="ConfirmDialog" width="220" persistent>
+
+    <v-dialog v-model="ConfirmDialog" width="260" persistent>
       <v-expand-x-transition>
         <v-card class="flashing-border" style="backdrop-filter: blur(5px); background-color: rgba(64, 64, 64, 0.5);">
-          <v-card-title style="font-size: 20px;">
-            {{ $t(ConfirmDialogTitle) }}
+          <v-card-title style="font-size: 20px; display: flex; align-items: center; justify-content: space-between;">
+            <span>{{ $t(ConfirmDialogTitle) }}</span>
+            <v-btn
+              v-if="ConfirmToDo === 'startAutoFocus'"
+              icon
+              small
+              @click.stop="ConfirmDialogCancel()"
+              style="margin-left: 8px; background-color: transparent;"
+            >
+              <v-icon color="rgba(255, 0, 0)">mdi-close</v-icon>
+            </v-btn>
           </v-card-title>
           <v-card-text style="font-size: 15px; margin-bottom: -20px; line-height: 1.5;">
-            {{ $t(ConfirmDialogText) }}
+            <span v-if="ConfirmToDo === 'startAutoFocus'">
+              {{ $t('Please confirm the auto focus mode') }}
+            </span>
+            <span v-else>
+              {{ $t(ConfirmDialogText) }}
+            </span>
           </v-card-text>
           <v-card-actions style="margin-top: -20px; padding-top: -20px;">
             <v-spacer></v-spacer>
-            <v-btn @click="ConfirmDialogCancel()" style="background-color: rgba(255, 255, 255, 0.1);">
-              <v-icon color="rgba(255, 0, 0)"> mdi-close </v-icon>
-            </v-btn>
-            <v-btn @click="ConfirmDialogToDo()" style="background-color: rgba(255, 255, 255, 0.1);">
-              <v-icon color="rgba(51, 218, 121)"> mdi-check </v-icon>
-            </v-btn>
+
+            <!-- 自动对焦：粗调 / 精调 -->
+            <template v-if="ConfirmToDo === 'startAutoFocus'">
+              <v-btn
+                @click="ConfirmDialogAutoFocus('coarse')"
+                style="background-color: rgba(255, 255, 255, 0.1); margin-right: 4px;"
+              >
+                {{ $t('Coarse focus') }}
+              </v-btn>
+              <v-btn
+                @click="ConfirmDialogAutoFocus('fine')"
+                style="background-color: rgba(255, 255, 255, 0.1); margin-left: 4px;"
+              >
+                {{ $t('Fine focus') }}
+              </v-btn>
+            </template>
+
+            <!-- 其它场景：保留原来的 勾/叉 图标按钮 -->
+            <template v-else>
+              <v-btn @click="ConfirmDialogCancel()" style="background-color: rgba(255, 255, 255, 0.1);">
+                <v-icon color="rgba(255, 0, 0)"> mdi-close </v-icon>
+              </v-btn>
+              <v-btn @click="ConfirmDialogToDo()" style="background-color: rgba(255, 255, 255, 0.1);">
+                <v-icon color="rgba(51, 218, 121)"> mdi-check </v-icon>
+              </v-btn>
+            </template>
+
             <v-spacer></v-spacer>
           </v-card-actions>
         </v-card>
@@ -387,6 +426,9 @@ import HistogramPanel from '@/components/HistogramPanel.vue';
 import FocuserPanel from '@/components/FocuserPanel.vue';
 
 import SchedulePanel from '@/components/SchedulePanel.vue';
+import ScheduleList from '@/components/ScheduleList.vue';
+
+import ScheduleKeyBoard from '@/components/ScheduleKeyBoard.vue';
 
 import CapturePanel from '@/components/CapturePanel.vue';
 
@@ -1333,6 +1375,26 @@ export default {
       }
     },
 
+    // 自动对焦模式选择：粗调 / 精调
+    ConfirmDialogAutoFocus(mode) {
+      this.ConfirmDialog = false;
+
+      if (mode === 'coarse') {
+        // 粗调：完整自动对焦流程
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'AutoFocusConfirm:Coarse');
+      } else if (mode === 'fine') {
+        // 精调：当前位置为中心的最终 super-fine 精调
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'AutoFocusConfirm:Fine');
+      } else {
+        // 兜底：视为取消
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'AutoFocusConfirm:No');
+      }
+
+      // 清理前端自动对焦数据，与原有逻辑保持一致
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'ClearDataPoints');
+      this.$bus.$emit('ClearAllData');
+    },
+
     ConfirmDialogToDo() {
       this.ConfirmDialog = false;
       if (this.ConfirmToDo === 'Refresh') {
@@ -1744,6 +1806,8 @@ export default {
     HistogramPanel,
     FocuserPanel,
     SchedulePanel,
+    ScheduleList,
+    ScheduleKeyBoard,
     CapturePanel,
     ImageManagerPanel,
     DeviceAllocationPanel,

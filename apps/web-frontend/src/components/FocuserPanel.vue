@@ -264,6 +264,8 @@ export default {
     this.$bus.$on('focusMoveFailed', this.focusMoveFailed);
 
     this.$bus.$on('updateAutoFocuserState', this.updateAutoFocuserState);  // 更新自动对焦状态
+    this.$bus.$on('UpdateAutoFocusStep', this.handleAutoFocusStep);        // 自动对焦步骤变化
+    this.$bus.$on('AutoFocusSNR', this.handleAutoFocusSNR);                // 自动对焦 SNR 结果
 
     // 当ui初始化完成,自动获取当前状态
     this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getFocuserState');
@@ -302,7 +304,7 @@ export default {
       }else{
         this.inAutoFocus = true;
         this.$startFeature(['Focuser'], 'AutoFocus')
-        this.$bus.$emit('ShowConfirmDialog','Confirm', 'Are you sure you want to start auto focus?', 'startAutoFocus');
+        this.$bus.$emit('ShowConfirmDialog','Confirm', 'Please confirm the auto focus mode', 'startAutoFocus');
       }
  
     },
@@ -537,12 +539,12 @@ export default {
       // this.$bus.$emit('setFocuserLoopingState', this.isLoopActive);
       this.$bus.$emit('disableCaptureButton', this.isLoopActive);
       if (this.isLoopActive) {
-        this.$startFeature(['MainCamera'], 'FocuserROILoop')
+        this.$startFeature(['Focuser'], 'FocuserROILoop')
         this.$bus.$emit('setFocuserState', 'selectstars'); // 设置焦距状态为选择星点
         this.$bus.$emit('setShowSelectStar', true);
         this.$bus.$emit('setFocusChartTimeMode', true); // 切换图表模式：时间轴模式
       } else {
-        this.$stopFeature(['MainCamera'], 'FocuserROILoop')
+        this.$stopFeature(['Focuser'], 'FocuserROILoop')
         this.$bus.$emit('setFocuserState', 'setROI'); // 设置焦距状态为设置ROI区域
         this.$bus.$emit('setShowSelectStar', false);
         this.$bus.$emit('setFocusChartTimeMode', false)
@@ -700,6 +702,32 @@ export default {
     },
     updateAutoFocuserState(state) {
       this.inAutoFocus = state;
+    },
+
+    // 处理自动对焦步骤变化（更新内部状态，方便以后在面板上展示）
+    handleAutoFocusStep(step, description) {
+      // 这里暂时只在控制台输出和记录，以后可扩展为在 UI 上显示步骤
+      console.log('AutoFocus step:', step, description);
+      // 也可以在这里根据 step 更新某些本地状态，用于在 FocuserPanel 上显示
+    },
+
+    // 处理来自后端的 SNR 结果，在前端弹出提示
+    handleAutoFocusSNR(payload) {
+      try {
+        const { stage, index, position, snr } = payload || {};
+        const stageText = stage === 'coarse'
+          ? this.$t('Coarse focus')
+          : (stage === 'fine' ? this.$t('Fine focus') : stage);
+        const msg = this.$t('{stage} image #{index} at position {pos}, avg_top50_snr = {snr}', {
+          stage: stageText,
+          index: index || 0,
+          pos: position || 0,
+          snr: (snr !== undefined && snr !== null) ? snr.toFixed(4) : '0.0000'
+        });
+        this.$bus.$emit('showMsgBox', msg, 'info');
+      } catch (e) {
+        console.error('Error in handleAutoFocusSNR:', e);
+      }
     },
   }
 }

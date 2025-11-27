@@ -600,7 +600,12 @@ export default {
       // 针对 |a| 很小时扩展范围以可见曲率
       const minA = 1e-16;
       const targetDelta = 1.0; // 期望在可视范围内至少 ~1 的 HFR 变化
-      const curvatureRange = Math.sqrt(targetDelta / Math.max(Math.abs(a), minA));
+      let curvatureRange = Math.sqrt(targetDelta / Math.max(Math.abs(a), minA));
+      // 避免 a≈0 时范围被放大到 1e8 级别，导致循环次数过多让前端卡死
+      const MAX_CURVATURE_RANGE = 50000; // 根据电调典型行程限制可视范围
+      if (!Number.isFinite(curvatureRange) || curvatureRange > MAX_CURVATURE_RANGE) {
+        curvatureRange = MAX_CURVATURE_RANGE;
+      }
       startX = Math.min(startX, bestPosition - curvatureRange, this.xAxis_min);
       endX = Math.max(endX, bestPosition + curvatureRange, this.xAxis_max);
 

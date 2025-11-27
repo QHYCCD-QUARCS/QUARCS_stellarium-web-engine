@@ -594,7 +594,7 @@
       <div class="calibration-content">
         <div class="calibration-title">{{ $t('Auto Focus') }}</div>
         <div class="calibration-message">{{ $t(autoFocusInfo.message) }}</div>
-        <div class="calibration-progress">{{ $t('Step') }} {{ autoFocusInfo.step }}/3</div>
+        <div class="calibration-progress">{{ $t('Step') }} {{ autoFocusInfo.step }}/4</div>
       </div>
     </div>
 
@@ -691,6 +691,8 @@ export default {
         step: 0,
         message: ''
       },
+      // FitResult 结果只弹一次的开关，防止对焦失败时频繁刷提示框
+      fitResultShown: false,
 
       // isMessageBoxShow: false,
 
@@ -763,6 +765,7 @@ export default {
         { driverType: 'Focuser', num: 2, label: 'Max Limit', value: '', inputType: 'tip' },
         { driverType: 'Focuser', num: 2, label: 'Sync Focuser Step', value: '', inputType: 'text' },
         { driverType: 'Focuser', num: 2, label: 'Backlash', value: '', inputType: 'number' },
+        { driverType: 'Focuser', num: 2, label: 'AutoFocus Exposure Time (ms)', value: 1000, inputType: 'number', min: 1, step: 1 },
       ],
 
       PoleCameraConfigItems: [
@@ -1010,6 +1013,7 @@ export default {
     this.$bus.$on('Min Limit', this.MinLimitSet);
     this.$bus.$on('Max Limit', this.MaxLimitSet);
     this.$bus.$on('Backlash', this.BacklashSet);
+    this.$bus.$on('AutoFocus Exposure Time (ms)', this.AutoFocusExposureTimeSet);
     this.$bus.$on('GotoThenSolve', this.GotoThenSolve);    // 切换GOTO后是否解析的信号
     this.$bus.$on('SolveCurrentPosition', this.SolveCurrentPosition);  // 实现解析当前位置的信号
     this.$bus.$on('Loop Capture', this.LoopCapture);
@@ -1168,7 +1172,11 @@ export default {
       if (item.max !== undefined && v > item.max) v = item.max;
 
       // 2) 按 step 对齐（以 min 或 0 为基准）
-      const step = item.step ?? 1;
+      // 对“AutoFocus Exposure Time (ms)”不做步长对齐，避免 2000 -> 2001 这类问题
+      const needSnap =
+        item.label !== 'AutoFocus Exposure Time (ms)' &&
+        item.label !== this.$t('AutoFocus Exposure Time (ms)');
+      const step = needSnap ? (item.step ?? 1) : 0;
       if (step > 0) {
         const base = (item.min !== undefined ? item.min : 0);
         v = base + Math.round((v - base) / step) * step;
@@ -1651,17 +1659,27 @@ export default {
                 break;
               case 'FitResult':
                 if (parts.length === 3) {
-                  this.callShowMessageBox('FitResult:' + parts[2], 'warning');
+                  // 只在每次自动对焦流程中弹出一次水平线拟合结果，避免连续刷屏
+                  if (!this.fitResultShown) {
+                    this.fitResultShown = true;
+                    // 使用国际化文案，而不是直接展示后端的原始英文/中文字符串
+                    this.callShowMessageBox(this.$t('AutoFocusFitResultFlatLine'), 'warning');
+                  }
                 }
-
+                break;
               case 'StarDetectionResult':
                 if (parts.length === 3) {
                   const detected = parts[1] === 'true';
                   const hfr = parseFloat(parts[2]);
-                  if (detected) {
-                    this.callShowMessageBox(`星点的HFR为：${hfr}`, 'info');
-                  } else {
-                    this.callShowMessageBox('未识别到星点', 'warning');
+                  // 仅在自动对焦第 4 步（更精细精调）时弹出 HFR 提示，
+                  // 粗调 / 精调阶段不再弹出，以免把 SNR 当成 HFR 显示。
+                  const step = this.autoFocusInfo && this.autoFocusInfo.step;
+                  if (step === 4) {
+                    if (detected) {
+                      this.callShowMessageBox(`星点的HFR为：${hfr}`, 'info');
+                    } else {
+                      this.callShowMessageBox('未识别到星点', 'warning');
+                    }
                   }
                 }
                 break;
@@ -2982,6 +3000,8 @@ export default {
                 if (parts.length >= 2) {
                   const message = parts[1];
                   console.log('AutoFocusStarted:', message);
+                  // 新的一次自动对焦开始时，重置 FitResult 提示开关
+                  this.fitResultShown = false;
                   this.$bus.$emit('StartAutoFocus');
                 }
                 break;
@@ -2991,6 +3011,19 @@ export default {
                   const message = parts[1];
                   console.log('AutoFocusEnded:', message);
                   this.$bus.$emit('EndAutoFocus');
+                }
+                break;
+
+              // 自动对焦 SNR 结果（粗调 / 精调） - [AUTO_FOCUS_UI_ENHANCEMENT]
+              // 格式: AutoFocusSNR:<stage>:<index>:<position>:<snr>
+              case 'AutoFocusSNR':
+                if (parts.length >= 5) {
+                  const stage = parts[1];   // 'coarse' or 'fine'
+                  const index = parseInt(parts[2], 10);
+                  const position = parseInt(parts[3], 10);
+                  const snr = parseFloat(parts[4]);
+                  console.log('AutoFocusSNR:', stage, index, position, snr);
+                  this.$bus.$emit('AutoFocusSNR', { stage, index, position, snr });
                 }
                 break;
               case 'StartAutoPolarAlignmentStatus':
@@ -3867,6 +3900,17 @@ export default {
       const IntValue = parseInt(value);
       this.SendConsoleLogMsg('Backlash:' + IntValue, 'info');
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'Backlash:' + IntValue);
+    },
+
+    AutoFocusExposureTimeSet(payload) {
+      const [signal, value] = payload.split(':'); // 拆分信号和值
+      let IntValue = parseInt(value);
+      if (!Number.isFinite(IntValue) || IntValue <= 0) {
+        this.callShowMessageBox('AutoFocus Exposure Time must be greater than 0', 'error');
+        IntValue = 1000;
+      }
+      this.SendConsoleLogMsg('AutoFocus Exposure Time (ms):' + IntValue, 'info');
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'AutoFocus Exposure Time (ms):' + IntValue);
     },
 
     GotoThenSolve(payload) {
@@ -7662,12 +7706,23 @@ export default {
       try {
 
         this.autoFocusInfo.step = step;
-        this.autoFocusInfo.message = message;
+        // 对第 4 步使用固定的国际化 key，避免后端描述字符串与本地 key 不一致导致无法翻译
+        if (parseInt(step, 10) === 4) {
+          this.autoFocusInfo.message = 'Super fine adjustment in progress. The system is performing precise HFR-based fitting, please wait for the final best focus position.';
+        } else {
+          this.autoFocusInfo.message = message;
+        }
         this.autoFocusInfo.isRunning = true;
         // 自动对焦开始时禁用拍摄按键
         this.$bus.$emit('disableCaptureButton', true);
         console.log('App: Auto focus info updated:', this.autoFocusInfo);
         this.$startFeature(['Focuser'], 'AutoFocus');
+
+        // 当进入第 4 步（更细致精调）时，清空焦点曲线上的既有数据点，
+        // 避免精调阶段的点影响观感，只保留 super-fine 的 HFR 拟合点。
+        if (parseInt(step, 10) === 4) {
+          this.$bus.$emit('ClearAllData');
+        }
       } catch (error) {
         console.error('Error in updateAutoFocusStep:', error);
       }
