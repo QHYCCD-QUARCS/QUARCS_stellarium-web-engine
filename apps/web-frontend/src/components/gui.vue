@@ -248,9 +248,7 @@
       class="get-click"
       style="position: absolute; z-index: 200;"
     />
-    <SchedulePanel v-show="ShowSchedulePanel" class="get-click" style="position: absolute; z-index: 200;" />
     <ScheduleKeyBoard v-show="ShowSchedulePanel" />
-    <ScheduleList v-show="ShowSchedulePanel" class="get-click" style="position: absolute; z-index: 200;" />
 
 
     <v-dialog v-model="ConfirmDialog" width="260" persistent>
@@ -426,8 +424,6 @@ import HistogramPanel from '@/components/HistogramPanel.vue';
 import FocuserPanel from '@/components/FocuserPanel.vue';
 
 import SchedulePanel from '@/components/SchedulePanel.vue';
-import ScheduleList from '@/components/ScheduleList.vue';
-
 import ScheduleKeyBoard from '@/components/ScheduleKeyBoard.vue';
 
 import CapturePanel from '@/components/CapturePanel.vue';
@@ -1806,7 +1802,6 @@ export default {
     HistogramPanel,
     FocuserPanel,
     SchedulePanel,
-    ScheduleList,
     ScheduleKeyBoard,
     CapturePanel,
     ImageManagerPanel,
