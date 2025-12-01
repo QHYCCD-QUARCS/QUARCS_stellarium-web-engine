@@ -279,9 +279,11 @@
     "europe": "Europe",
     "americas": "Americas",
     "asia": "Asia",
-    "africa": "Africa",
-    "oceania": "Oceania"
+  "africa": "Africa",
+  "oceania": "Oceania"
   },
+  "ScheduleMainCameraNotConnected": "{device} is not connected. Please connect the main camera in the device list before starting the schedule.",
+  "ScheduleOptionalDevicesNotConnected": "The following devices are not connected: {devices}. The schedule will still start, but related features may be unavailable.",
   "longitude": "Longitude",
   "latitude": "Latitude",
   "focalLength": "Focal Length (mm)",

@@ -2059,33 +2059,37 @@ export default {
                 break;
 
               case 'MainCameraOffsetRange':
-                if (parts.length === 3) {
+                if (parts.length === 4) {
                   console.log('MainCameraOffsetRange:', parts[1], ',', parts[2]);
                   this.SendConsoleLogMsg('MainCameraOffsetRange:' + parts[1] + ',' + parts[2], 'info');
                   this.MainCameraOffsetMin = parts[1];
                   this.MainCameraOffsetMax = parts[2];
+                  let MainCameraOffsetValue = parts[3];
 
                   const OffsetItem = this.MainCameraConfigItems.find(item => item.label === 'Offset');
                   if (OffsetItem) {
                     console.log('MainCameraOffsetRange:', parseInt(this.MainCameraOffsetMin, 10), ',', parseInt(this.MainCameraOffsetMax, 10));
                     OffsetItem.inputMin = parseInt(this.MainCameraOffsetMin, 10);
                     OffsetItem.inputMax = parseInt(this.MainCameraOffsetMax, 10);
+                    OffsetItem.value = parseInt(MainCameraOffsetValue, 10);
                   }
                 }
                 break;
 
               case 'MainCameraGainRange':
-                if (parts.length === 3) {
-                  console.log('MainCameraGainRange:', parts[1], ',', parts[2]);
-                  this.SendConsoleLogMsg('MainCameraGainRange:' + parts[1] + ',' + parts[2], 'info');
+                if (parts.length === 4) {
+                  console.log('MainCameraGainRange:', parts[1], ',', parts[2], ',', parts[3]);
+                  this.SendConsoleLogMsg('MainCameraGainRange:' + parts[1] + ',' + parts[2] + ',' + parts[3], 'info');
                   this.MainCameraGainMin = parts[1];
                   this.MainCameraGainMax = parts[2];
+                  let MainCameraGainValue = parts[3];
 
                   const gainItem = this.MainCameraConfigItems.find(item => item.label === 'Gain');
                   if (gainItem) {
                     console.log('MainCameraGainRange:', parseInt(this.MainCameraGainMin, 10), ',', parseInt(this.MainCameraGainMax, 10));
                     gainItem.inputMin = parseInt(this.MainCameraGainMin, 10);
                     gainItem.inputMax = parseInt(this.MainCameraGainMax, 10);
+                    gainItem.value = parseInt(MainCameraGainValue, 10);
                   }
                 }
                 break;
