@@ -72,6 +72,9 @@ export default {
       isGuiding: false,
       isLoopping: false,
       CurrentGuiderStatus: 'null',
+      // 导星丢星弹窗节流：记录上次弹窗时间（ms），默认每 5s 最多弹一次
+      lastStarLostAlertTime: 0,
+      starLostAlertIntervalMs: 5000,
 
       pressTimer: null,
       longPressThreshold: 1000,
@@ -208,6 +211,8 @@ export default {
       } else {
         this.isGuiding = false;
         this.CurrentGuiderStatus = 'null';
+        // 停止导星时重置丢星弹窗时间
+        this.lastStarLostAlertTime = 0;
         this.$bus.$emit('GuiderStop');
         this.$stopFeature(['GuiderCamera'], 'GuiderGuiding');
       }
@@ -230,11 +235,20 @@ export default {
     GuiderStatus(status) {
       if(status === 'InGuiding') {
         this.CurrentGuiderStatus = 'InGuiding';
+        // 恢复正常导星，重置丢星弹窗时间
+        this.lastStarLostAlertTime = 0;
       } else if(status === 'InCalibration') {
         this.CurrentGuiderStatus = 'InCalibration';
+        // 校准状态也视为“未丢星”，重置丢星弹窗时间
+        this.lastStarLostAlertTime = 0;
       } else if(status === 'StarLostAlert') {
         this.CurrentGuiderStatus = 'StarLostAlert';
-        this.$bus.$emit('showMsgBox', 'Lost guiding star target.', 'error');
+        // 节流：丢星期间每 starLostAlertIntervalMs 才弹一次
+        const now = Date.now();
+        if (now - this.lastStarLostAlertTime >= this.starLostAlertIntervalMs) {
+          this.$bus.$emit('showMsgBox', 'Lost guiding star target.', 'error');
+          this.lastStarLostAlertTime = now;
+        }
       }
       console.log('GuiderStatus:', this.CurrentGuiderStatus);
       this.$bus.$emit('SendConsoleLogMsg', 'GuiderStatus:' + this.CurrentGuiderStatus, 'info');

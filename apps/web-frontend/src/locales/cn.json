@@ -251,8 +251,10 @@
     "americas": "美洲",
     "asia": "亚洲",
     "africa": "非洲",
-    "oceania": "大洋洲"
+  "oceania": "大洋洲"
   },
+  "ScheduleMainCameraNotConnected": "{device}未连接，请先在设备列表中连接主相机后再启动任务计划表。",
+  "ScheduleOptionalDevicesNotConnected": "以下设备未连接：{devices}。任务计划表仍将启动，但相关功能可能不可用。",
   "longitude": "经度",
   "latitude": "纬度",
   "focalLength": "焦距(mm)",

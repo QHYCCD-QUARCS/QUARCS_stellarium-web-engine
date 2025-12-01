@@ -528,7 +528,8 @@ export default {
     active() { },
 
     toggleLoopShooting() {
-      const check = this.$canUseDevice('Focuser', 'FocuserROILoop');
+      // 视场 ROI 循环拍摄：互斥设备只占用主相机
+      const check = this.$canUseDevice('MainCamera', 'FocuserROILoop');
       if (!check.allowed) return;
       if (!this.currentMainCanvasHasImage) {
         this.$bus.$emit('showMsgBox', 'Please take a picture first!', 'warning');
@@ -539,12 +540,13 @@ export default {
       // this.$bus.$emit('setFocuserLoopingState', this.isLoopActive);
       this.$bus.$emit('disableCaptureButton', this.isLoopActive);
       if (this.isLoopActive) {
-        this.$startFeature(['Focuser'], 'FocuserROILoop')
+        // 只在主相机上登记该功能占用
+        this.$startFeature(['MainCamera'], 'FocuserROILoop')
         this.$bus.$emit('setFocuserState', 'selectstars'); // 设置焦距状态为选择星点
         this.$bus.$emit('setShowSelectStar', true);
         this.$bus.$emit('setFocusChartTimeMode', true); // 切换图表模式：时间轴模式
       } else {
-        this.$stopFeature(['Focuser'], 'FocuserROILoop')
+        this.$stopFeature(['MainCamera'], 'FocuserROILoop')
         this.$bus.$emit('setFocuserState', 'setROI'); // 设置焦距状态为设置ROI区域
         this.$bus.$emit('setShowSelectStar', false);
         this.$bus.$emit('setFocusChartTimeMode', false)
@@ -563,13 +565,14 @@ export default {
         this.isLoopActive = true;
         this.$bus.$emit('setFocusChartTimeMode', true);
         this.$bus.$emit('setShowSelectStar', true);
-        this.$startFeature(['Focuser'], 'FocuserROILoop')
+        // 与按钮逻辑保持一致：只占用主相机
+        this.$startFeature(['MainCamera'], 'FocuserROILoop')
       }
       else {
         this.isLoopActive = false;
         this.$bus.$emit('setShowSelectStar', false);
         this.$bus.$emit('setFocusChartTimeMode', false)
-        this.$stopFeature(['Focuser'], 'FocuserROILoop')
+        this.$stopFeature(['MainCamera'], 'FocuserROILoop')
       }
       this.$bus.$emit('disableCaptureButton', this.isLoopActive);
     },

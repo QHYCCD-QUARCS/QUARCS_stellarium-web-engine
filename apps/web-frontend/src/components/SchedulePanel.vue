@@ -413,9 +413,9 @@
                       />
                     </div>
                     <div class="editor-row target-actions">
-                      <button class="btn small" @click="cycleTargetPrefix">
-                        {{ targetPrefixLabel }}
-                      </button>
+          <button class="btn small" @click="cycleTargetPrefix">
+            {{ targetPrefixLabel }}
+          </button>
                       <button class="btn small" @click="searchTargetInSky">
                         <v-icon x-small>mdi-magnify</v-icon>
                         <span class="btn-text">{{ $t('Search & Center') }}</span>
@@ -692,7 +692,13 @@ export default {
       schedulePresetMode: 'save', // 'save' | 'load'
       schedulePresets: [],
       schedulePresetName: '',
-      scheduleSelectedPreset: null
+      scheduleSelectedPreset: null,
+
+      // 当前已连接设备列表（由 App.vue 通过事件总线回传）
+      connectedDevices: [],
+
+      // 当前时间戳（毫秒），用于驱动“等待开始”等基于时间的倒计时刷新
+      nowTs: Date.now()
     };
   },
   computed: {
@@ -850,13 +856,14 @@ export default {
               // 并限制在 [0, loopTotal] 范围内，避免出现每次 +2 之类的重复累加。
               loopDone = Math.min(loopTotal, Math.max(0, realState.loopDone));
             } else {
-              // 兼容旧后端：根据整体进度在中段 [30, 70]% 估算本轮已完成次数
-              const loopStart = 30;
-              const loopEnd = 70;
-              const clamped = Math.min(Math.max(progress, loopStart), loopEnd);
-              const approxRatio =
-                loopEnd - loopStart === 0 ? 0 : (clamped - loopStart) / (loopEnd - loopStart);
-              loopDone = loopTotal ? Math.max(0, Math.round(approxRatio * loopTotal)) : 0;
+              // 没有后端的真实循环次数时，一律认为“尚未开始”，显示 0/总数，
+              // 避免根据整体进度做模糊估算导致在赤道仪移动或滤镜步骤完成后就显示 1/2、2/2 等错误状态。
+              if (progress >= 100) {
+                // 整体已经 100%，兜底显示全部完成
+                loopDone = loopTotal;
+              } else {
+                loopDone = 0;
+              }
             }
 
             loopProgress = loopTotal ? Math.min(100, Math.max(0, (loopDone / loopTotal) * 100)) : 0;
@@ -892,6 +899,27 @@ export default {
             if (t) {
               timeTotalSec = t.totalSec;
               timeRemainingSec = t.remainSec;
+            }
+          } else if (step.key === 'wait' && shootTime && shootTime !== 'Now') {
+            // “等待开始”步骤：根据当前时间与计划拍摄时间计算倒计时
+            // shootTime 形如 "HH:MM"
+            const parts = String(shootTime).split(':');
+            if (parts.length === 2) {
+              const h = parseInt(parts[0], 10);
+              const m2 = parseInt(parts[1], 10);
+              if (!Number.isNaN(h) && !Number.isNaN(m2)) {
+                const now = new Date(this.nowTs);
+                const target = new Date(this.nowTs);
+                target.setHours(h, m2, 0, 0);
+                let diffMs = target.getTime() - now.getTime();
+                // 若计划时间已过，当作 0 秒剩余
+                if (diffMs < 0) diffMs = 0;
+                const remainSec = Math.round(diffMs / 1000);
+                if (remainSec >= 0) {
+                  timeTotalSec = Math.max(1, remainSec || 1);
+                  timeRemainingSec = remainSec;
+                }
+              }
             }
           }
 
@@ -992,6 +1020,10 @@ export default {
     this.$bus.$on('ScheduleLoopState', this.onScheduleLoopState);
     // 任务计划表运行状态（用于刷新或外部控制后的状态同步）
     this.$bus.$on('ScheduleRunning', this.onScheduleRunning);
+
+    // 获取当前已连接设备列表（用于在开始任务前检查主相机等设备是否连接）
+    this.$bus.$on('sendCurrentConnectedDevices', this.onSendCurrentConnectedDevices);
+    this.$bus.$emit('GetCurrentConnectedDevices');
   },
   mounted() {
     // 初始化表格
@@ -1000,6 +1032,11 @@ export default {
 
     // 向后端请求暂存的计划数据
     this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getStagingScheduleData');
+
+    // 启动每秒刷新一次的计时器，用于驱动“等待开始”等倒计时显示
+    this._nowTimer = setInterval(() => {
+      this.nowTs = Date.now();
+    }, 1000);
   },
   beforeDestroy() {
     this.$bus.$off('toggleSchedulePanel', this.recomputeLayout);
@@ -1016,6 +1053,13 @@ export default {
     this.$bus.$off('ScheduleRunning', this.onScheduleRunning);
     this.$bus.$off('ScheduleStepState', this.onScheduleStepState);
     this.$bus.$off('ScheduleLoopState', this.onScheduleLoopState);
+    this.$bus.$off('sendCurrentConnectedDevices', this.onSendCurrentConnectedDevices);
+
+    // 清理计时器
+    if (this._nowTimer) {
+      clearInterval(this._nowTimer);
+      this._nowTimer = null;
+    }
   },
   methods: {
     // ---------- 布局 ----------
@@ -1034,6 +1078,16 @@ export default {
     },
 
     // ---------- 运行控制 ----------
+    onSendCurrentConnectedDevices(payload) {
+      // 与 view-settings-dialog.vue 保持一致的解析方式
+      try {
+        this.connectedDevices = Array.isArray(payload) ? payload : JSON.parse(payload);
+      } catch (e) {
+        console.warn('SchedulePanel | sendCurrentConnectedDevices parse error', e);
+        this.connectedDevices = [];
+      }
+    },
+
     toggleSchedule() {
       // 统一管理本次任务计划需要占用的设备
       const scheduleDevices = ['MainCamera', 'Mount', 'Focuser', 'CFW', 'GuiderCamera'];
@@ -1046,6 +1100,49 @@ export default {
         this.addLog(this.$t('Schedule stopped'));
       } else {
         // 开始
+        // ---------- 设备连接状态检查 ----------
+        // 使用 App.vue 通过事件总线回传的设备列表
+        const allDevices = Array.isArray(this.connectedDevices) ? this.connectedDevices : [];
+
+        // 工具函数：按 driverType 查找设备（Schedule 中的 GuiderCamera 映射到全局的 Guider）
+        const findDevice = (driverType) => {
+          const mappedType = driverType === 'GuiderCamera' ? 'Guider' : driverType;
+          return allDevices.find(d => d.driverType === mappedType) || null;
+        };
+
+        // 1. 主相机必须已连接，否则禁止启动并弹出错误提示
+        const mainCamera = findDevice('MainCamera');
+        const isMainCameraConnected = mainCamera && mainCamera.isConnected;
+        if (!isMainCameraConnected) {
+          const name = (mainCamera && mainCamera.name) || this.$t('Main Camera') || 'Main Camera';
+          // 使用全局消息框提示用户先连接主相机
+          this.$bus.$emit(
+            'showMsgBox',
+            this.$t('ScheduleMainCameraNotConnected', { device: name }),
+            'error'
+          );
+          this.addLog('MainCamera not connected, schedule start blocked.');
+          return;
+        }
+
+        // 2. 其它相关设备若未连接，仅给出警告提示但不阻止启动
+        const optionalDevices = ['Mount', 'Focuser', 'CFW', 'GuiderCamera'];
+        const notConnectedNames = [];
+        optionalDevices.forEach(type => {
+          const dev = findDevice(type);
+          if (!dev || !dev.isConnected) {
+            // 优先使用设备中文名，其次用 driverType
+            const displayName = (dev && dev.name) || type;
+            notConnectedNames.push(displayName);
+          }
+        });
+        if (notConnectedNames.length > 0) {
+          const devicesText = notConnectedNames.join(', ');
+          const warnText = this.$t('ScheduleOptionalDevicesNotConnected', { devices: devicesText });
+          this.$bus.$emit('showMsgBox', warnText, 'warning');
+          this.addLog('Some optional devices are not connected: ' + notConnectedNames.join(', '));
+        }
+
         // 依次检查所有相关设备是否空闲，并统一走设备管理互斥逻辑
         for (const dev of scheduleDevices) {
           const check = this.$canUseDevice(dev, 'ScheduleCapture');
@@ -1055,6 +1152,9 @@ export default {
           }
         }
 
+        // 在开始本次计划前，先将当前所有行状态重置为“未执行”，避免沿用上一轮的进度
+        this.resetAllRowStatus();
+
         // 先构建并发送当前表格数据
         this.sendTableData(true);
 
@@ -1063,6 +1163,15 @@ export default {
         this.$startFeature(scheduleDevices, 'ScheduleCapture');
         this.addLog(this.$t('Schedule started'));
       }
+    },
+    // 将所有行的进度与细粒度步骤状态重置为“未执行”
+    resetAllRowStatus() {
+      const newProgress = {};
+      for (let row = 1; row <= this.numberOfRows; row++) {
+        newProgress[row] = 0;
+      }
+      this.rowProgress = newProgress;
+      this.stepState = {};
     },
     onScheduleComplete() {
       this.isScheduleRunning = false;
