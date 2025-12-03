@@ -300,6 +300,11 @@
         <v-list dense>
           <!-- 客户端版本和服务器版本信息 -->
           <template>
+            <!-- <div style="display: flex; justify-content: center; align-items: center;">
+              <span style="font-size: 10px; color: rgba(255, 255, 255, 0.7); user-select: none; white-space: nowrap;">
+                Total Version: {{ TotalVersion }}
+              </span>
+            </div> -->
             <div style="display: flex; justify-content: center; align-items: center;">
               <span style="font-size: 10px; color: rgba(255, 255, 255, 0.5); user-select: none; white-space: nowrap;">
                 Client Version: {{ VueClientVersion }}
@@ -674,7 +679,10 @@ export default {
 
       QTClientVersion: 'Not connected',
       // VueClientVersion: process.env.VUE_APP_VERSION,
-      VueClientVersion: '20251127', // 手动指定版本号
+      VueClientVersion: '20251202', // 手动指定版本号
+
+      // 全局总版本号（由 Qt 通过 WebSocket 从环境变量 QUARCS_TOTAL_VERSION 读取并发送）
+      TotalVersion: '0.0.0',
 
       // 校准信息对象
       calibrationInfo: {
@@ -1387,6 +1395,10 @@ export default {
     },
     getQTClientVersion() {
       this.sendMessage('Vue_Command', 'getQTClientVersion');
+    },
+    // 请求全局总版本号（Qt 将从环境变量 QUARCS_TOTAL_VERSION 读取并返回）
+    getTotalVersion() {
+      this.sendMessage('Vue_Command', 'getTotalVersion');
     },
     connect() {
       // 替换为你的 WebSocket 服务器地址
@@ -2161,6 +2173,11 @@ export default {
                 }
                 break;
 
+              case 'TotalVersion':
+                if (parts.length === 2) {
+                  this.TotalVersion = parts[1];
+                }
+                break;
 
               case 'CaptureImageSaveStatus':
                 if (parts.length === 2) {
@@ -3096,6 +3113,14 @@ export default {
             this.$bus.$emit('update_error', data.message);
           } else if (parts[0] === 'update_success') {
             this.$bus.$emit('update_success', data.message);
+          } else if (parts[0] === 'update_sequence_start') {
+            this.$bus.$emit('update_sequence_start', data.message);
+          } else if (parts[0] === 'update_sequence_step') {
+            this.$bus.$emit('update_sequence_step', data.message);
+          } else if (parts[0] === 'update_sequence_finished') {
+            this.$bus.$emit('update_sequence_finished', data.message);
+          } else if (parts[0] === 'update_sequence_failed') {
+            this.$bus.$emit('update_sequence_failed', data.message);
           } else if (parts[0] === 'testQtServerProcess') {
 
           }
@@ -3255,6 +3280,7 @@ export default {
     StatusRecovery() {
       // this.sendMessage('SendConsoleLogMsg', '网络连接恢复，恢复当前状态!', 'warning');
       this.getQTClientVersion();                // 获取QTClient版本
+      this.getTotalVersion();                   // 获取总版本号
       this.sendMessage('Vue_Command', 'getROIInfo'); // 获取ROI信息
       this.sendMessage('Vue_Command', 'localMessage'); // 获取位置信息
       this.sendMessage('Vue_Command', 'getLastSelectDevice'); // 获取上一次选择的设备

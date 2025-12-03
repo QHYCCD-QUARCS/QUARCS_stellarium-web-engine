@@ -64,7 +64,12 @@
         logExpanded: false,
         updateComplete: false,
         updateFailed: false,
-        errorMessage: ''
+        errorMessage: '',
+        // 顺序更新相关信息（用于多包依次更新的整体进度展示）
+        sequenceTotalSteps: 0,
+        sequenceCurrentStep: 0,
+        sequenceCurrentVersion: '',
+        sequenceFinished: false
       };
     },
     watch: {
@@ -79,6 +84,11 @@
       this.$bus.$on('update_progress', this.handleProgressMessage);
       this.$bus.$on('update_error', this.handleErrorMessage);
       this.$bus.$on('update_success', this.handleSuccessMessage);
+      // 多包顺序更新事件
+      this.$bus.$on('update_sequence_start', this.handleSequenceStart);
+      this.$bus.$on('update_sequence_step', this.handleSequenceStep);
+      this.$bus.$on('update_sequence_finished', this.handleSequenceFinished);
+      this.$bus.$on('update_sequence_failed', this.handleSequenceFailed);
       
       // 阻止页面滚动
       if (this.visible) {
@@ -89,22 +99,48 @@
       // 恢复页面滚动
       document.body.style.overflow = '';
     },
-          methods: {
+    methods: {
         handleOverlayClick() {
           // 点击背景时不做任何操作，防止误关闭
           // 如果需要点击背景关闭，可以在这里添加逻辑
         },
+        // 处理后端发来的进度信息：update_progress:<percent>:<message>
+        // 适配当前协议：
+        //  - percent 为“当前步骤内部”的阶段进度，而不是整体 0–100
+        //  - 如果是多包顺序更新，结合 sequenceCurrentStep/sequenceTotalSteps 计算整体进度
+        //  - 进度条只前进不后退，避免 UI 来回跳
         handleProgressMessage(message) {
-        const parts = message.split(':');
-        if (parts.length >= 3) {
-            const progressValue = parseInt(parts[1], 10);
-            const progressMessage = parts[2];
-            
-            this.progress = progressValue;
+          const parts = message.split(':');
+          if (parts.length >= 3) {
+            const stagePercent = parseInt(parts[1], 10);
+            // 防止消息体里再含有 ':'，这里把 2 之后的再拼回去
+            const progressMessage = parts.slice(2).join(':');
+
+            let globalProgress = this.progress;
+
+            if (
+              this.sequenceTotalSteps > 0 &&
+              this.sequenceCurrentStep > 0 &&
+              !isNaN(stagePercent)
+            ) {
+              // 多包顺序更新：把单步 0–100 映射到整体 0–100
+              const perStepSpan = 100 / this.sequenceTotalSteps;
+              const completedSteps = this.sequenceCurrentStep - 1; // 已完成的步数
+              const stepBase = completedSteps * perStepSpan;
+              const stepProgress = Math.max(0, Math.min(1, stagePercent / 100));
+              globalProgress = Math.floor(stepBase + stepProgress * perStepSpan);
+            } else if (!isNaN(stagePercent)) {
+              // 单包更新：直接使用当前阶段进度
+              globalProgress = stagePercent;
+            }
+
+            // 只前进不后退，避免进度条抖动
+            this.progress = Math.max(this.progress, globalProgress);
+
             this.currentTask = progressMessage;
             this.addLogEntry(progressMessage, 'progress');
-        }
-      },
+          }
+        },
       handleErrorMessage(message) {
         const parts = message.split(':');
         if (parts.length >= 3) {
@@ -116,14 +152,33 @@
         }
       },
       handleSuccessMessage(message) {
+        // update_success:<percent>:<message>
         const parts = message.split(':');
         if (parts.length >= 3) {
-            const successMessage = parts[2];
-            
-            this.progress = 100;
+          const successPercent = parseInt(parts[1], 10);
+          const successMessage = parts.slice(2).join(':');
+
+          let globalProgress = this.progress;
+
+          if (this.sequenceTotalSteps > 0 && this.sequenceCurrentStep > 0) {
+            // 当前步骤完成：整体进度推进到当前步骤结束
+            const perStepSpan = 100 / this.sequenceTotalSteps;
+            const completedSteps = this.sequenceCurrentStep;
+            globalProgress = Math.floor(perStepSpan * completedSteps);
+          } else if (!isNaN(successPercent)) {
+            globalProgress = successPercent;
+          }
+
+          this.progress = Math.min(100, Math.max(this.progress, globalProgress));
+          this.currentTask = successMessage;
+          this.addLogEntry(`${this.$t('update.completed')}: ${successMessage}`, 'success');
+
+          // 是否整体完成由 update_sequence_finished 控制；
+          // 如果后端在单包模式下发送 100，则也视为整体完成。
+          if (!isNaN(successPercent) && successPercent === 100) {
             this.updateComplete = true;
-            this.currentTask = successMessage;
-            this.addLogEntry(`${this.$t('update.completed')}: ${successMessage}`, 'success');
+            this.updateFailed = false;
+          }
         }
       },
       addLogEntry(message, type) {
@@ -165,7 +220,60 @@
         this.logs = [];
         // this.$emit('retry');
         this.$bus.$emit('reRunUpdate');
+        },
+      // 顺序更新事件处理：仅用于在日志和当前任务里展示多包整体进度
+      handleSequenceStart(message) {
+        const parts = message.split(':');
+        if (parts.length >= 2) {
+          const total = parseInt(parts[1], 10);
+          this.sequenceTotalSteps = isNaN(total) ? 0 : total;
+          this.sequenceCurrentStep = 0;
+          this.sequenceCurrentVersion = '';
+          this.sequenceFinished = false;
+
+          // 开始顺序更新时，重置整体状态，并清空上一轮的错误与日志，
+          // 避免旧的 “Error during extraction process / Failed to extract update package”
+          // 一直残留在界面上，让用户误以为每一轮更新都报错。
+          this.updateFailed = false;
+          this.updateComplete = false;
+          this.errorMessage = '';
+          this.progress = 0;
+          this.currentTask = this.$t('update.preparing');
+          this.logs = [];
+
+          this.addLogEntry(`Start sequential update: ${this.sequenceTotalSteps} steps`, 'progress');
         }
+      },
+      handleSequenceStep(message) {
+        const parts = message.split(':');
+        if (parts.length >= 4) {
+          const current = parseInt(parts[1], 10);
+          const total = parseInt(parts[2], 10);
+          const version = parts[3];
+          this.sequenceCurrentStep = isNaN(current) ? 0 : current;
+          this.sequenceTotalSteps = isNaN(total) ? this.sequenceTotalSteps : total;
+          this.sequenceCurrentVersion = version;
+          this.addLogEntry(`Step ${this.sequenceCurrentStep}/${this.sequenceTotalSteps} - ${version}`, 'progress');
+        }
+      },
+      handleSequenceFinished(message) {
+        this.sequenceFinished = true;
+        this.updateComplete = true;
+        this.updateFailed = false;
+        this.progress = 100;
+        if (!this.currentTask || this.currentTask === this.$t('update.preparing')) {
+          this.currentTask = this.$t('update.complete');
+        }
+        this.addLogEntry('Sequential update finished', 'success');
+      },
+      handleSequenceFailed(message) {
+        const parts = message.split(':');
+        let idx = '';
+        if (parts.length >= 2) {
+          idx = parts[1];
+        }
+        this.addLogEntry(`Sequential update failed at step ${idx}`, 'error');
+      }
     }
   };
   </script>
