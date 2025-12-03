@@ -7712,7 +7712,7 @@ export default {
         this.autoFocusInfo.step = step;
         // 对第 4 步使用固定的国际化 key，避免后端描述字符串与本地 key 不一致导致无法翻译
         if (parseInt(step, 10) === 4) {
-          this.autoFocusInfo.message = 'Super fine adjustment in progress. The system is performing precise HFR-based fitting, please wait for the final best focus position.';
+          this.autoFocusInfo.message = this.$t('Super fine adjustment in progress. The system is performing precise HFR-based fitting, please wait for the final best focus position.');
         } else {
           this.autoFocusInfo.message = message;
         }
