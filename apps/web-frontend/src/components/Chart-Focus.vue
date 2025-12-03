@@ -468,15 +468,17 @@ export default {
     addData_Point(x,y) {
       // 过滤掉无效的数据点（clear消息产生的-1,-1点）
       if (x === -1 && y === -1) {
-        // 这是clear消息，清空数据
+        // 这是 clear 消息，清空数据
         this.chartData1_pos = [];
         this.chartData1_time = [];
         this.scheduleRender(this.xAxis_min, this.xAxis_max);
         return;
       }
-      
+
       // 过滤掉其他无效数据点
-      if (x < 0 || y <= 0 || !isFinite(x) || !isFinite(y)) {
+      // 注意：允许电调位置为负值（例如经过零点同步或行程校准后），
+      // 仅根据 HFR 数值与数值有效性判断是否绘制。
+      if (y <= 0 || !isFinite(x) || !isFinite(y)) {
         return;
       }
       
