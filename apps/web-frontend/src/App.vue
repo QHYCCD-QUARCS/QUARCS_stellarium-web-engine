@@ -702,6 +702,9 @@ export default {
       // FitResult 结果只弹一次的开关，防止对焦失败时频繁刷提示框
       fitResultShown: false,
 
+      // 最近一次从客户端(QT)获取的 App 版本号（通过 bus 信号统一缓存）
+      AppVersion: '—',
+
       // isMessageBoxShow: false,
 
       CurrentDriverType: '',
@@ -1037,6 +1040,12 @@ export default {
     this.$bus.$on('PolarPointAltitude', this.setPolarPointAltitude);
     this.$bus.$on('showStelCanvas', this.showStelCanvas);
     this.$bus.$on('RecalibratePolarAxis', this.RecalibratePolarAxis);
+    // 统一缓存 appVersion，便于后续任意组件读取
+    this.$bus.$on('appVersion', (ver) => {
+      this.AppVersion = ver || '—';
+      // app 版本变更时，同步发出一次 SystemVersion，保证 System Version 区块能立即显示
+      this.$bus.$emit('SystemVersion', this.TotalVersion, this.QTClientVersion, this.VueClientVersion);
+    });
     this.$bus.$on('CurrentExpTimeList', this.CurrentExpTimeList);
     this.$bus.$on('disconnectAllDevice', this.disconnectAllDevice);
     this.$bus.$on('GetConnectedDevices', this.ReturnConnectedDevices);
@@ -1399,6 +1408,10 @@ export default {
     // 请求全局总版本号（Qt 将从环境变量 QUARCS_TOTAL_VERSION 读取并返回）
     getTotalVersion() {
       this.sendMessage('Vue_Command', 'getTotalVersion');
+    },
+    // 主动向所有订阅者广播当前的系统版本信息（用于组件刚创建时立即拿到一次）
+    broadcastSystemVersion() {
+      this.$bus.$emit('SystemVersion', this.TotalVersion, this.QTClientVersion, this.VueClientVersion);
     },
     connect() {
       // 替换为你的 WebSocket 服务器地址
@@ -2170,12 +2183,16 @@ export default {
               case 'QTClientVersion':
                 if (parts.length === 2) {
                   this.QTClientVersion = parts[1];
+                  // 通过全局事件总线向其他组件广播当前系统版本信息
+                  this.$bus.$emit('SystemVersion', this.TotalVersion, this.QTClientVersion, this.VueClientVersion);
                 }
                 break;
 
               case 'TotalVersion':
                 if (parts.length === 2) {
                   this.TotalVersion = parts[1];
+                  // 版本号更新时，同步通过信号发送给需要显示版本信息的组件
+                  this.$bus.$emit('SystemVersion', this.TotalVersion, this.QTClientVersion, this.VueClientVersion);
                 }
                 break;
 
@@ -3078,6 +3095,19 @@ export default {
                 break;
               case 'PHD2Restarting':
                 this.callShowMessageBox('Restarting PHD2...', 'info');
+                break;
+
+              case 'getMountInfo':
+                if (parts.length >= 2) {
+                  const mountInfo = parts[1];
+                  for (const item of this.devices) {
+                    if (item.driverType === 'Mount') {
+                      item.sdkVersion = mountInfo;
+                      break;
+                    }
+                  }
+                  this.$bus.$emit('sendCurrentConnectedDevices', this.devices);
+                }
                 break;
               default:
                 console.warn('未处理命令: ', data.message);
@@ -7979,6 +8009,8 @@ export default {
       // 页面完全加载
       this.SendConsoleLogMsg('页面已完全加载', 'info');
       this.$bus.$emit('AppSendMessage', 'Process_Command_Return', 'VueClientVersion:' + process.env.VUE_APP_VERSION);
+      // 页面加载完成后，主动广播一次当前已知的系统版本信息
+      this.broadcastSystemVersion();
     })
 
     document.addEventListener('DOMContentLoaded', () => {

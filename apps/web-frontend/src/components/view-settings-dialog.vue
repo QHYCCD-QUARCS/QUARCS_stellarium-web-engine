@@ -13,7 +13,7 @@
   <v-card-text class="qs-card-text">
     <v-tabs v-model="activeTab" class="qs-tabs" background-color="transparent" dark slider-color="rgba(75, 155, 250, 0.9)" color="rgba(255,255,255,0.7)" fixed-tabs center-active>
       <v-tab class="qs-tab">{{ $t('Display Settings') }}</v-tab>
-      <v-tab class="qs-tab">{{ $t('Device Settings') }}</v-tab>
+      <v-tab class="qs-tab">{{ $t('Version Info') }}</v-tab>
       <v-tab class="qs-tab">{{ $t('Memory Settings') }}</v-tab>
     </v-tabs>
 
@@ -56,27 +56,61 @@
       <v-tab-item>
         <div class="qs-pane">
           <div class="qs-narrow">
-            <div v-for="(dev, idx) in deviceEntries" :key="dev.driverType + '-' + (dev.driverName || '') + '-' + idx" class="qs-section">
-              <div class="qs-subheader">{{ dev.title }}</div>
-              <div class="qs-field">
-                <span class="qs-inline-label">{{ $t('Driver') }}</span>
-                <span>{{ dev.driverName || '—' }}</span>
-              </div>
-              <div class="qs-field">
-                <span class="qs-inline-label">{{ $t('Connected') }}</span>
-                <span>{{ dev.connected ? 'Yes' : 'No' }}</span>
-              </div>
-              <div v-if="dev.sdkVersion" class="qs-field">
-                <span class="qs-inline-label">{{ $t('SDK Version') }}</span>
-                <span>{{ dev.sdkVersion }}</span>
-              </div>
-              <div v-if="dev.usbSerialPath" class="qs-field">
-                <span class="qs-inline-label">{{ $t('USB Serial Path') }}</span>
-                <span>{{ dev.usbSerialPath }}</span>
+            <!-- 版本总览 -->
+            <div class="qs-section">
+              <div class="qs-subheader">{{ $t('System Version') }}</div>
+              <div class="qs-version-grid">
+                <div class="qs-version-item">
+                  <div class="qs-version-label">{{ $t('Total Version') }}</div>
+                  <div class="qs-version-value">{{ systemVersion.total }}</div>
+                </div>
+                <div class="qs-version-item">
+                  <div class="qs-version-label">{{ $t('Qt Client Version') }}</div>
+                  <div class="qs-version-value">{{ systemVersion.qt }}</div>
+                </div>
+                <div class="qs-version-item">
+                  <div class="qs-version-label">{{ $t('Web Client Version') }}</div>
+                  <div class="qs-version-value">{{ systemVersion.vue }}</div>
+                </div>
+                <div class="qs-version-item">
+                  <div class="qs-version-label">{{ $t('App Version') }}</div>
+                  <div class="qs-version-value">{{ appVersion }}</div>
+                </div>
               </div>
             </div>
-            <div class="qs-actions">
-              <v-btn small text @click="refreshDevices">{{ $t('Refresh') }}</v-btn>
+
+            <!-- 设备版本信息 -->
+            <div class="qs-section">
+              <div class="qs-subheader">{{ $t('Device Versions') }}</div>
+              <div v-if="deviceVersionRows.length === 0" class="qs-field">
+                <span class="qs-inline-label">{{ $t('Status') }}</span>
+                <span>{{ $t('No devices connected') }}</span>
+              </div>
+              <v-simple-table v-else dense class="qs-version-table">
+                <thead>
+                  <tr>
+                    <th class="text-left">{{ $t('Device Type') }}</th>
+                    <th class="text-left">{{ $t('Driver') }}</th>
+                    <th class="text-left">{{ $t('SDK Version') }}</th>
+                    <th class="text-left">{{ $t('Connected') }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="row in deviceVersionRows" :key="row.key">
+                    <td>{{ row.title }}</td>
+                    <td>{{ row.driverName || '—' }}</td>
+                    <td>{{ row.sdkVersion || 'N/A' }}</td>
+                    <td>
+                      <span :style="{ color: row.connected ? 'rgba(102, 187, 106, 0.9)' : 'rgba(244, 67, 54, 0.8)' }">
+                        {{ row.connected ? $t('Connected') : $t('Disconnected') }}
+                      </span>
+                    </td>
+                  </tr>
+                </tbody>
+              </v-simple-table>
+              <div class="qs-actions">
+                <v-btn small text @click="refreshDevices">{{ $t('Refresh') }}</v-btn>
+              </div>
             </div>
           </div>
         </div>
@@ -166,7 +200,15 @@ export default {
       boxInfo: { space: 0, spaceFormatted: '—' },
       usbSerialPath: '—',
       devices:[],
-      screenWidth: (typeof window !== 'undefined') ? window.innerWidth : 1024
+      screenWidth: (typeof window !== 'undefined') ? window.innerWidth : 1024,
+      // 通过信号(bus)接收的系统版本信息，而不是直接从根实例读取
+      systemVersion: {
+        total: '—',
+        qt: 'Not connected',
+        vue: '—'
+      },
+      // 通过单独信号接收的 App 版本号（来自 qtObj / 外部应用）
+      appVersion: '—'
     }
   },
   created() { 
@@ -177,6 +219,10 @@ export default {
     this.$bus.$on('USB_Name_Sapce', this.onUSBInfo);
     this.$bus.$on('ClearUSBList', this.clearUSBList);
     this.$bus.$on('Box_Space', this.onBoxSpace);
+    // 监听来自 App.vue 的系统版本信号：SystemVersion(total, qt, vue)
+    this.$bus.$on('SystemVersion', this.onSystemVersion);
+
+    this.$bus.$on('appVersion', this.onAppVersion);
 
     this.refreshDevices();
     this.refreshUSB();
@@ -239,6 +285,16 @@ export default {
         this.usbList[existingIndex].space = bytes;
         this.usbList[existingIndex].spaceFormatted = spaceFormatted;
       }
+    },
+    // 接收来自 App.vue 的系统版本信号
+    onSystemVersion(total, qt, vue) {
+      this.systemVersion.total = total || '—';
+      this.systemVersion.qt = qt || 'Not connected';
+      this.systemVersion.vue = vue || '—';
+    },
+
+    onAppVersion(appVersion) {
+      this.appVersion = appVersion || '—';
     },
     
     clearUSBList() {
@@ -341,6 +397,18 @@ export default {
       });
       return list;
     },
+    // 为“设备版本”表格准备的行数据，按设备类型聚合，便于在设备较多时压缩布局
+    deviceVersionRows() {
+      const entries = this.deviceEntries || [];
+      // 目前直接平铺即可，如需按类型分组可在此扩展
+      return entries.map((dev, index) => ({
+        key: dev.title + '-' + (dev.driverName || '') + '-' + index,
+        title: dev.title,
+        driverName: dev.driverName,
+        sdkVersion: dev.sdkVersion,
+        connected: dev.connected
+      }));
+    },
     dssOn: {
       get: function () {
         return this.$store.state.stel.dss.visible
@@ -418,10 +486,10 @@ export default {
   margin-top: 8px;
 }
 .qs-section {
-  margin-bottom: 6px; /* 收紧区块间距 */
+  margin-bottom: 4px; /* 再次收紧区块间距 */
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 6px;
-  padding: 6px 8px; /* 收紧内边距，提升密度 */
+  padding: 4px 6px; /* 收紧内边距，提升密度 */
 }
 .qs-subheader {
   font-size: clamp(16px, 2vw, 20px);
@@ -466,8 +534,18 @@ export default {
 }
 .qs-list .v-list-item__title { color: rgba(255, 255, 255, 0.92); font-weight: 500; }
 .qs-list .v-list-item__subtitle { color: rgba(255, 255, 255, 0.85); font-weight: 400; }
-.qs-divider { opacity: 0.3; margin: 6px 0; }
-.qs-actions { display: flex; gap: 6px; justify-content: flex-end; margin-top: 6px; }
+.qs-divider { opacity: 0.3; margin: 4px 0; }
+.qs-actions {
+  display: flex;
+  gap: 4px;              /* 按钮之间更紧凑 */
+  justify-content: flex-end;
+  margin-top: 4px;       /* 顶部间距更小 */
+}
+.qs-actions .v-btn {
+  min-width: auto;       /* 取消默认宽度，避免按钮过宽 */
+  padding: 0 10px;       /* 收紧左右内边距 */
+  font-size: 12px;       /* 字号略小一点 */
+}
 .qs-usb-section { position: relative; }
 .qs-usb-button-container { display: flex; justify-content: flex-end; margin-top: 8px; }
 .qs-usb-list { margin-top: 12px; }
@@ -499,5 +577,45 @@ export default {
 .qs-settings-card { min-width: 660px; }
 @media (max-width: 700px) {
   .qs-settings-card { min-width: auto; }
+}
+
+/* 版本信息布局 */
+.qs-version-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); /* 单元格再窄一点 */
+  grid-gap: 4px;                                               /* 版本项之间更紧凑 */
+}
+.qs-version-item {
+  padding: 2px 4px;      /* 再次收紧卡片内边距 */
+  border-radius: 6px;
+  background-color: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.qs-version-label {
+  font-size: 11px;       /* 标签字体再小一点 */
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 1px;
+  white-space: nowrap;
+}
+.qs-version-value {
+  font-size: 12px;       /* 数值字体再小一档，让卡片更小巧 */
+  color: rgba(255, 255, 255, 0.9);
+  word-break: break-all;
+}
+.qs-version-table {
+  max-height: 220px;
+  overflow-y: auto;
+  display: block;
+}
+.qs-version-table table {
+  width: 100%;
+}
+.qs-version-table th,
+.qs-version-table td {
+  font-size: 13px;
+  white-space: nowrap;
+}
+.qs-version-table tbody tr:nth-child(odd) {
+  background-color: rgba(255, 255, 255, 0.02);
 }
 </style>
