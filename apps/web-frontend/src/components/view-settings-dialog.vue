@@ -164,7 +164,7 @@
                 <span>{{ boxInfo.spaceFormatted }}</span>
               </div>
               <div class="qs-actions">
-                <v-btn small text @click="clearBoxCache">{{ $t('Clear Box Cache') }}</v-btn>
+                <v-btn small text @click="openClearBoxDialog">{{ $t('Clear Box Cache') }}</v-btn>
                 <v-btn small color="red" text @click="clearLogs">{{ $t('Clear Logs') }}</v-btn>
               </div>
             </div>
@@ -177,6 +177,60 @@
       </v-tab-item>
     </v-tabs-items>
   </v-card-text>
+  <!-- 清理盒子缓存选项弹窗 -->
+  <v-dialog v-model="showClearBoxDialog" max-width="480">
+    <v-card class="qs-settings-card qs-clearbox-card" elevation="2">
+      <v-card-title class="qs-title">
+        <div>{{ $t('Clear Box Cache') }}</div>
+      </v-card-title>
+      <v-card-text class="qs-card-text qs-card-text--compact">
+        <div class="qs-section">
+          <div class="qs-subheader">{{ $t('Select Cache Items to Clear') }}</div>
+          <div class="qs-clearbox-hint">
+            {{ $t('You can select multiple items to clear') }}
+          </div>
+          <div class="qs-field">
+            <v-checkbox
+              dense
+              hide-details
+              v-model="clearOptions.cache"
+              :label="$t('Cache Files (Recommended)')"
+            ></v-checkbox>
+          </div>
+          <div class="qs-field">
+            <v-checkbox
+              dense
+              hide-details
+              v-model="clearOptions.updatePack"
+              :label="$t('Update Packages')"
+            ></v-checkbox>
+          </div>
+          <div class="qs-field">
+            <v-checkbox
+              dense
+              hide-details
+              v-model="clearOptions.backup"
+              :label="$t('Backup Files')"
+            ></v-checkbox>
+          </div>
+        </div>
+      </v-card-text>
+      <v-card-actions>
+        <v-spacer></v-spacer>
+        <v-btn small text @click="onCancelClearBox">{{ $t('Cancel') }}</v-btn>
+        <v-btn
+          small
+          color="primary"
+          text
+          :disabled="!hasAnyClearSelection"
+          @click="onConfirmClearBox"
+        >
+          {{ $t('Confirm') }}
+        </v-btn>
+      </v-card-actions>
+    </v-card>
+  </v-dialog>
+
   <v-card-actions>
     <v-spacer></v-spacer><v-btn class="blue--text darken-1" text @click.native="$store.state.showViewSettingsDialog = false">Close</v-btn>
   </v-card-actions>
@@ -201,6 +255,13 @@ export default {
       usbSerialPath: '—',
       devices:[],
       screenWidth: (typeof window !== 'undefined') ? window.innerWidth : 1024,
+      // 清理盒子缓存弹窗
+      showClearBoxDialog: false,
+      clearOptions: {
+        cache: true,       // 默认勾选缓存文件
+        updatePack: false, // /var/www/update_pack
+        backup: false      // /home/quarcs/workspace/QUARCS/backup
+      },
       // 通过信号(bus)接收的系统版本信息，而不是直接从根实例读取
       systemVersion: {
         total: '—',
@@ -311,8 +372,24 @@ export default {
     refreshBoxSpace() {
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'CheckBoxSpace');
     },
-    clearBoxCache() {
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'ClearBoxCache');
+    openClearBoxDialog() {
+      // 打开弹窗前重置选项：缓存文件默认勾选，其余关闭
+      this.clearOptions.cache = true;
+      this.clearOptions.updatePack = false;
+      this.clearOptions.backup = false;
+      this.showClearBoxDialog = true;
+    },
+    onCancelClearBox() {
+      this.showClearBoxDialog = false;
+    },
+    onConfirmClearBox() {
+      // 生成形如 ClearBoxCache:1:0:1 的指令，按顺序表示：缓存 / 更新包 / 备份
+      const cacheFlag = this.clearOptions.cache ? '1' : '0';
+      const updateFlag = this.clearOptions.updatePack ? '1' : '0';
+      const backupFlag = this.clearOptions.backup ? '1' : '0';
+      const command = `ClearBoxCache:${cacheFlag}:${updateFlag}:${backupFlag}`;
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', command);
+      this.showClearBoxDialog = false;
     },
     clearLogs() {
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'ClearLogs');
@@ -352,6 +429,9 @@ export default {
     }
   },
   computed: {
+    hasAnyClearSelection() {
+      return this.clearOptions.cache || this.clearOptions.updatePack || this.clearOptions.backup;
+    },
     mainCameraSerialPath() {
       const mc = this.devices && Array.isArray(this.devices)
         ? this.devices.find(d => d.driverType === 'MainCamera')
@@ -617,5 +697,17 @@ export default {
 }
 .qs-version-table tbody tr:nth-child(odd) {
   background-color: rgba(255, 255, 255, 0.02);
+}
+.qs-clearbox-hint {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 6px;
+}
+.qs-clearbox-card {
+  min-width: auto;          /* 小弹窗不强制 660px 宽度，避免出现横向滚动条 */
+}
+.qs-card-text--compact {
+  max-height: none;         /* 内容不多，直接全部展示 */
+  overflow-y: visible;
 }
 </style>
