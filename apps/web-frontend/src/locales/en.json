@@ -439,6 +439,8 @@
   "Warning: Invalid Current Position Coordinate": "Warning: Invalid current position coordinate {0}: {1}",
   "Warning: Invalid Target Position Coordinate": "Warning: Invalid target position coordinate {0}: {1}",
   "Error: Invalid Adjustment Point Coordinates": "Error: Invalid adjustment point coordinates",
+  "Warning: Missing Observer Location, Using Equatorial Trajectory": "Warning: Cannot get observer latitude/longitude, trajectory will use equatorial coordinate differences",
+  "Observer Location Updated": "Observer latitude/longitude updated",
   "Starting Draw Adjustment Points": "Starting draw adjustment points: Current({0}, {1}) Target({2}, {3})",
   "Current Position Field Corners": "Current position field corners: {0}",
   "Target Position Field Corners": "Target position field corners: {0}",

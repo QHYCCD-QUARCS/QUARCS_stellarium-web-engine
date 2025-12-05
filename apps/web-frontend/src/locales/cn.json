@@ -409,6 +409,8 @@
   "Warning: Invalid Current Position Coordinate": "警告：当前位置坐标点{0}无效：{1}",
   "Warning: Invalid Target Position Coordinate": "警告：目标位置坐标点{0}无效：{1}",
   "Error: Invalid Adjustment Point Coordinates": "错误：调整点坐标无效，无法绘制",
+  "Warning: Missing Observer Location, Using Equatorial Trajectory": "警告：未能获取观测地经纬度，轨迹将使用赤道坐标差值绘制",
+  "Observer Location Updated": "观测地经纬度已更新",
   "Starting Draw Adjustment Points": "开始绘制调整点：当前位置({0}, {1}) 目标位置({2}, {3})",
   "Current Position Field Corners": "当前位置视场角点：{0}",
   "Target Position Field Corners": "目标位置视场角点：{0}",

@@ -312,6 +312,8 @@
 </template>
 
 <script>
+import swh from '@/assets/sw_helpers.js'
+
 // 常量定义
 const COLORS = {
   PRIMARY: '#64b5f6',
@@ -528,6 +530,9 @@ export default {
       testSimTimer: null,
       testSimActive: false,
       testPrevMergeTol: null,
+
+      // 观测者位置重试状态
+      locationRetryInProgress: false,
 
       hasAcceptUpdateMessage: false, // 是否已经接受更新消息,防止由于组件加载顺序导致组件更新丢失
     }
@@ -1098,6 +1103,11 @@ export default {
         if (!canvas) return
         const dpr = window.devicePixelRatio || 1
         let w, h, scaleX = 1, scaleY = 1
+        // 仅用于窗口模式下的等比缩放与居中
+        let uniformScale = 1
+        let offsetXPx = 0
+        let offsetYPx = 0
+
         if (this.overlayMode === 'fullscreen') {
           w = window.innerWidth
           h = window.innerHeight
@@ -1115,6 +1125,10 @@ export default {
           // 计算将逻辑画布缩放到可视窗口的缩放比
           scaleX = vw / lw
           scaleY = vh / lh
+          // 为保持几何正交性，使用等比缩放（取较小者），多余空间留黑边并居中
+          uniformScale = Math.min(scaleX, scaleY)
+          offsetXPx = (vw - lw * uniformScale) / 2
+          offsetYPx = (vh - lh * uniformScale) / 2
           // Canvas 显示尺寸 = 窗口尺寸，内部像素 = 显示尺寸 * DPR
           w = vw
           h = vh
@@ -1123,12 +1137,14 @@ export default {
           canvas.width = Math.round(vw * dpr)
           canvas.height = Math.round(vh * dpr)
         }
+
         const ctx = canvas.getContext('2d')
         // 设置设备像素比缩放
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-        // 窗口模式下增加整体缩放，将逻辑画布缩放到窗口尺寸
+        // 窗口模式下使用等比缩放 + 平移，将逻辑画布缩放并居中到窗口区域
         if (this.overlayMode === 'windowed') {
-          ctx.scale(scaleX, scaleY)
+          ctx.translate(offsetXPx, offsetYPx)
+          ctx.scale(uniformScale, uniformScale)
         }
         this.clearTrajectoryCanvas()
         // 背景由 drawTargetMarker 统一绘制
@@ -1154,16 +1170,70 @@ export default {
         const padY = Math.round(h * (this.viewPadRatioY || 0.10))
         return { w, h, padX, padY }
       },
+      /**
+       * 获取观测者经纬度；若缺失则尝试异步重新获取。
+       * 返回值用于决定是走地平坐标还是退化为赤道坐标差值。
+       */
+      ensureObserverLocation() {
+        const loc = this.$store?.state?.currentLocation || {}
+        const lat = Number(loc.lat)
+        const lon = Number(loc.lng)
+        // 视 (0,0) 为“未设置位置”，需要重试获取
+        const hasLatLon = Number.isFinite(lat) && Number.isFinite(lon) &&
+          !(lat === 0 && lon === 0) && !this.testSimActive
+
+        // 若当前没有有效经纬度，则触发一次异步重试
+        if (!hasLatLon) {
+          this.retryObserverLocationIfNeeded()
+        }
+
+        return { hasLatLon, lat, lon }
+      },
+      /**
+       * 异步重新获取观测地经纬度，并写回 Vuex。
+       * 每次发现经纬度缺失或为 (0,0) 时都会调用本方法；
+       * 若当前已有一次重试在进行中，则直接返回，避免并发调用。
+       */
+      retryObserverLocationIfNeeded() {
+        if (this.locationRetryInProgress) return
+        if (!this.$store) return
+
+        this.locationRetryInProgress = true
+
+        swh.getGeolocation()
+          .then(pos => {
+            if (!pos || !Number.isFinite(pos.lat) || !Number.isFinite(pos.lng)) {
+              throw new Error('Invalid geolocation position')
+            }
+            return swh.geoCodePosition(pos, this)
+          })
+          .then(loc => {
+            if (loc && Number.isFinite(loc.lat) && Number.isFinite(loc.lng)) {
+              const useAuto = this.$store.state.useAutoLocation
+              const mutation = useAuto ? 'setAutoDetectedLocation' : 'setCurrentLocation'
+              this.$store.commit(mutation, loc)
+              this.addLog(this.$t('Observer Location Updated'), 'success')
+            } else {
+              this.addLog(this.$t('Warning: Missing Observer Location, Using Equatorial Trajectory'), 'warning')
+            }
+          })
+          .catch(err => {
+            if (process.env.NODE_ENV === 'development') {
+              console.error('Failed to refresh observer location, fallback to equatorial trajectory:', err)
+            }
+            this.addLog(this.$t('Warning: Missing Observer Location, Using Equatorial Trajectory'), 'warning')
+          })
+          .finally(() => {
+            this.locationRetryInProgress = false
+          })
+      },
       worldForPoint(raDeg, decDeg, timeMsOrDate = null) {
         // 使用地平坐标（Az/Alt）绘制：世界坐标以“目标点”为原点
         // 若当前经纬度未知，则退化为赤道坐标差值（ΔRA, ΔDEC）
         if (!this.targetRawPosition) return { x: 0, y: 0 }
-        const loc = this.$store?.state?.currentLocation || {}
-        const lat = Number(loc.lat)
-        const lon = Number(loc.lng)
+        const { hasLatLon, lat, lon } = this.ensureObserverLocation()
         // 在测试模拟阶段（testSimActive=true）时，强制走 RA/DEC 差值分支，
         // 保证测试轨迹与我们设定的 20°/角分/角秒级别严格对应。
-        const hasLatLon = Number.isFinite(lat) && Number.isFinite(lon) && !this.testSimActive
         let dx, dy
         if (hasLatLon) {
           const t = (timeMsOrDate instanceof Date) ? timeMsOrDate : new Date(timeMsOrDate || Date.now())
@@ -1185,10 +1255,7 @@ export default {
       },
       makeWorldSeq(rawPoints) {
         if (!this.targetRawPosition || !rawPoints || rawPoints.length === 0) return []
-        const loc = this.$store?.state?.currentLocation || {}
-        const lat = Number(loc.lat)
-        const lon = Number(loc.lng)
-        const hasLatLon = Number.isFinite(lat) && Number.isFinite(lon) && !this.testSimActive
+        const { hasLatLon, lat, lon } = this.ensureObserverLocation()
 
         if (!hasLatLon) {
           // 无经纬度：退化为 RA/DEC 差值序列，并进行 RA 展开
@@ -1222,10 +1289,7 @@ export default {
       // 基于“全量轨迹”的连续展开，返回用于垂线的最后两点世界坐标（允许超出常规范围）
       getWorldABForPerp() {
         if (!this.targetRawPosition || this.rawTrajectoryPoints.length < 2) return null
-        const loc = this.$store?.state?.currentLocation || {}
-        const lat = Number(loc.lat)
-        const lon = Number(loc.lng)
-        const hasLatLon = Number.isFinite(lat) && Number.isFinite(lon) && !this.testSimActive
+        const { hasLatLon, lat, lon } = this.ensureObserverLocation()
         const all = this.rawTrajectoryPoints
         const tA = new Date(all[all.length - 2].t || Date.now())
         const tB = new Date(all[all.length - 1].t || Date.now())
