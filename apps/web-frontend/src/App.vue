@@ -8631,18 +8631,45 @@ body,
 /* 校准信息显示框样式 */
 .calibration-info-box {
   position: fixed;
-  top: 50vh;
-  left: 50vw;
-  transform: translate(-50%, -50%);
+  /* 默认：在所有设备上都靠上居中，避免遮挡底部控制区域 */
+  top: 18vh;
+  left: 50%;
+  transform: translateX(-50%);
   background-color: rgba(0, 0, 0, 0.9);
   backdrop-filter: blur(15px);
   border: 2px solid rgba(255, 165, 0, 0.8);
   border-radius: 15px;
-  padding: 25px;
+  padding: 18px 16px;
   z-index: 1000;
-  min-width: 350px;
-  max-width: 450px;
+  min-width: 300px;
+  max-width: 360px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+/* 手机端自动对焦 / 校准信息框自适应尺寸与位置，避免遮挡主要操作区域 */
+@media (max-width: 960px) {
+  .calibration-info-box {
+    top: 16vh;                  /* 手机端再稍微往上挪一点 */
+    min-width: 0;
+    width: 70vw;                /* 宽度再收窄一些 */
+    max-width: 80vw;
+    padding: 12px 10px;
+  }
+
+  .calibration-title {
+    font-size: 16px;
+    margin-bottom: 8px;
+  }
+
+  .calibration-message {
+    font-size: 12px;
+    line-height: 1.3;
+    margin-bottom: 8px;
+  }
+
+  .calibration-progress {
+    font-size: 11px;
+  }
 }
 
 .calibration-content {
@@ -8651,23 +8678,23 @@ body,
 }
 
 .calibration-title {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: bold;
-  margin-bottom: 20px;
+  margin-bottom: 14px;
   color: #FFA500;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
 }
 
 .calibration-message {
-  font-size: 16px;
-  line-height: 1.6;
-  margin-bottom: 20px;
+  font-size: 14px;
+  line-height: 1.4;
+  margin-bottom: 12px;
   color: #FFFFFF;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
 .calibration-progress {
-  font-size: 14px;
+  font-size: 12px;
   color: #FFA500;
   font-weight: bold;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
