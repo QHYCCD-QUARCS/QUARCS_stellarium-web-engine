@@ -227,6 +227,8 @@
   "The current image is already the original one.": "The current image is already the original one.",
   "Messages copied to clipboard!": "Messages copied to clipboard!",
   "Failed to copy messages!": "Failed to copy messages!",
+  "AutoFocusFitResultFlatLine": "The auto-focus fit result is a flat line.",
+  "AutoFocusFailed": "Auto focus failed.",
   "DeviceBusyWithFeatures": "Device {device} is busy with features: {features}",
   "CameraOpsBusy": "Camera-related operations in progress: {features}",
   "FeatureNames": {

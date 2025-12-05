@@ -198,6 +198,8 @@
   "The current image is already the original one.": "当前图像已经是原始图像",
   "Messages copied to clipboard!": "日志消息已复制到剪贴板!",
   "Failed to copy messages!": "复制日志消息失败！",
+  "AutoFocusFitResultFlatLine": "自动对焦拟合结果为一条水平线。",
+  "AutoFocusFailed": "对焦失败!",
   "DeviceBusyWithFeatures": "设备 {device} 正在参与功能：{features}",
   "CameraOpsBusy": "相机相关操作正在进行：{features}",
   "GuiderCamera": "导星相机",
