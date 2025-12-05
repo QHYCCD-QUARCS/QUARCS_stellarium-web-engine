@@ -1687,8 +1687,12 @@ export default {
                   // 只在每次自动对焦流程中弹出一次水平线拟合结果，避免连续刷屏
                   if (!this.fitResultShown) {
                     this.fitResultShown = true;
-                    // 使用国际化文案，而不是直接展示后端的原始英文/中文字符串
-                    this.callShowMessageBox(this.$t('AutoFocusFitResultFlatLine'), 'warning');
+                    // 使用国际化文案，并在消息末尾追加“对焦失败”的英文说明
+                    const msg =
+                      this.$t('AutoFocusFitResultFlatLine') +
+                      ' ' +
+                      this.$t('AutoFocusFailed');
+                    this.callShowMessageBox(msg, 'warning');
                   }
                 }
                 break;
