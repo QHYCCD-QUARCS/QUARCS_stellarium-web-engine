@@ -7843,10 +7843,16 @@ export default {
 
         this.autoFocusInfo.step = step;
         const stepNum = parseInt(step, 10);
-        // 对完整自动对焦的第 4 步使用固定的国际化 key；
-        // 若是“仅精调”模式（fine），则直接使用后端传来的描述文本
-        if (stepNum === 4 && this.autoFocusInfo.mode !== 'fine') {
-          this.autoFocusInfo.message = this.$t('Super fine adjustment in progress. The system is performing precise HFR-based fitting, please wait for the final best focus position.');
+        // 对完整自动对焦与“仅精调”模式分别使用固定的国际化文案，
+        // 避免直接展示后端传来的英文提示。
+        if (stepNum === 4) {
+          if (this.autoFocusInfo.mode === 'fine') {
+            // 仅精调（fine）模式下的 HFR 精调提示
+            this.autoFocusInfo.message = this.$t('Fine HFR adjustment in progress. The system is performing HFR-based fitting, please wait for the final best focus position.');
+          } else {
+            // 完整自动对焦流程的第 4 步（super-fine 精调）
+            this.autoFocusInfo.message = this.$t('Super fine adjustment in progress. The system is performing precise HFR-based fitting, please wait for the final best focus position.');
+          }
         } else {
           this.autoFocusInfo.message = message;
         }

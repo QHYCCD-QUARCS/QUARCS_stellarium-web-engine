@@ -502,6 +502,7 @@
   "Please observe if the camera has started shooting the full image. If it has started shooting, please wait for the shooting to complete": "请观察相机是否开始拍摄全图，如果已开始拍摄，请等待拍摄完成",
   "Coarse adjustment in progress, please observe if the focuser has started moving. If it has started moving, please wait for the coarse adjustment to complete": "正在进行粗调，请观察电调是否开始移动，如果已开始移动，请等待粗调完成",
   "Fine adjustment in progress, please observe if the focuser has started moving. If it has started moving, please wait for the fine adjustment to complete": "正在进行精调，请观察电调是否开始移动，如果已开始移动，请等待精调完成",
+  "Fine HFR adjustment in progress. The system is performing HFR-based fitting, please wait for the final best focus position.": "正在进行 HFR 精调，系统正在执行基于 HFR 的拟合，请等待最终最佳焦点位置。",
   "Super fine adjustment in progress. The system is performing precise HFR-based fitting, please wait for the final best focus position.": "正在进行超精细调焦，系统正在执行基于 HFR 的精确拟合，请等待最终最佳焦点位置。",
   "Please confirm the auto focus mode": "请选择自动对焦模式",
   "Coarse focus": "粗调对焦",
