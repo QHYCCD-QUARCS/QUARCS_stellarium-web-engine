@@ -226,11 +226,23 @@ export default {
       calibrationMessage: '', // 校准提示信息
       calibrationState: 'idle', // 校准状态: 'idle', 'running', 'complete'
 
+      // 自动对焦阶段拍摄进度（仅用于逻辑记录，不再在面板底部重复显示）
+      autoFocusStage: '',
+      autoFocusCurrentShot: 0,
+      autoFocusTotalShots: 0,
+      autoFocusMode: 'full',
+
     };
   },
   components: {
     FocusChart,
     ImageChart
+  },
+  computed: {
+    // 保留占位，当前不在该面板上展示阶段文案
+    autoFocusStageLabel() {
+      return '';
+    }
   },
   mounted() {
     this.updatePosition(); // 初始化位置
@@ -266,6 +278,9 @@ export default {
     this.$bus.$on('updateAutoFocuserState', this.updateAutoFocuserState);  // 更新自动对焦状态
     this.$bus.$on('UpdateAutoFocusStep', this.handleAutoFocusStep);        // 自动对焦步骤变化
     this.$bus.$on('AutoFocusSNR', this.handleAutoFocusSNR);                // 自动对焦 SNR 结果
+
+    // 自动对焦拍摄进度：来自 App.vue 的统一事件（AutoFocusCaptureProgressUI）
+    this.$bus.$on('AutoFocusCaptureProgressUI', this.handleAutoFocusProgress);
 
     // 当ui初始化完成,自动获取当前状态
     this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getFocuserState');
@@ -714,6 +729,19 @@ export default {
       // 也可以在这里根据 step 更新某些本地状态，用于在 FocuserPanel 上显示
     },
 
+    // 处理自动对焦各阶段拍摄进度，在对焦控制区域旁边展示
+    handleAutoFocusProgress(payload) {
+      try {
+        const { stage, current, total, mode } = payload || {};
+        this.autoFocusStage = stage || '';
+        this.autoFocusCurrentShot = current || 0;
+        this.autoFocusTotalShots = total || 0;
+        this.autoFocusMode = mode || 'full';
+      } catch (e) {
+        console.error('Error in handleAutoFocusProgress:', e);
+      }
+    },
+
     // 处理来自后端的 SNR 结果，在前端弹出提示
     handleAutoFocusSNR(payload) {
       try {
@@ -794,6 +822,48 @@ export default {
   top: -39px;
   left: 5px;
   right: 5px;
+}
+
+/* 自动对焦进度文本与动画：位于按钮下方，靠右对齐 */
+.auto-focus-inline-progress {
+  position: absolute;
+  top: -14px;              /* 位于按钮行正下方 */
+  right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: #FFD27F;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  pointer-events: none;    /* 不影响按钮点击 */
+}
+
+.auto-focus-spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 165, 0, 0.35);
+  border-top-color: #FFA500;
+  border-right-color: #FFA500;
+  background-color: transparent;
+  box-shadow: 0 0 6px rgba(255, 165, 0, 0.8);
+  animation: autofocus-inline-spin 0.9s linear infinite;
+}
+
+.auto-focus-inline-text {
+  white-space: nowrap;
+}
+
+@keyframes autofocus-inline-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(180deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .btn-Speed {

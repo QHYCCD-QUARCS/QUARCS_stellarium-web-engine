@@ -595,11 +595,21 @@
 
     <!-- 自动对焦信息显示框 - [AUTO_FOCUS_UI_ENHANCEMENT] -->
     <div v-if="(autoFocusInfo.isRunning || autoFocusInfo.state === 'complete') && currentcanvas === 'MainCamera'"
-      class="calibration-info-box">
+      class="calibration-info-box auto-focus-info-box">
       <div class="calibration-content">
         <div class="calibration-title">{{ $t('Auto Focus') }}</div>
         <div class="calibration-message">{{ $t(autoFocusInfo.message) }}</div>
         <div class="calibration-progress">{{ $t('Step') }} {{ autoFocusInfo.step }}/4</div>
+        <div
+          v-if="autoFocusInfo.totalShots > 0 && autoFocusInfo.currentShot > 0 && autoFocusStageLabel"
+          class="calibration-shot-info"
+        >
+          {{ $t('Auto Focus Capture Progress', [autoFocusStageLabel, autoFocusInfo.currentShot, autoFocusInfo.totalShots]) }}
+        </div>
+        <div v-if="autoFocusInfo.isRunning" class="calibration-running-indicator">
+          <span class="calibration-running-dot"></span>
+          <span class="calibration-running-text">{{ $t('Running') }}</span>
+        </div>
       </div>
     </div>
 
@@ -697,7 +707,14 @@ export default {
         isRunning: false,
         state: 'idle',
         step: 0,
-        message: ''
+        message: '',
+        // 当前自动对焦模式：full=完整自动对焦；fine=仅精调
+        mode: 'full',
+        // 当前阶段（coarse / fine / super_fine）
+        stage: '',
+        // 当前阶段拍摄进度：当前第几张 / 总张数
+        currentShot: 0,
+        totalShots: 0
       },
       // FitResult 结果只弹一次的开关，防止对焦失败时频繁刷提示框
       fitResultShown: false,
@@ -776,6 +793,7 @@ export default {
         { driverType: 'Focuser', num: 2, label: 'Max Limit', value: '', inputType: 'tip' },
         { driverType: 'Focuser', num: 2, label: 'Sync Focuser Step', value: '', inputType: 'text' },
         { driverType: 'Focuser', num: 2, label: 'Backlash', value: '', inputType: 'number' },
+        { driverType: 'Focuser', num: 2, label: 'Coarse Step Divisions', value: 10, inputType: 'number', min: 1, step: 1 },
         { driverType: 'Focuser', num: 2, label: 'AutoFocus Exposure Time (ms)', value: 1000, inputType: 'number', min: 1, step: 1 },
       ],
 
@@ -1024,6 +1042,7 @@ export default {
     this.$bus.$on('Min Limit', this.MinLimitSet);
     this.$bus.$on('Max Limit', this.MaxLimitSet);
     this.$bus.$on('Backlash', this.BacklashSet);
+    this.$bus.$on('Coarse Step Divisions', this.CoarseStepDivisionsSet);
     this.$bus.$on('AutoFocus Exposure Time (ms)', this.AutoFocusExposureTimeSet);
     this.$bus.$on('GotoThenSolve', this.GotoThenSolve);    // 切换GOTO后是否解析的信号
     this.$bus.$on('SolveCurrentPosition', this.SolveCurrentPosition);  // 实现解析当前位置的信号
@@ -3006,6 +3025,15 @@ export default {
                   }
                 }
                 break;
+              case 'Coarse Step Divisions':
+                if (parts.length === 2) {
+                  const divisions = parts[1];
+                  const item = this.FocuserConfigItems.find(i => i.label === 'Coarse Step Divisions');
+                  if (item) {
+                    item.value = divisions;
+                  }
+                }
+                break;
               case 'updateAutoFocuserState':
                 if (parts.length === 2) {
                   const autoFocusState = parts[1];
@@ -3040,8 +3068,18 @@ export default {
 
               case 'AutoFocusStarted': // [AUTO_FOCUS_UI_ENHANCEMENT]
                 if (parts.length >= 2) {
-                  const message = parts[1];
-                  console.log('AutoFocusStarted:', message);
+                  // 兼容旧格式：AutoFocusStarted:<message>
+                  // 新格式：AutoFocusStarted:<mode>:<message>，mode=full/fine
+                  let mode = 'full';
+                  let message = '';
+                  if (parts.length >= 3) {
+                    mode = parts[1] || 'full';
+                    message = parts.slice(2).join(':');
+                  } else {
+                    message = parts[1];
+                  }
+                  this.autoFocusInfo.mode = mode || 'full';
+                  console.log('AutoFocusStarted:', mode, message);
                   // 新的一次自动对焦开始时，重置 FitResult 提示开关
                   this.fitResultShown = false;
                   this.$bus.$emit('StartAutoFocus');
@@ -3066,6 +3104,26 @@ export default {
                   const snr = parseFloat(parts[4]);
                   console.log('AutoFocusSNR:', stage, index, position, snr);
                   this.$bus.$emit('AutoFocusSNR', { stage, index, position, snr });
+                }
+                break;
+              // 自动对焦拍摄进度：各阶段当前张数 / 总张数
+              // 格式: AutoFocusCaptureProgress:<stage>:<current>:<total>
+              case 'AutoFocusCaptureProgress':
+                if (parts.length >= 4) {
+                  const stage = parts[1];
+                  const current = parseInt(parts[2], 10) || 0;
+                  const total = parseInt(parts[3], 10) || 0;
+                  this.autoFocusInfo.stage = stage;
+                  this.autoFocusInfo.currentShot = current;
+                  this.autoFocusInfo.totalShots = total;
+                  console.log('AutoFocusCaptureProgress:', stage, current, '/', total);
+                  // 将进度信息同步到对焦面板，在自动对焦控制区域旁边显示
+                  this.$bus.$emit('AutoFocusCaptureProgressUI', {
+                    stage,
+                    current,
+                    total,
+                    mode: this.autoFocusInfo.mode || 'full'
+                  });
                 }
                 break;
               case 'StartAutoPolarAlignmentStatus':
@@ -3975,6 +4033,16 @@ export default {
       }
       this.SendConsoleLogMsg('AutoFocus Exposure Time (ms):' + IntValue, 'info');
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'AutoFocus Exposure Time (ms):' + IntValue);
+    },
+
+    CoarseStepDivisionsSet(payload) {
+      const [signal, value] = payload.split(':'); // 拆分信号和值
+      let IntValue = parseInt(value);
+      if (!Number.isFinite(IntValue) || IntValue <= 0) {
+        IntValue = 10;
+      }
+      this.SendConsoleLogMsg('Coarse Step Divisions:' + IntValue, 'info');
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'Coarse Step Divisions:' + IntValue);
     },
 
     GotoThenSolve(payload) {
@@ -7758,6 +7826,10 @@ export default {
       this.autoFocusInfo.state = 'running';
       this.autoFocusInfo.step = 0;
       this.autoFocusInfo.message = this.$t('Preparing to start auto focus...');
+      // 每次开始自动对焦时重置阶段与进度，避免沿用上一次的 coarse 进度
+      this.autoFocusInfo.stage = '';
+      this.autoFocusInfo.currentShot = 0;
+      this.autoFocusInfo.totalShots = 0;
       console.log('App: Auto focus started:', this.autoFocusInfo);
       
       // 自动对焦开始时禁用拍摄按键
@@ -7770,8 +7842,10 @@ export default {
       try {
 
         this.autoFocusInfo.step = step;
-        // 对第 4 步使用固定的国际化 key，避免后端描述字符串与本地 key 不一致导致无法翻译
-        if (parseInt(step, 10) === 4) {
+        const stepNum = parseInt(step, 10);
+        // 对完整自动对焦的第 4 步使用固定的国际化 key；
+        // 若是“仅精调”模式（fine），则直接使用后端传来的描述文本
+        if (stepNum === 4 && this.autoFocusInfo.mode !== 'fine') {
           this.autoFocusInfo.message = this.$t('Super fine adjustment in progress. The system is performing precise HFR-based fitting, please wait for the final best focus position.');
         } else {
           this.autoFocusInfo.message = message;
@@ -7782,9 +7856,9 @@ export default {
         console.log('App: Auto focus info updated:', this.autoFocusInfo);
         this.$startFeature(['Focuser'], 'AutoFocus');
 
-        // 当进入第 4 步（更细致精调）时，清空焦点曲线上的既有数据点，
+        // 当进入完整自动对焦的第 4 步（更细致精调）时，清空焦点曲线上的既有数据点，
         // 避免精调阶段的点影响观感，只保留 super-fine 的 HFR 拟合点。
-        if (parseInt(step, 10) === 4) {
+        if (stepNum === 4 && this.autoFocusInfo.mode !== 'fine') {
           this.$bus.$emit('ClearAllData');
         }
       } catch (error) {
@@ -7826,6 +7900,20 @@ export default {
       } else {
         return 'rgba(255, 255, 255, 0.5)'; // 默认白色，透明度 0.5
       }
+    },
+
+    // 自动对焦当前阶段的本地化名称（粗调 / 精调 / 超精细精调）
+    autoFocusStageLabel() {
+      // 若为“仅精调”模式，则统一显示为精调
+      if (this.autoFocusInfo && this.autoFocusInfo.mode === 'fine') {
+        return this.$t('Fine focus');
+      }
+      const stage = this.autoFocusInfo && this.autoFocusInfo.stage;
+      if (!stage) return '';
+      if (stage === 'coarse') return this.$t('Coarse focus');
+      if (stage === 'fine') return this.$t('Fine focus');
+      if (stage === 'super_fine') return this.$t('Super fine focus');
+      return '';
     },
     isMobile() {
       var ua = navigator.userAgent || '';
@@ -8632,7 +8720,7 @@ body,
   }
 }
 
-/* 校准信息显示框样式 */
+/* 校准信息显示框样式（用于“行程校准”等需要高优先级的大弹窗） */
 .calibration-info-box {
   position: fixed;
   /* 默认：在所有设备上都靠上居中，避免遮挡底部控制区域 */
@@ -8648,6 +8736,23 @@ body,
   min-width: 300px;
   max-width: 360px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+/* 自动对焦信息框：只保留文字，不再出现大灰色遮罩，优先级低于按键与控制面板 */
+.auto-focus-info-box {
+  position: fixed;
+  top: 14vh;                       /* 稍微靠上，避免靠近底部控制区 */
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: transparent;   /* 去除黑色背景 */
+  box-shadow: none;                /* 取消投影，弱化存在感 */
+  border-width: 0;                 /* 去掉描边，避免“弹窗感” */
+  backdrop-filter: none;           /* 不再模糊背景，防止出现整块灰色区域 */
+  pointer-events: none;            /* 不拦截点击，让下方按键可操作 */
+  z-index: 1;                      /* 降低层级，使电调与相机控制组件图标完全露出 */
+  min-width: 0;
+  max-width: 70vw;
+  padding: 8px 10px;               /* 自动对焦仅作轻量提示，缩小内边距 */
 }
 
 /* 手机端自动对焦 / 校准信息框自适应尺寸与位置，避免遮挡主要操作区域 */
@@ -8702,6 +8807,49 @@ body,
   color: #FFA500;
   font-weight: bold;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.calibration-shot-info {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #FFD27F;
+}
+
+.calibration-running-indicator {
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.calibration-running-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 165, 0, 0.35);
+  border-top-color: #FFA500;
+  border-right-color: #FFA500;
+  background-color: transparent;
+  box-shadow: 0 0 8px rgba(255, 165, 0, 0.8);
+  animation: autofocus-spin 0.9s linear infinite;
+}
+
+.calibration-running-text {
+  font-size: 12px;
+  color: #FFA500;
+}
+
+@keyframes autofocus-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(180deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .config-btn {
