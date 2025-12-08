@@ -149,6 +149,7 @@ export default {
   },
   created() {
     this.$bus.$on('ResetTime', this.resetTime);
+    this.resetTime();
   },
   methods: {
     resetTime: function () {
