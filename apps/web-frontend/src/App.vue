@@ -2713,9 +2713,10 @@ export default {
                   const language = parts[3];
                   this.SendConsoleLogMsg('2------------获得参数设置localMessage: ' + lat + ',' + lon + ',' + language, 'info');
                   if (language == 'zh') {
-                    this.$bus.$emit('ClientLanguage', 'cn');
+                    // 来自后端的语言更新（优先级：backend = 3）
+                    this.$bus.$emit('ClientLanguage', 'cn', 'backend');
                   } else {
-                    this.$bus.$emit('ClientLanguage', 'en');
+                    this.$bus.$emit('ClientLanguage', 'en', 'backend');
                   }
                   this.$bus.$emit('setLocationLatAndLon', lat, lon);
                 }

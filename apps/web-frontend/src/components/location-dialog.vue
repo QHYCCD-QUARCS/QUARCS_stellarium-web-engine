@@ -142,11 +142,12 @@ export default {
           this.$bus.$emit('SendConsoleLogMsg', "data:" +`Time: ${data.time},lat:${data.lat},long:${data.lon}, language: ${data.language}, WiFi: ${data.wifiname},appversion: ${data.appversion}`, 'info');  
           this.sendGetLocation(data.lat, data.lon);
           if (data.language == 'zh' || data.language == "zh") {
-            this.$bus.$emit('ClientLanguage', 'cn');
-            this.$bus.$emit('SendConsoleLogMsg', 'ClientLanguage: cn', 'info');
+            // 来自 App 的语言更新（优先级：app = 2）
+            this.$bus.$emit('ClientLanguage', 'cn', 'app');
+            this.$bus.$emit('SendConsoleLogMsg', 'ClientLanguage(app): cn', 'info');
           } else {
-            this.$bus.$emit('ClientLanguage', 'en');
-            this.$bus.$emit('SendConsoleLogMsg', 'ClientLanguage: en', 'info');
+            this.$bus.$emit('ClientLanguage', 'en', 'app');
+            this.$bus.$emit('SendConsoleLogMsg', 'ClientLanguage(app): en', 'info');
           }
           this.$bus.$emit('appVersion', data.appversion);
           this.$bus.$emit('AppSendMessage', 'Vue_Command', 'localMessage:'+ data.lat + ':' + data.lon+':'+data.language +':'+data.wifiname);

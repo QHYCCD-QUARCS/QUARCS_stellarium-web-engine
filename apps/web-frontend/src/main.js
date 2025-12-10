@@ -78,10 +78,38 @@ pluginsLocales.keys().forEach(key => {
   }
 })
 
-const loc = 'en'
-// Un-comment to select user's language automatically
-// loc = (navigator.language || navigator.userLanguage).split('-')[0] || 'en'
-Moment.locale(loc)
+// -----------------------------
+// 语言与国际化初始化
+// -----------------------------
+// 语言来源优先级（数值越小优先级越高）
+// 1: 用户手动选择
+// 2: App 发送
+// 3: 后端发送
+// 4: 浏览器默认
+const LANGUAGE_PRIORITY = {
+  user: 1,
+  app: 2,
+  backend: 3,
+  browser: 4
+}
+
+// 默认使用浏览器语言作为初始语言（来源：browser）
+let loc = 'en'
+let currentLanguageSource = 'browser'
+
+try {
+  if (typeof navigator !== 'undefined') {
+    const navLang = (navigator.language || navigator.userLanguage || 'en').split('-')[0] || 'en'
+    loc = navLang === 'zh' ? 'cn' : navLang
+  }
+} catch (e) {
+  // 容错：无法读取浏览器语言时保持 'en'
+}
+
+// 设置 moment 的语言（cn -> zh-cn，其它直接使用）
+const momentLocale = (loc === 'cn') ? 'zh-cn' : loc
+Moment.locale(momentLocale)
+
 var i18n = new VueI18n({
   locale: loc,
   messages: messages,
@@ -89,6 +117,47 @@ var i18n = new VueI18n({
   fallbackLocale: 'en',
   silentTranslationWarn: true
 })
+
+// 全局语言更新助手：根据来源和优先级更新语言
+// 使用方式：
+// this.$setLanguageWithSource('user' | 'app' | 'backend' | 'browser', 'cn' | 'en' | ...)
+Vue.prototype.$setLanguageWithSource = function (source, lang) {
+  const src = source || 'backend'
+  const newPri = LANGUAGE_PRIORITY[src] || LANGUAGE_PRIORITY.browser
+  const curPri = LANGUAGE_PRIORITY[currentLanguageSource] || LANGUAGE_PRIORITY.browser
+
+  // 如果新来源优先级不高于当前来源，则忽略（例如：当前为 user 时，app/backend/browser 一律不生效）
+  if (newPri > curPri) {
+    if (this && this.$bus) {
+      this.$bus.$emit(
+        'SendConsoleLogMsg',
+        `Ignore language update from ${src}(${newPri}) -> ${lang}, current=${currentLanguageSource}(${curPri})`,
+        'info'
+      )
+    }
+    return
+  }
+
+  // 执行语言切换
+  i18n.locale = lang
+  const mLoc = (lang === 'cn') ? 'zh-cn' : lang
+  Moment.locale(mLoc)
+  currentLanguageSource = src
+
+  if (this && this.$bus) {
+    this.$bus.$emit(
+      'SendConsoleLogMsg',
+      `Set language to ${lang} from ${src} (priority ${newPri})`,
+      'info'
+    )
+    this.$bus.$emit('LanguageSourceChanged', src, lang)
+  }
+}
+
+// 获取当前语言来源
+Vue.prototype.$getLanguageSource = function () {
+  return currentLanguageSource
+}
 
 // Setup routes for the app
 Vue.use(Router)

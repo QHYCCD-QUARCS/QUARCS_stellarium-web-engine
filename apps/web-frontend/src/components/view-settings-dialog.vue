@@ -273,7 +273,9 @@ export default {
     }
   },
   created() { 
-    this.$bus.$on('ClientLanguage', this.switchLanguage);
+    // 监听来自 App / 后端 的语言更新事件
+    // 事件签名：ClientLanguage(lang, source?)
+    this.$bus.$on('ClientLanguage', this.onClientLanguage);
     this.$bus.$on('HighFPSMode', this.switchHighFPSMode);
     this.$bus.$on('sendCurrentConnectedDevices', this.onSendCurrentConnectedDevices);
     this.$bus.$on('DeviceConnectSuccess', this.onDeviceConnectSuccess);
@@ -299,12 +301,28 @@ export default {
     }
   },
   methods: {
-    // 切换语言的方法
+    // 通用的语言应用方法，支持来源优先级
+    applyLanguage(lang, source) {
+      if (typeof this.$setLanguageWithSource === 'function') {
+        this.$setLanguageWithSource(source, lang)
+      } else {
+        // 兼容：如果全局助手不存在，则直接切换
+        this.$i18n.locale = lang
+      }
+      this.selectedLanguage = this.$i18n.locale
+    },
+
+    // 用户在界面中手动切换语言（优先级：user = 1）
     switchLanguage(lang) {
       // this.$bus.$emit('SendConsoleLogMsg', "当前语言:" + lang, 'info');
-      this.$i18n.locale = lang;
-      this.selectedLanguage = this.$i18n.locale;
+      this.applyLanguage(lang, 'user')
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'saveToConfigFile:ClientLanguage:'+ lang);
+    },
+
+    // 来自 App / 后端 的语言更新（通过事件总线）
+    onClientLanguage(lang, source) {
+      const src = source || 'backend'
+      this.applyLanguage(lang, src)
     },
     switchHighFPSMode(Value) {
       if(Value === 'true'){
