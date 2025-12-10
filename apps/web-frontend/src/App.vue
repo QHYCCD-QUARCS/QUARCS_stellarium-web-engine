@@ -599,7 +599,12 @@
       <div class="calibration-content">
         <div class="calibration-title">{{ $t('Auto Focus') }}</div>
         <div class="calibration-message">{{ $t(autoFocusInfo.message) }}</div>
-        <div class="calibration-progress">{{ $t('Step') }} {{ autoFocusInfo.step }}/4</div>
+        <div
+          v-if="autoFocusInfo.mode !== 'fine'"
+          class="calibration-progress"
+        >
+          {{ $t('Step') }} {{ autoFocusInfo.step }}/4
+        </div>
         <div
           v-if="autoFocusInfo.totalShots > 0 && autoFocusInfo.currentShot > 0 && autoFocusStageLabel"
           class="calibration-shot-info"
@@ -7851,10 +7856,14 @@ export default {
             this.autoFocusInfo.message = this.$t('Fine HFR adjustment in progress. The system is performing HFR-based fitting, please wait for the final best focus position.');
           } else {
             // 完整自动对焦流程的第 4 步（super-fine 精调）
-            this.autoFocusInfo.message = this.$t('Super fine adjustment in progress. The system is performing precise HFR-based fitting, please wait for the final best focus position.');
+            this.autoFocusInfo.message = this.$t('Fine HFR adjustment in progress. The system is performing HFR-based fitting, please wait for the final best focus position.');
           }
         } else {
-          this.autoFocusInfo.message = message;
+          // 其它步骤：把后端传来的英文提示当作 i18n key 做一次翻译
+          // 例如：
+          //   "Star finding in progress, please observe if the focuser has started moving..."
+          // 会在 cn.json / en.json 中找到对应条目。
+          this.autoFocusInfo.message = this.$t(message);
         }
         this.autoFocusInfo.isRunning = true;
         // 自动对焦开始时禁用拍摄按键
@@ -7908,17 +7917,34 @@ export default {
       }
     },
 
-    // 自动对焦当前阶段的本地化名称（粗调 / 精调 / 超精细精调）
+    // 自动对焦当前阶段的本地化名称
+    // 要求：
+    //  - 第一步：由“粗调”改为“找星”
+    //  - 第二步：由“精调”改为“粗调”
+    //  - 第三步：由“超精细精调”改为“精调”
     autoFocusStageLabel() {
-      // 若为“仅精调”模式，则统一显示为精调
-      if (this.autoFocusInfo && this.autoFocusInfo.mode === 'fine') {
-        return this.$t('Fine focus');
+      if (!this.autoFocusInfo) return '';
+
+      // “仅精调”模式下，统一视为精调阶段
+      if (this.autoFocusInfo.mode === 'fine') {
+        return this.$t('Auto Focus Stage - Fine');
       }
-      const stage = this.autoFocusInfo && this.autoFocusInfo.stage;
+
+      const stage = this.autoFocusInfo.stage;
       if (!stage) return '';
-      if (stage === 'coarse') return this.$t('Coarse focus');
-      if (stage === 'fine') return this.$t('Fine focus');
-      if (stage === 'super_fine') return this.$t('Super fine focus');
+
+      if (stage === 'coarse') {
+        // 原来的“粗调”阶段，现在在 UI 上显示为“找星”
+        return this.$t('Auto Focus Stage - Finding stars');
+      }
+      if (stage === 'fine') {
+        // 原来的“精调”阶段，现在在 UI 上显示为“粗调”
+        return this.$t('Auto Focus Stage - Coarse');
+      }
+      if (stage === 'super_fine') {
+        // 原来的“超精细精调”阶段，现在在 UI 上显示为“精调”
+        return this.$t('Auto Focus Stage - Fine');
+      }
       return '';
     },
     isMobile() {
