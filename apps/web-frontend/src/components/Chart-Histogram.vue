@@ -21,6 +21,10 @@ export default {
       histogram_min: 0,
       histogram_max: 65535,
 
+      // 自动拉伸得到的“有效区间”总范围（按钮显示“区”时，X 轴固定到这个范围）
+      auto_min: 0,
+      auto_max: 65535,
+
       // 是否使用有效区间绘制（true：只画有效区间；false：画全范围）
       useEffectiveRange: true,
 
@@ -39,18 +43,29 @@ export default {
     this.$bus.$on('AutoHistogramNum', this.setAutoRange);
     // 手动/自动拉伸窗口变化：只更新窗口位置（用于全图模式下的蓝/红竖线）
     this.$bus.$on('ChangeDialPosition', this.setWindowRange);
+    // 与拨盘联动：切换“全图 / 区间”模式
+    this.$bus.$on('HistogramRangeMode', this.setRangeMode);
   },
   methods: {
     // 自动拉伸得到的固定显示范围（16bit：0-65535）
     setAutoRange(min, max) {
-      // 记录自动拉伸的黑白位范围
+      // 记录自动拉伸得到的“有效区间”总范围
+      this.auto_min = min;
+      this.auto_max = max;
+
+      // 初始窗口与自动拉伸范围一致
       this.histogram_min = min;
       this.histogram_max = max;
 
-      // 区间模式：使用自动拉伸区间作为固定显示范围
+      // 按模式决定 X 轴总范围：
+      // 区间模式（按钮显示“区”）：X 轴固定为自动拉伸区间 [auto_min, auto_max]
+      // 全图模式（按钮显示“全”）：X 轴固定为完整 16bit 范围 [0, 65535]
       if (this.useEffectiveRange) {
-        this.xAxis_min = min;
-        this.xAxis_max = max;
+        this.xAxis_min = this.auto_min;
+        this.xAxis_max = this.auto_max;
+      } else {
+        this.xAxis_min = this.fullRange_min;
+        this.xAxis_max = this.fullRange_max;
       }
 
       // 已有图表和数据时，立即按新范围重绘，便于观察像素变化
@@ -64,12 +79,6 @@ export default {
       this.histogram_min = min;
       this.histogram_max = max;
 
-      // 全图模式下：让直方图 x 轴范围跟随当前窗口
-      if (!this.useEffectiveRange) {
-        this.xAxis_min = min;
-        this.xAxis_max = max;
-      }
-
       if (this.myChart && this.barData.length > 0) {
         this.renderChart(this.xAxis_min, this.xAxis_max);
       }
@@ -80,13 +89,32 @@ export default {
       this.useEffectiveRange = !this.useEffectiveRange;
 
       if (this.useEffectiveRange) {
-        // 区间模式：使用自动拉伸得到的固定区间
-        this.xAxis_min = this.histogram_min;
-        this.xAxis_max = this.histogram_max;
+        // 区间模式：X 轴固定为自动拉伸得到的有效区间 [auto_min, auto_max]
+        this.xAxis_min = this.auto_min;
+        this.xAxis_max = this.auto_max;
       } else {
-        // 全图模式：以当前窗口为初始显示范围（之后由 setWindowRange 动态更新）
-        this.xAxis_min = this.histogram_min;
-        this.xAxis_max = this.histogram_max;
+        // 全图模式：始终显示完整 16bit 范围 [0, 65535]
+        this.xAxis_min = this.fullRange_min;
+        this.xAxis_max = this.fullRange_max;
+      }
+
+      if (this.myChart && this.barData.length > 0) {
+        this.renderChart(this.xAxis_min, this.xAxis_max);
+      }
+    },
+
+    // 根据外部开关直接设置“全图 / 区间”模式（与拨盘和面板按钮联动）
+    setRangeMode(flag) {
+      this.useEffectiveRange = flag;
+
+      if (this.useEffectiveRange) {
+        // 区间模式：X 轴固定为自动拉伸得到的有效区间 [auto_min, auto_max]
+        this.xAxis_min = this.auto_min;
+        this.xAxis_max = this.auto_max;
+      } else {
+        // 全图模式：始终显示完整 0-65535 范围
+        this.xAxis_min = this.fullRange_min;
+        this.xAxis_max = this.fullRange_max;
       }
 
       if (this.myChart && this.barData.length > 0) {
@@ -177,31 +205,28 @@ export default {
       }
       }
 
-      // 在“全图模式”下，添加最小和最大值的垂直线，标出有效区间在整体中的位置
-      // 在“区间模式”下，x 轴本身就是 [histogram_min, histogram_max]，再画竖线会和缩放后的坐标轴边界重合，反而显得不匹配，因此隐藏
-      if (!this.useEffectiveRange) {
-        option.series.push({
-          data: [[this.histogram_min, 0], [this.histogram_min, yAxisMax]],
-          type: 'line',
-          lineStyle: {
-            color: 'blue',
-            type: 'dashed',
-            width: 1
-          },
-          symbolSize: 0
-        });
+      // 在两种模式下都添加最小和最大值的垂直线，标出当前窗口在 X 轴总范围中的位置
+      option.series.push({
+        data: [[this.histogram_min, 0], [this.histogram_min, yAxisMax]],
+        type: 'line',
+        lineStyle: {
+          color: 'blue',
+          type: 'dashed',
+          width: 1
+        },
+        symbolSize: 0
+      });
 
-        option.series.push({
-          data: [[this.histogram_max, 0], [this.histogram_max, yAxisMax]],
-          type: 'line',
-          lineStyle: {
-            color: 'red',
-            type: 'dashed',
-            width: 1
-          },
-          symbolSize: 0
-        });
-      }
+      option.series.push({
+        data: [[this.histogram_max, 0], [this.histogram_max, yAxisMax]],
+        type: 'line',
+        lineStyle: {
+          color: 'red',
+          type: 'dashed',
+          width: 1
+        },
+        symbolSize: 0
+      });
 
       this.myChart.setOption(option);
     },

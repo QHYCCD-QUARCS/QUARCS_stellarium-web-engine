@@ -19,11 +19,7 @@
       </button>
 
       <!-- 切换：全图 / 有效区间（支持鼠标点击和触摸） -->
-      <button
-        @click="toggleHistogramRangeMode"
-        @touchend="toggleHistogramRangeMode"
-        class="get-click btn-Range"
-      >
+      <button @click="toggleHistogramRangeMode" @touchend="toggleHistogramRangeMode" class="get-click btn-Range">
         <span v-if="showEffectiveRange">区</span>
         <span v-else>全</span>
       </button>
@@ -88,6 +84,7 @@ export default {
     // 切换“全图 / 有效区间”显示模式
     toggleHistogramRangeMode() {
       this.showEffectiveRange = !this.showEffectiveRange;
+      console.log("toggleHistogramRangeMode:", this.showEffectiveRange);
       // 通知拨盘组件同步区间模式
       this.$bus.$emit('HistogramRangeMode', this.showEffectiveRange);
     },
