@@ -18,6 +18,16 @@
         </div>
       </button>
 
+      <!-- 切换：全图 / 有效区间（支持鼠标点击和触摸） -->
+      <button
+        @click="toggleHistogramRangeMode"
+        @touchend="toggleHistogramRangeMode"
+        class="get-click btn-Range"
+      >
+        <span v-if="showEffectiveRange">区</span>
+        <span v-else>全</span>
+      </button>
+
     </div>
 
   </div>
@@ -38,6 +48,9 @@ export default {
 
       histogram_min: 0,
       histogram_max: 65535,
+
+      // true：只绘制有效区间；false：绘制全局直方图
+      showEffectiveRange: true,
     };
   },
   components: {
@@ -69,7 +82,14 @@ export default {
       this.$bus.$emit('HandleHistogramNum', -1, -1);
     },
     ResetHistogram() {
-      this.$bus.$emit('HandleHistogramNum', 0 , 65535);
+      // 恢复原功能：将区间重置为 0 ~ 65535 全范围
+      this.$bus.$emit('HandleHistogramNum', 0, 65535);
+    },
+    // 切换“全图 / 有效区间”显示模式
+    toggleHistogramRangeMode() {
+      this.showEffectiveRange = !this.showEffectiveRange;
+      // 通知拨盘组件同步区间模式
+      this.$bus.$emit('HistogramRangeMode', this.showEffectiveRange);
     },
     setAutoHistogramNum(min, max) {
       this.histogram_min = min;
@@ -148,6 +168,20 @@ export default {
   border: none;
   border-radius: 50%; 
   box-sizing: border-box;
+}
+
+.btn-Range {
+  width: 30px;
+  height: 30px;
+
+  user-select: none;
+  background-color: rgba(64, 64, 64, 0.5);
+  backdrop-filter: blur(5px);
+  border: none;
+  border-radius: 50%;
+  box-sizing: border-box;
+  color: white;
+  font-size: 14px;
 }
 
 .btn-Reset {

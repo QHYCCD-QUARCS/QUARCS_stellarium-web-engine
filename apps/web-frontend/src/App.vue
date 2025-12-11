@@ -53,6 +53,28 @@
               @change="confirmDriver" style="width: 150px; display: inline-block;">
             </v-select>
 
+          <!-- 串口下拉框：在波特率下方，仅对 Mount / Focuser 显示 -->
+          <v-select
+            v-if="CurrentDriverType === 'Mount' && mountSerialPortItems.length > 0"
+            :label="$t('Serial Port')"
+            :items="mountSerialPortItems"
+            item-text="label"
+            item-value="value"
+            v-model="mountSerialPortSelected"
+            @change="onSerialPortSelect('Mount', mountSerialPortSelected)"
+            style="width: 150px; display: inline-block; margin-top: 8px;">
+          </v-select>
+          <v-select
+            v-if="CurrentDriverType === 'Focuser' && focuserSerialPortItems.length > 0"
+            :label="$t('Serial Port')"
+            :items="focuserSerialPortItems"
+            item-text="label"
+            item-value="value"
+            v-model="focuserSerialPortSelected"
+            @change="onSerialPortSelect('Focuser', focuserSerialPortSelected)"
+            style="width: 150px; display: inline-block; margin-top: 8px;">
+          </v-select>
+
             <v-row no-gutters>
               <v-col cols="6">
                 <button @click="clearDriver" class="btn-confirm" style="display: inline-block;">
@@ -373,23 +395,23 @@
           <!-- 设备列表(动态生成) -->
           <v-list-item v-for="(device, index) in devices" :key="index" @click.stop="selectDevice(device)"
             :style="{ height: '36px' }">
-            <v-list-item-icon style="margin-right: 10px;">
-              <div style="display: flex; justify-content: center; align-items: center;">
+              <v-list-item-icon style="margin-right: 10px;">
+                <div style="display: flex; justify-content: center; align-items: center;">
                 <img :src="require(`@/assets/images/svg/ui/${device.driverType}.svg`)" height="30px"
                   style="min-height: 30px"></img>
-              </div>
-            </v-list-item-icon>
-            <v-list-item-content>
-              <v-list-item-title>
-                <span>
+                </div>
+              </v-list-item-icon>
+              <v-list-item-content>
+                <v-list-item-title>
+                  <span>
                   <div :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t(device.driverType) }}</div>
                   <div :style="{ fontSize: '7px' }" :class="{ 'connected-device': device.isConnected }">{{
                     device.device }}
-                  </div>
-                </span>
-              </v-list-item-title>
-            </v-list-item-content>
-          </v-list-item>
+                    </div>
+                  </span>
+                </v-list-item-title>
+              </v-list-item-content>
+            </v-list-item>
 
           <v-divider></v-divider>
 
@@ -988,6 +1010,12 @@ export default {
         { label: '230400', value: 230400 },
       ],
       BaudRateSelected: 9600, // 波特率选择
+
+      // 串口选择（在连接面板中，位于波特率下方）
+      mountSerialPortItems: [],
+      mountSerialPortSelected: '',
+      focuserSerialPortItems: [],
+      focuserSerialPortSelected: '',
       cpuTemp: null,  // CPU温度
       cpuUsage: null, // CPU使用率
 
@@ -1146,6 +1174,12 @@ export default {
 
   },
   methods: {
+    // 串口选择变更：在连接面板中（波特率下方）选择串口
+    onSerialPortSelect(driverType, value) {
+      if (!value) return;
+      this.SendConsoleLogMsg(driverType + ' Serial Port:' + value, 'info');
+      this.sendMessage('Vue_Command', 'SetSerialPort:' + driverType + ':' + value);
+    },
     onButtonPress(item) {
       // 禁用按钮
       this.$set(item, '_disabled', true);
@@ -2711,6 +2745,50 @@ export default {
                 }
                 break;
 
+              // 后端下发串口候选列表与当前保存的串口：
+              //   SerialPortOptions:<driverType>:<savedPort>:<port1>:<port2>:...
+              case 'SerialPortOptions': {
+                if (parts.length >= 3) {
+                  const driverType = parts[1];
+                  const savedPort = parts[2] || '';
+                  const ports = parts.slice(3);
+
+                  if (driverType === 'Mount') {
+                    this.mountSerialPortItems = ports;
+                    if (savedPort) {
+                      this.mountSerialPortSelected = savedPort;
+                    } else if (ports.length > 0) {
+                      this.mountSerialPortSelected = ports[0];
+                    } else {
+                      this.mountSerialPortSelected = '';
+                    }
+                  } else if (driverType === 'Focuser') {
+                    this.focuserSerialPortItems = ports;
+                    if (savedPort) {
+                      this.focuserSerialPortSelected = savedPort;
+                    } else if (ports.length > 0) {
+                      this.focuserSerialPortSelected = ports[0];
+                    } else {
+                      this.focuserSerialPortSelected = '';
+                    }
+                  }
+                }
+                break;
+              }
+
+              // 后端请求前端弹出指定设备类型的串口选择界面：
+              //   RequestSerialPortSelection:<driverType>
+              case 'RequestSerialPortSelection': {
+                if (parts.length >= 2) {
+                  const driverType = parts[1];
+                  // 切换到对应驱动类型，使连接面板中显示该设备的串口/波特率设置
+                  this.CurrentDriverType = driverType;
+                  // 可选：给用户一个提示
+                  this.callShowMessageBox(this.$t('Please select serial port for ') + driverType, 'info');
+                }
+                break;
+              }
+
               case 'localMessage':
                 if (parts.length === 4) {
                   const lat = parts[1];
@@ -3625,6 +3703,10 @@ export default {
       this.autoConnectAllDevice();
     },
     connectAllDevice() {
+      if (this.QTClientVersion === 'Not connected'){
+        this.callShowMessageBox('Please connect the QT client first.', 'error');
+        return;
+      }
       console.log("QHYCCD | connectAllDevice.");
       this.SendConsoleLogMsg('Connect All Device', 'info');
       this.sendMessage('Vue_Command', 'connectAllDevice');
@@ -4408,9 +4490,14 @@ export default {
         });
 
         if (analysis.histogram) {
-          this.$bus.$emit('showHistogram', analysis.histogram);  // 更新 直方图数据
-          this.$bus.$emit('ChangeDialPosition', blackLevel, whiteLevel);  // 更新直方图的显示轴
-          this.$bus.$emit('AutoHistogramNum', blackLevel, whiteLevel);
+          // 更新直方图数据
+          this.$bus.$emit('showHistogram', analysis.histogram);
+          // 更新拨盘窗口位置
+          this.$bus.$emit('ChangeDialPosition', blackLevel, whiteLevel);
+          // 仅在“自动拉伸”模式下（histogramMin / histogramMax 为 -1）更新“区间模式”的固定显示范围
+          if (histogramMin == -1 && histogramMax == -1) {
+            this.$bus.$emit('AutoHistogramNum', blackLevel, whiteLevel);
+          }
         }
 
         this.lastImageProcessParams = {
