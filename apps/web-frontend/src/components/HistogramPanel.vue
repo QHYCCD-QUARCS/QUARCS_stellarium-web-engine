@@ -4,22 +4,22 @@
     <HistogramChart ref="histogramchart" class="histogram-chart"/>
     <DialKnob class="dial-knob"/>
     <div class="buttons-container">
-      <button @click="calcWhiteBalanceGains"  @touchend="calcWhiteBalanceGains" class="get-click btn-Reset">
+      <button @click="calcWhiteBalanceGains"   class="get-click btn-Reset">
         <div style="display: flex; justify-content: center; align-items: center;">
           <img src="@/assets/images/svg/ui/WhiteBalance.svg" height="20px" style="min-height: 20px; pointer-events: none;"></img>
         </div>
       </button>
 
-      <button @click="AutoHistogram"  @touchend="AutoHistogram" class="get-click btn-Auto"><v-icon>mdi-alpha-a-circle-outline</v-icon></button>
+      <button @click="AutoHistogram"   class="get-click btn-Auto"><v-icon>mdi-alpha-a-circle-outline</v-icon></button>
 
-      <button @click="ResetHistogram"  @touchend="ResetHistogram" class="get-click btn-Reset">
+      <button @click="ResetHistogram"  class="get-click btn-Reset">
         <div style="display: flex; justify-content: center; align-items: center;">
           <img src="@/assets/images/svg/ui/reset.svg" height="25px" style="min-height: 25px; pointer-events: none;"></img>
         </div>
       </button>
 
       <!-- 切换：全图 / 有效区间（支持鼠标点击和触摸） -->
-      <button @click="toggleHistogramRangeMode" @touchend="toggleHistogramRangeMode" class="get-click btn-Range">
+      <button @click="toggleHistogramRangeMode"  class="get-click btn-Range">
         <span v-if="showEffectiveRange">区</span>
         <span v-else>全</span>
       </button>
