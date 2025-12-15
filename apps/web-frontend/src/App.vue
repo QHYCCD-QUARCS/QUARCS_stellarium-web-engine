@@ -716,7 +716,7 @@ export default {
 
       QTClientVersion: 'Not connected',
       // VueClientVersion: process.env.VUE_APP_VERSION,
-      VueClientVersion: '20251205', // 手动指定版本号
+      VueClientVersion: '20251215', // 手动指定版本号
 
       // 全局总版本号（由 Qt 通过 WebSocket 从环境变量 QUARCS_TOTAL_VERSION 读取并发送）
       TotalVersion: '0.0.0',
@@ -1013,9 +1013,10 @@ export default {
 
       // 串口选择（在连接面板中，位于波特率下方）
       mountSerialPortItems: [],
-      mountSerialPortSelected: '',
+      // v-model 保存真实串口路径，或 'default' 表示自动匹配
+      mountSerialPortSelected: 'default',
       focuserSerialPortItems: [],
-      focuserSerialPortSelected: '',
+      focuserSerialPortSelected: 'default',
       cpuTemp: null,  // CPU温度
       cpuUsage: null, // CPU使用率
 
@@ -1176,7 +1177,12 @@ export default {
   methods: {
     // 串口选择变更：在连接面板中（波特率下方）选择串口
     onSerialPortSelect(driverType, value) {
-      if (!value) return;
+      // 'default' 表示使用自动匹配逻辑，不强制指定串口
+      if (!value || value === 'default') {
+        this.SendConsoleLogMsg(driverType + ' Serial Port: default(auto-detect)', 'info');
+        this.sendMessage('Vue_Command', 'SetSerialPort:' + driverType + ':default');
+        return;
+      }
       this.SendConsoleLogMsg(driverType + ' Serial Port:' + value, 'info');
       this.sendMessage('Vue_Command', 'SetSerialPort:' + driverType + ':' + value);
     },
@@ -2745,31 +2751,45 @@ export default {
                 }
                 break;
 
-              // 后端下发串口候选列表与当前保存的串口：
-              //   SerialPortOptions:<driverType>:<savedPort>:<port1>:<port2>:...
+              // 后端下发串口候选列表与当前使用/覆盖的串口：
+              //   SerialPortOptions:<driverType>:<currentPort>:<port1>:<port2>:...
               case 'SerialPortOptions': {
                 if (parts.length >= 3) {
                   const driverType = parts[1];
-                  const savedPort = parts[2] || '';
-                  const ports = parts.slice(3);
+                  const currentPort = parts[2] || '';
+                  const rawPorts = parts.slice(3);
+
+                  // 解析 "<portPath>-><displayName>" 为 { label, value }
+                  const parsedItems = rawPorts
+                    .map(p => {
+                      const [path, name] = p.split('->');
+                      const value = (path || '').trim();
+                      if (!value) return null;
+                      const display = (name || '').trim();
+                      const label = display ? `${value} -> ${display}` : value;
+                      return { label, value };
+                    })
+                    .filter(Boolean);
+
+                  // 第一个选项为“默认”（自动匹配）
+                  const defaultItem = {
+                    label: this.$t ? this.$t('Default') : 'Default',
+                    value: 'default',
+                  };
 
                   if (driverType === 'Mount') {
-                    this.mountSerialPortItems = ports;
-                    if (savedPort) {
-                      this.mountSerialPortSelected = savedPort;
-                    } else if (ports.length > 0) {
-                      this.mountSerialPortSelected = ports[0];
+                    this.mountSerialPortItems = [defaultItem, ...parsedItems];
+                    if (currentPort && parsedItems.some(it => it.value === currentPort)) {
+                      this.mountSerialPortSelected = currentPort;
                     } else {
-                      this.mountSerialPortSelected = '';
+                      this.mountSerialPortSelected = 'default';
                     }
                   } else if (driverType === 'Focuser') {
-                    this.focuserSerialPortItems = ports;
-                    if (savedPort) {
-                      this.focuserSerialPortSelected = savedPort;
-                    } else if (ports.length > 0) {
-                      this.focuserSerialPortSelected = ports[0];
+                    this.focuserSerialPortItems = [defaultItem, ...parsedItems];
+                    if (currentPort && parsedItems.some(it => it.value === currentPort)) {
+                      this.focuserSerialPortSelected = currentPort;
                     } else {
-                      this.focuserSerialPortSelected = '';
+                      this.focuserSerialPortSelected = 'default';
                     }
                   }
                 }

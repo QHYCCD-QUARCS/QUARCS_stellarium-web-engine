@@ -11,15 +11,28 @@
 #include "ini.h"
 #include <string.h>
 #include <zlib.h> // For crc32.
+#include <math.h>
 
 // Should be good enough...
 #define URL_MAX_SIZE 4096
+
+// Some systems don't define M_PI in <math.h>.
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 
 // Size of the cache allocated to all the hips tiles.
 // Note: we get into trouble if the tiles visible on screen actually use
 // more space than that.  We could use a more clever cache that can grow
 // past its limit if the items are still in use!
 #define CACHE_SIZE (256 * (1 << 20))
+
+// DSS color correction parameters (HSV hue range & saturation boost).
+// Hue is in [0,1] (i.e. h * 360 degrees).
+// Pixels with hue in [DSS_HUE_MIN, DSS_HUE_MAX] are forced toward pure red.
+#define DSS_HUE_MIN              0.01   // ~14 degrees
+#define DSS_HUE_MAX              0.25   // ~80 degrees
+#define DSS_SATURATION_BOOST     1.3    // Slightly increase saturation in that band
 
 // Flags of the tiles:
 enum {
@@ -81,6 +94,78 @@ typedef struct {
 static cache_t *g_cache = NULL;
 
 
+// Return true if a given hips survey corresponds to the DSS background.
+// We detect it from the survey URL so that only DSS tiles are color‑corrected.
+static bool hips_is_dss(const hips_t *hips)
+{
+    if (!hips || !hips->url) return false;
+    return strstr(hips->url, "/dss/") || strstr(hips->url, "dss/v1");
+}
+
+// Simple RGB<->HSV helpers, using ranges:
+//   r,g,b,s,v in [0,1], h in [0,1] (i.e. h*360 degrees)
+static void rgb_to_hsv(double r, double g, double b,
+                       double *h, double *s, double *v)
+{
+    double maxc = fmax(r, fmax(g, b));
+    double minc = fmin(r, fmin(g, b));
+    double delta = maxc - minc;
+
+    *v = maxc;
+    if (maxc <= 0.0) {
+        *s = 0.0;
+        *h = 0.0;
+        return;
+    }
+    *s = delta / maxc;
+    if (delta <= 0.0) {
+        *h = 0.0;
+        return;
+    }
+
+    if (maxc == r) {
+        *h = (g - b) / delta;
+    } else if (maxc == g) {
+        *h = 2.0 + (b - r) / delta;
+    } else {
+        *h = 4.0 + (r - g) / delta;
+    }
+    *h /= 6.0;
+    if (*h < 0.0) *h += 1.0;
+    if (*h > 1.0) *h -= 1.0;
+}
+
+static void hsv_to_rgb(double h, double s, double v,
+                       double *r, double *g, double *b)
+{
+    int i;
+    double f, p, q, t;
+
+    if (s <= 0.0) {
+        *r = *g = *b = v;
+        return;
+    }
+
+    h = fmod(h, 1.0);
+    if (h < 0.0) h += 1.0;
+    h *= 6.0;
+    i = (int)floor(h);
+    f = h - i;
+    p = v * (1.0 - s);
+    q = v * (1.0 - s * f);
+    t = v * (1.0 - s * (1.0 - f));
+
+    switch (i) {
+    case 0: *r = v; *g = t; *b = p; break;
+    case 1: *r = q; *g = v; *b = p; break;
+    case 2: *r = p; *g = v; *b = t; break;
+    case 3: *r = p; *g = q; *b = v; break;
+    case 4: *r = t; *g = p; *b = v; break;
+    default: *r = v; *g = p; *b = q; break;
+    }
+}
+
+
 static void *create_img_tile(
         void *user, int order, int pix, const void *src, int size,
         int *cost, int *transparency);
@@ -98,6 +183,10 @@ hips_t *hips_create(const char *url, double release_date,
 
     hips->ref = 1;
     hips->settings = *settings;
+    // If no custom user pointer is provided, default to passing the hips
+    // survey itself to the tile creation callback.
+    if (!hips->settings.user)
+        hips->settings.user = hips;
     hips->url = strdup(url);
     hips->service_url = strdup(url);
     hips->ext = settings->ext ?: "jpg";
@@ -777,6 +866,7 @@ static void *create_img_tile(
         void *user, int order, int pix, const void *data, int size,
         int *cost, int *transparency)
 {
+    hips_t *hips = (hips_t*)user;
     void *img;
     int i, w, h, bpp = 0;
     img_tile_t *tile;
@@ -792,6 +882,37 @@ static void *create_img_tile(
         LOG_W("Cannot parse img");
         return NULL;
     }
+
+    // Optional per‑survey color correction for DSS tiles:
+    // apply a small HSV hue compression to shift orange/yellow towards red,
+    // similar to the provided Python prototype.
+    if (hips_is_dss(hips) && bpp >= 3) {
+        uint8_t *ptr = img;
+        int x, y;
+        for (y = 0; y < h; y++) {
+            for (x = 0; x < w; x++) {
+                uint8_t *px = ptr + (y * w + x) * bpp;
+                double r = px[0] / 255.0;
+                double g = px[1] / 255.0;
+                double b = px[2] / 255.0;
+                double hh, ss, vv;
+
+                rgb_to_hsv(r, g, b, &hh, &ss, &vv);
+                // Shift orange/yellow (approx DSS_HUE_MIN‑DSS_HUE_MAX) to pure red
+                // and slightly boost saturation so the effect is visible.
+                if (hh > DSS_HUE_MIN && hh < DSS_HUE_MAX) {
+                    hh = 0.0; // pure red
+                    ss = fmin(1.0, ss * DSS_SATURATION_BOOST);
+                }
+                hsv_to_rgb(hh, ss, vv, &r, &g, &b);
+
+                px[0] = (uint8_t)clamp(r * 255.0, 0.0, 255.0);
+                px[1] = (uint8_t)clamp(g * 255.0, 0.0, 255.0);
+                px[2] = (uint8_t)clamp(b * 255.0, 0.0, 255.0);
+            }
+        }
+    }
+
     tile = calloc(1, sizeof(*tile));
     tile->img = img;
     tile->w = w;
