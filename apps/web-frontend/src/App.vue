@@ -157,8 +157,7 @@
 
               <!-- 选择框类型 -->
               <v-select v-if="item.inputType === 'select'" v-model="item.value" :label="$t(item.label)"
-                @change="handleConfigChange(item.label, item.value)" 
-                :items="getFilteredSelectOptions(item)" class="config-input">
+                @change="handleConfigChange(item.label, item.value)" :items="item.selectValue" class="config-input">
               </v-select>
 
               <!-- 开关类型 -->
@@ -2406,18 +2405,6 @@ export default {
                   this.SendConsoleLogMsg('Configure Recovery:' + parts[1] + ',' + parts[2], 'info');
                   this.$bus.$emit(ConfigName, ConfigValue);
 
-                  // 小工具：按 label 更新 GuiderConfigItems，避免依赖固定下标（新增/删减配置项时不易出错）
-                  const setGuiderItemValue = (label, value) => {
-                    const item = this.GuiderConfigItems.find(it => it.label === label);
-                    if (item) {
-                      // 如果是下拉框类型，确保值在选项中（如果不在，则动态添加）
-                      if (item.inputType === 'select' && item.selectValue && !item.selectValue.includes(value)) {
-                        item.selectValue.push(value);
-                      }
-                      item.value = value;
-                    }
-                  };
-
                   if (parts[1] === 'FocalLength') {
                     this.TelescopesConfigItems[0].value = parts[2];
                     for (const device of this.devices) {
@@ -2479,36 +2466,6 @@ export default {
                   if (parts[1] === 'GuiderDecGuideDir') {
                     setGuiderItemValue('DEC Single Guide Direction', parts[2]);
                     this.$bus.$emit('AppSendMessage', 'Vue_Command', 'GuiderDecGuideDir:' + parts[2]);
-                  }
-                }
-                break;
-
-              case 'Configure':
-                // 处理 Configure: 消息（与 ConfigureRecovery: 类似，但不发送到后端）
-                if (parts.length === 3) {
-                  const ConfigName = parts[1];
-                  const ConfigValue = parts[2];
-                  console.log('Configure:', ConfigName, ',', ConfigValue);
-                  
-                  // 小工具：按 label 更新 GuiderConfigItems
-                  const setGuiderItemValue = (label, value) => {
-                    const item = this.GuiderConfigItems.find(it => it.label === label);
-                    if (item) {
-                      // 如果是下拉框类型，确保值在选项中（如果不在，则动态添加，用于显示）
-                      // 这样当后端发送 "AUTO (EAST)" 时，下拉框能正确显示
-                      if (item.inputType === 'select' && item.selectValue && !item.selectValue.includes(value)) {
-                        item.selectValue.push(value);
-                      }
-                      item.value = value;
-                    }
-                  };
-
-                  // 处理导星方向配置
-                  if (ConfigName === 'GuiderRaGuideDir') {
-                    setGuiderItemValue('RA Single Guide Direction', ConfigValue);
-                  }
-                  if (ConfigName === 'GuiderDecGuideDir') {
-                    setGuiderItemValue('DEC Single Guide Direction', ConfigValue);
                   }
                 }
                 break;
@@ -8014,30 +7971,6 @@ export default {
         item.value += item.inputStep;
         this.handleConfigChange(item.label, item.value);
       }
-    },
-
-    // 获取过滤后的下拉框选项：只显示基本选项（不包含括号），但保留当前值（如果当前值是动态添加的）
-    getFilteredSelectOptions(item) {
-      if (!item || !item.selectValue || !Array.isArray(item.selectValue)) {
-        return [];
-      }
-      // 基本选项：不包含括号的选项
-      // 处理字符串和数字类型的选项：只有字符串才检查是否包含括号
-      const basicOptions = item.selectValue.filter(opt => {
-        if (typeof opt === 'string') {
-          return !opt.includes('(') && !opt.includes(')');
-        }
-        // 对于数字或其他类型，直接包含
-        return true;
-      });
-      // 如果当前值包含括号（如 "AUTO (EAST)"），将其也添加到选项中以便显示
-      if (item.value && typeof item.value === 'string' && item.value.includes('(') && item.value.includes(')')) {
-        // 确保当前值在选项中
-        if (!basicOptions.includes(item.value)) {
-          return [...basicOptions, item.value];
-        }
-      }
-      return basicOptions;
     },
 
     // 通用的配置更改处理函数
