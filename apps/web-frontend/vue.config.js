@@ -32,6 +32,22 @@ function resolveTilesPath() {
   return candidates.find(p => fs.existsSync(p));
 }
 
+function resolveSkydataPath() {
+  const candidates = [];
+
+  if (process.env.SKYDATA_SRC_DIR) {
+    candidates.push(process.env.SKYDATA_SRC_DIR);
+  }
+
+  candidates.push(
+    path.resolve(__dirname, '../test-skydata'),
+    path.resolve(__dirname, '../../test-skydata'),
+    path.resolve(__dirname, 'test-skydata')
+  );
+
+  return candidates.find(p => fs.existsSync(p));
+}
+
 module.exports = {
   runtimeCompiler: true,
   publicPath: process.env.CDN_ENV ? process.env.CDN_ENV : '/',
@@ -119,8 +135,14 @@ module.exports = {
         });
       }
       if (copySkydata) {
+        const skydataPath = resolveSkydataPath();
+        if (!skydataPath) {
+          throw new Error(
+            'Skydata directory not found. Set SKYDATA_SRC_DIR or provide test-skydata in ../test-skydata, ../../test-skydata, or ./test-skydata.'
+          );
+        }
         patterns.push({
-          from: path.resolve(__dirname, '../test-skydata'),
+          from: skydataPath,
           to: 'skydata',
           ignore: ['**/.DS_Store']
         });

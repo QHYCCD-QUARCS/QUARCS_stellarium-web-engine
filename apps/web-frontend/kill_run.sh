@@ -3,21 +3,78 @@
 set -euo pipefail
 
 cd "$(dirname "$0")"
+SCRIPT_DIR="$(pwd -P)"
 
 PORT_HTTP="${PORT_HTTP:-8080}"
 PORT_HTTPS="${PORT_HTTPS:-9090}"
-TILES_MODE="${TILES_MODE:-symlink}"   # symlink(默认)/copy
+TILES_MODE="${TILES_MODE:-}"          # sudo 默认 copy；普通用户默认 symlink
+SKYDATA_MODE="${SKYDATA_MODE:-}"      # sudo 默认 copy；普通用户默认 symlink
 ENGINE_UPDATE="${ENGINE_UPDATE:-1}"   # 1=make update-engine, 0=跳过（默认跳过：该步骤需要 docker 且耗时较长）
 BUMP_VERSION="${BUMP_VERSION:-0}"     # 1=更新 .env 中 VUE_APP_VERSION, 0=保持不变（默认不改：避免触发前端全量重建）
 WAIT_SERVERS="${WAIT_SERVERS:-1}"     # 1=启动后保持前台运行（wait），0=启动后直接返回
 
 # Pin Node via nvm to avoid /usr/bin/node (v12) breaking modern JS syntax (??, etc.)
 NODE_VER="${NODE_VER:-20}"
-NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+ARTIFACT_UID="${SUDO_UID:-$(id -u)}"
+ARTIFACT_GID="${SUDO_GID:-$(id -g)}"
+RUN_AS_ROOT="0"
+DEFAULT_HOME="${HOME:-}"
+
+if [ "$(id -u)" -eq 0 ]; then
+  RUN_AS_ROOT="1"
+fi
+
+if [ "${RUN_AS_ROOT}" = "1" ] && [ -n "${SUDO_USER:-}" ]; then
+  DEFAULT_HOME="$(getent passwd "${SUDO_USER}" 2>/dev/null | cut -d: -f6)"
+fi
+
+if [ -z "${DEFAULT_HOME}" ]; then
+  DEFAULT_HOME="${HOME:-}"
+fi
+
+if [ "${RUN_AS_ROOT}" = "1" ] && [ -n "${DEFAULT_HOME}" ] && [ "${HOME:-}" = "/root" ]; then
+  export HOME="${DEFAULT_HOME}"
+fi
+
+NVM_DIR="${NVM_DIR:-${HOME}/.nvm}"
+
+if [ -z "${TILES_MODE}" ]; then
+  if [ "${RUN_AS_ROOT}" = "1" ]; then
+    TILES_MODE="copy"
+  else
+    TILES_MODE="symlink"
+  fi
+fi
+
+if [ -z "${SKYDATA_MODE}" ]; then
+  if [ "${RUN_AS_ROOT}" = "1" ]; then
+    SKYDATA_MODE="copy"
+  else
+    SKYDATA_MODE="symlink"
+  fi
+fi
 
 log() { printf '%s\n' "$*"; }
 warn() { printf 'WARN: %s\n' "$*" >&2; }
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 2; }
+
+restore_path_owner() {
+  local target="$1"
+
+  if [ ! -e "${target}" ]; then
+    return 0
+  fi
+
+  if [ "$(id -u)" -ne 0 ]; then
+    return 0
+  fi
+
+  if [ -z "${SUDO_UID:-}" ] || [ -z "${SUDO_GID:-}" ]; then
+    return 0
+  fi
+
+  chown -R "${ARTIFACT_UID}:${ARTIFACT_GID}" "${target}"
+}
 
 resolve_tiles_dir() {
   local candidate
@@ -28,9 +85,39 @@ resolve_tiles_dir() {
   fi
 
   candidates+=(
+    "${SCRIPT_DIR}/tile-server/tiles"
+    "${SCRIPT_DIR}/../../tile-server/tiles"
+    "${SCRIPT_DIR}/../tile-server/tiles"
     "../../tile-server/tiles"
     "../tile-server/tiles"
     "tile-server/tiles"
+  )
+
+  for candidate in "${candidates[@]}"; do
+    if [ -d "${candidate}" ]; then
+      readlink -f "${candidate}"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+resolve_skydata_dir() {
+  local candidate
+  local candidates=()
+
+  if [ -n "${SKYDATA_SRC_DIR:-}" ]; then
+    candidates+=("${SKYDATA_SRC_DIR}")
+  fi
+
+  candidates+=(
+    "${SCRIPT_DIR}/../test-skydata"
+    "${SCRIPT_DIR}/../../test-skydata"
+    "${SCRIPT_DIR}/test-skydata"
+    "../test-skydata"
+    "../../test-skydata"
+    "test-skydata"
   )
 
   for candidate in "${candidates[@]}"; do
@@ -149,6 +236,8 @@ maybe_update_engine() {
       return 0
     fi
     make update-engine
+    restore_path_owner "src/assets/js/stellarium-web-engine.js"
+    restore_path_owner "src/assets/js/stellarium-web-engine.wasm"
     check_file src/assets/js/stellarium-web-engine.js
     check_file src/assets/js/stellarium-web-engine.wasm
   else
@@ -161,9 +250,12 @@ build_frontend() {
   ensure_node
   local tiles_dir=""
   local tiles_env=""
+  local skydata_dir=""
+  local copy_skydata_flag="0"
 
   tiles_dir="$(resolve_tiles_dir || true)"
   tiles_env="${TILES_SRC_DIR:-${tiles_dir}}"
+  skydata_dir="$(resolve_skydata_dir || true)"
 
   if [ -z "${tiles_dir}" ]; then
     warn "未找到离线瓦片目录，build-with-tiles 可能失败；可设置 TILES_SRC_DIR=/path/to/tiles"
@@ -171,7 +263,38 @@ build_frontend() {
     log "[tiles] source=${tiles_dir}"
   fi
 
-  TILES_MODE="${TILES_MODE}" TILES_SRC_DIR="${tiles_env}" NODE_VER="${NODE_VER}" NVM_DIR="${NVM_DIR}" make build-with-tiles
+  if [ "${SKYDATA_MODE}" = "copy" ]; then
+    if [ -z "${skydata_dir}" ]; then
+      warn "未找到星图数据目录，无法复制；可设置 SKYDATA_SRC_DIR=/path/to/test-skydata"
+    else
+      copy_skydata_flag="1"
+      log "[skydata] source=${skydata_dir}"
+      log "[skydata] mode=copy"
+    fi
+  elif [ "${SKYDATA_MODE}" = "symlink" ]; then
+    if [ -z "${skydata_dir}" ]; then
+      warn "未找到星图数据目录，无法创建软链接；可设置 SKYDATA_SRC_DIR=/path/to/test-skydata"
+    else
+      log "[skydata] source=${skydata_dir}"
+      log "[skydata] mode=symlink"
+    fi
+  else
+    log "跳过星图数据处理（SKYDATA_MODE=${SKYDATA_MODE}）"
+  fi
+
+  TILES_MODE="${TILES_MODE}" \
+  TILES_SRC_DIR="${tiles_env}" \
+  SKYDATA_SRC_DIR="${skydata_dir}" \
+  SWE_COPY_SKYDATA="${copy_skydata_flag}" \
+  NODE_VER="${NODE_VER}" \
+  NVM_DIR="${NVM_DIR}" \
+  make build-with-tiles
+  if [ "${SKYDATA_MODE}" = "symlink" ] && [ -n "${skydata_dir}" ]; then
+    mkdir -p dist
+    rm -rf dist/skydata
+    ln -sfn "${skydata_dir}" dist/skydata
+  fi
+  restore_path_owner "dist"
   check_file dist/index.html
 
   # tiles 可能是软链接或目录
@@ -181,6 +304,14 @@ build_frontend() {
     log "✅ dist/tiles 是目录"
   else
     warn "dist/tiles 不存在（如果不需要离线瓦片可忽略）"
+  fi
+
+  if [ -L dist/skydata ]; then
+    log "✅ dist/skydata 是软链接 -> $(readlink dist/skydata)"
+  elif [ -d dist/skydata ]; then
+    log "✅ dist/skydata 是目录"
+  elif [ "${SKYDATA_MODE}" != "none" ]; then
+    warn "dist/skydata 不存在，星图数据处理可能失败"
   fi
 }
 
