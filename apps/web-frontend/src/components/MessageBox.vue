@@ -1,7 +1,7 @@
 <template>
   <transition name="message-slide">
     <div class="message-box" :class="{ 'message-box-expanded': isExpanded }"
-      :style="{ transform: `translateY(${5 + Pos * 50}px)`, ...messageStyle }" @click="expandMessage">
+      :style="{ transform: `translateY(${5 + Pos * 50}px)`, ...messageStyle }" @click="expandMessage" data-testid="ui-message-box-root">
       <div class="message-content">{{ $t(message) }}</div>
     </div>
   </transition>

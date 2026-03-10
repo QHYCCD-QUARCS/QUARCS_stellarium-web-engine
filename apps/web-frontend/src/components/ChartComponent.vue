@@ -1,13 +1,20 @@
 <template>
 <transition name="panel">
-  <div class="chart-panel" :style="{ bottom: bottom + 'px', left: ComponentPadding + 'px', right: ComponentPadding + 'px', height: height + 'px' }">
+  <div class="chart-panel" :style="{ bottom: bottom + 'px', left: ComponentPadding + 'px', right: ComponentPadding + 'px', height: height + 'px' }" data-testid="ui-chart-component-root">
     <LineChart ref="linechart" class="line-chart"/>
     
     <ScatterChart ref="scatterchart" class="scatter-chart"/>
 
     <div class="buttons-container">
 
-      <button :class="LoopExpSwitchBtnClass" :style="{ animationDuration: ExpTime + 'ms' }" @click="LoopExpSwitch" @touchend.prevent="LoopExpSwitch">
+      <button
+        :class="LoopExpSwitchBtnClass"
+        :style="{ animationDuration: ExpTime + 'ms' }"
+        @click="LoopExpSwitch"
+        data-testid="ui-chart-component-btn-loop-exp-switch"
+        :data-state="isLoopping ? 'on' : 'off'"
+        :aria-pressed="isLoopping ? 'true' : 'false'"
+      >
         <div style="display: flex; justify-content: center; align-items: center;">
           <img src="@/assets/images/svg/ui/GuiderLoopExp.svg" height="20px" style="min-height: 20px; pointer-events: none;"></img>
         </div>
@@ -15,13 +22,13 @@
 
       <button class="btn-Style" :class="GuiderSwitchBtnClass"
         @mousedown="startPress" @mouseup="endPress"
-        @touchstart="startPress" @touchend="endPress">
+        @touchstart.stop.prevent="startPress" @touchend.stop.prevent="endPress" data-testid="ui-chart-component-btn-start-press">
         <div style="display: flex; justify-content: center; align-items: center;">
           <img src="@/assets/images/svg/ui/Guider.svg" height="20px" style="min-height: 20px; pointer-events: none;"></img>
         </div>
       </button>
 
-      <button class="btn-Style" @click="ExpTimeSwitch" @touchend.prevent="ExpTimeSwitch">
+      <button class="btn-Style" @click="ExpTimeSwitch" data-testid="ui-chart-component-btn-exp-time-switch">
         <span v-if="ExpTime === 1000">
           <div style="display: flex; justify-content: center; align-items: center;">
             <img src="@/assets/images/svg/ui/Exp-1000.svg" height="25px" style="min-height: 25px; pointer-events: none;"></img>
@@ -39,13 +46,13 @@
         </span>
       </button>
 
-      <button class="btn-Style" @click="DataClear" @touchend.prevent="DataClear">
+      <button class="btn-Style" @click="DataClear" data-testid="ui-chart-component-btn-data-clear">
         <div style="display: flex; justify-content: center; align-items: center;">
           <img src="@/assets/images/svg/ui/delete.svg" height="20px" style="min-height: 20px; pointer-events: none;"></img>
         </div>
       </button>
 
-      <button class="btn-Style" @click="RangeSwitch" @touchend.prevent="RangeSwitch">
+      <button class="btn-Style" @click="RangeSwitch" data-testid="ui-chart-component-btn-range-switch">
         <div style="display: flex; justify-content: center; align-items: center;">
           <img src="@/assets/images/svg/ui/suofang.svg" height="20px" style="min-height: 20px; pointer-events: none;"></img>
         </div>

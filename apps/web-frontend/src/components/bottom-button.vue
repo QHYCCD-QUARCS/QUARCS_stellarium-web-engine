@@ -7,7 +7,7 @@
 // repository.
 
 <template>
-  <div class="bottom-button" :class="{on: toggled}">
+  <div class="bottom-button" :class="{on: toggled}" data-testid="ui-bottom-button-root">
     <a v-on:click='clicked'>
       <img :src="img" :alt="img_alt"/>
     </a>

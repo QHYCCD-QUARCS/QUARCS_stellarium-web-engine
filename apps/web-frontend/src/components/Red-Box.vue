@@ -1,6 +1,6 @@
 <template>
-  <div class="floating-box" :style="{ top: top + 'px', left: left + 'px', width: width + 'px', height: height + 'px' }">
-    <div class="drag-handle" v-if="isDragging" @mousedown="startDrag" @touchstart="startDragTouch">
+  <div class="floating-box" :style="{ top: top + 'px', left: left + 'px', width: width + 'px', height: height + 'px' }" data-testid="ui-red-box-root">
+    <div class="drag-handle" v-if="isDragging" @mousedown="startDrag" @touchstart="startDragTouch" data-testid="ui-components-red-box-act-start-drag">
     
     </div>
   </div>

@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div data-testid="ui-chart-line-root">
     <!-- 折线图区域 -->
     <div ref="linechart" :style="{ width: containerMaxWidth + 'px', height: 80 + 'px' }" class="linechart-panel"></div>
   </div>

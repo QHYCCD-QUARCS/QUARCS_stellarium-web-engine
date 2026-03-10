@@ -7,9 +7,9 @@
 // repository.
 
 <template>
-  <div id="toolbar-image">
+  <div id="toolbar-image" data-testid="tb-root">
     <v-toolbar height="40px" elevation="0" class="transparent" dense>
-      <v-app-bar-nav-icon @click="toggleNavigationDrawer"></v-app-bar-nav-icon>
+      <v-app-bar-nav-icon @click="toggleNavigationDrawer" data-testid="tb-act-toggle-navigation-drawer"></v-app-bar-nav-icon>
       <img class="tbtitle hidden-xs-only" id="stellarium-web-toolbar-logo" src="@/assets/images/logo.svg" width="33" height="33"  style="pointer-events: none;" alt="Stellarium Web Logo"/>
       <span class="tbtitle hidden-xs-only">Q U A R C S</span>
       <v-spacer></v-spacer>
@@ -24,13 +24,23 @@
         </div>
       </div>
       <div>
-        <div v-if="$store.state.showFPS" class="subheader text-subtitle-2 pr-2" style="user-select: none;">FPS {{ $store.state.stel ? $store.state.stel.fps.toFixed(1) : '?' }}</div>
+        <div v-if="$store.state.showFPS" class="subheader text-subtitle-2 pr-2" style="user-select: none;">
+          FPS {{ renderFpsDisplay }}
+        </div>
+        <!-- 调试：同时展示 SDK / Render / UI 三路 FPS，便于对比后端 SDK 循环与前端实际刷新 -->
+        <div
+          v-if="showFpsDebug && $store.state.showFPS"
+          class="text-caption pr-2"
+          style="user-select: none; opacity: 0.85;"
+        >
+          SDK {{ sdkFpsDisplay }} / Proc {{ LiveProcessFPS }} / UI {{ uiFpsDisplay }}
+        </div>
         <div class="subheader text-subtitle-2" style="user-select: none;">FOV {{ fov }}</div>
       </div>
-      <!-- <v-btn class="transparent" v-if="!$store.state.showSidePanel" to="/p">{{ $t('Observe') }}<v-icon>mdi-chevron-down</v-icon></v-btn> -->
+      <!-- <v-btn class="transparent" v-if="!$store.state.showSidePanel" to="/p" data-testid="tb-btn-transparent">{{ $t('Observe') }}<v-icon>mdi-chevron-down</v-icon></v-btn> -->
       <!-- <v-menu v-if="$store.state.showTimeButtons" :close-on-content-click="false" transition="v-slide-y-transition" offset-y top left>
         <template v-slot:activator="{ on }">
-          <button class="TimerPickBtn" v-on="on">
+          <button class="TimerPickBtn" v-on="on" data-testid="tb-btn-timer-pick-btn">
             <v-icon class="hidden-sm-and-up">mdi-clock-outline</v-icon>
             <span class="hidden-xs-only">
               <div class="text-subtitle-2">{{ time }}</div>
@@ -166,7 +176,7 @@
 
       </card>
 
-      <button class="ScheduleBtn" @click="toggleSchedulePanel" >
+      <button class="ScheduleBtn" @click="toggleSchedulePanel" data-testid="tb-btn-toggle-schedule-panel">
         <div style="display: flex; justify-content: center; align-items: center;">
           <img src="@/assets/images/svg/ui/schedule_table.svg" height="25px" style="min-height: 25px; pointer-events: none;"></img>
         </div>
@@ -204,6 +214,15 @@ export default {
 
       cpuTemp: null,
       cpuUsage: null,
+
+      // Live模式下相机出图帧率（来自后端 SDK 的无限循环读取统计）
+      liveCameraFps: null,
+      // 后端处理帧率（以“进入FITS/PNG/瓦片处理链路”为准）
+      liveProcessFps: null,
+      // 当前拍摄模式
+      captureMode: 'Single', // 'Single' | 'Live' | 'Burst'
+      // UI 实际刷新 FPS（由画面绘制端统计并通过总线上报）
+      frameUpdateFps: null,
     }
   },
   created() {
@@ -224,12 +243,58 @@ export default {
     this.$bus.$on('FocusInProgress', this.FocusStatus);
 
     this.$bus.$on('updateCPUInfo', this.updateCPUInfo);
+
+    // 接收Live FPS和拍摄模式
+    this.$bus.$on('LiveFPS', (fps) => {
+      this.liveCameraFps = fps;
+    });
+    // 接收后端处理帧率
+    this.$bus.$on('LiveProcessFPS', (fps) => {
+      this.liveProcessFps = fps;
+    })
+    this.$bus.$on('SetCaptureMode', (mode) => {
+      this.captureMode = String(mode || 'Single');
+      // 如果切换到非Live模式，清空Live FPS
+      if (this.captureMode !== 'Live') {
+        this.liveCameraFps = null;
+        this.liveProcessFps = null;
+      }
+    });
+
+    // UI 刷新 FPS（由 App.vue 在每帧绘制完成时统计后上报）
+    this.$bus.$on('UIFPS', (fps) => {
+      if (typeof fps === 'number' && isFinite(fps)) {
+        this.frameUpdateFps = fps
+      }
+    })
+  },
+  beforeDestroy() {
+    // 解绑总线事件
+    this.$bus.$off('UIFPS')
   },
   computed: {
     fov: function () {
       if (!this.$store.state.stel) return '-'
       const fov = this.$store.state.stel.fov * 180 / Math.PI
       return fov.toPrecision(3) + '°'
+    },
+    displayFps: function () {
+      // 前端显示帧率：以 UI 实际刷新统计（UIFPS）为准
+      if (this.frameUpdateFps != null && isFinite(this.frameUpdateFps)) return this.frameUpdateFps.toFixed(1)
+      return '?'
+    },
+    // 调试：SDK / Render / UI 三路 FPS 文本
+    sdkFpsDisplay () {
+      if (this.liveCameraFps === null || this.liveCameraFps === undefined || !isFinite(this.liveCameraFps)) return '-'
+      return this.liveCameraFps.toFixed(1)
+    },
+    uiFpsDisplay () {
+      if (this.frameUpdateFps == null || !isFinite(this.frameUpdateFps)) return '-'
+      return this.frameUpdateFps.toFixed(1)
+    },
+    procFpsDisplay () {
+      if (this.liveProcessFps == null || !isFinite(this.liveProcessFps)) return '-'
+      return this.liveProcessFps.toFixed(1)
     },
     // cpuTemp: function () {
     //   return this.$store.state.cpuTemp

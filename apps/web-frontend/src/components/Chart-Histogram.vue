@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div data-testid="ui-chart-histogram-root">
     <div ref="barchart" :style="{ width: containerMaxWidth + 'px', height: 80 + 'px' }" class="barchart-panel"></div>
   </div>
 </template>
@@ -103,7 +103,7 @@ export default {
       }
     },
 
-    // 根据外部开关直接设置“全图 / 区间”模式（与拨盘和面板按钮联动）
+    // 根据外部开关直接设置"全图 / 区间"模式（与拨盘和面板按钮联动）
     setRangeMode(flag) {
       this.useEffectiveRange = flag;
 
@@ -111,14 +111,18 @@ export default {
         // 区间模式：X 轴固定为自动拉伸得到的有效区间 [auto_min, auto_max]
         this.xAxis_min = this.auto_min;
         this.xAxis_max = this.auto_max;
+        console.log(`[Chart-Histogram] 切换到区间模式: [${this.auto_min}, ${this.auto_max}]`);
       } else {
         // 全图模式：始终显示完整 0-65535 范围
         this.xAxis_min = this.fullRange_min;
         this.xAxis_max = this.fullRange_max;
+        console.log(`[Chart-Histogram] 切换到全图模式: [${this.fullRange_min}, ${this.fullRange_max}]`);
       }
 
       if (this.myChart && this.barData.length > 0) {
         this.renderChart(this.xAxis_min, this.xAxis_max);
+      } else {
+        console.log('[Chart-Histogram] 图表尚未初始化或无数据，延迟渲染');
       }
     },
 

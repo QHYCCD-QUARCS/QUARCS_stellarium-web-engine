@@ -1,5 +1,9 @@
 <template>
-  <div class="progress-container" v-if="progress > 0 && progress < 100 && isShow">
+  <div
+    class="progress-container"
+    v-if="progress > 0 && progress < 100 && isShow"
+    data-testid="ui-progress-bar-root"
+  >
     <div class="progress-description" v-if="showDescription">{{ description }}</div>
     <div class="progress-bar">
       <div class="progress-fill" :style="{width: `${progress}%`}"></div>

@@ -1,69 +1,170 @@
 <template>
   <transition name="panel">
-  <div class="capture-panel" :style="{ bottom: bottom + 'px', left: left + 'px', width: width + 'px', height: height + 'px' }">
-    <span style="position: absolute; top: 4%; left: 50%; transform: translate(-50%, -50%); font-size: 10px; color: rgba(255, 255, 255, 0.5); user-select: none;"> 
-      {{ CameraTemperature }}
-    </span>
-
-    <div class="Direction-Btn">
-        <button class="ExpTime-minus no-select" @click="handleExpTimeButtonClick('minus')">
-          <span class="ExpTime-minus-icon"> <v-icon>mdi-menu-up</v-icon> </span>
-        </button>
-        <button class="ExpTime-plus no-select" @click="handleExpTimeButtonClick('plus')">
-          <span class="ExpTime-plus-icon"> <v-icon>mdi-menu-up</v-icon> </span>
-        </button>
-        <button class="CFW-minus no-select" :disabled="cfwButtonsDisabled" @click="handleCFWButtonClick('minus')">
-          <span class="CFW-minus-icon"> <v-icon>mdi-menu-down</v-icon> </span>
-        </button>
-        <button class="CFW-plus no-select" :disabled="cfwButtonsDisabled" @click="handleCFWButtonClick('plus')">
-          <span class="CFW-plus-icon"> <v-icon>mdi-menu-down</v-icon> </span>
-        </button>
-
-        <span class="text-ExpTime-content" ref="expTimeContent"> {{ExpTimes[currentExpTimeIndex]}} </span>
-        <span class="text-CFW-content" ref="CFWContent"> {{CFWs[currentCFWIndex]}} </span>
-    </div>
-
-    <div>
-      <CircularProgressButton class="btn-Capture"/>
-    </div>
-    
-    <div>
-      <button class="custom-button btn-focus no-select" @click="toggleFocuserPanel"> 
-        <div style="display: flex; justify-content: center; align-items: center;">
-          <img src="@/assets/images/svg/ui/focuser.svg" height="45px" style="min-height: 45px; pointer-events: none;"></img>
-        </div>
-      </button>
-      <button class="custom-button btn-hist no-select" @click="toggleHistogramPanel"> 
-        <div style="display: flex; justify-content: center; align-items: center;">
-          <img src="@/assets/images/svg/ui/histo.svg" height="45px" style="min-height: 45px; pointer-events: none;"></img>
-        </div> 
-      </button>
-    </div>
-
-    <div>
-      <span v-if="isIDLE" class="icon-container">
-        <div style="display: flex; justify-content: center; align-items: center;">
-          <img src="@/assets/images/svg/ui/Status-idle.svg" height="15px" style="min-height: 15px; pointer-events: none;"></img>
-        </div>
+    <div
+      class="capture-panel"
+      :style="{ bottom: bottom + 'px', left: left + 'px', width: width + 'px', height: height + 'px' }"
+      data-testid="cp-panel"
+    >
+      <span
+        style="position: absolute; top: 4%; left: 50%; transform: translate(-50%, -50%); font-size: 10px; color: rgba(255, 255, 255, 0.5); user-select: none;"
+        data-testid="cp-camera-temperature"
+      >
+        {{ CameraTemperature }}
       </span>
-      <span v-else class="icon-container">
-        <div style="display: flex; justify-content: center; align-items: center;">
-          <img src="@/assets/images/svg/ui/Status-busy.svg" height="15px" style="min-height: 15px; pointer-events: none;"></img>
-        </div>
-      </span>
-    </div>
 
-    <div>
-      <button class="btn-save no-select" @click="CaptureImageSave"> 
-        <div style="display: flex; justify-content: center; align-items: center;">
-          <img src="@/assets/images/svg/ui/download.svg" height="25px" style="min-height: 25px; pointer-events: none;"></img>
-        </div>
-      </button>
-    </div>
+      <div class="Direction-Btn" data-testid="cp-direction-controls">
+        <button
+          class="ExpTime-minus no-select"
+          @click="handleExpTimeButtonClick('minus')"
+          data-testid="cp-btn-exptime-minus"
+        >
+          <span class="ExpTime-minus-icon" data-testid="cp-icon-exptime-minus">
+            <v-icon>mdi-menu-up</v-icon>
+          </span>
+        </button>
 
-  </div>
-</transition>
+        <button
+          class="ExpTime-plus no-select"
+          @click="handleExpTimeButtonClick('plus')"
+          data-testid="cp-btn-exptime-plus"
+        >
+          <span class="ExpTime-plus-icon" data-testid="cp-icon-exptime-plus">
+            <v-icon>mdi-menu-up</v-icon>
+          </span>
+        </button>
+
+        <button
+          class="CFW-minus no-select"
+          :disabled="cfwButtonsDisabled"
+          @click="handleCFWButtonClick('minus')"
+          data-testid="cp-btn-cfw-minus"
+          :data-state="cfwButtonsDisabled ? 'disabled' : 'enabled'"
+        >
+          <span class="CFW-minus-icon" data-testid="cp-icon-cfw-minus">
+            <v-icon>mdi-menu-down</v-icon>
+          </span>
+        </button>
+
+        <button
+          class="CFW-plus no-select"
+          :disabled="cfwButtonsDisabled"
+          @click="handleCFWButtonClick('plus')"
+          data-testid="cp-btn-cfw-plus"
+          :data-state="cfwButtonsDisabled ? 'disabled' : 'enabled'"
+        >
+          <span class="CFW-plus-icon" data-testid="cp-icon-cfw-plus">
+            <v-icon>mdi-menu-down</v-icon>
+          </span>
+        </button>
+
+        <span
+          class="text-ExpTime-content"
+          ref="expTimeContent"
+          data-testid="cp-exptime-value"
+          :data-value="ExpTimes[currentExpTimeIndex]"
+        >
+          {{ ExpTimes[currentExpTimeIndex] }}
+        </span>
+
+        <div
+          class="cfw-display"
+          :class="{ moving: isCFWMoving }"
+          data-testid="cp-cfw-display"
+          :data-state="isCFWMoving ? 'moving' : 'stable'"
+        >
+          <!-- 方案 C：点阵旋转（不遮挡数字） -->
+          <div v-if="isCFWMoving" class="cfw-dots" aria-hidden="true" data-testid="cp-cfw-moving-dots">
+            <div class="cfw-dots-rotor" data-testid="cp-cfw-moving-rotor">
+              <span class="cfw-dot" style="--i:0" data-testid="cp-cfw-dot-0"></span>
+              <span class="cfw-dot" style="--i:1" data-testid="cp-cfw-dot-1"></span>
+              <span class="cfw-dot" style="--i:2" data-testid="cp-cfw-dot-2"></span>
+              <span class="cfw-dot" style="--i:3" data-testid="cp-cfw-dot-3"></span>
+              <span class="cfw-dot" style="--i:4" data-testid="cp-cfw-dot-4"></span>
+              <span class="cfw-dot" style="--i:5" data-testid="cp-cfw-dot-5"></span>
+              <span class="cfw-dot" style="--i:6" data-testid="cp-cfw-dot-6"></span>
+              <span class="cfw-dot" style="--i:7" data-testid="cp-cfw-dot-7"></span>
+            </div>
+          </div>
+
+          <span
+            class="text-CFW-content"
+            ref="CFWContent"
+            data-testid="cp-cfw-value"
+            :data-value="CFWs[currentCFWIndex]"
+          >
+            {{ CFWs[currentCFWIndex] }}
+          </span>
+        </div>
+      </div>
+
+      <div data-testid="cp-capture">
+        <CircularProgressButton class="btn-Capture" data-testid="cp-btn-capture" />
+      </div>
+
+      <div data-testid="cp-secondary-panels">
+        <button
+          class="custom-button btn-focus no-select"
+          @click="toggleFocuserPanel"
+          data-testid="cp-btn-toggle-focuser"
+        >
+          <div style="display: flex; justify-content: center; align-items: center;" data-testid="cp-btn-toggle-focuser-content">
+            <img
+              src="@/assets/images/svg/ui/focuser.svg"
+              height="45px"
+              style="min-height: 45px; pointer-events: none;"
+              data-testid="cp-img-focuser"
+            />
+          </div>
+        </button>
+
+        <button
+          class="custom-button btn-hist no-select"
+          @click="toggleHistogramPanel"
+          data-testid="cp-btn-toggle-histogram"
+        >
+          <div style="display: flex; justify-content: center; align-items: center;" data-testid="cp-btn-toggle-histogram-content">
+            <img
+              src="@/assets/images/svg/ui/histo.svg"
+              height="45px"
+              style="min-height: 45px; pointer-events: none;"
+              data-testid="cp-img-histogram"
+            />
+          </div>
+        </button>
+      </div>
+
+      <div
+        data-testid="cp-status"
+        :data-state="isIDLE ? 'idle' : 'busy'"
+      >
+        <span class="icon-container" data-testid="cp-status-icon">
+          <div style="display: flex; justify-content: center; align-items: center;" data-testid="cp-status-icon-content">
+            <img
+              :src="require(isIDLE ? '@/assets/images/svg/ui/Status-idle.svg' : '@/assets/images/svg/ui/Status-busy.svg')"
+              height="15px"
+              style="min-height: 15px; pointer-events: none;"
+              data-testid="cp-img-status"
+            />
+          </div>
+        </span>
+      </div>
+
+      <div data-testid="cp-save">
+        <button class="btn-save no-select" @click="CaptureImageSave" data-testid="cp-btn-save">
+          <div style="display: flex; justify-content: center; align-items: center;" data-testid="cp-btn-save-content">
+            <img
+              src="@/assets/images/svg/ui/download.svg"
+              height="25px"
+              style="min-height: 25px; pointer-events: none;"
+              data-testid="cp-img-save"
+            />
+          </div>
+        </button>
+      </div>
+    </div>
+  </transition>
 </template>
+
 
 <script>
 import CircularProgressButton from './CircularButton.vue';
@@ -87,7 +188,14 @@ export default {
 
       currentExpTimeIndex: 0,
       currentCFWIndex: 0,
+      // 记录“已确认”的滤镜位置（用于失败/超时后还原）
+      lastConfirmedCFWIndex: 0,
+      // 当前一次切换的目标位置（0-based），用于判断是否在移动中
+      pendingCFWIndex: null,
       cfwButtonsDisabled: false,
+      isCFWMoving: false,
+      cfwMoveTargetPos1: null,
+      cfwMoveWatchdog: null,
 
       ExpTimes: ['1ms', '10ms', '100ms', '1s', '5s', '10s', '30s', '60s', '120s','300s','600s'],
       ExpTimeNum: 11, // 默认曝光时间数量
@@ -139,6 +247,7 @@ export default {
     this.$bus.$on('initExpTimeList', this.initExpTimeList);
     // this.$bus.$on('SetCFWPositionMax', this.SetCFWPositionMax);
     this.$bus.$on('SetCFWPositionSuccess', this.SetCFWPositionSuccess);
+    this.$bus.$on('SetCFWPositionFailed', this.SetCFWPositionFailed);
 
     this.$bus.$on('initCFWList', this.initCFWList);
 
@@ -152,12 +261,38 @@ export default {
 
     this.$bus.$emit('getSelfExposureTime');  // 初始化完成后获取自定义曝光时间
   },
+  beforeDestroy() {
+    if (this.cfwMoveWatchdog) {
+      clearTimeout(this.cfwMoveWatchdog);
+      this.cfwMoveWatchdog = null;
+    }
+  },
   mounted: function () {
     // this.CurrentExpTimeList();
     // this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getExpTimeList');
 
   },
   methods: {
+    startCfwMoving(targetPos1) {
+      this.cfwMoveTargetPos1 = targetPos1;
+      this.isCFWMoving = true;
+
+      if (this.cfwMoveWatchdog) clearTimeout(this.cfwMoveWatchdog);
+      // 避免异常情况下无限转：15s 兜底
+      this.cfwMoveWatchdog = setTimeout(() => {
+        // 统一走失败处理：会负责停转、解锁按钮、并把 UI 位置还原到 lastConfirmedCFWIndex
+        this.SetCFWPositionFailed('timeout');
+      }, 15000);
+    },
+    finishCfwMoving() {
+      this.isCFWMoving = false;
+      this.cfwMoveTargetPos1 = null;
+      this.pendingCFWIndex = null;
+      if (this.cfwMoveWatchdog) {
+        clearTimeout(this.cfwMoveWatchdog);
+        this.cfwMoveWatchdog = null;
+      }
+    },
     handleExpTimeButtonClick(direction) {
       if(this.btnExpTimeStatus) {
         return;
@@ -188,6 +323,11 @@ export default {
       }
       this.btnCFWStatus = true;
       if(this.CFWConnect) {
+        // 保存当前“已确认位置”，以便失败后还原
+        if (this.pendingCFWIndex === null || this.pendingCFWIndex === undefined) {
+          this.lastConfirmedCFWIndex = this.currentCFWIndex;
+        }
+
         if (direction === 'plus') {
           if (this.currentCFWIndex < this.CFWs.length - 1) {
             this.currentCFWIndex++;
@@ -201,6 +341,7 @@ export default {
             this.currentCFWIndex = this.CFWs.length - 1;
           }
         }
+        this.pendingCFWIndex = this.currentCFWIndex;
         // console.log('handleMouseDownCFW: ',this.CFWs[this.currentCFWIndex]);
         // this.$refs.CFWContent.innerText = this.CFWs[this.currentCFWIndex];
         // this.$bus.$emit('cfw-selected', this.currentCFWIndex);
@@ -208,6 +349,7 @@ export default {
         this.$bus.$emit('SendConsoleLogMsg', 'SetCFWPosition:' + (this.currentCFWIndex+1), 'info');
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'SetCFWPosition:' + (this.currentCFWIndex+1));
         this.cfwButtonsDisabled = true;
+        this.startCfwMoving(this.currentCFWIndex + 1);
       } else {
         this.$bus.$emit('showMsgBox', 'Please connect the Filter Wheels first.', 'error');
       }
@@ -307,7 +449,28 @@ export default {
     SetCFWPositionSuccess(num) {
       console.log('Set CFW Position Success: ', num);
       this.$bus.$emit('SendConsoleLogMsg', 'Set CFW Position Success:' + num, 'info');
+      // 以成功回包为准，更新“已确认位置”
+      const pos1 = parseInt(num, 10);
+      if (!isNaN(pos1) && pos1 > 0) {
+        this.currentCFWIndex = pos1 - 1;
+        this.lastConfirmedCFWIndex = this.currentCFWIndex;
+      } else {
+        // 若回包格式异常，则至少把当前 UI 位置视为已确认
+        this.lastConfirmedCFWIndex = this.currentCFWIndex;
+      }
+      this.finishCfwMoving();
       this.cfwButtonsDisabled = false;
+    },
+    SetCFWPositionFailed(reason) {
+      console.log('Set CFW Position Failed: ', reason);
+      this.$bus.$emit('SendConsoleLogMsg', 'Set CFW Position Failed:' + reason, 'error');
+      // 失败/超时：还原到“已确认位置”，避免 UI 位置被错误改变
+      if (this.lastConfirmedCFWIndex !== null && this.lastConfirmedCFWIndex !== undefined) {
+        this.currentCFWIndex = this.lastConfirmedCFWIndex;
+      }
+      this.finishCfwMoving();
+      this.cfwButtonsDisabled = false;
+      this.$bus.$emit('showMsgBox', 'Filter wheel move failed: ' + reason, 'error');
     },
 
     initCFWList(list) {
@@ -624,6 +787,15 @@ export default {
   border: 1px solid rgba(255, 255, 255, 0.8);
 }
 
+.cfw-moving-indicator {
+  position: absolute;
+  left: 50%;
+  bottom: 2px;
+  transform: translateX(-50%);
+  pointer-events: none; /* 不影响按钮点击 */
+  z-index: 2;
+}
+
 .text-ExpTime-content {
   position:absolute;
   width: 30px;
@@ -643,11 +815,11 @@ export default {
 }
 
 .text-CFW-content {
-  position:absolute;
+
   width: 30px;
   height: 10px;
-  bottom: 10px;
-  left: 45px;
+
+  display: block;
 
   user-select: none;
   text-align: center;
@@ -658,6 +830,75 @@ export default {
   backdrop-filter: blur(5px); */
   box-sizing: border-box;
   border: none;
+}
+
+.cfw-display {
+  /* CFW 文本位于两 CFW 按钮的中间（水平居中），保持与曝光时间围绕拍摄键的对称感 */
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  width: 30px;
+  height: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible; /* 允许点阵环超出文本盒子 */
+  pointer-events: none; /* 不影响按钮点击 */
+}
+
+.cfw-display .text-CFW-content {
+  z-index: 2;
+  color: rgba(255, 255, 255, 0.92);
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+}
+
+.cfw-dots {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 38px;
+  height: 38px;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+  filter: drop-shadow(0 0 4px rgba(0, 229, 255, 0.35));
+}
+
+.cfw-dots-rotor {
+  position: absolute;
+  inset: 0;
+  animation: cfwDotsRotate 0.9s linear infinite;
+}
+
+.cfw-dot {
+  --radius: 16px;
+  --size: 4px;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: var(--size);
+  height: var(--size);
+  border-radius: 50%;
+  background: rgba(0, 229, 255, 0.95);
+  transform:
+    translate(-50%, -50%)
+    rotate(calc(var(--i) * 45deg))
+    translate(0, calc(-1 * var(--radius)));
+  opacity: 0.18;
+  animation: cfwDotPulse 0.9s ease-in-out infinite;
+  animation-delay: calc(var(--i) * -0.11s);
+}
+
+@keyframes cfwDotsRotate {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes cfwDotPulse {
+  0%, 100% { opacity: 0.18; transform: translate(-50%, -50%) rotate(calc(var(--i) * 45deg)) translate(0, calc(-1 * var(--radius))) scale(0.92); }
+  50%      { opacity: 0.92; transform: translate(-50%, -50%) rotate(calc(var(--i) * 45deg)) translate(0, calc(-1 * var(--radius))) scale(1.12); }
 }
 
 </style>

@@ -1,13 +1,13 @@
 <template>
   <transition name="panel">
     <div class="chart-panel"
-      :style="{ bottom: bottom + 'px', left: ComponentPadding + 'px', right: ComponentPadding + 'px', height: height + 'px' }">
+      :style="{ bottom: bottom + 'px', left: ComponentPadding + 'px', right: ComponentPadding + 'px', height: height + 'px' }" data-testid="fp-root">
       <ImageChart ref="imagechart" class="image-chart" />
       <FocusChart ref="focuschart" class="focus-chart" />
 
-      <div class="buttons-container">
+      <div class="buttons-container" data-testid="fp-buttons-container">
 
-        <button @click="startCalibration" :class="{'btn-calibration': true, 'active-calibration': isCalibrating, 'complete-calibration': calibrationState === 'complete', 'error-calibration': calibrationState === 'error'}" class="get-click">
+        <button @click="startCalibration" :class="{'btn-calibration': true, 'active-calibration': isCalibrating, 'complete-calibration': calibrationState === 'complete', 'error-calibration': calibrationState === 'error'}" class="get-click" data-testid="fp-btn-start-calibration">
           <div style="display: flex; justify-content: center; align-items: center;">
             <img v-if="calibrationState === 'complete'" src="@/assets/images/svg/ui/CalibrationComplete.svg" height="25px"
               style="min-height: 25px; pointer-events: none;"></img>
@@ -19,7 +19,7 @@
           </div>
         </button>
 
-        <button @click="toggleLoopShooting" :class="{'btn-loop-shooting': true, 'active-loop': isLoopActive}" class="get-click">
+        <button @click="toggleLoopShooting" :class="{'btn-loop-shooting': true, 'active-loop': isLoopActive}" class="get-click" data-testid="fp-btn-toggle-loop-shooting">
           <div style="display: flex; justify-content: center; align-items: center;">
             <img :src="require(isLoopActive ? '@/assets/images/svg/ui/ROI-Capturing.svg' : '@/assets/images/svg/ui/ROI-Capture.svg')" height="25px"
               :class="{'rotate-animation': isLoopActive}"
@@ -27,8 +27,8 @@
           </div>
         </button>
 
-        <!-- <button  @click="SpeedChange" @touchend="active" class="get-click btn-Speed"><v-icon>mdi-run-fast</v-icon></button> -->
-        <button @click="SpeedChange" @touchend="active" class="get-click btn-Speed">
+        <!-- <button  @click="SpeedChange" @touchend="active" class="get-click btn-Speed" data-testid="fp-btn-speed-change"><v-icon>mdi-run-fast</v-icon></button> -->
+        <button @click="SpeedChange" @touchend="active" class="get-click btn-Speed" data-testid="fp-btn-speed-change-2">
           <span v-if="MoveSpeed === 1">
             <div style="display: flex; justify-content: center; align-items: center;">
               <img src="@/assets/images/svg/ui/Speed-1.svg" height="25px"
@@ -49,7 +49,7 @@
           </span>
         </button>
 
-        <button @click="ROIChange" @touchend="active" class="get-click btn-ROI">
+        <button @click="ROIChange" @touchend="active" class="get-click btn-ROI" data-testid="fp-btn-roichange">
         <span v-if="ROI_length === 100">
           <div style="display: flex; justify-content: center; align-items: center;">
             <img src="@/assets/images/svg/ui/ROI-100.svg" height="25px"
@@ -70,21 +70,21 @@
         </span>
       </button>
 
-        <!-- <button :disabled="isBtnMoveDisabled" @click="FocusLeftMove" @touchend="active" class="get-click btn-Left">
+        <!-- <button :disabled="isBtnMoveDisabled" @click="FocusLeftMove" @touchend="active" class="get-click btn-Left" data-testid="fp-btn-focus-left-move">
         <div style="display: flex; justify-content: center; align-items: center;">
           <img src="@/assets/images/svg/ui/arrow-left-circle.svg" height="20px" style="min-height: 20px; pointer-events: none;"></img>
         </div>
       </button> -->
         <button :disabled="isBtnMoveDisabled" @mousedown="FocusMove('left')" @mouseup="FocusAbort" @mouseleave="FocusAbort"
-          @touchstart="FocusMove('left')" @touchend="FocusAbort" @touchcancel="FocusAbort" class="get-click btn-Left">
+          @touchstart.stop.prevent="FocusMove('left')" @touchend.stop.prevent="FocusAbort" @touchcancel.stop.prevent="FocusAbort" class="get-click btn-Left" data-testid="fp-btn-focus-move">
           <div style="display: flex; justify-content: center; align-items: center;">
             <img src="@/assets/images/svg/ui/arrow-left-circle.svg" height="20px"
               style="min-height: 20px; pointer-events: none;"></img>
           </div>
         </button>
 
-        <!-- <button  @click="AutoFocus" @touchend="active" class="get-click btn-Auto"><v-icon>mdi-focus-auto</v-icon></button> -->
-        <button @click="AutoFocus" @touchend="active" class="get-click btn-Auto">
+        <!-- <button  @click="AutoFocus" @touchend="active" class="get-click btn-Auto" data-testid="fp-btn-auto-focus"><v-icon>mdi-focus-auto</v-icon></button> -->
+        <button @click="AutoFocus" @touchend="active" class="get-click btn-Auto" data-testid="fp-btn-auto-focus-2">
           <span v-if="inAutoFocus">
             <div style="display: flex; justify-content: center; align-items: center;">
               <img src="@/assets/images/svg/ui/StopAutoFocus.svg" height="20px"
@@ -99,13 +99,13 @@
           </span>
         </button>
 
-        <!-- <button @click="FocusGoto" @touchend="active" class="get-click btn-Goto">
+        <!-- <button @click="FocusGoto" @touchend="active" class="get-click btn-Goto" data-testid="fp-btn-focus-goto">
           <div style="display: flex; justify-content: center; align-items: center;">
             <img src="@/assets/images/svg/ui/Move.svg" height="10px"
               style="min-height: 10px; pointer-events: none;"></img>
           </div>
         </button> -->
-        <!-- <button :disabled="isBtnMoveDisabled" @click="FocusRightMove" @touchend="active" class="get-click btn-Right">
+        <!-- <button :disabled="isBtnMoveDisabled" @click="FocusRightMove" @touchend="active" class="get-click btn-Right" data-testid="fp-btn-focus-right-move">
           <div style="display: flex; justify-content: center; align-items: center;">
             <img src="@/assets/images/svg/ui/arrow-right-circle.svg" height="20px"
               style="min-height: 20px; pointer-events: none;"></img>
@@ -113,45 +113,13 @@
         </button> -->
 
         <button :disabled="isBtnMoveDisabled" @mousedown="FocusMove('right')" @mouseup="FocusAbort" @mouseleave="FocusAbort"
-          @touchstart="FocusMove('right')" @touchend="FocusAbort" @touchcancel="FocusAbort" class="get-click btn-Right">
+          @touchstart.stop.prevent="FocusMove('right')" @touchend.stop.prevent="FocusAbort" @touchcancel.stop.prevent="FocusAbort" class="get-click btn-Right" data-testid="fp-btn-focus-move-2">
           <div style="display: flex; justify-content: center; align-items: center;">
             <img src="@/assets/images/svg/ui/arrow-right-circle.svg" height="20px"
               style="min-height: 20px; pointer-events: none;"></img>
           </div>
         </button>
 
-        <!-- <button @click="StepsChange" @touchend="active" class="get-click btn-Steps">
-          <span v-if="MoveSteps === 100">
-            <div style="display: flex; justify-content: center; align-items: center;">
-              <img src="@/assets/images/svg/ui/step_100.svg" height="25px"
-                style="min-height: 25px; pointer-events: none;"></img>
-            </div>
-          </span>
-          <span v-if="MoveSteps === 500">
-            <div style="display: flex; justify-content: center; align-items: center;">
-              <img src="@/assets/images/svg/ui/step_500.svg" height="25px"
-                style="min-height: 25px; pointer-events: none;"></img>
-            </div>
-          </span>
-          <span v-if="MoveSteps === 1000">
-            <div style="display: flex; justify-content: center; align-items: center;">
-              <img src="@/assets/images/svg/ui/step_1000.svg" height="25px"
-                style="min-height: 25px; pointer-events: none;"></img>
-            </div>
-          </span>
-          <span v-if="MoveSteps === 5000">
-            <div style="display: flex; justify-content: center; align-items: center;">
-              <img src="@/assets/images/svg/ui/step_5000.svg" height="25px"
-                style="min-height: 25px; pointer-events: none;"></img>
-            </div>
-          </span>
-          <span v-if="MoveSteps === 10000">
-            <div style="display: flex; justify-content: center; align-items: center;">
-              <img src="@/assets/images/svg/ui/step_10000.svg" height="25px"
-                style="min-height: 25px; pointer-events: none;"></img>
-            </div>
-          </span>
-        </button> -->
       </div>
 
       <div class="Canvas-Bar">
@@ -162,8 +130,8 @@
         {{ this.MoveSpeed_ }}
       </div>
 
-      <div class="State-Bar" :style="{ left: 80 + 'px', right: 80 + 'px', fontSize: '8px' }">
-        <div style="text-align: left;"> Current:{{ this.CurrentPosition }}</div>
+      <div class="State-Bar" data-testid="fp-act-state-bar" :style="{ left: 80 + 'px', right: 80 + 'px', fontSize: '8px' }">
+        <div style="text-align: left;" data-testid="fp-state-current"> Current:{{ this.CurrentPosition }}</div>
         <div style="text-align: center;"> FWHM:{{ this.FWHM }}</div>
         <!-- <div style="text-align: right;">Target:{{ this.TargetPosition }} </div> -->
       </div>
@@ -191,7 +159,7 @@ export default {
       ComponentPadding: 0,
       height: 90,
 
-      MoveSteps: 100,
+      MoveSteps: 50,
       MoveSpeed: 1,
       MoveSpeed_: 1,
 
@@ -282,6 +250,8 @@ export default {
     // 自动对焦拍摄进度：来自 App.vue 的统一事件（AutoFocusCaptureProgressUI）
     this.$bus.$on('AutoFocusCaptureProgressUI', this.handleAutoFocusProgress);
 
+
+    this.$bus.$on('focusMoveStep', this.StepsChange);
     // 当ui初始化完成,自动获取当前状态
     this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getFocuserState');
   },
@@ -330,19 +300,9 @@ export default {
       this.inAutoFocus = false;
     },
 
-    StepsChange() {
-      if (!this.FocuserIsConnected) {
-        this.$bus.$emit('showMsgBox', 'Focuser is not connected!', 'warning');
-        return;
-      }
-      if (this.MoveSteps === 100) this.MoveSteps = 500;
-      else if (this.MoveSteps === 500) this.MoveSteps = 1000;
-      else if (this.MoveSteps === 1000) this.MoveSteps = 5000;
-      else if (this.MoveSteps === 5000) this.MoveSteps = 10000;
-      else if (this.MoveSteps === 10000) this.MoveSteps = 100;
-
+    StepsChange(steps) {
+      this.MoveSteps = steps;
       console.log('QHYCCD | StepsChange: ', this.MoveSteps);
-      // this.$bus.$emit('SendConsoleLogMsg', 'StepsChange:' + this.MoveSteps, 'info');
     },
 
     SpeedChange() {
@@ -544,6 +504,15 @@ export default {
 
     toggleLoopShooting() {
       // 视场 ROI 循环拍摄：互斥设备只占用主相机
+      // 仅限制：ROI循环拍摄（主相机未绑定时禁止）
+      if (!this.$store.getters['device/isDeviceBound']('MainCamera')) {
+        this.$bus.$emit(
+          'showMsgBox',
+          this.$t('MainCameraNotBoundAction', { action: this.$t('Feature_ROILoopCapture') }),
+          'error'
+        );
+        return;
+      }
       const check = this.$canUseDevice('MainCamera', 'FocuserROILoop');
       if (!check.allowed) return;
       if (!this.currentMainCanvasHasImage) {

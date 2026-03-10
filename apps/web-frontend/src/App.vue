@@ -7,77 +7,146 @@
 // repository.
 
 <template>
-  <v-app>
-    <v-navigation-drawer v-model="drawer_2" ref="Drawer_2" app absolute temporary :width="DeviceIsConnected ? 200 : 200"
-      class="submenu-navigation-drawer"
-      style="left: 170px; backdrop-filter: blur(5px); background-color: rgba(0, 0, 0, 0.1);">
+  <v-app :class="{ 'no-backdrop-blur': disableBackdropBlur }" data-testid="ui-app-root">
+    <!--
+      E2E 探针（隐藏）：
+      - 设备连接状态：来自 data().devices[*].isConnected
+      - 出图成功信号：每次收到 TileGPM 时自增 e2eTileGpmSeq
+      目的：让 Playwright 不必“盲等超时”，而是等待真实状态变化。
+    -->
+    <div
+      data-testid="e2e-probes"
+      style="position: fixed; left: -99999px; top: -99999px; width: 1px; height: 1px; overflow: hidden;"
+      aria-hidden="true"
+    >
+      <div
+        v-for="d in devices"
+        :key="`e2e-device-${d && d.driverType ? d.driverType : UNKNOWN_DRIVER_TYPE}`"
+        :data-testid="`e2e-device-${d && d.driverType ? d.driverType : UNKNOWN_DRIVER_TYPE}-conn`"
+        :data-state="d && d.isConnected ? 'connected' : 'disconnected'"
+        :data-connection-mode="String((d && d.connectionMode) || '')"
+        :data-driver-name="String((d && d.driverName) || '')"
+        :data-device="String((d && d.device) || '')"
+      ></div>
+      <div
+        data-testid="e2e-tilegpm"
+        :data-seq="String(e2eTileGpmSeq)"
+        :data-session="String(tileSessionId || '')"
+      ></div>
+    </div>
 
-      <div v-show="isOpenDevicePage" style="position: relative; width: 200px; height: 100%; display: flex; flex-direction: column;">
-        <span
-          style="position: absolute; top: 0px; left: 50%; transform: translateX(-50%); font-size: clamp(14px, 4vw, 30px); color: rgba(255, 255, 255, 0.5); user-select: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 190px; display: inline-block; z-index: 1;">
+    <v-navigation-drawer v-model="drawer_2" ref="Drawer_2" app absolute temporary :width="submenuDrawerWidth"
+      class="submenu-navigation-drawer"
+      data-testid="ui-app-submenu-drawer"
+      :data-state="drawer_2 ? 'open' : 'closed'"
+      :style="{ left: submenuLeft }">
+
+      <div v-show="isOpenDevicePage" class="submenu-page" data-testid="ui-app-submenu-device-page" :data-state="isOpenDevicePage ? 'open' : 'closed'">
+        <span class="submenu-page-title">
           {{ $t(CurrentDriverType) }}
           <v-divider style="margin-top: 2px;"></v-divider>
         </span>
 
-        <div :style="{ 
-          width: DeviceIsConnected ? '200px' : '200px',
-          position: 'absolute',
-          top: '60px',
-          bottom: DeviceIsConnected ? '60px' : '10px',
-          left: 0,
-          right: 0,
-          overflowY: 'auto',
-          overflowX: 'hidden',
-          paddingRight: '5px',
-          paddingBottom: '80px',
-          paddingLeft: '5px',
-          boxSizing: 'border-box'
-        }"
+        <div :style="submenuParamsStyle"
           class="params-container"
-          style="-ms-overflow-style: none; scrollbar-width: none;">
+          data-testid="ui-app-submenu-params-container">
+          <!-- 内容包装：用 key 控制子菜单“内部重新挂载”，避免必须关开抽屉才能刷新 -->
+          <div :key="submenuContentKey">
 
           <!-- 设备未连接状态 -->
-          <div v-show="!DeviceIsConnected" style="text-align: center;">
-            <span style="display: inline-block; font-size: 15px; color: rgba(255, 255, 255, 0.5); user-select: none;">
+          <div
+            v-show="!DeviceIsConnected"
+            class="submenu-center"
+            data-testid="ui-app-device-connection-panel"
+            :data-state="drawer_2 && isOpenDevicePage ? 'ready' : 'closed'"
+          >
+            <span class="submenu-section-title">
               {{ $t('Device Connection') }}
             </span>
 
             <!-- 驱动选择下拉框，添加@change事件 -->
             <v-select :label="$t('Select Driver')" :items="drivers" item-text="label" item-value="value"
-              v-model="selectedDriver" @change="confirmDriver" style="width: 150px; display: inline-block;">
+              v-model="selectedDriver" @change="confirmDriver" class="config-input" data-testid="ui-app-select-confirm-driver">
+              <template v-slot:item="{ item, on, attrs }">
+                <v-list-item
+                  v-on="on"
+                  v-bind="attrs"
+                  :data-testid="
+                    'ui-app-select-confirm-driver-option-'
+                    + String((item && item.value) || item || 'unknown').replace(/[^A-Za-z0-9]+/g, '')
+                  "
+                >
+                  <v-list-item-content>
+                    <v-list-item-title>{{ item && item.label ? item.label : item }}</v-list-item-title>
+                  </v-list-item-content>
+                </v-list-item>
+              </template>
             </v-select>
+
+            <!-- SDK/INDI 模式切换：仅在所选驱动支持 SDK 时显示 -->
+            <v-expand-transition>
+              <div v-if="showConnectionModeSelector" class="submenu-connection-mode">
+                <v-select
+                  :label="$t('Connection Mode')"
+                  :items="connectionModeItemsForCurrentDevice"
+                  item-text="label"
+                  item-value="value"
+                  item-disabled="disabled"
+                  v-model="selectedConnectionMode"
+                  :disabled="isSettingConnectionMode"
+                  @change="onConnectionModeChange"
+                  class="config-input" data-testid="ui-app-select-on-connection-mode-change">
+                  <template v-slot:item="{ item, on, attrs }">
+                    <v-list-item
+                      v-on="on"
+                      v-bind="attrs"
+                      :data-testid="
+                        'ui-app-select-connection-mode-option-'
+                        + String((item && item.value) || item || 'unknown').replace(/[^A-Za-z0-9]+/g, '')
+                      "
+                    >
+                      <v-list-item-content>
+                        <v-list-item-title>{{ item && item.label ? item.label : item }}</v-list-item-title>
+                      </v-list-item-content>
+                    </v-list-item>
+                  </template>
+                </v-select>
+              </div>
+            </v-expand-transition>
 
             <!-- 波特率下拉框，添加@change事件 -->
             <v-select v-if="CurrentDriverType === 'Mount' || CurrentDriverType === 'Focuser'" :label="$t('Baud Rate')"
               :items="BaudRateItems" item-text="label" item-value="value" v-model="BaudRateSelected"
-              @change="confirmDriver" style="width: 150px; display: inline-block;">
+              @change="confirmDriver" class="config-input" data-testid="ui-app-select-confirm-driver-2">
             </v-select>
 
           <!-- 串口下拉框：在波特率下方，仅对 Mount / Focuser 显示 -->
           <v-select
-            v-if="CurrentDriverType === 'Mount' && mountSerialPortItems.length > 0"
+            v-if="CurrentDriverType === 'Mount' && mountSerialPortItems.length"
+            data-testid="ui-app-select-auto"
             :label="$t('Serial Port')"
             :items="mountSerialPortItems"
             item-text="label"
             item-value="value"
             v-model="mountSerialPortSelected"
-            @change="onSerialPortSelect('Mount', mountSerialPortSelected)"
-            style="width: 150px; display: inline-block; margin-top: 8px;">
+            @change="onSerialPortSelect('Mount', $event)"
+            class="config-input submenu-serial-select">
           </v-select>
           <v-select
-            v-if="CurrentDriverType === 'Focuser' && focuserSerialPortItems.length > 0"
+            v-if="CurrentDriverType === 'Focuser' && focuserSerialPortItems.length"
+            data-testid="ui-app-select-auto-2"
             :label="$t('Serial Port')"
             :items="focuserSerialPortItems"
             item-text="label"
             item-value="value"
             v-model="focuserSerialPortSelected"
-            @change="onSerialPortSelect('Focuser', focuserSerialPortSelected)"
-            style="width: 150px; display: inline-block; margin-top: 8px;">
+            @change="onSerialPortSelect('Focuser', $event)"
+            class="config-input submenu-serial-select">
           </v-select>
 
             <v-row no-gutters>
               <v-col cols="6">
-                <button @click="clearDriver" class="btn-confirm" style="display: inline-block;">
+                <button type="button" @click="clearDriver" class="btn-confirm" aria-label="Clear driver" data-testid="ui-app-btn-clear-driver">
                   <div style="display: flex; justify-content: center; align-items: center;">
                     <img src="@/assets/images/svg/ui/delete.svg" height="20px"
                       style="min-height: 20px; pointer-events: none;"></img>
@@ -85,8 +154,8 @@
                 </button>
               </v-col>
               <v-col cols="6">
-                <button v-if="!isConnecting" @click="connectDriver(selectedDriver)" class="btn-confirm"
-                  style="display: inline-block; background-color: green;">
+                <button v-if="!isConnecting" type="button" @click="connectDriver(selectedDriver)" class="btn-confirm btn-confirm--green"
+                  aria-label="Connect" data-testid="ui-app-btn-connect-driver">
                   <div style="display: flex; justify-content: center; align-items: center;">
                     <v-icon color="white">mdi-link</v-icon>
                   </div>
@@ -98,8 +167,20 @@
           <!-- 设备未连接状态 -->
 
           <!-- 设备连接状态 -->
-          <div v-show="DeviceIsConnected" v-for="(item, index) in CurrentConfigItems()" :key="index"
-            class="config-item">
+          <div
+            v-show="DeviceIsConnected"
+            v-for="(item, index) in CurrentConfigItems()"
+            :key="(item.driverType || '') + ':' + (item.label || '') + ':' + index"
+            class="config-item"
+            :data-testid="
+              'ui-app-config-item-'
+              + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')
+              + '-'
+              + String(item.label || 'Field').replace(/[^A-Za-z0-9]+/g, '')
+              + '-'
+              + index
+            "
+          >
             <!-- 标题，仅在第一个项目显示 -->
             <span v-if="index === 0" class="config-title">
               {{ $t('Device Config Items') }}
@@ -108,9 +189,22 @@
             <!-- 配置项卡片内容 -->
             <v-card-text>
               <!-- 文本输入类型 -->
-              <v-text-field v-if="item.inputType === 'text'" v-model="item.value" :label="$t(item.label)"
-                @input="handleConfigChange(item.label, item.value)" class="config-input">
-              </v-text-field>
+              <v-text-field
+                v-if="item.inputType === 'text'"
+                v-model="item.value"
+                :label="$t(item.label)"
+                :disabled="isCurrentDeviceUnbound"
+                @input="handleConfigChange(item.label, item.value)"
+                class="config-input"
+                :data-testid="
+                  'ui-config-'
+                  + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')
+                  + '-'
+                  + String(item.label || 'Field').replace(/[^A-Za-z0-9]+/g, '')
+                  + '-text-'
+                  + index
+                "
+              />
 
               <!-- 数字输入类型 -->
               <v-text-field v-if="item.inputType === 'number'" 
@@ -119,13 +213,22 @@
                 :type="isDesktop ? 'number' : 'text'" :min="item.min" :max="item.max"
                 :step="item.step !== undefined && item.step !== null ? item.step : 1" :rules="numberRules(item)"
                 :inputmode="isMobile ? 'none' : ''" :readonly="isMobile"
+                :disabled="isCurrentDeviceUnbound"
                 enterkeyhint="done" 
                 @blur="isMobile ? handleNumberBlur(item) : onNumberCommit(item)" 
                 @keydown.enter.prevent="onNumberCommit(item)"
                 @focus="isMobile ? openNumberKeyboard(item, $event) : null"
                 @click="isMobile ? openNumberKeyboard(item, $event) : null"
                 @input="!isMobile ? (item.value = $event) : null"
-                class="config-input" />
+                class="config-input"
+                :data-testid="
+                  'ui-config-'
+                  + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')
+                  + '-' 
+                  + String(item.label || 'Field').replace(/[^A-Za-z0-9]+/g, '')
+                  + '-number-'
+                  + index
+                " />
 
               <!-- 滑动条类型 -->
               <div v-if="item.inputType === 'slider'" class="slider-container">
@@ -134,20 +237,60 @@
                 </span>
                 <div>
                   <!-- 减小按钮 -->
-                  <button @click="decrementAndNotify(item)" class="get-click btn-slider btn-minus">
+                  <button
+                    type="button"
+                    :disabled="isCurrentDeviceUnbound"
+                    @click="decrementAndNotify(item)"
+                    class="get-click btn-slider btn-minus"
+                    :data-testid="
+                      'ui-config-'
+                      + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')
+                      + '-'
+                      + String(item.label || 'Field').replace(/[^A-Za-z0-9]+/g, '')
+                      + '-slider-dec-'
+                      + index
+                    "
+                  >
                     <div class="btn-content">
                       <img src="@/assets/images/svg/ui/Minus.svg" height="10px" class="btn-icon">
                     </div>
                   </button>
 
                   <!-- 滑动条 -->
-                  <v-slider v-model="item.value" :step="item.inputStep" :max="item.inputMax" :min="item.inputMin"
-                    @change="handleConfigChange(item.label, item.value)" color="white"
-                    class="align-center slider-control">
-                  </v-slider>
+                  <v-slider
+                    v-model="item.value"
+                    :step="item.inputStep"
+                    :max="item.inputMax"
+                    :min="item.inputMin"
+                    :disabled="isCurrentDeviceUnbound"
+                    @change="handleConfigChange(item.label, item.value)"
+                    color="white"
+                    class="align-center slider-control"
+                    :data-testid="
+                      'ui-config-'
+                      + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')
+                      + '-'
+                      + String(item.label || 'Field').replace(/[^A-Za-z0-9]+/g, '')
+                      + '-slider-'
+                      + index
+                    "
+                  />
 
                   <!-- 增加按钮 -->
-                  <button @click="incrementAndNotify(item)" class="get-click btn-slider btn-plus">
+                  <button
+                    type="button"
+                    :disabled="isCurrentDeviceUnbound"
+                    @click="incrementAndNotify(item)"
+                    class="get-click btn-slider btn-plus"
+                    :data-testid="
+                      'ui-config-'
+                      + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')
+                      + '-'
+                      + String(item.label || 'Field').replace(/[^A-Za-z0-9]+/g, '')
+                      + '-slider-inc-'
+                      + index
+                    "
+                  >
                     <div class="btn-content">
                       <img src="@/assets/images/svg/ui/Plus.svg" height="10px" class="btn-icon">
                     </div>
@@ -156,14 +299,41 @@
               </div>
 
               <!-- 选择框类型 -->
-              <v-select v-if="item.inputType === 'select'" v-model="item.value" :label="$t(item.label)"
-                @change="handleConfigChange(item.label, item.value)" :items="item.selectValue" class="config-input">
-              </v-select>
+              <v-select
+                v-if="item.inputType === 'select'"
+                v-model="item.value"
+                :label="$t(item.label)"
+                :disabled="isCurrentDeviceUnbound"
+                @change="handleConfigChange(item.label, item.value)"
+                :items="item.selectValue"
+                class="config-input"
+                :data-testid="
+                  'ui-config-'
+                  + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')
+                  + '-'
+                  + String(item.label || 'Field').replace(/[^A-Za-z0-9]+/g, '')
+                  + '-select-'
+                  + index
+                "
+              />
 
               <!-- 开关类型 -->
-              <v-switch v-if="item.inputType === 'switch'" v-model="item.value" :label="$t(item.label)"
-                @change="handleConfigChange(item.label, item.value)" class="config-switch">
-              </v-switch>
+              <v-switch
+                v-if="item.inputType === 'switch'"
+                v-model="item.value"
+                :label="$t(item.label)"
+                :disabled="isCurrentDeviceUnbound"
+                @change="handleConfigChange(item.label, item.value)"
+                class="config-switch"
+                :data-testid="
+                  'ui-config-'
+                  + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')
+                  + '-'
+                  + String(item.label || 'Field').replace(/[^A-Za-z0-9]+/g, '')
+                  + '-switch-'
+                  + index
+                "
+              />
 
               <!-- 提示信息类型（只读） -->
               <div v-if="item.inputType === 'tip'" class="tip-field">
@@ -184,8 +354,16 @@
                   density="comfortable"
                   block
                   :loading="!!item._disabled"
-                  :disabled="!!item._disabled"
+                  :disabled="isCurrentDeviceUnbound || !!item._disabled"
                   @click="onButtonPress(item)"
+                  :data-testid="
+                    'ui-config-'
+                    + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')
+                    + '-'
+                    + String(item.label || item.buttonText || 'Button').replace(/[^A-Za-z0-9]+/g, '')
+                    + '-button-'
+                    + index
+                  "
                 >
                   <template v-if="item._disabled" #loader>
                     <v-progress-circular indeterminate size="18" width="2" />
@@ -202,14 +380,20 @@
           <!-- 设备连接状态 -->
           
           <!-- 底部占位，确保最后一个参数可以完全显示 -->
-          <div v-show="DeviceIsConnected" style="height: 5px; flex-shrink: 0;"></div>
+          <div v-show="DeviceIsConnected" class="submenu-footer-spacer"></div>
 
+          </div>
         </div>
 
         <!-- 断开按钮 - 固定在底部，不受滚动影响 -->
-        <div v-show="DeviceIsConnected"
-          style="position: absolute; bottom: 10px; left: 0; right: 0; text-align: center; display: flex; justify-content: center; gap: 10px; z-index: 2;">
-          <button @click="disconnectDriver" class="btn-confirm" style="display: inline-block; background-color: red;">
+        <div v-show="DeviceIsConnected" class="submenu-bottom-actions">
+          <button
+            type="button"
+            @click="disconnectDriver"
+            class="btn-confirm btn-confirm--red"
+            aria-label="Disconnect"
+            data-testid="ui-app-btn-disconnect-driver"
+          >
             <div style="display: flex; justify-content: center; align-items: center;">
               <v-icon color="white">mdi-link-off</v-icon>
             </div>
@@ -219,7 +403,11 @@
       </div>
 
       <!-- 电源管理页面 -->
-      <div v-show="isOpenPowerPage">
+      <div
+        v-show="isOpenPowerPage"
+        data-testid="ui-power-manager-root"
+        :data-state="isOpenPowerPage ? 'open' : 'closed'"
+      >
         <span
           style="position: absolute; top: 0px; left: 50%; transform: translateX(-50%); font-size: 26px; color: rgba(255, 255, 255, 0.5); user-select: none; white-space: nowrap; ">
           {{ $t('Power Management') }}
@@ -229,7 +417,7 @@
         <div style="position: absolute; top: 50px; max-height: calc(100% - 50px); width: 200px; overflow-y: auto;">
           <v-list dense>
             <v-list-item @click.stop="SwitchOutPutPower(1, OutPutPower_1_ON)"
-              :style="{ height: '36px', marginBottom: '10px' }">
+              :style="{ height: '36px', marginBottom: '10px' }" data-testid="ui-app-power-page-output-power-1">
               <v-list-item-icon style="margin-right: 10px;">
                 <div style="display: flex; justify-content: center; align-items: center;">
                   <img src="@/assets/images/svg/ui/OutPutPower.svg" height="30px"
@@ -249,7 +437,7 @@
             </v-list-item>
 
             <v-list-item @click.stop="SwitchOutPutPower(2, OutPutPower_2_ON)"
-              :style="{ height: '36px', marginBottom: '10px' }">
+              :style="{ height: '36px', marginBottom: '10px' }" data-testid="ui-app-power-page-output-power-2">
               <v-list-item-icon style="margin-right: 10px;">
                 <div style="display: flex; justify-content: center; align-items: center;">
                   <img src="@/assets/images/svg/ui/OutPutPower.svg" height="30px"
@@ -270,7 +458,7 @@
 
             <v-divider :style="{ marginBottom: '10px' }"></v-divider>
 
-            <v-list-item @click.stop="RestartRaspberryPi()" :style="{ height: '36px', marginBottom: '10px' }">
+            <v-list-item @click.stop="RestartRaspberryPi()" :style="{ height: '36px', marginBottom: '10px' }" data-testid="ui-app-power-page-restart">
               <v-list-item-icon style="margin-right: 10px;">
                 <div style="display: flex; justify-content: center; align-items: center;">
                   <img src="@/assets/images/svg/ui/Reboot.svg" height="30px"
@@ -282,7 +470,7 @@
               </v-list-item-content>
             </v-list-item>
 
-            <v-list-item @click.stop="ShutdownRaspberryPi()" :style="{ height: '36px', marginBottom: '10px' }">
+            <v-list-item @click.stop="ShutdownRaspberryPi()" :style="{ height: '36px', marginBottom: '10px' }" data-testid="ui-app-power-page-shutdown">
               <v-list-item-icon style="margin-right: 10px;">
                 <div style="display: flex; justify-content: center; align-items: center;">
                   <img src="@/assets/images/svg/ui/PowerOFF.svg" height="30px"
@@ -294,7 +482,7 @@
               </v-list-item-content>
             </v-list-item>
             <!-- 强制更新 -->
-            <v-list-item @click.stop="ForceUpdate()" :style="{ height: '36px', marginBottom: '10px' }">
+            <v-list-item @click.stop="ForceUpdate()" :style="{ height: '36px', marginBottom: '10px' }" data-testid="ui-app-power-page-force-update">
               <v-list-item-icon style="margin-right: 10px;">
                 <div style="display: flex; justify-content: center; align-items: center;">
                   <img src="@/assets/images/svg/ui/PowerOFF.svg" height="30px"
@@ -315,9 +503,16 @@
 
     </v-navigation-drawer>
 
-    <v-navigation-drawer v-model="nav" app :stateless="drawer_2" temporary width="170"
+    <v-navigation-drawer
+      v-model="nav"
+      app
+      :stateless="drawer_2"
+      temporary
+      :width="menuDrawerWidth"
       class="menu-navigation-drawer"
-      style="backdrop-filter: blur(5px); background-color: rgba(0, 0, 0, 0.1);">
+      data-testid="ui-app-menu-drawer"
+      :data-state="nav ? 'open' : 'closed'"
+    >
       <v-layout column fill-height>
         <v-list dense>
           <!-- 客户端版本和服务器版本信息 -->
@@ -349,7 +544,7 @@
           </template>
 
           <!-- 退出(Quit) -->
-          <v-list-item @click.stop="QuitToMainApp()" :style="{ height: '36px' }">
+          <v-list-item @click.stop="QuitToMainApp()" :style="{ height: '36px' }" data-testid="ui-app-menu-quit">
             <v-list-item-icon style="margin-right: 10px;">
               <div style="display: flex; justify-content: center; align-items: center;">
                 <img src="@/assets/images/svg/ui/Quit.svg" height="30px"
@@ -363,7 +558,7 @@
           </v-list-item>
 
           <!-- 视图设置(View Settings) -->
-          <v-list-item @click.stop="toggleStoreValue('showViewSettingsDialog')" :style="{ height: '36px' }">
+          <v-list-item @click.stop="toggleStoreValue('showViewSettingsDialog')" :style="{ height: '36px' }" data-testid="ui-app-menu-general-settings">
             <v-list-item-icon style="margin-right: 10px;">
               <div style="display: flex; justify-content: center; align-items: center;">
                 <img src="@/assets/images/svg/ui/Setting.svg" height="30px"
@@ -377,7 +572,7 @@
           </v-list-item>
 
           <!-- 电源管理(Power Management) -->
-          <v-list-item @click.stop="openPowerManagerPage()" :style="{ height: '36px' }">
+          <v-list-item @click.stop="openPowerManagerPage()" :style="{ height: '36px' }" data-testid="ui-app-menu-open-power-manager">
             <v-list-item-icon style="margin-right: 10px;">
               <div style="display: flex; justify-content: center; align-items: center;">
                 <img src="@/assets/images/svg/ui/Power.svg" height="30px"
@@ -393,8 +588,17 @@
           <v-divider></v-divider>
 
           <!-- 设备列表(动态生成) -->
-          <v-list-item v-for="(device, index) in devices" :key="index" @click.stop="selectDevice(device)"
-            :style="{ height: '36px' }">
+          <v-list-item
+            v-for="(device, index) in devices"
+            :key="device.driverType || index"
+            @click.stop="selectDevice(device)"
+            :style="{ height: '36px' }"
+            :data-testid="`ui-app-menu-device-${device && device.driverType ? device.driverType : UNKNOWN_DRIVER_TYPE}`"
+            :data-driver-type="device && device.driverType ? device.driverType : UNKNOWN_DRIVER_TYPE"
+            :data-device-name="device && device.device ? device.device : ''"
+            :data-selected="CurrentDriverType === (device && device.driverType ? device.driverType : UNKNOWN_DRIVER_TYPE) ? 'true' : 'false'"
+            :data-state="(device && device.isConnected) || (device && device.driverType === 'Telescopes') ? 'connected' : 'disconnected'"
+          >
               <v-list-item-icon style="margin-right: 10px;">
                 <div style="display: flex; justify-content: center; align-items: center;">
                 <img :src="require(`@/assets/images/svg/ui/${device.driverType}.svg`)" height="30px"
@@ -405,9 +609,13 @@
                 <v-list-item-title>
                   <span>
                   <div :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t(device.driverType) }}</div>
-                  <div :style="{ fontSize: '7px' }" :class="{ 'connected-device': device.isConnected }">{{
-                    device.device }}
-                    </div>
+                  <div
+                    :style="{ fontSize: '7px' }"
+                    :class="{
+                      'connected-device': device.isConnected,
+                      'not-bind-device': device.isConnected && isNotBindDevice(device.device)
+                    }"
+                  >{{ device.device }}</div>
                   </span>
                 </v-list-item-title>
               </v-list-item-content>
@@ -416,9 +624,12 @@
           <v-divider></v-divider>
 
           <!-- 连接所有(Connect All) -->
-          <v-list-item :disabled="loadingConnectAllDevice" @touchstart="startConnectBtnPress"
-            @touchend="endConnectBtnPress" @mousedown="startConnectBtnPress" @mouseup="endConnectBtnPress"
-            :style="{ height: '36px' }">
+          <v-list-item :disabled="loadingConnectAllDevice" @touchstart.stop.prevent="startConnectBtnPress"
+            @touchend.stop.prevent="endConnectBtnPress" @mousedown.stop="startConnectBtnPress" @mouseup.stop="endConnectBtnPress"
+            :style="{ height: '36px' }"
+            data-testid="ui-app-menu-connect-all"
+            :data-state="loadingConnectAllDevice ? 'busy' : 'idle'"
+            :aria-disabled="loadingConnectAllDevice ? 'true' : 'false'">
             <v-list-item-icon style="margin-right: 10px;">
               <div style="display: flex; justify-content: center; align-items: center;">
                 <img src="@/assets/images/svg/ui/Connect.svg" height="30px"
@@ -435,7 +646,7 @@
           </v-list-item>
 
           <!-- 断开所有连接(Disconnect All) -->
-          <v-list-item @click.stop="disconnectAllDevice(false)" :style="{ height: '36px' }">
+          <v-list-item @click.stop="disconnectAllDevice(false)" :style="{ height: '36px' }" data-testid="ui-app-menu-disconnect-all">
             <v-list-item-icon style="margin-right: 10px;">
               <div style="display: flex; justify-content: center; align-items: center;">
                 <img src="@/assets/images/svg/ui/DisConnect.svg" height="30px"
@@ -449,7 +660,7 @@
           </v-list-item>
 
           <!-- 设备分配(Device Allocation) -->
-          <v-list-item @click.stop="DeviceAllocation()" :style="{ height: '36px' }">
+          <v-list-item @click.stop="DeviceAllocation()" :style="{ height: '36px' }" data-testid="ui-app-menu-device-allocation">
             <v-list-item-icon style="margin-right: 10px;">
               <div style="display: flex; justify-content: center; align-items: center;">
                 <img src="@/assets/images/svg/ui/Allocation.svg" height="30px"
@@ -463,7 +674,7 @@
           </v-list-item>
 
           <!-- 校准极轴(Calibrate Polar Axis) -->
-          <v-list-item @click.stop="CalibratePolarAxis()" :style="{ height: '36px' }">
+          <v-list-item @click.stop="CalibratePolarAxis()" :style="{ height: '36px' }" data-testid="ui-app-menu-calibrate-polar-axis">
             <v-list-item-icon style="margin-right: 10px;">
               <div style="display: flex; justify-content: center; align-items: center;">
                 <img src="@/assets/images/svg/ui/PoleAxis.svg" height="30px"
@@ -477,7 +688,7 @@
           </v-list-item>
 
           <!-- 图像文件(Image Files) -->
-          <v-list-item @click.stop="OpenIamgeFolder()" :style="{ height: '36px' }">
+          <v-list-item @click.stop="OpenIamgeFolder()" :style="{ height: '36px' }" data-testid="ui-app-menu-open-image-manager">
             <v-list-item-icon style="margin-right: 10px;">
               <div style="display: flex; justify-content: center; align-items: center;">
                 <img src="@/assets/images/svg/ui/FolderSwitch.svg" height="30px"
@@ -491,7 +702,7 @@
           </v-list-item>
 
           <!-- 日志(Logs) -->
-          <v-list-item @click.stop="OpenDebugLog()" :style="{ height: '36px' }">
+          <v-list-item @click.stop="OpenDebugLog()" :style="{ height: '36px' }" data-testid="ui-app-menu-open-debug-log">
             <v-list-item-icon style="margin-right: 10px;">
               <div style="display: flex; justify-content: center; align-items: center;">
                 <img src="@/assets/images/svg/ui/DebugLog.svg" height="30px"
@@ -507,7 +718,7 @@
           <v-divider></v-divider>
 
           <!-- 纬度和经度(Lat & Long) -->
-          <v-list-item @click.stop="locationClicked()" :style="{ height: '36px' }">
+          <v-list-item @click.stop="locationClicked()" :style="{ height: '36px' }" data-testid="ui-app-menu-location">
             <v-list-item-icon style="margin-right: 10px;">
               <div style="display: flex; justify-content: center; align-items: center;">
                 <img :src="require(`@/assets/images/svg/ui/Location.svg`)" height="30px" style="min-height: 30px"></img>
@@ -526,7 +737,7 @@
 
           <!-- 刷新页面(Refresh Page) -->
           <v-list-item @click.stop="ShowConfirmDialog('Confirm', $t('Are you sure you need to refresh?'), 'Refresh')"
-            :style="{ height: '36px' }">
+            :style="{ height: '36px' }" data-testid="ui-app-menu-refresh-page">
             <v-list-item-icon style="margin-right: 10px;">
               <div style="display: flex; justify-content: center; align-items: center;">
                 <img :src="require(`@/assets/images/svg/ui/Refresh.svg`)" height="30px" style="min-height: 30px"></img>
@@ -542,7 +753,7 @@
           </v-list-item>
 
           <!-- 数据版权(Data Credits) -->
-          <v-list-item @click.stop="toggleStoreValue('showDataCreditsDialog')" :style="{ height: '36px' }">
+          <v-list-item @click.stop="toggleStoreValue('showDataCreditsDialog')" :style="{ height: '36px' }" data-testid="ui-app-menu-data-credits">
             <v-list-item-icon style="margin-right: 10px;">
               <div style="display: flex; justify-content: center; align-items: center;">
                 <img src="@/assets/images/svg/ui/DataCredits.svg" height="30px"
@@ -573,7 +784,8 @@
             <canvas id="stel-canvas" ref='stelCanvas' :style="{ zIndex: canvasZIndexStel }"></canvas>
             <canvas ref="mainCanvas" id="mainCamera-canvas" :style="{ zIndex: canvasZIndexMainCamera }"
               @click="handleMainCanvasClick" @touchstart="handleTouchStart" @touchmove="handleTouchMove"
-              @touchend="handleTouchEnd" @mousedown="handleMouseDown" @mouseup="handleMouseUp"
+              @touchend="handleTouchEnd" @touchcancel="handleTouchEnd"
+              @mousedown="handleMouseDown" @mouseup="handleMouseUp" @mouseleave="handleMouseUp"
               @mousemove="handleMouseMove" @wheel="handleWheel">
             </canvas>
             <canvas ref="guiderCanvas" id="guiderCamera-canvas" :style="{ zIndex: canvasZIndexGuiderCamera }"
@@ -682,9 +894,56 @@ let glTestCircle;
 let glLayer;
 let glStel;
 
+// 固定表格/规则：用于在"驱动列表"未携带 supportSDK 信息时做前端兜底判断
+// 规则按 deviceType 区分，匹配 QT 端定义的驱动名称（driverName/value 和 driverLabel/label）
+// 匹配逻辑：driverName 或 driverLabel 任一匹配即可
+// 
+// 注意：这些规则需要与后端 mainwindow.cpp 中的匹配逻辑保持一致
+// 后端匹配规则（indi_Driver_Confirm）：
+//   - QHY相机：indi_qhy_ccd, indi_qhy_ccd2, libqhyccd
+//   - QHY电调：indi_qhy_focuser, qhy_focuser, 或包含 "qhy" 和 "focus"
+const FIXED_SDK_SUPPORT_RULES = {
+  // 主相机/导星相机/极轴相机：匹配 QHYCCD 驱动
+  // QT端定义：SDK_DRIVER_NAME_INDI_QHY_CCD="indi_qhy_ccd", SDK_DRIVER_NAME_QHYCCD="QHYCCD"
+  // 后端匹配：indi_qhy_ccd, indi_qhy_ccd2, libqhyccd
+  // 前端可能显示为：driverName="indi_qhy_ccd", driverLabel="QHY CCD" 或 "QHYCCD"
+  MainCamera: [
+    /^indi_qhy_ccd$/i,        // 精确匹配驱动名称
+    /^indi_qhy_ccd2$/i,       // 匹配 indi_qhy_ccd2（后端支持的变体）
+    /^libqhyccd$/i,           // 匹配 libqhyccd（后端支持的变体）
+    /^qhyccd$/i,              // 精确匹配 QHYCCD（SDK驱动名）
+    /^qhy\s+ccd$/i,           // 匹配 "QHY CCD" (带空格，显示标签)
+    /^qhy\s+ccd2$/i,          // 匹配 "QHY CCD2" (显示标签)
+  ],
+  Guider: [
+    /^indi_qhy_ccd$/i,        // 精确匹配驱动名称
+    /^indi_qhy_ccd2$/i,       // 匹配 indi_qhy_ccd2（后端支持的变体）
+    /^libqhyccd$/i,           // 匹配 libqhyccd（后端支持的变体）
+    /^qhyccd$/i,              // 精确匹配 QHYCCD（SDK驱动名）
+    /^qhy\s+ccd$/i,           // 匹配 "QHY CCD" (带空格，显示标签)
+    /^qhy\s+ccd2$/i,          // 匹配 "QHY CCD2" (显示标签)
+  ],
+  PoleCamera: [
+
+  ],
+  // 电调：匹配 QHYFocuser 驱动
+  // QT端定义：SDK_DRIVER_NAME_INDI_QHY_CCD="indi_qhy_focuser", SDK_DRIVER_NAME_QHYCCD="QFocuser"
+  // 后端匹配：indi_qhy_focuser, qhy_focuser, 或包含 "qhy" 和 "focus"
+  // 前端可能显示为：driverName="indi_qhy_focuser", driverLabel="QFocuser"
+  Focuser: [
+    /^indi_qhy_focuser$/i,    // 精确匹配驱动名称
+    /^qhy_focuser$/i,         // 匹配 qhy_focuser（后端支持的变体）
+    /^qfocuser$/i,            // 精确匹配 QFocuser（SDK驱动名，显示标签）
+    // 注意：后端的包含匹配（"qhy" 和 "focus"）在前端使用精确匹配，避免误判
+    // 如果需要支持更多变体，可以添加更宽松的规则，但要小心误判
+  ],
+  // 如果后续要扩展更多 SDK（例如 ZWO），可在这里加规则
+};
+
 export default {
   data(context) {
     return {
+      UNKNOWN_DRIVER_TYPE: 'unknown',
       menuItems: [
         { title: this.$t('View Settings'), icon: 'mdi-settings', store_var_name: 'showViewSettingsDialog', store_show_menu_item: 'showViewSettingsMenuItem' },
         { title: this.$t('Planets Tonight'), icon: 'mdi-panorama-fisheye', store_var_name: 'showPlanetsVisibilityDialog', store_show_menu_item: 'showPlanetsVisibilityMenuItem' },
@@ -699,6 +958,19 @@ export default {
       dataSourceInitDone: false,
       imageSrc: 'https://i.imgur.com/egA5FIv.jpeg', // 替换为你的图像路径
       cvReady: false,
+
+      // 关闭“模糊化”：
+      // - UI 毛玻璃：backdrop-filter: blur(...)
+      // - 图像缩放平滑：canvas image smoothing（会让细节发糊）
+      disableBackdropBlur: true,
+      // 插值平滑动态策略：
+      // - 'auto'：按放大倍率/瓦片层级自动开关（推荐）
+      // - 'always'：始终开启
+      // - 'never'：始终关闭
+      imageSmoothingMode: 'auto',
+      // 当主画布“放大倍率” >= 该值时，自动关闭插值平滑（更锐利）
+      // 放大倍率 = 目标画布尺寸 / 当前可见区域尺寸
+      imageSmoothingDisableAtUpscale: 1.25,
       canvasZIndexStel: -10,
       canvasZIndexMainCamera: -11,
       canvasZIndexGuiderCamera: -12,
@@ -716,7 +988,7 @@ export default {
 
       QTClientVersion: 'Not connected',
       // VueClientVersion: process.env.VUE_APP_VERSION,
-      VueClientVersion: '20251215', // 手动指定版本号
+      VueClientVersion: '20260310', // 手动指定版本号
 
       // 全局总版本号（由 Qt 通过 WebSocket 从环境变量 QUARCS_TOTAL_VERSION 读取并发送）
       TotalVersion: '0.0.0',
@@ -749,6 +1021,15 @@ export default {
       // 最近一次从客户端(QT)获取的 App 版本号（通过 bus 信号统一缓存）
       AppVersion: '—',
 
+      // Live模式下相机出图帧率（由后端SDK统计并发送）
+      liveCameraFps: null,
+      // 后端处理帧率（由后端处理链路统计并发送）
+      liveProcessFps: null,
+
+      // UI 刷新 FPS 统计：用于衡量浏览器端实际看到的画面刷新率
+      uiFrameCount: 0,
+      uiFpsLastTs: 0,
+
       // isMessageBoxShow: false,
 
       CurrentDriverType: '',
@@ -762,13 +1043,13 @@ export default {
       MainCameraGainMax: 0,
 
       devices: [
-        { name: '导星镜', driverType: 'Guider', type: 'CCDs', ListNum: "1", isget: false, device: '', BaudRate: 9600, driverName: '', usbSerialPath: '', sdkVersion: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_Guider' },
-        { name: '主相机', driverType: 'MainCamera', type: 'CCDs', ListNum: "20", isget: false, device: '', BaudRate: 9600, driverName: '', usbSerialPath: '', sdkVersion: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_MainCamera' },
-        { name: '赤道仪', driverType: 'Mount', type: 'Telescopes', ListNum: "0", isget: false, device: '', BaudRate: 9600, driverName: '', usbSerialPath: '', sdkVersion: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_Mount' },
+        { name: '导星镜', driverType: 'Guider', type: 'CCDs', ListNum: "1", isget: false, device: '', BaudRate: 9600, driverName: '', usbSerialPath: '', sdkVersion: '', supportSDK: false, connectionMode: 'INDI', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_Guider' },
+        { name: '主相机', driverType: 'MainCamera', type: 'CCDs', ListNum: "20", isget: false, device: '', BaudRate: 9600, driverName: '', usbSerialPath: '', sdkVersion: '', supportSDK: false, connectionMode: 'INDI', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_MainCamera' },
+        { name: '赤道仪', driverType: 'Mount', type: 'Telescopes', ListNum: "0", isget: false, device: '', BaudRate: 9600, driverName: '', usbSerialPath: '', sdkVersion: '', supportSDK: false, connectionMode: 'INDI', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_Mount' },
         { name: '望远镜', driverType: 'Telescopes', device: '', isConnected: true },
-        { name: '电动调焦器', driverType: 'Focuser', type: 'Focusers', ListNum: "22", isget: false, device: '', BaudRate: 9600, driverName: '', usbSerialPath: '', sdkVersion: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_Focuser' },
-        { name: '电子极轴镜', driverType: 'PoleCamera', type: 'CCDs', ListNum: "2", isget: false, device: '', BaudRate: 9600, driverName: '', usbSerialPath: '', sdkVersion: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_PoleCamera' },
-        { name: '滤镜轮', driverType: 'CFW', type: 'Filter Wheels', ListNum: "21", isget: false, device: '', BaudRate: 9600, driverName: '', usbSerialPath: '', sdkVersion: '', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_CFW' },
+        { name: '电动调焦器', driverType: 'Focuser', type: 'Focusers', ListNum: "22", isget: false, device: '', BaudRate: 9600, driverName: '', usbSerialPath: '', sdkVersion: '', supportSDK: false, connectionMode: 'INDI', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_Focuser' },
+        { name: '电子极轴镜', driverType: 'PoleCamera', type: 'CCDs', ListNum: "2", isget: false, device: '', BaudRate: 9600, driverName: '', usbSerialPath: '', sdkVersion: '', supportSDK: false, connectionMode: 'INDI', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_PoleCamera' },
+        { name: '滤镜轮', driverType: 'CFW', type: 'Filter Wheels', ListNum: "21", isget: false, device: '', BaudRate: 9600, driverName: '', usbSerialPath: '', sdkVersion: '', supportSDK: false, connectionMode: 'INDI', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_CFW' },
       ],
 
       // Changing the label name also requires changing the emit signal name
@@ -791,6 +1072,12 @@ export default {
         { driverType: 'MainCamera', label: 'Temperature', value: '-5', inputType: 'select', selectValue: [5, 0, -5, -10, -15, -20, -25] },
         { driverType: 'MainCamera', label: 'Gain', value: '', inputType: 'slider', inputMin: 0, inputMax: 0, inputStep: 1 },
         { driverType: 'MainCamera', label: 'Offset', value: '', inputType: 'slider', inputMin: 0, inputMax: 0, inputStep: 1 },
+
+        { driverType: 'MainCamera', label: 'LoopCaptureNum', value: 0, inputType: 'number', min: 0,max: 1000, step: 1 },  // 循环拍摄次数
+
+        // QHYCCD SDK 专用：主相机三态采集模式（Single / Live / Burst）
+        { driverType: 'MainCamera', label: 'Capture Mode', value: 'Single', inputType: 'select', selectValue: ['Single', 'Live', 'Burst'], qhyOnly: true },
+        { driverType: 'MainCamera', label: 'Burst Frames', value: 20, inputType: 'number', min: 1, max: 1024, step: 1, qhyOnly: true },
 
         { driverType: 'MainCamera', num: 1, label: 'Self Exposure Time (ms)', value: 0, inputType: 'number' }, // 自曝光时间
         
@@ -818,7 +1105,8 @@ export default {
       FocuserConfigItems: [
         { driverType: 'Focuser', num: 2, label: 'Min Limit', value: '', inputType: 'tip' },
         { driverType: 'Focuser', num: 2, label: 'Max Limit', value: '', inputType: 'tip' },
-        { driverType: 'Focuser', num: 2, label: 'Sync Focuser Step', value: '', inputType: 'text' },
+        { driverType: 'Focuser', num: 2, label: 'Sync Focuser Step', value: '', inputType: 'number' , min: 0, step: 1 },
+        { driverType: 'Focuser', num: 2, label: 'Steps per Click', value: 50, inputType: 'number', min: 1, step: 1 },
         { driverType: 'Focuser', num: 2, label: 'Backlash', value: '', inputType: 'number' },
         { driverType: 'Focuser', num: 2, label: 'Coarse Step Divisions', value: 10, inputType: 'number', min: 1, step: 1 },
         { driverType: 'Focuser', num: 2, label: 'AutoFocus Exposure Time (ms)', value: 1000, inputType: 'number', min: 1, step: 1 },
@@ -829,8 +1117,13 @@ export default {
       ],
 
       CFWConfigItems: [
-
+        { driverType: 'CFW', label: 'CFW Prev', inputType: 'button', buttonText: 'CFW Prev', buttonTextWhenDisabled: 'Moving...', _disabled: false, isCfwMenuControl: true, cfwDirection: 'minus' },
+        { driverType: 'CFW', label: 'CFW Current', inputType: 'tip', value: '-', isCfwMenuDisplay: true },
+        { driverType: 'CFW', label: 'CFW Next', inputType: 'button', buttonText: 'CFW Next', buttonTextWhenDisabled: 'Moving...', _disabled: false, isCfwMenuControl: true, cfwDirection: 'plus' },
       ],
+      cfwMenuButtonsDisabled: false,
+      cfwMenuCurrentIndex: 0,
+      cfwMenuLastConfirmedIndex: 0,
 
       BeforeChangeConfigItems: [],
 
@@ -894,6 +1187,47 @@ export default {
       showImageSizeX: 0,
       showImageSizeY: 0,
 
+      // ========================= 瓦片金字塔相关 =========================
+      TILE_PATH_SUFFIX: 'img/capture-tiles',  // 与 nginx location /img/capture-tiles/ 对应
+      tileGPM: null,              // 全局处理元数据
+      tileSessionId: null,        // 当前瓦片会话ID
+      tileFrameId: null,          // 当前瓦片帧ID（用于丢弃旧帧瓦片/防错帧拉伸）
+      // E2E：出图成功信号（每次收到 TileGPM 自增；用于 Playwright 等待真实状态变化）
+      e2eTileGpmSeq: 0,
+      tileCache: null,            // 瓦片缓存 Map<"z/x/y", ImageData> (在initCanvas中初始化)
+      tileRawDataCache: null,     // 原始瓦片数据缓存 Map<"z/x/y", {width, height, type, data}> (在initCanvas中初始化)
+      tilePendingLoads: null,     // 正在加载的瓦片集合 (在initCanvas中初始化)
+      tileAbortControllers: null, // 瓦片加载取消控制器 Map<"z/x/y", AbortController> (在initCanvas中初始化)
+      tileLoadQueue: [],          // 瓦片加载队列
+      maxConcurrentTileLoads: 4,  // 最大并发加载数（live 覆盖写时过高会放大请求风暴/失败率）
+      currentTileLoads: 0,        // 当前加载数
+      tileLoadBatchSeq: 0,        // 可见瓦片加载批次号（用于“全齐再显示”屏障）
+      activeTileLoadBatchId: 0,   // 当前有效批次ID（视窗变化/新帧会覆盖旧批次）
+      tileLoadWaiters: null,      // 等待某瓦片完成的回调 Map<"z/x/y", Function[]>
+      tileBatchMaxWaitMs: 1200,   // 单批次最长等待时长（避免网络异常导致无限等待）
+      tileCanvas: null,           // 瓦片合成画布
+      tileCtx: null,              // 瓦片合成画布上下文
+      viewportChangeTimer: null,  // 视窗变化防抖定时器
+      currentVisibleTiles: null,  // 当前可见的瓦片集合 Set<"z/x/y">
+      tileHistogram: null,        // 当前会话直方图 { sessionId, bins, total, counts }
+      autoStretchBlackLevel: null, // 保存初始自动拉伸的黑点参数
+      autoStretchWhiteLevel: null, // 保存初始自动拉伸的白点参数
+      // Live 模式 TileGPM 节流：避免高帧率下每条 TileGPM 都清缓存/abort，导致“永远拉不齐一帧”
+      liveTileGpmThrottleMs: 250,   // 建议 200~400ms（对应 5~2.5fps）
+      liveTileGpmLastHandledAt: 0,
+      pendingLiveTileGpm: null,
+      pendingLiveTileGpmTimer: null,
+      // ========================= 瓦片金字塔相关结束 =========================
+
+      // 记忆瓦片层级：当再次拍摄（新 TileGPM 会话）时，若 maxZoomLevel 未变化则保持在此前层级
+      preferredTileZ: null,
+      preferredTileMaxZoomLevel: null,
+      // 记忆瓦片缩放比例（连续值），用于精确恢复缩放程度（不仅是离散层级）
+      preferredTileScale: null,
+      // 记忆瓦片视野中心（归一化到 0..1），用于新拍摄时恢复位置（尺寸变化也能复用）
+      preferredTileCenterNormX: null,
+      preferredTileCenterNormY: null,
+
       ImageProportion: 0,
 
       DetectedStarsList: [],
@@ -922,9 +1256,24 @@ export default {
       fieldOfViewPolygons: [], // 存储视场多边形对象
 
       drawer_2: null,    // 设置侧边栏的显示与隐藏
+      // 子菜单内容刷新 nonce：用于在不关闭 drawer 的情况下强制重建子菜单内容区
+      submenuRenderNonce: 0,
 
       drivers: [], // 驱动选项数组
       selectedDriver: null, // 选中的驱动
+
+      // 连接模式（INDI/SDK）相关：仅当驱动支持 SDK 时显示
+      selectedConnectionMode: 'INDI',
+      isSettingConnectionMode: false,
+      // 下拉框选项（使用 $t 做本地化）
+      connectionModeItems: [
+        { label: this.$t('INDI'), value: 'INDI' },
+        { label: this.$t('SDK'), value: 'SDK' },
+      ],
+      // 后端下发的能力缓存：优先使用；格式 { [deviceType]: { [driverName]: boolean } }
+      sdkSupportCache: {},
+      // 模式设置请求的待处理缓存：{ [deviceType]: { prev: 'INDI'|'SDK', next: 'INDI'|'SDK' } }
+      pendingConnectionModeByDevice: {},
 
       devicesList: [], // 设备选项数组
       selectedDevice: null, // 选中的设备
@@ -953,6 +1302,8 @@ export default {
       ConnectBtnlongPressThreshold: 1000,
       isConnectBtnLongPress: false, // 标记是否为长按
       ConnectBtnCanClick: true,
+      // 触摸后浏览器可能会额外触发一组合成鼠标事件（mousedown/mouseup），用这个窗口期屏蔽掉
+      ignoreMouseEventsUntil: 0,
 
 
       haveDeviceConnect: false,
@@ -991,6 +1342,10 @@ export default {
       ROI_x_qt: -1,    // 用来保存ROI区域的x坐标,在qt中计算
       ROI_y_qt: -1,    // 用来保存ROI区域的y坐标,在qt中计算
       ROI_length: 300, // 用来保存ROI区域的长度
+      // ROI 循环帧叠加层（用于瓦片模式下的 ROI 更新，避免被 renderTiles 覆盖）
+      roiOverlayImageData: null, // ImageData
+      roiOverlayX: 0,
+      roiOverlayY: 0,
       showSelectStar: false,
 
       isOneTouch: false,
@@ -1073,6 +1428,7 @@ export default {
     this.$bus.$on('Ra Aggression', this.RaAggressionSet);
     this.$bus.$on('Dec Aggression', this.DecAggressionSet);
     this.$bus.$on('Sync Focuser Step', this.SyncFocuserStep);
+    this.$bus.$on('Steps per Click', this.StepsPerClickSet);
     this.$bus.$on('Min Limit', this.MinLimitSet);
     this.$bus.$on('Max Limit', this.MaxLimitSet);
     this.$bus.$on('Backlash', this.BacklashSet);
@@ -1147,6 +1503,8 @@ export default {
     this.$bus.$on('MainCameraConnected', (num) => {
       const connected = num === 1;
       this.$store.commit('device/SET_DEVICE_CONNECTED', { device: 'MainCamera', connected });
+      // 断开连接时，将 bound 重置为 true（默认不限制）；实际绑定状态会在连接成功时由 updateDevicesConnect 再同步
+      if (!connected) this.$store.commit('device/SET_DEVICE_BOUND', { device: 'MainCamera', bound: true });
       if (!connected) this.$store.commit('device/CLEAR_FEATURES', { device: 'MainCamera' });
     });
     this.$bus.$on('MountConnected', (num) => {
@@ -1175,6 +1533,134 @@ export default {
 
   },
   methods: {
+    // 每当“UI完成一帧刷新”的信号到来时调用，用于统计 UI 刷新 FPS
+    // 说明：后端使用 ExposureCompleted 作为“刷新一帧”的信号，因此这里以 ExposureCompleted 作为 UI FPS 的统计触发。
+    onLiveFramePresented () {
+      const now = (typeof performance !== 'undefined' && performance.now)
+        ? performance.now()
+        : Date.now()
+
+      if (!this.uiFpsLastTs) {
+        this.uiFpsLastTs = now
+        this.uiFrameCount = 0
+        return
+      }
+
+      this.uiFrameCount += 1
+      const elapsed = now - this.uiFpsLastTs
+
+      if (elapsed >= 1000) {
+        const fps = this.uiFrameCount * 1000.0 / elapsed
+        if (Number.isFinite(fps)) {
+          this.$bus.$emit('UIFPS', fps)
+        }
+        this.uiFrameCount = 0
+        this.uiFpsLastTs = now
+      }
+    },
+    // =========================
+    // MainCamera / Guider 模式联动与锁定逻辑
+    // =========================
+    normalizeDriverKey(name) {
+      const n = String(name || '').trim();
+      if (!n) return '';
+      const u = n.toUpperCase();
+      // 防护：避免将占位符当作驱动
+      if (u === 'SDK' || u === 'INDI') return '';
+      return n.toLowerCase();
+    },
+    getDeviceByType(deviceType) {
+      return (this.devices || []).find(d => d.driverType === deviceType) || null;
+    },
+    isMainGuiderSameDriver() {
+      const main = this.getDeviceByType('MainCamera');
+      const guider = this.getDeviceByType('Guider');
+      const mk = this.normalizeDriverKey(main && main.driverName);
+      const gk = this.normalizeDriverKey(guider && guider.driverName);
+      return !!(mk && gk && mk === gk);
+    },
+    anySdkConnectedInMainGuider() {
+      const main = this.getDeviceByType('MainCamera');
+      const guider = this.getDeviceByType('Guider');
+      const mainSdkConnected = !!(main && main.isConnected && String(main.connectionMode || '').toUpperCase() === 'SDK');
+      const guiderSdkConnected = !!(guider && guider.isConnected && String(guider.connectionMode || '').toUpperCase() === 'SDK');
+      return mainSdkConnected || guiderSdkConnected;
+    },
+    anyIndiConnectedInMainGuider() {
+      const main = this.getDeviceByType('MainCamera');
+      const guider = this.getDeviceByType('Guider');
+      const mainIndiConnected = !!(main && main.isConnected && String(main.connectionMode || 'INDI').toUpperCase() !== 'SDK');
+      const guiderIndiConnected = !!(guider && guider.isConnected && String(guider.connectionMode || 'INDI').toUpperCase() !== 'SDK');
+      return mainIndiConnected || guiderIndiConnected;
+    },
+    ensureMainGuiderModeConsistency(preferDeviceType = '') {
+      // 仅在同驱动时要求一致
+      if (!this.isMainGuiderSameDriver()) return;
+
+      const main = this.getDeviceByType('MainCamera');
+      const guider = this.getDeviceByType('Guider');
+      if (!main || !guider) return;
+
+      const mainMode = (String(main.connectionMode || 'INDI').toUpperCase() === 'SDK') ? 'SDK' : 'INDI';
+      const guiderMode = (String(guider.connectionMode || 'INDI').toUpperCase() === 'SDK') ? 'SDK' : 'INDI';
+
+      // 若已存在 SDK 连接，则强制双方都锁到 SDK（并阻止切回 INDI）
+      if (this.anySdkConnectedInMainGuider()) {
+        if (mainMode !== 'SDK') this.requestSetConnectionMode('MainCamera', 'SDK', { silent: true, fromPeer: true });
+        if (guiderMode !== 'SDK') this.requestSetConnectionMode('Guider', 'SDK', { silent: true, fromPeer: true });
+        return;
+      }
+
+      // 若已存在 INDI 连接，则强制双方都锁到 INDI（并阻止切到 SDK）
+      if (this.anyIndiConnectedInMainGuider()) {
+        if (mainMode !== 'INDI') this.requestSetConnectionMode('MainCamera', 'INDI', { silent: true, fromPeer: true });
+        if (guiderMode !== 'INDI') this.requestSetConnectionMode('Guider', 'INDI', { silent: true, fromPeer: true });
+        return;
+      }
+
+      // 无锁：若不一致，则以触发方（或当前 UI 选中值）为准同步另一方
+      if (mainMode !== guiderMode) {
+        let desired = 'INDI';
+        if (preferDeviceType === 'MainCamera') desired = mainMode;
+        else if (preferDeviceType === 'Guider') desired = guiderMode;
+        else desired = (String(this.selectedConnectionMode || '').toUpperCase() === 'SDK') ? 'SDK' : 'INDI';
+
+        if (mainMode !== desired) this.requestSetConnectionMode('MainCamera', desired, { silent: true, fromPeer: true });
+        if (guiderMode !== desired) this.requestSetConnectionMode('Guider', desired, { silent: true, fromPeer: true });
+      }
+    },
+    // 确保主相机的“USB Traffic”配置项存在；若不存在则动态插入到 Offset 后面
+    // 返回该 item（若无法插入则返回 null）
+    ensureMainCameraUsbTrafficItem() {
+      if (!this.MainCameraConfigItems) return null;
+
+      let item = this.MainCameraConfigItems.find(it => it && it.label === 'USB Traffic');
+      if (item) return item;
+
+      const offsetIndex = this.MainCameraConfigItems.findIndex(it => it && it.label === 'Offset');
+      if (offsetIndex === -1) return null;
+
+      item = {
+        driverType: 'MainCamera',
+        label: 'USB Traffic',
+        value: 0,
+        inputType: 'slider',
+        inputMin: 0,
+        inputMax: 0,
+        inputStep: 1,
+      };
+      this.MainCameraConfigItems.splice(offsetIndex + 1, 0, item);
+      return item;
+    },
+    bumpSubmenuRender() {
+      // 仅在子菜单打开时再刷新，避免无意义的重建
+      if (this.drawer_2) {
+        this.submenuRenderNonce += 1;
+      }
+    },
+    isNotBindDevice(name) {
+      return (name || '').trim() === 'Not Bind Device';
+    },
     // 串口选择变更：在连接面板中（波特率下方）选择串口
     onSerialPortSelect(driverType, value) {
       // 'default' 表示使用自动匹配逻辑，不强制指定串口
@@ -1187,6 +1673,12 @@ export default {
       this.sendMessage('Vue_Command', 'SetSerialPort:' + driverType + ':' + value);
     },
     onButtonPress(item) {
+      // 未绑定时：所有参数设置不可操作
+      if (this.isCurrentDeviceUnbound) return;
+      if (item && item.driverType === 'CFW' && item.isCfwMenuControl) {
+        this.handleCfwMenuButtonClick(item);
+        return;
+      }
       // 禁用按钮
       this.$set(item, '_disabled', true);
 
@@ -1200,6 +1692,66 @@ export default {
         this.$set(item, '_disabled', false);
       }
       // this.handleConfigChange(item.label, false);
+    },
+    getCfwPositionCount() {
+      return this.CFWConfigItems.filter(item => /^CFW \[\d+\]$/.test(String(item.label || ''))).length;
+    },
+    getCfwMenuDisplayItem() {
+      return this.CFWConfigItems.find(item => item && item.isCfwMenuDisplay);
+    },
+    getCfwLabelValueByIndex(index) {
+      const cfwItem = this.CFWConfigItems.find(item => item && item.label === `CFW [${index + 1}]`);
+      if (cfwItem && cfwItem.value !== '' && cfwItem.value != null) {
+        return String(cfwItem.value);
+      }
+      return String(index + 1);
+    },
+    updateCfwMenuCurrentDisplay() {
+      const displayItem = this.getCfwMenuDisplayItem();
+      if (!displayItem) return;
+      const total = this.getCfwPositionCount();
+      if (total <= 0) {
+        this.$set(displayItem, 'value', '-');
+        return;
+      }
+      let index = parseInt(this.cfwMenuCurrentIndex, 10);
+      if (!Number.isFinite(index) || index < 0) index = 0;
+      if (index >= total) index = total - 1;
+      this.cfwMenuCurrentIndex = index;
+      this.$set(displayItem, 'value', this.getCfwLabelValueByIndex(index));
+    },
+    setCfwMenuButtonsDisabled(disabled) {
+      this.cfwMenuButtonsDisabled = disabled;
+      this.CFWConfigItems.forEach(item => {
+        if (item && item.isCfwMenuControl) {
+          this.$set(item, '_disabled', disabled);
+        }
+      });
+    },
+    handleCfwMenuButtonClick(item) {
+      if (this.cfwMenuButtonsDisabled) return;
+      const cfwDevice = this.getDeviceByType('CFW');
+      if (!(cfwDevice && cfwDevice.isConnected)) {
+        this.callShowMessageBox('Please connect the Filter Wheels first.', 'error');
+        return;
+      }
+      const total = this.getCfwPositionCount();
+      if (total <= 0) {
+        this.callShowMessageBox('No filter wheel slots found.', 'error');
+        return;
+      }
+      const direction = item.cfwDirection === 'plus' ? 'plus' : 'minus';
+      let nextIndex = this.cfwMenuCurrentIndex;
+      if (direction === 'plus') {
+        nextIndex = nextIndex < total - 1 ? nextIndex + 1 : 0;
+      } else {
+        nextIndex = nextIndex > 0 ? nextIndex - 1 : total - 1;
+      }
+      this.cfwMenuCurrentIndex = nextIndex;
+      this.updateCfwMenuCurrentDisplay();
+      this.setCfwMenuButtonsDisabled(true);
+      this.SendConsoleLogMsg('SetCFWPosition:' + (nextIndex + 1), 'info');
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'SetCFWPosition:' + (nextIndex + 1));
     },
     // 是否允许小数：step 不是整数，或显式允许
     allowsDecimal(item) {
@@ -1536,6 +2088,23 @@ export default {
             }
           }
 
+          // 下载清单（JSON 可能包含 ':'，必须用“首个冒号”截取）
+          if (data.message.startsWith('DownloadManifest:')) {
+            acceptMessage = true;
+            try {
+              const colonIndex = data.message.indexOf(':');
+              if (colonIndex === -1 || colonIndex >= data.message.length - 1) {
+                this.$bus.$emit('DownloadManifest', { error: 'Invalid message format', totalBytes: 0, files: [] });
+              } else {
+                const jsonString = data.message.substring(colonIndex + 1);
+                const jsonData = JSON.parse(jsonString);
+                this.$bus.$emit('DownloadManifest', jsonData);
+              }
+            } catch (e) {
+              this.$bus.$emit('DownloadManifest', { error: 'Failed to parse manifest: ' + e.message, totalBytes: 0, files: [] });
+            }
+          }
+
           if (!acceptMessage) {
             switch (messageType) {
               case 'AddDriver':
@@ -1615,6 +2184,11 @@ export default {
                 }
                 break;
 
+              case 'ConnectAllDeviceComplete':
+                // 全部连接完成，关闭进度条
+                this.loadingConnectAllDevice = false;
+                break;
+
               case 'ScanFailed':
                 if (parts.length === 2) {
                   const reason = parts[1];
@@ -1635,7 +2209,9 @@ export default {
                   const DeviceType = parts[1];
                   const DeviceIndex = parts[2];
                   const DeviceName = parts[3];
-                  this.$bus.$emit('DeviceToBeAllocated', DeviceIndex, DeviceName);
+                  // 关键：必须携带 DeviceType，否则分配列表会混淆（例如电调/赤道仪错绑）
+                  const idxNum = Number(DeviceIndex);
+                  this.$bus.$emit('DeviceToBeAllocated', DeviceType, Number.isFinite(idxNum) ? idxNum : DeviceIndex, DeviceName);
                 }
                 break;
 
@@ -1646,6 +2222,41 @@ export default {
 
               case 'ExposureCompleted':
                 this.$bus.$emit('ExposureCompleted');
+                // 以 ExposureCompleted 作为“UI刷新一帧”的信号，统计前端显示帧率
+                this.onLiveFramePresented();
+                break;
+
+              case 'LiveFPS':
+                if (parts.length >= 2) {
+                  const fps = parseFloat(parts[1]);
+                  if (!isNaN(fps) && isFinite(fps)) {
+                    this.liveCameraFps = fps;
+                    this.$bus.$emit('LiveFPS', fps);
+                  }
+                }
+                break;
+
+              case 'LiveProcessFPS':
+                if (parts.length >= 2) {
+                  const fps = parseFloat(parts[1]);
+                  if (!isNaN(fps) && isFinite(fps)) {
+                    this.liveProcessFps = fps;
+                    this.$bus.$emit('LiveProcessFPS', fps);
+                  }
+                }
+                break;
+
+              case 'ExposureFailed':
+                if (parts.length >= 2) {
+                  // 失败原因里可能包含 ':'，这里做兼容拼回完整字符串
+                  const reason = parts.slice(1).join(':');
+                  this.$bus.$emit('ExposureFailed', reason);
+                  this.callShowMessageBox(reason, 'error');
+                } else {
+                  const reason = 'Exposure failed';
+                  this.$bus.$emit('ExposureFailed', reason);
+                  this.callShowMessageBox(reason, 'error');
+                }
                 break;
 
               case 'SaveJpgSuccess':
@@ -1662,17 +2273,115 @@ export default {
                 break;
 
               case 'SaveBinSuccess':
+                // 已废弃：不再使用传统bin文件方式，完全使用瓦片金字塔模式
+                // 后端应该发送 TileGPM 消息而不是 SaveBinSuccess
                 if (parts.length === 4) {
                   const fileName = parts[1];
                   const showImageSizeX = parseInt(parts[2]);
                   const showImageSizeY = parseInt(parts[3]);
                   this.showImageSizeX = showImageSizeX;
                   this.showImageSizeY = showImageSizeY;
-                  this.readBinFile('img/' + fileName);
+                  // this.readBinFile('img/' + fileName);
                   this.DetectedStarsFinish = false;
+                  
+                  this.SendConsoleLogMsg(`收到SaveBinSuccess消息，等待TileGPM消息以启动瓦片模式: ${fileName}`, 'info');
+                  // 不再处理bin文件，等待瓦片数据
                 }
                 break;
 
+              case 'TileGPM':
+                // 瓦片金字塔GPM消息处理
+                // 格式:
+                // - v1: TileGPM:{sessionId}:{imageWidth}:{imageHeight}:{tileSize}:{maxZoomLevel}:{blackLevel}:{whiteLevel}:{cfa}:{gainR}:{gainB}
+                // - v2(追加): ...:{previewWidth}:{previewHeight}:{previewBinningFactor}
+                // - v3(追加): ...:{frameId}
+                if (parts.length >= 11) {
+                  const gpm = {
+                    sessionId: parts[1],
+                    imageWidth: parseInt(parts[2]),
+                    imageHeight: parseInt(parts[3]),
+                    tileSize: parseInt(parts[4]),
+                    maxZoomLevel: parseInt(parts[5]),
+                    blackLevel: parseInt(parts[6]),
+                    whiteLevel: parseInt(parts[7]),
+                    cfa: parts[8],
+                    gainR: parseFloat(parts[9]),
+                    gainB: parseFloat(parts[10]),
+                    // 兼容字段（可能不存在）
+                    previewWidth: (parts.length >= 14) ? parseInt(parts[11]) : null,
+                    previewHeight: (parts.length >= 14) ? parseInt(parts[12]) : null,
+                    previewBinningFactor: (parts.length >= 14) ? parseInt(parts[13]) : null,
+                    frameId: (parts.length >= 15) ? parseInt(parts[14]) : null,
+                  };
+                  this.handleTileGPM(gpm);
+                }
+                break;
+
+              case 'TileHistogramFile':
+                // 新方案：直方图保存为文件，通过HTTPS下载
+                // 格式: TileHistogramFile:{sessionId}:{bins}:{total}:{url}
+                if (parts.length >= 5) {
+                  const sessionId = parts[1];
+                  const bins = parseInt(parts[2]);
+                  const total = parseInt(parts[3]);
+                  const url = parts.slice(4).join(':'); // URL可能包含':'
+
+                  // 仅处理当前会话的直方图
+                  if (!this.tileSessionId || this.tileSessionId === sessionId) {
+                    this.SendConsoleLogMsg(`Downloading histogram: session=${sessionId}, url=${url}`, 'info');
+                    
+                    // 异步下载并解析直方图文件
+                    this.loadHistogramFromFile(sessionId, bins, total, url);
+                  }
+                }
+                break;
+
+              case 'WhiteBalanceGains':
+                // 白平衡增益计算结果
+                // 格式: WhiteBalanceGains:{gainR}:{gainB}
+                if (parts.length >= 3) {
+                  const gainR = parseFloat(parts[1]);
+                  const gainB = parseFloat(parts[2]);
+                  
+                  console.log(`[WhiteBalanceGains] 收到白平衡增益: R=${gainR}, B=${gainB}`);
+                  this.SendConsoleLogMsg(`白平衡计算完成: R增益=${gainR.toFixed(3)}, B增益=${gainB.toFixed(3)}`, 'info');
+                  
+                  // 更新增益值
+                  const oldGainR = this.ImageGainR;
+                  const oldGainB = this.ImageGainB;
+                  this.ImageGainR = gainR;
+                  this.ImageGainB = gainB;
+                  
+                  // 更新配置面板显示
+                  const GainRIndex = this.MainCameraConfigItems.findIndex(item => item.label === 'ImageGainR');
+                  if (GainRIndex !== -1) {
+                    this.MainCameraConfigItems[GainRIndex].value = gainR;
+                  }
+                  
+                  const GainBIndex = this.MainCameraConfigItems.findIndex(item => item.label === 'ImageGainB');
+                  if (GainBIndex !== -1) {
+                    this.MainCameraConfigItems[GainBIndex].value = gainB;
+                  }
+                  
+                  // 如果在瓦片模式下，更新GPM并重新处理瓦片（不重新下载）
+                  if (this.tileGPM) {
+                    // 检查是否是灰度图且增益值没有实际变化
+                    const isGrayImage = !this.ImageCFA || this.ImageCFA === 'null';
+                    const gainsUnchanged = (gainR === oldGainR || (gainR === 1 && oldGainR === 1)) && 
+                                          (gainB === oldGainB || (gainB === 1 && oldGainB === 1));
+                    
+                    if (isGrayImage && gainsUnchanged) {
+                      console.log('[WhiteBalanceGains] 灰度图模式且增益值未变化，跳过重新处理瓦片');
+                      this.SendConsoleLogMsg('灰度图模式下白平衡增益保持不变', 'info');
+                    } else {
+                      this.tileGPM.gainR = gainR;
+                      this.tileGPM.gainB = gainB;
+                      console.log('[WhiteBalanceGains] 更新瓦片GPM增益参数，使用新增益重新处理已缓存瓦片');
+                      this.reprocessTilesWithNewGains();
+                    }
+                  }
+                }
+                break;
 
               case 'SaveGuiderImageSuccess':
                 if (parts.length === 2) {
@@ -1924,11 +2633,15 @@ export default {
               case 'CFWPositionMax':
                 if (parts.length === 2) {
                   this.$bus.$emit('SetCFWPositionMax', parts[1]);
-
-                  for (let i = 1; i <= parts[1]; i++) {
+                  const cfwCount = parseInt(parts[1], 10) || 0;
+                  this.CFWConfigItems = this.CFWConfigItems.filter(item => !/^CFW \[\d+\]$/.test(String(item.label || '')));
+                  for (let i = 1; i <= cfwCount; i++) {
                     this.CFWConfigItems.push({ driverType: 'CFW', label: `CFW [${i}]`, value: '', inputType: 'text' });
                   }
-
+                  this.cfwMenuCurrentIndex = 0;
+                  this.cfwMenuLastConfirmedIndex = 0;
+                  this.setCfwMenuButtonsDisabled(false);
+                  this.updateCfwMenuCurrentDisplay();
                   this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getCFWList');
                 }
                 break;
@@ -1936,7 +2649,25 @@ export default {
 
               case 'SetCFWPositionSuccess':
                 if (parts.length === 2) {
+                  const pos1 = parseInt(parts[1], 10);
+                  if (!isNaN(pos1) && pos1 > 0) {
+                    this.cfwMenuCurrentIndex = pos1 - 1;
+                  }
+                  this.cfwMenuLastConfirmedIndex = this.cfwMenuCurrentIndex;
+                  this.setCfwMenuButtonsDisabled(false);
+                  this.updateCfwMenuCurrentDisplay();
                   this.$bus.$emit('SetCFWPositionSuccess', parts[1]);
+                }
+                break;
+
+              case 'SetCFWPositionFailed':
+                if (parts.length >= 2) {
+                  // 失败原因里可能包含 ':'，这里做兼容拼回完整字符串
+                  const reason = parts.slice(1).join(':');
+                  this.cfwMenuCurrentIndex = this.cfwMenuLastConfirmedIndex;
+                  this.setCfwMenuButtonsDisabled(false);
+                  this.updateCfwMenuCurrentDisplay();
+                  this.$bus.$emit('SetCFWPositionFailed', reason);
                 }
                 break;
 
@@ -2051,6 +2782,7 @@ export default {
                     }
                   }
                 }
+                this.bumpSubmenuRender();
                 break;
 
               case 'USBFilesList':
@@ -2166,6 +2898,26 @@ export default {
                     OffsetItem.inputMax = parseInt(this.MainCameraOffsetMax, 10);
                     OffsetItem.value = parseInt(MainCameraOffsetValue, 10);
                   }
+                  this.bumpSubmenuRender();
+                }
+                break;
+
+              case 'MainCameraUsbTrafficRange':
+                // MainCameraUsbTrafficRange:min:max:value:step(可选)
+                if (parts.length >= 4) {
+                  const min = parseInt(parts[1], 10);
+                  const max = parseInt(parts[2], 10);
+                  const value = parseInt(parts[3], 10);
+                  const step = (parts.length >= 5) ? Math.max(1, parseInt(parts[4], 10) || 1) : 1;
+
+                  const usbItem = this.ensureMainCameraUsbTrafficItem();
+                  if (usbItem) {
+                    usbItem.inputMin = min;
+                    usbItem.inputMax = max;
+                    usbItem.inputStep = step;
+                    usbItem.value = value;
+                  }
+                  this.bumpSubmenuRender();
                 }
                 break;
 
@@ -2184,6 +2936,7 @@ export default {
                     gainItem.inputMax = parseInt(this.MainCameraGainMax, 10);
                     gainItem.value = parseInt(MainCameraGainValue, 10);
                   }
+                  this.bumpSubmenuRender();
                 }
                 break;
 
@@ -2458,9 +3211,41 @@ export default {
                 break;
 
               case 'ConnectDriverFailed':
-                if (parts.length === 2) {
-                  const message = parts[1];
-                  this.connectDriverFailed(message);
+                // 支持两种格式：
+                // 1. ConnectDriverFailed:message (旧格式，兼容)
+                // 2. ConnectDriverFailed:DeviceType:ErrorMessage (新格式，包含设备类型)
+                if (parts.length >= 2) {
+                  let errorMessage;
+                  let deviceType = '';
+                  
+                  if (parts.length >= 3) {
+                    // 新格式：ConnectDriverFailed:DeviceType:ErrorMessage
+                    deviceType = parts[1];
+                    errorMessage = parts.slice(2).join(':'); // 兼容错误信息里包含 ':'
+                  } else {
+                    // 旧格式：ConnectDriverFailed:message
+                    errorMessage = parts[1];
+                  }
+                  
+                  this.connectDriverFailed(errorMessage, deviceType);
+                }
+                break;
+
+              case 'SetConnectionModeSuccess':
+                // 格式：SetConnectionModeSuccess:DeviceDescription:Mode
+                if (parts.length === 3) {
+                  const deviceType = (parts[1] || '').trim();
+                  const mode = (parts[2] || '').trim().toUpperCase() === 'SDK' ? 'SDK' : 'INDI';
+                  this.onSetConnectionModeSuccess(deviceType, mode);
+                }
+                break;
+
+              case 'SetConnectionModeFailed':
+                // 格式：SetConnectionModeFailed:DeviceDescription:ErrorMessage
+                if (parts.length >= 3) {
+                  const deviceType = (parts[1] || '').trim();
+                  const errorMsg = parts.slice(2).join(':'); // 兼容错误信息里包含 ':'
+                  this.onSetConnectionModeFailed(deviceType, errorMsg);
                 }
                 break;
 
@@ -2478,27 +3263,40 @@ export default {
                 }
 
               case 'SelectedDriverList':
+                // 兼容旧格式(Desc:Driver)与新格式(Desc:Driver:SDKSupport:Mode)
                 if (parts.length >= 3) {
-                  const deviceObjects = parts.slice(1).reduce((acc, part, index, array) => {
-                    if (index % 2 === 0) {
-                      acc.push({ [array[index]]: array[index + 1] });
-                    }
-                    return acc;
-                  }, []);
-                  this.loadSelectedDriverList(deviceObjects);
+                  this.loadSelectedDriverListFromParts(parts);
                 }
                 break;
 
 
               case 'BindDeviceList':
-                if (parts.length >= 3) {
-                  const deviceObjects = parts.slice(1).reduce((acc, part, index, array) => {
-                    if (index % 2 === 0) {
-                      acc.push({ [array[index]]: array[index + 1] });
+                // 兼容两种格式：
+                // - 旧：BindDeviceList:Name1:Index1:Name2:Index2:...
+                // - 新：BindDeviceList:Type1:Name1:Index1:Type2:Name2:Index2:...
+                if (parts.length > 1) {
+                  const payload = parts.slice(1);
+                  if (payload.length % 3 === 0) {
+                    const list = [];
+                    for (let i = 0; i < payload.length; i += 3) {
+                      list.push({
+                        DeviceType: (payload[i] || '').trim(),
+                        DeviceName: (payload[i + 1] || '').trim(),
+                        DeviceIndex: payload[i + 2],
+                      });
                     }
-                    return acc;
-                  }, []);
-                  this.loadBindDeviceList(deviceObjects);
+                    this.loadBindDeviceList(list);
+                  } else if (payload.length % 2 === 0) {
+                    const deviceObjects = payload.reduce((acc, part, index, array) => {
+                      if (index % 2 === 0) {
+                        acc.push({ [array[index]]: array[index + 1] });
+                      }
+                      return acc;
+                    }, []);
+                    this.loadBindDeviceList(deviceObjects);
+                  } else {
+                    console.warn('BindDeviceList | invalid payload:', data.message);
+                  }
                 }
                 break;
 
@@ -2619,6 +3417,8 @@ export default {
                     this.isFocusLoopShooting = true;
                   } else {
                     this.isFocusLoopShooting = false;
+                    // 停止 ROI 循环时，清空 ROI 叠加层，避免画面残留
+                    this.roiOverlayImageData = null;
                   }
                 }
                 break;
@@ -2661,6 +3461,9 @@ export default {
                   this.visibleY = parseFloat(parts[2]);
                   this.scale = parseFloat(parts[3]);
                   this.$bus.$emit('setScale', this.scale);
+                  this.emitTileLevelInfo();
+                  // SetVisibleArea 也代表一次视窗变化，记录位置以便下次拍摄恢复
+                  this.rememberTileViewportState();
                   console.log('设置可见区域: ', this.visibleX, this.visibleY, this.scale);
                   this.SendConsoleLogMsg('update VisibleArea x=' + this.visibleX + ', y=' + this.visibleY + ', scale=' + this.scale, 'info');
                 }
@@ -3120,24 +3923,87 @@ export default {
                   this.$bus.$emit('setFocusChartRange', FocuserMinLimit, FocuserMaxLimit);
                 }
                 break;
-              case 'Backlash':
+
+              case 'FocuserRangeReset':
+                // 电调范围重置警告（当设备初始化时检测到本地保存的范围不合理）
                 if (parts.length === 2) {
-                  const FocuserBacklash = parts[1];
-                  let item = this.FocuserConfigItems.find(i => i.label === 'Backlash');
+                  const message = parts[1];
+                  // 显示警告消息框
+                  this.callShowMessageBox(this.$t('focuser.range_reset_warning', { message }), 'warning');
+                  // 同时在控制台输出
+                  this.SendConsoleLogMsg(this.$t('focuser.range_reset_warning', { message }), 'warning');
+                }
+                break;
+
+              case 'FocuserParameters':
+                // 后端格式（兼容）:
+                // - 旧: FocuserParameters:<minLimit>:<maxLimit>:<backlash>:<coarseDivisions>
+                // - 新: FocuserParameters:<minLimit>:<maxLimit>:<backlash>:<coarseDivisions>:<stepsPerClick>
+                if (parts.length === 5 || parts.length === 6) {
+                  const FocuserMinLimit = parts[1];
+                  const FocuserMaxLimit = parts[2];
+                  const FocuserBacklash = parts[3];
+                  const divisions = parts[4];
+                  const stepsPerClick = (parts.length === 6) ? parts[5] : null;
+
+                  // Min/Max Limit
+                  let item = this.FocuserConfigItems.find(i => i.label === 'Min Limit');
+                  if (item) {
+                    item.value = FocuserMinLimit;
+                  } else {
+                    this.FocuserConfigItems.push({ driverType: 'Focuser', label: 'Min Limit', value: FocuserMinLimit, inputType: 'number' },);
+                  }
+                  item = this.FocuserConfigItems.find(i => i.label === 'Max Limit');
+                  if (item) {
+                    item.value = FocuserMaxLimit;
+                  } else {
+                    this.FocuserConfigItems.push({ driverType: 'Focuser', label: 'Max Limit', value: FocuserMaxLimit, inputType: 'number' },);
+                  }
+                  this.$bus.$emit('setFocusChartRange', FocuserMinLimit, FocuserMaxLimit);
+
+                  // Backlash
+                  item = this.FocuserConfigItems.find(i => i.label === 'Backlash');
                   if (item) {
                     item.value = FocuserBacklash;
                   }
-                }
-                break;
-              case 'Coarse Step Divisions':
-                if (parts.length === 2) {
-                  const divisions = parts[1];
-                  const item = this.FocuserConfigItems.find(i => i.label === 'Coarse Step Divisions');
+
+                  // Steps per Click
+                  if (stepsPerClick !== null) {
+                    item = this.FocuserConfigItems.find(i => i.label === 'Steps per Click');
+                    if (item) {
+                      item.value = stepsPerClick;
+                    }
+                    const stepInt = parseInt(stepsPerClick);
+                    if (!Number.isNaN(stepInt)) {
+                      this.$bus.$emit('focusMoveStep', stepInt);
+                    }
+                  }
+
+                  // Coarse Step Divisions
+                  item = this.FocuserConfigItems.find(i => i.label === 'Coarse Step Divisions');
                   if (item) {
                     item.value = divisions;
                   }
                 }
                 break;
+              // case 'Backlash':
+              //   if (parts.length === 2) {
+              //     const FocuserBacklash = parts[1];
+              //     let item = this.FocuserConfigItems.find(i => i.label === 'Backlash');
+              //     if (item) {
+              //       item.value = FocuserBacklash;
+              //     }
+              //   }
+              //   break;
+              // case 'Coarse Step Divisions':
+              //   if (parts.length === 2) {
+              //     const divisions = parts[1];
+              //     const item = this.FocuserConfigItems.find(i => i.label === 'Coarse Step Divisions');
+              //     if (item) {
+              //       item.value = divisions;
+              //     }
+              //   }
+              //   break;
               case 'updateAutoFocuserState':
                 if (parts.length === 2) {
                   const autoFocusState = parts[1];
@@ -3491,7 +4357,7 @@ export default {
       this.sendMessage('Vue_Command', 'getStagingSolveResult'); // 获取定标结果
       this.sendMessage('Vue_Command', 'getGPIOsStatus'); // 获取GPIO状态
 
-      // this.sendMessage('Vue_Command', 'getStagingImage'); // 获取最后拍摄的图像,弃用
+
       // this.sendMessage('Vue_Command', 'getPolarAlignmentState'); // 获取极轴对齐状态,更换位置
       this.sendMessage('Vue_Command', 'loadSDKVersionAndUSBSerialPath'); // 获取SDK版本和USB序列号路径
       this.sendMessage('Vue_Command', 'USBCheck'); // 检查USB状态
@@ -3549,7 +4415,15 @@ export default {
         case 'Guider':
           return this.GuiderConfigItems;
         case 'MainCamera':
-          return this.MainCameraConfigItems;
+          // 仅当主相机=QHY 且连接模式=SDK 时，才展示 Burst 相关配置
+          {
+            const dev = (this.devices || []).find(d => d && d.driverType === 'MainCamera') || {};
+            const driverName = String(dev.driverName || '');
+            const isQhy = driverName.toLowerCase().includes('qhy');
+            const isSdk = String(dev.connectionMode || '').toUpperCase() === 'SDK';
+            const allowBurst = isQhy && isSdk;
+            return (this.MainCameraConfigItems || []).filter(it => !(it && it.qhyOnly) || allowBurst);
+          }
         case 'Mount':
           return this.MountConfigItems;
         case 'Telescopes':
@@ -3568,6 +4442,21 @@ export default {
     confirmDriver() {
       // 确定驱动的逻辑
       console.log("QHYCCD | confirmDriver: ", this.selectedDriver);
+
+      // 防护：若 selectedDriver 是 SDK/INDI 占位符，拒绝确认并提示用户重新选择
+      const upperDriver = String(this.selectedDriver || '').toUpperCase();
+      if (upperDriver === 'SDK' || upperDriver === 'INDI') {
+        this.SendConsoleLogMsg(`Invalid driver "${this.selectedDriver}". Please select a valid driver from the list.`, 'error');
+        this.callShowMessageBox(`Invalid driver "${this.selectedDriver}". Please select a valid driver.`, 'error');
+        return;
+      }
+
+      if (!this.selectedDriver || this.selectedDriver === '') {
+        this.SendConsoleLogMsg('No driver selected', 'warning');
+        this.callShowMessageBox('Please select a driver first', 'warning');
+        return;
+      }
+
       this.SendConsoleLogMsg('Confirm Indi Driver:' + this.selectedDriver, 'info');
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'ConfirmIndiDriver:' + this.selectedDriver + ':' + this.BaudRateSelected);
       this.confirmDriverType = this.CurrentDriverType;
@@ -3578,8 +4467,15 @@ export default {
           device.device = this.selectedDriver;
           device.driverName = this.selectedDriver;
           device.BaudRate = this.BaudRateSelected;
+          // 驱动切换后，刷新该设备是否支持 SDK，并确保模式与能力匹配
+          this.refreshSdkSupportAndModeForDevice(device.driverType, device.driverName);
         }
       });
+
+      // 若主相机与导星镜选用了同一驱动：确保二者连接模式保持一致
+      if (this.CurrentDriverType === 'MainCamera' || this.CurrentDriverType === 'Guider') {
+        this.ensureMainGuiderModeConsistency(this.CurrentDriverType);
+      }
     },
     clearDriver() {
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'ClearIndiDriver');
@@ -3589,9 +4485,16 @@ export default {
           device.device = '';
           device.driverName = '';
           device.BaudRate = 9600;
+          device.supportSDK = false;
+          device.connectionMode = 'INDI';
         }
       });
       this.selectedDriver = '';
+      this.selectedConnectionMode = 'INDI';
+      // 更新UI显示，确保清除后的状态正确反映在界面上
+      if (this.CurrentDriverType) {
+        this.updateSelectedDriver(this.CurrentDriverType);
+      }
     },
     confirmDevice() {
       // 确定设备的逻辑
@@ -3617,26 +4520,42 @@ export default {
       this.loadingConnectAllDevice = false;
     },
 
-    updateDevicesConnect(type, DeviceName, DriverName, isBind = true) {    // 连接成功
+    updateDevicesConnect(type, DeviceName, DriverName, isBind = true, opts = {}) {    // 连接成功
+      const silent = !!opts.silent;
       this.SendConsoleLogMsg('updateDevicesConnect' + type + ' ' + DeviceName + ' ' + DriverName + ' ' + isBind, 'info');
+      
+      // driverName 允许缺省（例如解绑流程只需要改 bound，不应该把 driverName 写成 undefined）
+      const hasDriverName = !(DriverName === undefined || DriverName === null || String(DriverName).trim() === '');
+      // 防护：过滤掉 SDK/INDI 占位符，避免将连接模式误当作驱动名称
+      const upperDriverName = hasDriverName ? String(DriverName).toUpperCase() : '';
+      if (hasDriverName && (upperDriverName === 'SDK' || upperDriverName === 'INDI')) {
+        console.warn(`updateDevicesConnect: Invalid driver name "${DriverName}" for ${type}, skipping driverName update`);
+      }
+
       this.devices.forEach(device => {
         if (device.driverType === type) {
-          if (isBind == true) {
-            device.device = DeviceName;
-          } else {
-            device.device = "Not Bind Device";
+          device.device = (isBind == true) ? DeviceName : "Not Bind Device";
+          // 仅当 driverName 有效时才更新，避免解绑/异常路径污染已有驱动名
+          if (hasDriverName && upperDriverName !== 'SDK' && upperDriverName !== 'INDI') {
+            device.driverName = DriverName;
           }
-          device.driverName = DriverName;
           device.isConnected = true;
         }
       });
-      this.callShowMessageBox(DeviceName + ' success connected', 'success');
+      if (!silent) {
+        const shownName = (isBind && DeviceName) ? DeviceName : 'Not Bind Device';
+        this.callShowMessageBox(shownName + ' success connected', 'success');
+      }
       this.haveDeviceConnect = true;
-      this.loadingConnectAllDevice = false;
+      // 注释掉：不再在单个设备连接成功时关闭进度条，等待全部连接完成消息
+      // this.loadingConnectAllDevice = false;
 
       if (type === 'MainCamera') {
+        // 连接成功：仍视为已连接（是否绑定由 bound 单独标记，不影响其它功能）
         this.$bus.$emit('MainCameraConnected', 1);
-        console.log('MainCamera is Connected.');
+        // 同步“绑定状态”到全局设备管理（用于：拍摄/循环拍摄/自动对焦/极轴校准/计划表/解析等精确拦截）
+        this.$store.commit('device/SET_DEVICE_BOUND', { device: 'MainCamera', bound: !!isBind });
+        console.log('MainCamera is Connected. bound=', !!isBind);
       } else if (type === 'Mount') {
         this.$bus.$emit('MountConnected', 1);
         console.log('Mount is Connected.');
@@ -3659,40 +4578,42 @@ export default {
       if (event.type === 'touchstart') {
         this.isTouching = true;
         this.isConnectBtnLongPress = false; // 重置长按标记
-        // this.ConnectBtnPressTimer = setTimeout(() => {
-        //   this.isConnectBtnLongPress = true; // 标记为长按
-        //   this.handleConnectBtnLongPress();
-        // }, this.ConnectBtnlongPressThreshold);
-        this.handleConnectBtnClick();
+        // 触摸后通常会跟随触发合成鼠标事件，设置一个 ignore 窗口期来屏蔽
+        this.ignoreMouseEventsUntil = Date.now() + 800;
+        clearTimeout(this.ConnectBtnPressTimer);
+        this.ConnectBtnPressTimer = setTimeout(() => {
+          this.isConnectBtnLongPress = true; // 标记为长按
+          this.handleConnectBtnLongPress();
+        }, this.ConnectBtnlongPressThreshold);
       }
       // 如果是鼠标事件，且没有正在进行的触摸事件，则处理
       else if (event.type === 'mousedown' && !this.isTouching) {
+        if (Date.now() < this.ignoreMouseEventsUntil) return;
         this.isConnectBtnLongPress = false; // 重置长按标记
-        // this.ConnectBtnPressTimer = setTimeout(() => {
-        //   this.isConnectBtnLongPress = true; // 标记为长按
-        //   this.handleConnectBtnLongPress();
-        // }, this.ConnectBtnlongPressThreshold);
-        this.handleConnectBtnClick();
+        clearTimeout(this.ConnectBtnPressTimer);
+        this.ConnectBtnPressTimer = setTimeout(() => {
+          this.isConnectBtnLongPress = true; // 标记为长按
+          this.handleConnectBtnLongPress();
+        }, this.ConnectBtnlongPressThreshold);
       }
     },
     endConnectBtnPress(event) {
       // 如果是触摸事件，处理并重置标记
       if (event.type === 'touchend') {
         clearTimeout(this.ConnectBtnPressTimer); // 清除定时器
-        // if (!this.isConnectBtnLongPress) {
-        //   this.handleConnectBtnClick(); // 如果不是长按，则触发点击事件
-        // }
-        this.handleConnectBtnClick();
+        if (!this.isConnectBtnLongPress) {
+          this.handleConnectBtnClick(); // 如果不是长按，则触发点击事件
+        }
         this.ConnectBtnPressTimer = null; // 重置定时器
         this.isTouching = false; // 重置触摸标记
       }
       // 如果是鼠标事件，且没有正在进行的触摸事件，则处理
       else if (event.type === 'mouseup' && !this.isTouching) {
+        if (Date.now() < this.ignoreMouseEventsUntil) return;
         clearTimeout(this.ConnectBtnPressTimer); // 清除定时器
-        // if (!this.isConnectBtnLongPress) {
-        //   this.handleConnectBtnClick(); // 如果不是长按，则触发点击事件
-        // }
-        this.handleConnectBtnClick();
+        if (!this.isConnectBtnLongPress) {
+          this.handleConnectBtnClick(); // 如果不是长按，则触发点击事件
+        }
         this.ConnectBtnPressTimer = null; // 重置定时器
       }
     },
@@ -3876,6 +4797,9 @@ export default {
       if (expTimeIndex !== -1) { // 确保找到了对应的配置项
         // 更新 ExpTime1 配置项的值
         this.CFWConfigItems[expTimeIndex].value = value;
+        if (index === this.cfwMenuCurrentIndex) {
+          this.updateCfwMenuCurrentDisplay();
+        }
       } else {
         console.error('CFW [' + index + '] configuration item not found.');
       }
@@ -3920,6 +4844,85 @@ export default {
       }
     },
 
+    /**
+     * 从文件加载直方图数据（新方案：通过HTTPS下载.bin文件）
+     * @param {string} sessionId - 会话ID
+     * @param {number} bins - bin数量
+     * @param {number} total - 总像素数
+     * @param {string} url - 直方图文件URL
+     */
+    async loadHistogramFromFile(sessionId, bins, total, url) {
+      try {
+        // 添加时间戳避免浏览器缓存
+        const timestamp = new Date().getTime();
+        const fetchUrl = url.includes('?') ? `${url}&_t=${timestamp}` : `${url}?_t=${timestamp}`;
+        
+        this.SendConsoleLogMsg(`Fetching histogram from: ${fetchUrl}`, 'info');
+        
+        // 下载二进制文件
+        const response = await fetch(fetchUrl);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const arrayBuffer = await response.arrayBuffer();
+        this.SendConsoleLogMsg(`Downloaded histogram file: ${arrayBuffer.byteLength} bytes`, 'info');
+        
+        // 解析二进制格式
+        // 文件格式：[bins(4字节)][total(8字节)][histogram数据(bins*4字节)]
+        const dataView = new DataView(arrayBuffer);
+        let offset = 0;
+        
+        // 读取bins数量（4字节，uint32，little-endian）
+        const fileBins = dataView.getUint32(offset, true);
+        offset += 4;
+        
+        // 读取总像素数（8字节，uint64，little-endian）
+        // JavaScript的Number只能精确表示53位整数，但对于像素总数已足够
+        const fileTotal = Number(dataView.getBigUint64(offset, true));
+        offset += 8;
+        
+        // 验证文件头数据
+        if (fileBins !== bins) {
+          this.SendConsoleLogMsg(`Warning: bins mismatch (expected ${bins}, got ${fileBins})`, 'warning');
+        }
+        
+        // 读取直方图数据
+        const counts = new Array(fileBins);
+        for (let i = 0; i < fileBins; i++) {
+          counts[i] = dataView.getUint32(offset, true);
+          offset += 4;
+        }
+        
+        // 保存直方图数据
+        this.tileHistogram = { sessionId, bins: fileBins, total: fileTotal, counts };
+        this.SendConsoleLogMsg(
+          `Histogram loaded: session=${sessionId}, bins=${fileBins}, total=${fileTotal}, parsed=${counts.length}`,
+          'info'
+        );
+        
+        // 复用既有直方图绘制链路
+        if (counts && counts.length > 0) {
+          this.$bus.$emit('showHistogram', counts);
+          
+          // 如果有对应的GPM数据，同步更新拉伸参数
+          if (this.tileGPM && this.tileGPM.sessionId === sessionId) {
+            const blackLevel = this.tileGPM.blackLevel;
+            const whiteLevel = this.tileGPM.whiteLevel;
+            console.log(`[TileMode] 同步直方图参数: blackLevel=${blackLevel}, whiteLevel=${whiteLevel}`);
+            this.$bus.$emit('ChangeDialPosition', blackLevel, whiteLevel);
+            this.$bus.$emit('AutoHistogramNum', blackLevel, whiteLevel);
+          } else {
+            console.log('[TileMode] 直方图数据已加载，但GPM数据尚未到达，等待GPM数据同步');
+          }
+        }
+        
+      } catch (error) {
+        this.SendConsoleLogMsg(`Failed to load histogram: ${error.message}`, 'error');
+        console.error('Histogram loading error:', error);
+      }
+    },
+
     ImageGainSet(payload) {
       const [signal, value] = payload.split(':'); // 拆分信号和值
       const doubleValue = parseFloat(value); // 将值转换为 double 类型
@@ -3929,11 +4932,25 @@ export default {
         this.ImageGainR = doubleValue;
         this.SendConsoleLogMsg('ImageGainR is set to:' + doubleValue, 'info');
         this.sendMessage('Vue_Command', 'ImageGainR:' + doubleValue);
+        
+        // 同步更新瓦片GPM参数（不重新下载瓦片，只重新处理显示）
+        if (this.tileGPM) {
+          this.SendConsoleLogMsg(`更新瓦片ImageGainR参数: ${doubleValue}`, 'info');
+          this.tileGPM.gainR = doubleValue;
+          this.reprocessTilesWithNewGains();
+        }
       } else if (signal === 'ImageGainB') {
         // 处理 ImageGainB 信号
         this.ImageGainB = doubleValue;
         this.SendConsoleLogMsg('ImageGainB is set to:' + doubleValue, 'info');
         this.sendMessage('Vue_Command', 'ImageGainB:' + doubleValue);
+        
+        // 同步更新瓦片GPM参数（不重新下载瓦片，只重新处理显示）
+        if (this.tileGPM) {
+          this.SendConsoleLogMsg(`更新瓦片ImageGainB参数: ${doubleValue}`, 'info');
+          this.tileGPM.gainB = doubleValue;
+          this.reprocessTilesWithNewGains();
+        }
       }
     },
 
@@ -4113,6 +5130,13 @@ export default {
       this.SendConsoleLogMsg('Sync Focuser Step:' + IntValue, 'info');
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'SyncFocuserStep:' + IntValue);
     },
+    StepsPerClickSet(payload) {
+      const [signal, value] = payload.split(':'); // 拆分信号和值
+      const IntValue = parseInt(value);
+      this.SendConsoleLogMsg('Steps per Click:' + IntValue, 'info');
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'StepsPerClick:' + IntValue);
+      this.$bus.$emit('focusMoveStep', IntValue);
+    },
     MinLimitSet(payload) {
       const [signal, value] = payload.split(':'); // 拆分信号和值
       const IntValue = parseInt(value);
@@ -4162,6 +5186,14 @@ export default {
     SolveCurrentPosition(payload) {
       const [signal, value] = payload.split(':'); // 拆分信号和值
       const BooleanValue = Boolean(value);
+      // 仅限制：解析当前位置（主相机未绑定时禁止）
+      if (!this.$store.getters['device/isDeviceBound']('MainCamera')) {
+        this.callShowMessageBox(
+          this.$t('MainCameraNotBoundAction', { action: this.$t('Feature_SolveCurrentPosition') }),
+          'error'
+        );
+        return;
+      }
       this.SendConsoleLogMsg('Solve Current Position:' + BooleanValue, 'info');
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'SolveCurrentPosition:' + BooleanValue);
     },
@@ -4170,6 +5202,14 @@ export default {
       const [signal, value] = payload.split(':'); // 拆分信号和值
       const BooleanValue = Boolean(value);
       this.SendConsoleLogMsg('Loop Capture:' + BooleanValue, 'info');
+      // 仅限制：ROI循环拍摄（主相机未绑定时禁止）
+      if (!this.$store.getters['device/isDeviceBound']('MainCamera')) {
+        this.callShowMessageBox(
+          this.$t('MainCameraNotBoundAction', { action: this.$t('Feature_ROILoopCapture') }),
+          'error'
+        );
+        return;
+      }
       if (BooleanValue) {
         const check = this.$canUseDevice('MainCamera', 'CaptureLoop');
         if (!check.allowed) return;
@@ -4257,7 +5297,13 @@ export default {
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'EastMinutesPastMeridian:' + EastMinutesPastMeridian);
     },
 
+    /**
+     * @deprecated 已废弃：不再使用传统bin文件方式，请使用瓦片金字塔模式
+     * 保留此函数仅为了防止后端仍然调用导致错误
+     */
     async readBinFile(fileName, retryCount = 1) {
+      this.SendConsoleLogMsg(`警告: readBinFile已废弃，请使用瓦片模式。文件: ${fileName}`, 'warning');
+      return; // 直接返回，不再处理
       while (this.isDownloadingImage) {
         await new Promise(resolve => setTimeout(resolve, 1000));
         if (!this.isWaitingLogged) {
@@ -4409,7 +5455,952 @@ export default {
       }
     },
 
+    // ========================= 瓦片金字塔方法 =========================
 
+    /**
+     * 处理后端发送的GPM消息
+     * @param {Object} gpm - 全局处理元数据
+     */
+    async handleTileGPM(gpm) {
+      this.SendConsoleLogMsg(`Received TileGPM: session=${gpm.sessionId}, size=${gpm.imageWidth}x${gpm.imageHeight}, maxZoom=${gpm.maxZoomLevel}`, 'info');
+
+      // frameId：用于让“瓦片下载回包/缓存写入”与“当前 GPM”强绑定，避免错帧拉伸（尤其是 live 覆盖写 + 异步 fetch）
+      const incomingFrameId = (typeof gpm.frameId === 'number' && isFinite(gpm.frameId)) ? gpm.frameId : null;
+      
+      // 判定是否是新的瓦片会话（新图/新 session 才需要清空缓存和画布）
+      const isNewSession =
+        this.tileSessionId !== gpm.sessionId ||
+        this.showImageSizeX !== gpm.imageWidth ||
+        this.showImageSizeY !== gpm.imageHeight;
+
+      // live 覆盖写帧节流：高帧率下若每条 TileGPM 都立即清缓存/abort，会导致前端持续“重启加载”，
+      // 表现为跳帧、卡顿、瓦片大量失败、缩放后长时间不刷新。
+      // 策略：对 isNewSession=false 且 sessionId=live 的 TileGPM 做节流，只处理“最新一条”。
+      const isLiveOverwriteFrame = (!isNewSession) && (String(gpm.sessionId) === 'live');
+      if (isLiveOverwriteFrame) {
+        const now = Date.now();
+        const throttleMs = Number(this.liveTileGpmThrottleMs) || 250;
+        const last = Number(this.liveTileGpmLastHandledAt) || 0;
+        if (last > 0 && (now - last) < throttleMs) {
+          this.pendingLiveTileGpm = gpm;
+          if (!this.pendingLiveTileGpmTimer) {
+            const wait = Math.max(0, throttleMs - (now - last));
+            this.pendingLiveTileGpmTimer = setTimeout(() => {
+              const pg = this.pendingLiveTileGpm;
+              this.pendingLiveTileGpm = null;
+              this.pendingLiveTileGpmTimer = null;
+              if (pg) this.handleTileGPM(pg);
+            }, wait);
+          }
+          return;
+        }
+        this.liveTileGpmLastHandledAt = now;
+      }
+
+      // E2E：每次“真正处理”的 TileGPM 视为“出图成功”的关键标志（节流会合并掉中间帧）
+      this.e2eTileGpmSeq = (Number(this.e2eTileGpmSeq) || 0) + 1;
+
+      // 保存GPM
+      this.tileGPM = gpm;
+      this.tileSessionId = gpm.sessionId;
+      // 注意：live 模式 sessionId 固定为 "live"，必须依赖 frameId 区分新旧帧
+      if (incomingFrameId !== null) {
+        this.tileFrameId = incomingFrameId;
+      } else if (this.tileFrameId == null) {
+        // 兼容：后端未提供 frameId 时，退化为本地时间戳（仅用于避免缓存错帧）
+        this.tileFrameId = Date.now();
+      }
+      this.showImageSizeX = gpm.imageWidth;
+      this.showImageSizeY = gpm.imageHeight;
+      this.ImageCFA = gpm.cfa || 'null';
+      this.ImageGainR = gpm.gainR || 1;
+      this.ImageGainB = gpm.gainB || 1;
+      
+      // 确保Map/Set已初始化
+      if (!this.tileCache) {
+        this.tileCache = new Map();
+      }
+      if (!this.tileRawDataCache) {
+        this.tileRawDataCache = new Map();
+      }
+      if (!this.tilePendingLoads) {
+        this.tilePendingLoads = new Set();
+      }
+      if (!this.tileAbortControllers) {
+        this.tileAbortControllers = new Map();
+      }
+      if (!this.currentVisibleTiles) {
+        this.currentVisibleTiles = new Set();
+      }
+      
+      // 重要：后端当前固定 sessionId="live"，并且每帧覆盖写 /dev/shm/capture-tiles/live/ 下的瓦片文件。
+      // 因此即使 sessionId/尺寸都不变（isNewSession=false），TileGPM 也代表“新一帧”，必须失效本地瓦片缓存，
+      // 否则前端会因为 tileRawDataCache 命中而跳过下载，画面看起来“永远不更新”。
+      const isOverwriteLiveFrame = (!isNewSession) && (String(gpm.sessionId) === 'live');
+
+      if (isNewSession || isOverwriteLiveFrame) {
+        // 新会话或 live 覆盖写帧：清空瓦片缓存与队列，避免旧帧残留/命中缓存导致不刷新
+        this.tileCache.clear();
+        this.tileRawDataCache.clear();
+        this.tilePendingLoads.clear();
+        this.currentVisibleTiles.clear();
+
+        // 取消所有进行中的请求
+        for (const [key, controller] of this.tileAbortControllers.entries()) {
+          controller.abort();
+        }
+        this.tileAbortControllers.clear();
+
+        this.tileLoadQueue = [];
+        this.currentTileLoads = 0;
+
+        if (isNewSession) {
+          // 重置上一次渲染的瓦片层级（避免新会话沿用旧层级状态）
+          this._tileLastRenderedZ = undefined;
+          
+          // 清除旧会话的自动拉伸参数
+          this.autoStretchBlackLevel = null;
+          this.autoStretchWhiteLevel = null;
+        }
+      }
+
+      // 初始化瓦片画布
+      if (!this.tileCanvas) {
+        this.tileCanvas = document.createElement('canvas');
+        this.tileCtx = this.tileCanvas.getContext('2d');
+      }
+      
+      // 设置瓦片画布尺寸为原图尺寸
+      if (this.tileCanvas.width !== gpm.imageWidth || this.tileCanvas.height !== gpm.imageHeight) {
+        this.tileCanvas.width = gpm.imageWidth;
+        this.tileCanvas.height = gpm.imageHeight;
+      }
+
+      // 新会话时，标记下次渲染前需要清空瓦片画布；但不要在这里立刻清空，避免出现“先透明后补齐”的闪烁
+      if (isNewSession) {
+        this.tileCanvasNeedsClear = true;
+      }
+      
+      // 计算图像比例
+      this.ImageProportion = this.CanvasWidth / this.CanvasHeight;
+      
+      // 新会话才重置缩放和平移
+      if (isNewSession) {
+        // 记忆瓦片层级：仅当 maxZoomLevel 变化时才重置，否则保持在上一次的层级
+        const maxZ = Number(gpm.maxZoomLevel);
+        const canRestore =
+          Number.isFinite(maxZ) &&
+          this.preferredTileMaxZoomLevel === maxZ &&
+          (Number.isFinite(this.preferredTileScale) || Number.isFinite(this.preferredTileZ));
+        if (canRestore) {
+          // 优先用连续 scale 精确恢复；若没有则退化为按层级恢复
+          if (Number.isFinite(this.preferredTileScale)) {
+            // 0.01~0.1 是新增“仅缩放”的细分区间（瓦片层级映射仍以 0.1 为最小）
+            const MIN_SCALE = 0.01;
+            const MAX_SCALE = 1.0;
+            const s = Number(this.preferredTileScale);
+            this.scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, s));
+          } else {
+            const targetZ = Math.max(0, Math.min(maxZ, Number(this.preferredTileZ)));
+            this.scale = this.tileLevelToScale(targetZ, maxZ);
+          }
+        } else {
+          this.scale = 1;
+          this.preferredTileMaxZoomLevel = maxZ;
+          this.preferredTileZ = this.calculateTileLevel(this.scale, maxZ);
+          this.preferredTileScale = this.scale;
+          // maxZoomLevel 变化：按需求重置位置记忆（回到中心）
+          this.preferredTileCenterNormX = 0.5;
+          this.preferredTileCenterNormY = 0.5;
+        }
+        this.translateX = 0;
+        this.translateY = 0;
+
+        // 同步缩放到GUI（瓦片模式下 ImageInfo 需要基于 scale/level 动态显示）
+        this.$bus.$emit('setScale', this.scale);
+
+        // 新会话：恢复视野中心点（若 maxZoomLevel 未变化则沿用上次位置；否则回到中心）
+        const nx = Number.isFinite(this.preferredTileCenterNormX) ? this.preferredTileCenterNormX : 0.5;
+        const ny = Number.isFinite(this.preferredTileCenterNormY) ? this.preferredTileCenterNormY : 0.5;
+        const clamp01 = (v) => Math.max(0, Math.min(1, v));
+        const cx = clamp01(nx) * gpm.imageWidth;
+        const cy = clamp01(ny) * gpm.imageHeight;
+        // 可见中心需要在边界内（后续 calculateVisibleTiles 也有钳制，这里先做一次避免“空瓦片”）
+        this.visibleX = Math.max(0, Math.min(gpm.imageWidth, cx));
+        this.visibleY = Math.max(0, Math.min(gpm.imageHeight, cy));
+      }
+
+      // 推送一次当前瓦片层级信息到 GUI（用于显示合并等级/分辨率）
+      this.emitTileLevelInfo();
+
+      // 如果后端提供了黑白点，优先同步到直方图面板（复用既有绘制/拨盘逻辑）
+      if (Number.isFinite(gpm.blackLevel) && Number.isFinite(gpm.whiteLevel)) {
+        console.log(`[TileMode-GPM] 设置直方图区间参数: blackLevel=${gpm.blackLevel}, whiteLevel=${gpm.whiteLevel}`);
+        
+        // 保存“自动拉伸基准参数”：
+        // - 非 live 会话：仅在新会话/首次设置时保存（用于“恢复到本会话的自动拉伸”）
+        // - live 覆盖写帧：每帧都会产生新的推荐黑白点；若不刷新，则“自动拉伸”会一直恢复到旧帧参数，表现为用上一帧/更早的拉伸数据
+        const isLiveSession = (String(gpm.sessionId) === 'live');
+        if (isNewSession || this.autoStretchBlackLevel === null || this.autoStretchWhiteLevel === null || isLiveSession) {
+          this.autoStretchBlackLevel = gpm.blackLevel;
+          this.autoStretchWhiteLevel = gpm.whiteLevel;
+          console.log(`[TileMode-GPM] 保存初始自动拉伸参数: black=${this.autoStretchBlackLevel}, white=${this.autoStretchWhiteLevel}`);
+        }
+        
+        this.$bus.$emit('ChangeDialPosition', gpm.blackLevel, gpm.whiteLevel);
+        this.$bus.$emit('AutoHistogramNum', gpm.blackLevel, gpm.whiteLevel);
+      } else {
+        console.log('[TileMode-GPM] GPM未包含有效的黑白点参数');
+      }
+      
+      // 开始加载可见区域的瓦片
+      this.DetectedStarsFinish = false;
+      await this.loadVisibleTiles();
+    },
+
+    /**
+     * 当前瓦片渲染参数的快照 key（用于判断处理后瓦片是否需要重新计算）
+     * 参数变化（白平衡/拉伸）不应导致重新下载 raw，仅需要重处理渲染。
+     */
+    getTileRenderParamsKey() {
+      const gpm = this.tileGPM;
+      if (!gpm) return 'no-gpm';
+      const cfa = gpm.cfa || 'null';
+      const gainR = Number.isFinite(gpm.gainR) ? gpm.gainR : 1;
+      const gainB = Number.isFinite(gpm.gainB) ? gpm.gainB : 1;
+      const black = Number.isFinite(gpm.blackLevel) ? gpm.blackLevel : 0;
+      const white = Number.isFinite(gpm.whiteLevel) ? gpm.whiteLevel : 65535;
+      return `${cfa}|${gainR}|${gainB}|${black}|${white}`;
+    },
+
+    /**
+     * 根据缩放比例计算瓦片层级
+     * @param {Number} scale - 当前缩放比例
+     * @param {Number} maxZoomLevel - 最大层级
+     * @returns {Number} 瓦片层级 (0-maxZoomLevel)
+     */
+    calculateTileLevel(scale, maxZoomLevel) {
+      // 缩放范围：0.1 - 1.0，量化为 10 个离散级别进行映射
+      // 注意：本项目里 scale 越小表示越“放大”(视野越小)，因此瓦片层级需要反向映射：
+      // - scale=0.1 -> z=maxZoomLevel（最高精度，原图）
+      // - scale=1.0 -> z=0（最低精度，缩小层）
+      const MIN_SCALE = 0.1;
+      const MAX_SCALE = 1.0;
+      const LEVELS = 10; // 0.1~1.0 共 10 档
+
+      const clampedScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, Number(scale)));
+      const denom = (MAX_SCALE - MIN_SCALE) || 1;
+      const t = (clampedScale - MIN_SCALE) / denom; // 0..1
+
+      // 先映射到 10 档的索引，再反向，再投影到实际的 maxZoomLevel
+      const idx = Math.round(t * (LEVELS - 1)); // 0..9
+      const invIdx = (LEVELS - 1) - idx; // 9..0
+      const z = Math.round((invIdx / (LEVELS - 1)) * maxZoomLevel);
+
+      return Math.max(0, Math.min(maxZoomLevel, z));
+    },
+
+    /**
+     * 将瓦片层级 z 反推为 scale（与 calculateTileLevel 使用同一套 10 档映射）
+     * @param {Number} z
+     * @param {Number} maxZoomLevel
+     * @returns {Number} scale in [0.1, 1.0]
+     */
+    tileLevelToScale(z, maxZoomLevel) {
+      const MIN_SCALE = 0.1;
+      const MAX_SCALE = 1.0;
+      const LEVELS = 10;
+      const maxZ = Math.max(0, Number(maxZoomLevel) || 0);
+      if (maxZ === 0) return MAX_SCALE; // 只有一层时，固定为 z=0
+
+      const targetZ = Math.max(0, Math.min(maxZ, Number(z) || 0));
+      // 反推 invIdx（0..9），再得到 idx（0..9）
+      const invIdx = Math.round((targetZ / maxZ) * (LEVELS - 1)); // 0..9
+      const idx = (LEVELS - 1) - invIdx; // 9..0
+      const t = idx / (LEVELS - 1); // 0..1
+      const scale = MIN_SCALE + t * (MAX_SCALE - MIN_SCALE);
+      return Math.max(MIN_SCALE, Math.min(MAX_SCALE, scale));
+    },
+
+    /**
+     * 向 GUI 广播当前瓦片层级信息（用于显示合并等级与分辨率）
+     * - enabled=false：非瓦片模式（或瓦片元数据未就绪）
+     * - enabled=true：瓦片模式下包含 z/maxZoom/levelScale/levelWidth/levelHeight
+     */
+    emitTileLevelInfo() {
+      const gpm = this.tileGPM;
+      if (!gpm) {
+        this.$bus.$emit('TileLevelInfo', { enabled: false });
+        return;
+      }
+      const maxZoomLevel = Number(gpm.maxZoomLevel);
+      const z = this.calculateTileLevel(this.scale, maxZoomLevel);
+      const levelScale = Math.pow(2, maxZoomLevel - z);
+      const levelWidth = Math.ceil(Number(gpm.imageWidth) / levelScale);
+      const levelHeight = Math.ceil(Number(gpm.imageHeight) / levelScale);
+
+      // 记忆当前层级（供下一次拍摄复用；仅当 maxZoomLevel 相同才会恢复）
+      this.preferredTileZ = z;
+      this.preferredTileMaxZoomLevel = maxZoomLevel;
+      // 同步记忆当前视野中心（位置）
+      this.rememberTileViewportState();
+
+      this.$bus.$emit('TileLevelInfo', {
+        enabled: true,
+        z,
+        maxZoomLevel,
+        levelScale,
+        levelWidth,
+        levelHeight,
+        imageWidth: Number(gpm.imageWidth),
+        imageHeight: Number(gpm.imageHeight),
+        previewWidth: (gpm.previewWidth != null) ? Number(gpm.previewWidth) : null,
+        previewHeight: (gpm.previewHeight != null) ? Number(gpm.previewHeight) : null,
+        previewBinningFactor: (gpm.previewBinningFactor != null) ? Number(gpm.previewBinningFactor) : null,
+      });
+    },
+
+    /**
+     * 记忆瓦片视窗状态（位置/中心），用于新会话恢复
+     */
+    rememberTileViewportState() {
+      const gpm = this.tileGPM;
+      if (!gpm) return;
+      const w = Number(gpm.imageWidth);
+      const h = Number(gpm.imageHeight);
+      if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) return;
+      const cx = Number.isFinite(this.visibleX) ? this.visibleX : (w / 2);
+      const cy = Number.isFinite(this.visibleY) ? this.visibleY : (h / 2);
+      const clamp01 = (v) => Math.max(0, Math.min(1, v));
+      this.preferredTileCenterNormX = clamp01(cx / w);
+      this.preferredTileCenterNormY = clamp01(cy / h);
+
+      // 同步记忆缩放（连续值）；同时更新层级缓存，供“按层级恢复”的兜底逻辑使用
+      const MIN_SCALE = 0.01;
+      const MAX_SCALE = 1.0;
+      const s = Number(this.scale);
+      if (Number.isFinite(s)) {
+        this.preferredTileScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, s));
+      }
+      const maxZ = Number(gpm.maxZoomLevel);
+      if (Number.isFinite(maxZ)) {
+        this.preferredTileZ = this.calculateTileLevel(this.scale, maxZ);
+        this.preferredTileMaxZoomLevel = maxZ;
+      }
+
+      // 关键：每次新帧到来（TileGPM）都主动把当前可视区 + frameId 发给后端，避免“视口不变时 sendVisibleArea 被去抖/不触发”
+      // 这能确保后端按最新帧调度视口瓦片生成，减少“看起来还是上一帧”的概率。
+      try {
+        if (Number.isFinite(this.visibleX) && Number.isFinite(this.visibleY) && Number.isFinite(this.scale)) {
+          this.$bus.$emit('AppSendMessage', 'Vue_Command', 'sendVisibleArea:' + this.visibleX + ':' + this.visibleY + ':' + this.scale + ':' + this.tileFrameId);
+        }
+      } catch (e) {
+        // ignore
+      }
+    },
+
+    /**
+     * 计算当前视窗需要加载的瓦片
+     * @returns {Array} 需要加载的瓦片列表 [{z, x, y}, ...]
+     */
+    calculateVisibleTiles() {
+      if (!this.tileGPM) return [];
+      
+      const gpm = this.tileGPM;
+      const T = gpm.tileSize;
+      
+      // 根据当前缩放级别选择合适的z层级（反向金字塔）
+      const z = this.calculateTileLevel(this.scale, gpm.maxZoomLevel);
+      
+      // 计算当前层级的图像尺寸（反向金字塔）
+      // z=0时是16倍缩小，z=maxZoomLevel时是原图
+      const levelScale = Math.pow(2, gpm.maxZoomLevel - z);
+      const levelWidth = Math.ceil(gpm.imageWidth / levelScale);
+      const levelHeight = Math.ceil(gpm.imageHeight / levelScale);
+      
+      // 计算可见区域在原图的像素范围
+      // 初始加载时visibleX/visibleY可能还没设置，使用图像中心
+      // 注意：visibleX/visibleY 可能为 0（合法边界值），不能用 `||` 回退
+      let visibleX = Number.isFinite(this.visibleX) ? this.visibleX : gpm.imageWidth / 2;
+      let visibleY = Number.isFinite(this.visibleY) ? this.visibleY : gpm.imageHeight / 2;
+
+      // 兜底：当视野中心点越界时（常见于先打开历史图像再切回实时拍摄图像），
+      // 会导致 startTileX > endTileX，从而 tiles 为空，画布表现为“透明/空白”。
+      // 这里将其钳制回图像边界内，并写回状态，避免依赖缩放事件来“修复”。
+      const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+      const clampedX = clamp(visibleX, 0, gpm.imageWidth);
+      const clampedY = clamp(visibleY, 0, gpm.imageHeight);
+      if (clampedX !== visibleX || clampedY !== visibleY) {
+        visibleX = clampedX;
+        visibleY = clampedY;
+        this.visibleX = clampedX;
+        this.visibleY = clampedY;
+      }
+
+      const visibleWidth = gpm.imageWidth * this.scale;
+      const visibleHeight = visibleWidth / (this.ImageProportion || (this.CanvasWidth / this.CanvasHeight));
+      const visibleLeft = Math.max(0, visibleX - visibleWidth / 2);
+      const visibleTop = Math.max(0, visibleY - visibleHeight / 2);
+      const visibleRight = Math.min(gpm.imageWidth, visibleLeft + visibleWidth);
+      const visibleBottom = Math.min(gpm.imageHeight, visibleTop + visibleHeight);
+      
+      // 转换到当前层级的坐标
+      const levelLeft = visibleLeft / levelScale;
+      const levelTop = visibleTop / levelScale;
+      const levelRight = visibleRight / levelScale;
+      const levelBottom = visibleBottom / levelScale;
+      
+      // 计算需要的瓦片范围
+      const startTileX = Math.floor(levelLeft / T);
+      const startTileY = Math.floor(levelTop / T);
+      const endTileX = Math.floor(levelRight / T);
+      const endTileY = Math.floor(levelBottom / T);
+      
+      // 计算该层级的最大瓦片数
+      const maxTilesX = Math.ceil(levelWidth / T);
+      const maxTilesY = Math.ceil(levelHeight / T);
+      
+      const tiles = [];
+      for (let ty = startTileY; ty <= endTileY && ty < maxTilesY; ty++) {
+        for (let tx = startTileX; tx <= endTileX && tx < maxTilesX; tx++) {
+          tiles.push({ z, x: tx, y: ty });
+        }
+      }
+      
+      // 最后兜底：在极端情况下若仍然没有任何瓦片（例如中心点/比例异常），将视野回到中心再试一次。
+      if (tiles.length === 0 && gpm.imageWidth > 0 && gpm.imageHeight > 0) {
+        const fallbackX = gpm.imageWidth / 2;
+        const fallbackY = gpm.imageHeight / 2;
+        this.visibleX = fallbackX;
+        this.visibleY = fallbackY;
+
+        // 重新计算一次（避免递归调用本函数导致潜在死循环）
+        const visibleWidth2 = gpm.imageWidth * this.scale;
+        const visibleHeight2 = visibleWidth2 / (this.ImageProportion || (this.CanvasWidth / this.CanvasHeight));
+        const visibleLeft2 = Math.max(0, fallbackX - visibleWidth2 / 2);
+        const visibleTop2 = Math.max(0, fallbackY - visibleHeight2 / 2);
+        const visibleRight2 = Math.min(gpm.imageWidth, visibleLeft2 + visibleWidth2);
+        const visibleBottom2 = Math.min(gpm.imageHeight, visibleTop2 + visibleHeight2);
+
+        const levelLeft2 = visibleLeft2 / levelScale;
+        const levelTop2 = visibleTop2 / levelScale;
+        const levelRight2 = visibleRight2 / levelScale;
+        const levelBottom2 = visibleBottom2 / levelScale;
+
+        const startTileX2 = Math.floor(levelLeft2 / T);
+        const startTileY2 = Math.floor(levelTop2 / T);
+        const endTileX2 = Math.floor(levelRight2 / T);
+        const endTileY2 = Math.floor(levelBottom2 / T);
+
+        for (let ty = startTileY2; ty <= endTileY2 && ty < maxTilesY; ty++) {
+          for (let tx = startTileX2; tx <= endTileX2 && tx < maxTilesX; tx++) {
+            tiles.push({ z, x: tx, y: ty });
+          }
+        }
+      }
+      
+      return tiles;
+    },
+
+    /**
+     * 加载可见区域的瓦片（带优先级优化）
+     */
+    async loadVisibleTiles() {
+      if (!this.tileGPM) return;
+      if (!this.tileLoadWaiters) {
+        this.tileLoadWaiters = new Map();
+      }
+      
+      const tiles = this.calculateVisibleTiles();
+      const gpm = this.tileGPM;
+      const batchId = ++this.tileLoadBatchSeq;
+      this.activeTileLoadBatchId = batchId;
+      
+      // 更新当前可见瓦片集合
+      const newVisibleTiles = new Set(tiles.map(t => `${t.z}/${t.x}/${t.y}`));
+      
+      // 取消不在可见范围内的加载请求
+      for (const [key, controller] of this.tileAbortControllers.entries()) {
+        if (!newVisibleTiles.has(key)) {
+          controller.abort();
+          this.tileAbortControllers.delete(key);
+          this.tilePendingLoads.delete(key);
+        }
+      }
+      
+      // 清理加载队列中不可见的瓦片
+      this.tileLoadQueue = this.tileLoadQueue.filter(t => {
+        const key = `${t.z}/${t.x}/${t.y}`;
+        return newVisibleTiles.has(key);
+      });
+      
+      this.currentVisibleTiles = newVisibleTiles;
+      
+      const paramsKey = this.getTileRenderParamsKey();
+
+      // 先对“已有原始数据”的可见瓦片做一次就地处理：
+      // - 若尚未处理过，生成处理后瓦片
+      // - 若处理参数已变化，按新参数重处理并覆盖
+      for (const t of tiles) {
+        const key = `${t.z}/${t.x}/${t.y}`;
+        const hasRaw = this.tileRawDataCache && this.tileRawDataCache.has(key);
+        if (!hasRaw) continue;
+
+        const cached = this.tileCache && this.tileCache.get(key);
+        const needReprocess = !cached || cached.paramsKey !== paramsKey;
+
+        if (needReprocess) {
+          try {
+            const processedTile = this.processTile(this.tileRawDataCache.get(key));
+            this.tileCache.set(key, { imageData: processedTile, paramsKey });
+          } catch (e) {
+            console.error(`Error processing cached raw tile ${key}:`, e);
+          }
+        }
+      }
+
+      // 过滤需要“下载原始数据”的瓦片：只有 raw 不存在且不在加载中，才发起请求
+      const tilesToLoad = tiles.filter(t => {
+        const key = `${t.z}/${t.x}/${t.y}`;
+        const hasRaw = this.tileRawDataCache && this.tileRawDataCache.has(key);
+        return !hasRaw && !this.tilePendingLoads.has(key);
+      });
+
+      const waitVisiblePromises = tiles.map(t => {
+        const key = `${t.z}/${t.x}/${t.y}`;
+        const hasRaw = this.tileRawDataCache && this.tileRawDataCache.has(key);
+        if (hasRaw) return Promise.resolve();
+        return this.waitForTileSettled(key);
+      });
+      
+      // 计算视口中心（用于优先级排序）
+      const centerX = (Number.isFinite(this.visibleX) ? this.visibleX : (gpm.imageWidth / 2)) / gpm.imageWidth;
+      const centerY = (Number.isFinite(this.visibleY) ? this.visibleY : (gpm.imageHeight / 2)) / gpm.imageHeight;
+      
+      // 按优先级排序瓦片：
+      // 1. 距离视口中心越近优先级越高
+      // 2. 当前缩放层级优先于其他层级
+      const currentZ = this.calculateTileLevel(this.scale, gpm.maxZoomLevel);
+      
+      tilesToLoad.forEach(tile => {
+        const levelScale = Math.pow(2, gpm.maxZoomLevel - tile.z);
+        const levelWidth = Math.ceil(gpm.imageWidth / levelScale);
+        const levelHeight = Math.ceil(gpm.imageHeight / levelScale);
+        
+        // 瓦片中心点（归一化坐标）
+        const tileCenterX = (tile.x + 0.5) * gpm.tileSize / levelWidth;
+        const tileCenterY = (tile.y + 0.5) * gpm.tileSize / levelHeight;
+        
+        // 计算距离视口中心的距离
+        const dx = tileCenterX - centerX;
+        const dy = tileCenterY - centerY;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        // 优先级：当前层级的瓦片优先，然后按距离排序
+        tile.priority = (tile.z === currentZ ? 0 : 1000) + distance;
+      });
+      
+      // 按优先级排序（优先级值越小越优先）
+      tilesToLoad.sort((a, b) => a.priority - b.priority);
+      
+      // 将瓦片添加到加载队列（插入到队列前面）
+      this.tileLoadQueue.unshift(...tilesToLoad);
+      
+      // 开始处理加载队列
+      this.processLoadQueue();
+
+      // 屏障：等待“当前可视范围”瓦片就绪（或超时）后再统一渲染，避免逐瓦片补齐造成闪烁
+      const waitMs = Math.max(100, Number(this.tileBatchMaxWaitMs) || 1200);
+      await Promise.race([
+        Promise.all(waitVisiblePromises),
+        new Promise(resolve => setTimeout(resolve, waitMs)),
+      ]);
+
+      // 若期间已切换到新批次（新视窗/新帧），放弃本次渲染
+      if (batchId !== this.activeTileLoadBatchId) return;
+      this.renderTiles();
+    },
+
+    /**
+     * 处理瓦片加载队列（带优先级）
+     */
+    async processLoadQueue() {
+      while (this.tileLoadQueue.length > 0 && this.currentTileLoads < this.maxConcurrentTileLoads) {
+        const tile = this.tileLoadQueue.shift();
+        const key = `${tile.z}/${tile.x}/${tile.y}`;
+        
+        // 跳过已缓存、正在加载或不在可见范围内的瓦片
+        // 已有 raw 的瓦片无需再下载（即使处理参数变化，也只需重处理）
+        if ((this.tileRawDataCache && this.tileRawDataCache.has(key)) ||
+            (this.tileCache && this.tileCache.has(key)) ||
+            this.tilePendingLoads.has(key) ||
+            !this.currentVisibleTiles.has(key)) {
+          continue;
+        }
+        
+        this.tilePendingLoads.add(key);
+        this.currentTileLoads++;
+        
+        this.loadSingleTile(tile).finally(() => {
+          this.tilePendingLoads.delete(key);
+          this.currentTileLoads--;
+          this.processLoadQueue();
+        });
+      }
+    },
+
+    waitForTileSettled(key) {
+      if (!this.tileLoadWaiters) {
+        this.tileLoadWaiters = new Map();
+      }
+      return new Promise(resolve => {
+        const waiters = this.tileLoadWaiters.get(key) || [];
+        waiters.push(resolve);
+        this.tileLoadWaiters.set(key, waiters);
+      });
+    },
+
+    notifyTileSettled(key) {
+      if (!this.tileLoadWaiters) return;
+      const waiters = this.tileLoadWaiters.get(key);
+      if (!waiters || waiters.length === 0) return;
+      this.tileLoadWaiters.delete(key);
+      for (const fn of waiters) {
+        try {
+          fn();
+        } catch (e) {
+          // ignore
+        }
+      }
+    },
+
+    /**
+     * 加载单个瓦片（支持取消）
+     * @param {Object} tile - 瓦片信息 {z, x, y}
+     */
+    async loadSingleTile(tile) {
+      const { z, x, y } = tile;
+      const key = `${z}/${x}/${y}`;
+      // 使用 BASE_URL + 常量路径，支持子路径部署；与 nginx location /img/capture-tiles/ 对应
+      const base = (process.env.BASE_URL || '/').replace(/\/?$/, '/');
+      // 追加 frameId 到 query string：
+      // - 避免浏览器/代理把 live 覆盖写的同路径瓦片当作“同一资源”缓存
+      // - 允许我们在回包时做“帧一致性校验”，丢弃旧帧的 late response
+      const frameQ = (this.tileFrameId != null) ? `?f=${encodeURIComponent(String(this.tileFrameId))}` : '';
+      const url = `${base}${this.TILE_PATH_SUFFIX}/${this.tileSessionId}/${z}/${x}/${y}.bin${frameQ}`;
+      const expectedSessionId = this.tileSessionId;
+      const expectedFrameId = this.tileFrameId;
+      
+      // 创建AbortController用于取消请求
+      const abortController = new AbortController();
+      this.tileAbortControllers.set(key, abortController);
+      
+      try {
+        const response = await fetch(url, { 
+          cache: 'no-store',
+          signal: abortController.signal 
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Failed to load tile ${key}: ${response.status}`);
+        }
+        
+        const buffer = await response.arrayBuffer();
+
+        // 回包时校验：若期间已切换到新帧/新会话，直接丢弃，避免错帧拉伸/错帧缓存污染
+        if (expectedSessionId !== this.tileSessionId || expectedFrameId !== this.tileFrameId) {
+          this.tileAbortControllers.delete(key);
+          return;
+        }
+        
+        // 解析瓦片数据
+        const tileData = this.parseTileData(buffer);
+        if (tileData) {
+          const paramsKey = this.getTileRenderParamsKey();
+          // 保存原始瓦片数据（用于白平衡等参数变化时重新处理）
+          this.tileRawDataCache.set(key, tileData);
+          
+          // 处理瓦片并缓存
+          const processedTile = this.processTile(tileData);
+          this.tileCache.set(key, { imageData: processedTile, paramsKey });
+          
+          // 清理AbortController
+          this.tileAbortControllers.delete(key);
+        }
+      } catch (error) {
+        // 如果是取消请求，不输出错误
+        if (error.name === 'AbortError') {
+          console.log(`Tile load cancelled: ${key}`);
+        } else {
+          console.error(`Error loading tile ${key}:`, error);
+        }
+        
+        // 清理AbortController
+        this.tileAbortControllers.delete(key);
+      } finally {
+        // 无论成功/失败/取消，都要通知等待中的批次，避免“全齐再显示”屏障悬挂
+        this.notifyTileSettled(key);
+      }
+    },
+
+    /**
+     * 解析瓦片二进制数据
+     * @param {ArrayBuffer} buffer - 瓦片二进制数据
+     * @returns {Object} 解析后的瓦片数据 {width, height, data}
+     */
+    parseTileData(buffer) {
+      if (buffer.byteLength < 16) {
+        console.error('Tile data too small');
+        return null;
+      }
+      
+      const headerView = new DataView(buffer);
+      const width = headerView.getInt32(0, true);
+      const height = headerView.getInt32(4, true);
+      const type = headerView.getInt32(8, true);  // CV_16UC1 = 2
+      const border = headerView.getInt32(12, true) || 0; // 预留字段：瓦片外扩边界像素数（用于局部 Bayer 转换避免接缝）
+      
+      // 提取像素数据
+      const pixelData = new Uint16Array(buffer, 16);
+      
+      return { width, height, type, border, data: pixelData };
+    },
+
+    /**
+     * 处理单个瓦片数据（应用GPM参数）
+     * @param {Object} tileData - 解析后的瓦片数据
+     * @returns {ImageData} 处理后的ImageData
+     */
+    processTile(tileData) {
+      const { width, height, data, border = 0 } = tileData;
+      const gpm = this.tileGPM;
+      
+      // 创建OpenCV Mat
+      let mat = null;
+      let resultImg = null;
+      let roiMat = null;
+      let finalImg = null;
+      
+      try {
+        mat = new cv.Mat(height, width, cv.CV_16UC1);
+        mat.data16U.set(data);
+        
+        // 应用统一的处理参数
+        const isColorCamera = gpm.cfa && gpm.cfa !== '' && gpm.cfa !== 'null';
+        
+        if (isColorCamera) {
+          // applyStretchAndGain() 期望 analysis.whiteBalance.gainR/gainB
+          const analysis = { whiteBalance: { gainR: gpm.gainR ?? 1, gainB: gpm.gainB ?? 1 } };
+          resultImg = this.applyStretchAndGain(mat, analysis, 'bayer', gpm.cfa, gpm.blackLevel, gpm.whiteLevel);
+        } else {
+          resultImg = this.applyStretchAndGain(mat, {
+            gainR: 1,
+            gainB: 1,
+            offset: 0
+          }, 'gray', gpm.cfa, gpm.blackLevel, gpm.whiteLevel);
+        }
+
+        // 如果后端为瓦片附带了边界像素（用于避免局部去马赛克接缝），这里裁掉边界再返回
+        if (border > 0 && resultImg && resultImg.cols > 2 * border && resultImg.rows > 2 * border) {
+          const rect = new cv.Rect(border, border, resultImg.cols - 2 * border, resultImg.rows - 2 * border);
+          roiMat = resultImg.roi(rect);
+          finalImg = roiMat.clone();
+        } else {
+          finalImg = resultImg;
+        }
+        
+        // 转换为ImageData
+        const imageData = new ImageData(
+          new Uint8ClampedArray(finalImg.data),
+          finalImg.cols,
+          finalImg.rows
+        );
+        
+        return imageData;
+      } finally {
+        if (roiMat) roiMat.delete();
+        if (finalImg && finalImg !== resultImg) finalImg.delete();
+        if (mat) mat.delete();
+        if (resultImg) resultImg.delete();
+      }
+    },
+
+    /**
+     * 渲染所有已加载的瓦片到缓冲画布
+     */
+    renderTiles() {
+      if (!this.tileGPM || !this.tileCanvas) return;
+      
+      const gpm = this.tileGPM;
+      const T = gpm.tileSize;
+      const ctx = this.tileCtx;
+      
+      // 只在新会话开始时清空一次；层级切换时不清空，避免“先透明后补齐”的闪烁
+      if (this.tileCanvasNeedsClear) {
+        ctx.clearRect(0, 0, this.tileCanvas.width, this.tileCanvas.height);
+        this.tileCanvasNeedsClear = false;
+      }
+      
+      // 获取当前应该显示的层级（反向金字塔）
+      const z = this.calculateTileLevel(this.scale, gpm.maxZoomLevel);
+
+      // 若缩放导致瓦片层级切换：清理“当前可视区域”，避免旧层级瓦片残留造成“看起来没有更新”的错觉
+      // 只清一次（每次层级切换清一次），避免每块瓦片加载都清空导致闪烁
+      if (this._tileLastRenderedZ === undefined) {
+        this._tileLastRenderedZ = z;
+      } else if (this._tileLastRenderedZ !== z) {
+        const prevZ = this._tileLastRenderedZ;
+        const cx = Number.isFinite(this.visibleX) ? this.visibleX : (gpm.imageWidth / 2);
+        const cy = Number.isFinite(this.visibleY) ? this.visibleY : (gpm.imageHeight / 2);
+        const vw = gpm.imageWidth * this.scale;
+        const vh = vw / (this.ImageProportion || (this.CanvasWidth / this.CanvasHeight));
+        const left = Math.max(0, cx - vw / 2);
+        const top = Math.max(0, cy - vh / 2);
+        const right = Math.min(gpm.imageWidth, left + vw);
+        const bottom = Math.min(gpm.imageHeight, top + vh);
+        const w = Math.max(0, right - left);
+        const h = Math.max(0, bottom - top);
+
+        // 层级变化日志：用于确认缩放是否触发了新层级瓦片加载
+        // 注意：scale 越小表示越放大；z 越大表示越高精度（接近原图）
+        try {
+          const msg = `[TileLevelChange] session=${this.tileSessionId} z:${prevZ} -> ${z} scale=${Number(this.scale).toFixed(3)} center=(${Math.round(cx)},${Math.round(cy)}) visible=(${Math.round(left)},${Math.round(top)})-${Math.round(w)}x${Math.round(h)}`;
+          console.log(msg);
+          this.SendConsoleLogMsg(msg, 'info');
+        } catch (e) {
+          // ignore logging errors
+        }
+
+        if (w > 0 && h > 0) {
+          ctx.clearRect(left, top, w, h);
+        }
+        this._tileLastRenderedZ = z;
+      }
+
+      const levelScale = Math.pow(2, gpm.maxZoomLevel - z);
+
+      // 动态插值平滑（瓦片模式）：
+      // - 使用低层级瓦片（levelScale>1，表示低分辨率瓦片被放大）时开启平滑，观感更顺
+      // - 进入最高精度（levelScale≈1，接近原图像素）时关闭平滑，细节更锐利
+      let smoothing = true;
+      if (this.imageSmoothingMode === 'never') {
+        smoothing = false;
+      } else if (this.imageSmoothingMode === 'always') {
+        smoothing = true;
+      } else {
+        smoothing = levelScale > 1.0001;
+      }
+      ctx.imageSmoothingEnabled = smoothing;
+      ctx.mozImageSmoothingEnabled = smoothing;
+      ctx.webkitImageSmoothingEnabled = smoothing;
+      ctx.msImageSmoothingEnabled = smoothing;
+      
+      // 渲染优化：只绘制当前“可见集合”内的瓦片，避免全缓存遍历；
+      // 同时复用一个临时画布，避免每块瓦片都创建 canvas（会非常慢）
+      if (!this._tileBlitCanvas) {
+        this._tileBlitCanvas = document.createElement('canvas');
+        this._tileBlitCtx = this._tileBlitCanvas.getContext('2d');
+      }
+
+      // 仅在需要时清空（参数变化/视图切换时由外部设置 tileCanvasNeedsClear），避免每块瓦片加载时“闪白/重置”观感
+      if (this.tileCanvasNeedsClear) {
+        ctx.clearRect(0, 0, this.tileCanvas.width, this.tileCanvas.height);
+        this.tileCanvasNeedsClear = false;
+      }
+
+      const keysToDraw =
+        (this.currentVisibleTiles && this.currentVisibleTiles.size > 0)
+          ? Array.from(this.currentVisibleTiles)
+          : Array.from(this.tileCache.keys());
+
+      for (const key of keysToDraw) {
+        const cached = this.tileCache.get(key);
+        const imageData = cached && cached.imageData;
+        if (!imageData) continue;
+
+        const [tileZ, tileX, tileY] = key.split('/').map(Number);
+        if (tileZ !== z) continue; // 只绘制当前层级
+
+        const destX = tileX * T * levelScale;
+        const destY = tileY * T * levelScale;
+        const destWidth = T * levelScale;
+        const destHeight = T * levelScale;
+
+        if (this._tileBlitCanvas.width !== imageData.width || this._tileBlitCanvas.height !== imageData.height) {
+          this._tileBlitCanvas.width = imageData.width;
+          this._tileBlitCanvas.height = imageData.height;
+        }
+        this._tileBlitCtx.putImageData(imageData, 0, 0);
+        ctx.drawImage(this._tileBlitCanvas, 0, 0, imageData.width, imageData.height, destX, destY, destWidth, destHeight);
+      }
+      
+      // 将瓦片画布复制到缓冲画布
+      if (this.bufferCanvas) {
+        // 避免每次 resize 导致 bufferCanvas 被清空（闪烁）；仅在尺寸变化时调整
+        if (this.bufferCanvas.width !== this.tileCanvas.width || this.bufferCanvas.height !== this.tileCanvas.height) {
+          this.bufferCanvas.width = this.tileCanvas.width;
+          this.bufferCanvas.height = this.tileCanvas.height;
+        }
+        this.bufferCtx.drawImage(this.tileCanvas, 0, 0);
+
+        // 若存在 ROI 叠加层（通常来自对焦 ROI 循环），在瓦片渲染后叠加，避免被瓦片重绘覆盖
+        this.applyRoiOverlay();
+        
+        // 更新显示
+        this.drawImgData = true;
+        this.drawImageData();
+      }
+    },
+
+    /**
+     * 视窗变化时重新加载瓦片
+     */
+    onViewportChange() {
+      if (this.tileGPM) {
+        // 记忆当前位置（拖动/缩放导致视野变化时）
+        this.rememberTileViewportState();
+        // 使用防抖，避免频繁加载
+        if (this.viewportChangeTimer) {
+          clearTimeout(this.viewportChangeTimer);
+        }
+        this.viewportChangeTimer = setTimeout(() => {
+          this.loadVisibleTiles();
+        }, 100);
+      }
+    },
+
+    /**
+     * 参数变化时重新加载瓦片（清除缓存）
+     * 注意：此方法用于直方图拉伸等参数变化，会清除所有缓存并重新下载瓦片
+     * 白平衡增益变化应使用 reprocessTilesWithNewGains() 方法
+     */
+    reloadTilesWithNewParams() {
+      if (!this.tileGPM) return;
+      
+      // 参数变化（直方图拉伸/黑白点等）只影响渲染，不应触发瓦片重新生成或重新下载。
+      // 做法：保留 raw 瓦片数据，通过 paramsKey 机制让可见瓦片按需重处理。
+      // 标记下次渲染需要重绘（renderTiles 会只清一次，避免闪烁）
+      this.tileCanvasNeedsClear = true;
+
+      // 重新处理/补齐当前可见瓦片（raw 缺失的才会触发下载）
+      this.loadVisibleTiles();
+    },
+
+    /**
+     * 仅白平衡增益变化时重新处理瓦片（不重新下载）
+     * 使用已缓存的原始瓦片数据，应用新的增益参数重新处理
+     */
+    reprocessTilesWithNewGains() {
+      if (!this.tileGPM || !this.tileRawDataCache) return;
+      
+      console.log('[reprocessTilesWithNewGains] 使用新的白平衡增益重新处理已缓存的瓦片');
+      
+      // 白平衡增益变化同样只影响渲染：通过 paramsKey 机制让可见瓦片按需重处理。
+      this.tileCanvasNeedsClear = true;
+      this.loadVisibleTiles();
+    },
+
+    // ========================= 瓦片金字塔方法结束 =========================
 
     updateCaptureImageProgress(num) {
       this.$bus.$emit('ShowCaptureImageProgress', num);
@@ -4419,6 +6410,10 @@ export default {
       this.ImageProportion = value;
     },
 
+    /**
+     * @deprecated 已废弃：不再使用传统图像处理方式，请使用瓦片金字塔模式
+     * 保留此函数仅为了兼容某些特殊场景（如极轴校准模式）
+     */
     async processImage(imgArray, histogramMin = -1, histogramMax = -1, options = {}) {
       let { calculateHistogram = true } = options;
       this.progressValue = 0;
@@ -5246,6 +7241,17 @@ export default {
 
       this.tempCanvas = document.createElement('canvas');
       this.tempCtx = this.tempCanvas.getContext('2d');
+
+      // 初始化瓦片合成画布
+      this.tileCanvas = document.createElement('canvas');
+      this.tileCtx = this.tileCanvas.getContext('2d');
+      
+      // 初始化瓦片缓存 (使用非响应式的Map/Set)
+      this.tileCache = new Map();
+      this.tileRawDataCache = new Map();
+      this.tilePendingLoads = new Set();
+      this.tileAbortControllers = new Map();
+      this.currentVisibleTiles = new Set();
     },
 
     //*/*/*/*/*/*/*/*/*/*/*/
@@ -5344,6 +7350,25 @@ export default {
       canvas.width = this.CanvasWidth;
       canvas.height = this.CanvasHeight;
 
+      // 动态插值平滑：缩小时开启更顺滑；放大到一定倍率后关闭更锐利
+      // 注意：scale 越小表示越“放大”（可见区域越小，放大倍率越高）
+      let smoothing = true;
+      if (this.imageSmoothingMode === 'never') {
+        smoothing = false;
+      } else if (this.imageSmoothingMode === 'always') {
+        smoothing = true;
+      } else {
+        const upscaleX = canvas.width / (newVisibleWidth || 1);
+        const upscaleY = canvas.height / (newVisibleHeight || 1);
+        const upscale = Math.max(upscaleX, upscaleY);
+        smoothing = upscale < (Number(this.imageSmoothingDisableAtUpscale) || 1.25);
+      }
+      ctx.imageSmoothingEnabled = smoothing;
+      // 兼容旧前缀字段
+      ctx.mozImageSmoothingEnabled = smoothing;
+      ctx.webkitImageSmoothingEnabled = smoothing;
+      ctx.msImageSmoothingEnabled = smoothing;
+
       ctx.drawImage(this.bufferCanvas, visibleLeft, visibleTop, newVisibleWidth, newVisibleHeight, 0, 0, canvas.width, canvas.height);
 
       this.visibleX = newVisibleX;
@@ -5354,7 +7379,11 @@ export default {
       this.$bus.$emit('setCurrentMainCanvasHasImage', true); // 发送给电调，用于判断是否可以进行循环拍摄
       // 发送消息给QT客户端，用于信息图标
       // 统一坐标：发送给 QT 的 ROI 坐标采用传感器像素坐标（不再按 bin 放大），避免在回环中被重复乘以 bin 导致指数级增长
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'sendVisibleArea:' + this.visibleX + ':' + this.visibleY + ':' + this.scale);
+      if (this.tileFrameId != null) {
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'sendVisibleArea:' + this.visibleX + ':' + this.visibleY + ':' + this.scale + ':' + this.tileFrameId);
+      } else {
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'sendVisibleArea:' + this.visibleX + ':' + this.visibleY + ':' + this.scale);
+      }
 
       // 如果选择了星点，则根据选择位置，在ROI区域中绘制一个圆
       if (this.DrawSelectStarX != -1 && this.DrawSelectStarY != -1 && this.showSelectStar) {
@@ -5515,39 +7544,110 @@ export default {
     },
 
     applyHistStretch(Min, Max) {
+      console.log(`[applyHistStretch] 应用直方图拉伸: Min=${Min}, Max=${Max}`);
+      
+      // -1, -1 表示自动拉伸模式：使用初始保存的黑白点参数
+      if (Min === -1 && Max === -1) {
+        console.log('[applyHistStretch] 自动拉伸模式：恢复到初始自动计算的黑白点');
+        if (this.tileGPM) {
+          // 检查是否有保存的初始自动拉伸参数
+          if (Number.isFinite(this.autoStretchBlackLevel) && Number.isFinite(this.autoStretchWhiteLevel) &&
+              this.autoStretchBlackLevel >= 0 && this.autoStretchWhiteLevel > this.autoStretchBlackLevel) {
+            console.log(`[applyHistStretch] 使用保存的初始自动拉伸参数: black=${this.autoStretchBlackLevel}, white=${this.autoStretchWhiteLevel}`);
+            
+            // 检查当前参数是否已经是初始参数，避免不必要的重新加载
+            if (this.tileGPM.blackLevel === this.autoStretchBlackLevel && 
+                this.tileGPM.whiteLevel === this.autoStretchWhiteLevel) {
+              console.log('[applyHistStretch] 当前已是自动拉伸参数，无需重新加载');
+              this.SendConsoleLogMsg('已处于自动拉伸状态', 'info');
+              // 更新拨盘位置
+              this.$bus.$emit('ChangeDialPosition', this.autoStretchBlackLevel, this.autoStretchWhiteLevel);
+              return;
+            }
+            
+            // 恢复到初始的自动拉伸参数
+            this.currentHistogramMin = this.autoStretchBlackLevel;
+            this.currentHistogramMax = this.autoStretchWhiteLevel;
+            this.tileGPM.blackLevel = this.autoStretchBlackLevel;
+            this.tileGPM.whiteLevel = this.autoStretchWhiteLevel;
+            
+            this.SendConsoleLogMsg(`应用自动拉伸: black=${this.autoStretchBlackLevel}, white=${this.autoStretchWhiteLevel}`, 'info');
+            
+            // 更新拨盘位置
+            this.$bus.$emit('ChangeDialPosition', this.autoStretchBlackLevel, this.autoStretchWhiteLevel);
+            
+            // 重新加载瓦片以应用新参数
+            console.log('[applyHistStretch] 触发瓦片重新加载');
+            this.reloadTilesWithNewParams();
+            return;
+          } else {
+            console.log('[applyHistStretch] 没有保存的初始自动拉伸参数');
+            this.SendConsoleLogMsg('没有可用的自动拉伸参数', 'warning');
+            return;
+          }
+        } else {
+          console.log('[applyHistStretch] 瓦片模式未初始化，跳过自动拉伸');
+          return;
+        }
+      }
+      
+      // 手动设置的拉伸参数
       this.currentHistogramMin = Min;
       this.currentHistogramMax = Max;
-      if (this.ImageArrayBuffer) {
-        this.processImage(this.ImageArrayBuffer, Min, Max, { calculateHistogram: false });
+      
+      // 更新瓦片GPM参数并重新加载瓦片（完全使用瓦片模式）
+      if (this.tileGPM) {
+        this.SendConsoleLogMsg(`[瓦片模式] 更新直方图参数: blackLevel=${Min}, whiteLevel=${Max}`, 'info');
+        this.tileGPM.blackLevel = Min;
+        this.tileGPM.whiteLevel = Max;
+        console.log('[applyHistStretch] 触发瓦片重新加载');
+        this.reloadTilesWithNewParams();
+      } else {
+        this.SendConsoleLogMsg('警告: 尚未初始化瓦片模式，无法应用直方图拉伸', 'warning');
+        console.log('[applyHistStretch] 警告: tileGPM为空');
       }
+      
+      // 同步更新拨盘位置（无论是否在瓦片模式）
       this.$bus.$emit('ChangeDialPosition', Min, Max);
     },
 
 
     calcWhiteBalanceGains() {
-      // const Gains = this.calculateWhiteBalanceGains(this.histogramData, this.ImageOffset);
+      console.log('[calcWhiteBalanceGains] 开始计算白平衡增益');
+      
+      // 瓦片模式：向后端请求计算白平衡增益
+      if (this.tileGPM) {
+        console.log('[calcWhiteBalanceGains] 瓦片模式：向后端请求计算白平衡');
+        this.SendConsoleLogMsg('正在计算白平衡增益...', 'info');
+        
+        // 发送命令到后端，请求计算白平衡
+        this.sendMessage('Vue_Command', 'CalcWhiteBalance');
+        
+        // 后端应该：
+        // 1. 接收 CalcWhiteBalance 命令
+        // 2. 基于当前原始图像计算 R 和 B 通道的增益值
+        // 3. 更新 ImageGainR 和 ImageGainB 变量
+        // 4. 发送消息回前端: "WhiteBalanceGains:<gainR>:<gainB>"
+        // 5. 前端收到增益值后，使用已缓存的原始瓦片数据重新处理显示（不重新生成瓦片）
+        
+        console.log('[calcWhiteBalanceGains] 已发送白平衡计算请求到后端');
+        return;
+      }
+      
+      // 检查是否有图像数据
+      if (!this.ImageArrayBuffer || this.ImageArrayBuffer.byteLength === 0) {
+        this.SendConsoleLogMsg('没有可用的图像数据，无法计算白平衡', 'warning');
+        console.log('[calcWhiteBalanceGains] ImageArrayBuffer为空');
+        return;
+      }
+      
+      // 传统模式：使用processImage重新处理图像并计算增益
       this.calculateGain = true;
       this.processImage(this.ImageArrayBuffer, this.currentHistogramMin, this.currentHistogramMax, { calculateHistogram: false });
-
-      this.ImageGainR = Gains.GainR;
-      this.ImageGainB = Gains.GainB;
-
-      const GainRIndex = this.MainCameraConfigItems.findIndex(item => item.label === 'ImageGainR');
-      if (GainRIndex !== -1) { // 确保找到了对应的配置项
-        // 更新 ExpTime1 配置项的值
-        this.MainCameraConfigItems[GainRIndex].value = this.ImageGainR;
-      } else {
-        console.error('ImageGainR configuration item not found.');
-      }
-
-      const GainBIndex = this.MainCameraConfigItems.findIndex(item => item.label === 'ImageGainB');
-      if (GainBIndex !== -1) { // 确保找到了对应的配置项
-        // 更新 ExpTime1 配置项的值
-        this.MainCameraConfigItems[GainBIndex].value = this.ImageGainB;
-      } else {
-        console.error('ImageGainB configuration item not found.');
-      }
-
+      
+      // 注意：Gains会在processImage的回调中设置，这里不应该立即使用
+      // 移除了直接引用Gains的代码，因为它是异步获取的
+      console.log('[calcWhiteBalanceGains] 已触发图像重新处理以计算白平衡');
     },
 
 
@@ -6663,12 +8763,28 @@ export default {
     },
 
     CalibratePolarAxis() {
+      // 仅限制：自动极轴校准（主相机未绑定时禁止进入/执行）
+      if (!this.$store.getters['device/isDeviceBound']('MainCamera')) {
+        this.callShowMessageBox(
+          this.$t('MainCameraNotBoundAction', { action: this.$t('Feature_AutoPolarAlignment') }),
+          'error'
+        );
+        return;
+      }
       this.$bus.$emit('CalibratePolarAxisMode');
       // this.$bus.$emit('AppSendMessage', 'Vue_Command', 'StartLoopCapture');
       this.nav = false;
     },
 
     RecalibratePolarAxis() {
+      // 仅限制：自动极轴校准（主相机未绑定时禁止）
+      if (!this.$store.getters['device/isDeviceBound']('MainCamera')) {
+        this.callShowMessageBox(
+          this.$t('MainCameraNotBoundAction', { action: this.$t('Feature_AutoPolarAlignment') }),
+          'error'
+        );
+        return;
+      }
       // 清空列表，准备下次计算
       this.CartesianList = [];
       this.MarkCircleNum = 0;
@@ -7047,13 +9163,30 @@ export default {
       const DeviceType = this.CurrentDriverType;
       for (const device of this.devices) {
         if (device.driverType === DeviceType && device.isConnected == false) {
-          const DriverName = device.driverName;
-          if (DriverName == '') {
+          let DriverName = device.driverName;
+          if (!DriverName || DriverName === '') {
             this.SendConsoleLogMsg('No driver selected', 'warning');
             this.isConnecting = false;
+            this.stopLoading();
             return;
           }
-          this.$bus.$emit('AppSendMessage', 'Vue_Command', 'ConnectDriver:' + DriverName + ':' + DeviceType);
+
+          // 防护：若 driverName 被污染成 SDK/INDI 占位符，拒绝连接并提示用户重新选择驱动
+          const upperName = String(DriverName).toUpperCase();
+          if (upperName === 'SDK' || upperName === 'INDI') {
+            this.SendConsoleLogMsg(`Invalid driver name "${DriverName}". Please select a valid driver from the list.`, 'error');
+            this.callShowMessageBox(`Invalid driver name "${DriverName}". Please reselect driver.`, 'error');
+            this.isConnecting = false;
+            this.stopLoading();
+            return;
+          }
+
+          // 根据 UI 当前选择的连接模式，显式携带 :SDK，避免后端仍处于 INDI 默认分支
+          const mode = String(device.connectionMode || this.selectedConnectionMode || 'INDI').toUpperCase();
+          const msg = (mode === 'SDK')
+            ? `ConnectDriver:${DriverName}:${DeviceType}:SDK`
+            : `ConnectDriver:${DriverName}:${DeviceType}`;
+          this.$bus.$emit('AppSendMessage', 'Vue_Command', msg);
           this.SendConsoleLogMsg('Start Connecting driver:' + DeviceType + ' ' + DriverName, 'info');
           return;
         }
@@ -7069,9 +9202,27 @@ export default {
 
       this.stopLoading();
     },
-    connectDriverFailed(message) {
-      console.log('connectDriverFailed:', message);
-      this.SendConsoleLogMsg("connectDriverFailed:" + message, 'error');
+    connectDriverFailed(message, deviceType = '') {
+      console.log('connectDriverFailed:', message, deviceType);
+      this.SendConsoleLogMsg("connectDriverFailed:" + (deviceType ? deviceType + ':' : '') + message, 'error');
+      
+      // 构建友好的错误提示
+      let errorMsg = message;
+      if (deviceType) {
+        // 尝试翻译设备类型
+        const deviceTypeName = this.$t(deviceType) !== deviceType ? this.$t(deviceType) : deviceType;
+        // 尝试翻译错误消息
+        const translatedMsg = this.$t(message) !== message ? this.$t(message) : message;
+        errorMsg = `${deviceTypeName}: ${translatedMsg}`;
+      } else {
+        // 尝试翻译错误消息
+        errorMsg = this.$t(message) !== message ? this.$t(message) : message;
+      }
+      
+      // 显示错误提示框
+      this.callShowMessageBox(errorMsg, 'error');
+      
+      // 关闭连接状态和进度条
       this.isConnecting = false;
       this.stopLoading();
     },
@@ -7104,6 +9255,12 @@ export default {
           device.isConnected = false;
           device.isget = false;
           device.device = device.driverName;
+          // 防护：如果 driverName 是 "SDK" 或 "INDI"，清空它，避免断开后仍然保留无效值
+          const upperName = String(device.driverName || '').toUpperCase();
+          if (upperName === 'SDK' || upperName === 'INDI') {
+            console.warn(`disconnectDriversuccess: Clearing invalid driverName "${device.driverName}" for ${devicetype}`);
+            device.driverName = '';
+          }
         }
       }
       for (const device of this.ToBeConnectDevice) {
@@ -7123,6 +9280,11 @@ export default {
         this.$bus.$emit('CFWConnected', 0);
       } else if (devicetype == "Guider") {
         this.$bus.$emit('GuiderConnected', 0);
+      }
+      
+      // 恢复选中驱动：断开后保持驱动选择不变，方便用户重新连接
+      if (this.CurrentDriverType === devicetype) {
+        this.updateSelectedDriver(devicetype);
       }
     },
 
@@ -7147,6 +9309,12 @@ export default {
           device.isConnected = false;
           device.isget = false;
           device.device = device.driverName;
+          // 防护：如果 driverName 是 "SDK" 或 "INDI"，清空它，避免断开后仍然保留无效值
+          const upperName = String(device.driverName || '').toUpperCase();
+          if (upperName === 'SDK' || upperName === 'INDI') {
+            console.warn(`disconnectDriverFail: Clearing invalid driverName "${device.driverName}" for ${devicetype}`);
+            device.driverName = '';
+          }
         }
       }
       for (const device of this.ToBeConnectDevice) {
@@ -7167,20 +9335,228 @@ export default {
       } else if (devicetype == "Guider") {
         this.$bus.$emit('GuiderConnected', 0);
       }
+      
+      // 恢复选中驱动：断开后保持驱动选择不变，方便用户重新连接
+      if (this.CurrentDriverType === devicetype) {
+        this.updateSelectedDriver(devicetype);
+      }
     },
-    loadSelectedDriverList(deviceObject) {
-      console.log('loadSelectedDriverList:', deviceObject);
-      deviceObject.forEach(device => {
-        // 假设你想要打印每个设备对象的键值对
-        for (const [driverType, driverName] of Object.entries(device)) {
-          this.devices.forEach(device => {
-            if (device.driverType === driverType && device.isConnected == false) {
-              device.device = driverName;
-              device.driverName = driverName;
-            }
-          });
+    // 兼容处理 SelectedDriverList（旧/新协议）
+    // - 旧：SelectedDriverList:Desc1:Driver1:Desc2:Driver2:...
+    // - 新：SelectedDriverList:Desc1:Driver1:SDKSupport1:Mode1:Desc2:Driver2:SDKSupport2:Mode2:...
+    loadSelectedDriverListFromParts(parts) {
+      const payload = parts.slice(1);
+      if (!payload.length) return;
+
+      const isNewFormat = (payload.length % 4 === 0);
+      const step = isNewFormat ? 4 : 2;
+
+      for (let i = 0; i < payload.length; i += step) {
+        const deviceType = (payload[i] || '').trim();
+        const driverName = (payload[i + 1] || '').trim();
+        const supportSDK = isNewFormat ? String(payload[i + 2]).trim().toLowerCase() === 'true' : undefined;
+        const modeRaw = isNewFormat ? String(payload[i + 3] || '').trim() : undefined;
+        const connectionMode = (modeRaw && modeRaw.toUpperCase() === 'SDK') ? 'SDK' : (modeRaw ? 'INDI' : undefined);
+
+        if (!deviceType) continue;
+
+        // 防护：过滤掉 SDK/INDI 占位符，避免将连接模式误当作驱动名称
+        const upperName = String(driverName).toUpperCase();
+        if (upperName === 'SDK' || upperName === 'INDI') {
+          console.warn(`loadSelectedDriverListFromParts: Skipping invalid driver name "${driverName}" for ${deviceType}`);
+          continue;
         }
-      });
+
+        // 写入后端下发缓存（优先级最高）
+        if (typeof supportSDK === 'boolean' && driverName) {
+          if (!this.sdkSupportCache[deviceType]) this.sdkSupportCache[deviceType] = {};
+          this.sdkSupportCache[deviceType][driverName] = supportSDK;
+        }
+
+        // 写回 devices
+        const dev = this.devices.find(d => d.driverType === deviceType);
+        if (!dev) continue;
+
+        // 只有在 driverName 有效时才更新（避免空字符串或无效值覆盖已有的驱动名称）
+        if (driverName && driverName.trim() !== '') {
+          if (!dev.isConnected) {
+            dev.device = driverName;
+            dev.driverName = driverName;
+          } else {
+            // 已连接时也同步 driverName（用于 UI/缓存一致性）
+            dev.driverName = driverName;
+          }
+        }
+        // 如果 driverName 为空，保持 dev.driverName 不变，避免清空已有的驱动选择
+
+        if (typeof supportSDK === 'boolean') dev.supportSDK = supportSDK;
+        if (connectionMode) dev.connectionMode = connectionMode;
+      }
+
+      // 如果当前正在查看某个设备页，刷新 UI 显示（选中驱动/模式）
+      if (this.CurrentDriverType) {
+        this.updateSelectedDriver(this.CurrentDriverType);
+      }
+    },
+
+    // 由固定表格/规则判定某个(设备类型,驱动)是否支持 SDK
+    // 分别匹配 driverName (value) 和 driverLabel (label)，二者有一者匹配即可
+    isDriverSupportSDK(deviceType, driverName, driverLabel = '') {
+      if (!deviceType || !driverName) return false;
+
+      const rules = FIXED_SDK_SUPPORT_RULES[deviceType] || [];
+      if (rules.length === 0) return false;
+      
+      // 分别检查 driverName 和 driverLabel
+      const nameMatch = rules.some(r => r.test(driverName));
+      const labelMatch = driverLabel ? rules.some(r => r.test(driverLabel)) : false;
+      
+      return nameMatch || labelMatch;
+    },
+
+    // 驱动切换/状态恢复后：刷新 supportSDK + selectedConnectionMode，并在“不支持 SDK”时强制回到 INDI
+    refreshSdkSupportAndModeForDevice(deviceType, driverName) {
+      const driverItem = (this.drivers || []).find(d => d.value === driverName);
+      const driverLabel = driverItem ? driverItem.label : '';
+      const supportSDK = this.isDriverSupportSDK(deviceType, driverName, driverLabel);
+
+      const dev = this.devices.find(d => d.driverType === deviceType);
+      if (!dev) return;
+      dev.supportSDK = !!supportSDK;
+
+      // UI 当前设备：同步显示
+      if (this.CurrentDriverType === deviceType) {
+        const nextMode = dev.connectionMode || 'INDI';
+        this.selectedConnectionMode = nextMode;
+      }
+
+      // 如果当前驱动不支持 SDK，则强制切回 INDI，避免后端仍处于 SDK 模式导致连接失败
+      if (!supportSDK) {
+        const prev = dev.connectionMode || 'INDI';
+        if (prev !== 'INDI') {
+          dev.connectionMode = 'INDI';
+        }
+        if (this.CurrentDriverType === deviceType) {
+          this.selectedConnectionMode = 'INDI';
+        }
+        // 等 ConfirmIndiDriver 先被后端处理，再发 SetConnectionMode，降低竞态
+        setTimeout(() => {
+          this.requestSetConnectionMode(deviceType, 'INDI', { silent: true });
+        }, 50);
+      }
+    },
+
+    requestSetConnectionMode(deviceType, mode, opts = {}) {
+      const nextMode = (String(mode || '').toUpperCase() === 'SDK') ? 'SDK' : 'INDI';
+      const dev = this.devices.find(d => d.driverType === deviceType);
+      if (!dev) return;
+
+      // 已连接：禁止切换连接模式（必须先断开）
+      const prev = dev.connectionMode || 'INDI';
+      if (dev.isConnected && prev !== nextMode) {
+        // 回滚 UI（保持原模式）
+        dev.connectionMode = prev;
+        if (this.CurrentDriverType === deviceType) this.selectedConnectionMode = prev;
+        if (!opts.silent) this.callShowMessageBox(this.$t('DeviceConnectedLockModeChangeForbidden'), 'warning');
+        return;
+      }
+
+      // 规则：主相机与导星镜若使用同一驱动，则必须同一连接模式；且一旦存在 SDK 连接则禁止切换到 INDI
+      const isMainOrGuider = (deviceType === 'MainCamera' || deviceType === 'Guider');
+      if (isMainOrGuider && this.isMainGuiderSameDriver()) {
+        if (nextMode === 'INDI' && this.anySdkConnectedInMainGuider()) {
+          // 禁止切回 INDI：回滚到 SDK 并提示
+          dev.connectionMode = 'SDK';
+          if (this.CurrentDriverType === deviceType) this.selectedConnectionMode = 'SDK';
+          if (!opts.silent) this.callShowMessageBox(this.$t('SDKConnectedLockIndiForbidden'), 'warning');
+          return;
+        }
+        if (nextMode === 'SDK' && this.anyIndiConnectedInMainGuider()) {
+          // 禁止切到 SDK：回滚到 INDI 并提示
+          dev.connectionMode = 'INDI';
+          if (this.CurrentDriverType === deviceType) this.selectedConnectionMode = 'INDI';
+          if (!opts.silent) this.callShowMessageBox(this.$t('INDIConnectedLockSdkForbidden'), 'warning');
+          return;
+        }
+
+        // 同步另一台相机的模式（避免 SDK/INDI 混用）
+        if (!opts.fromPeer) {
+          const peerType = (deviceType === 'MainCamera') ? 'Guider' : 'MainCamera';
+          this.requestSetConnectionMode(peerType, nextMode, { silent: true, fromPeer: true });
+        }
+      }
+
+      // 只有在“该驱动支持 SDK 或目标模式为 INDI”时才允许发（INDI 永远安全）
+      if (nextMode === 'SDK' && !dev.supportSDK) {
+        if (!opts.silent) this.callShowMessageBox('Device does not support SDK mode', 'error');
+        // 回滚 UI
+        if (this.CurrentDriverType === deviceType) this.selectedConnectionMode = 'INDI';
+        dev.connectionMode = 'INDI';
+        return;
+      }
+
+      if (prev === nextMode) return;
+
+      this.pendingConnectionModeByDevice[deviceType] = { prev, next: nextMode };
+      this.isSettingConnectionMode = true;
+
+      // 乐观更新 UI
+      dev.connectionMode = nextMode;
+      if (this.CurrentDriverType === deviceType) this.selectedConnectionMode = nextMode;
+
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', `SetConnectionMode:${deviceType}:${nextMode}`);
+      if (!opts.silent) this.SendConsoleLogMsg(`SetConnectionMode:${deviceType}:${nextMode}`, 'info');
+    },
+
+    onConnectionModeChange() {
+      // v-select 的 @change 传入 value，这里直接读取 selectedConnectionMode，避免 Vuetify 版本差异
+      const deviceType = this.CurrentDriverType;
+      this.requestSetConnectionMode(deviceType, this.selectedConnectionMode);
+    },
+
+    onSetConnectionModeSuccess(deviceType, mode) {
+      const dev = this.devices.find(d => d.driverType === deviceType);
+      if (dev) dev.connectionMode = mode;
+      if (this.CurrentDriverType === deviceType) this.selectedConnectionMode = mode;
+      delete this.pendingConnectionModeByDevice[deviceType];
+      this.isSettingConnectionMode = Object.keys(this.pendingConnectionModeByDevice || {}).length > 0;
+      this.SendConsoleLogMsg(`SetConnectionModeSuccess:${deviceType}:${mode}`, 'info');
+
+      // 成功后再次确保主相机/导星镜一致（防止并发/竞态导致短暂不一致）
+      if (deviceType === 'MainCamera' || deviceType === 'Guider') {
+        this.ensureMainGuiderModeConsistency(deviceType);
+      }
+    },
+
+    onSetConnectionModeFailed(deviceType, errorMsg) {
+      const pending = this.pendingConnectionModeByDevice[deviceType];
+      const dev = this.devices.find(d => d.driverType === deviceType);
+
+      // 回滚到之前模式：优先使用 pending.prev，如果没有则回滚到 INDI（因为SDK模式失败了）
+      if (pending && dev) {
+        // 如果尝试设置SDK失败，应该回滚到INDI
+        const rollbackMode = pending.next === 'SDK' ? 'INDI' : (pending.prev || 'INDI');
+        dev.connectionMode = rollbackMode;
+        if (this.CurrentDriverType === deviceType) {
+          this.selectedConnectionMode = rollbackMode;
+        }
+      } else if (dev) {
+        // 如果没有pending信息，强制回滚到INDI（因为SDK设置失败了）
+        dev.connectionMode = 'INDI';
+        if (this.CurrentDriverType === deviceType) {
+          this.selectedConnectionMode = 'INDI';
+        }
+      }
+
+      delete this.pendingConnectionModeByDevice[deviceType];
+      this.isSettingConnectionMode = Object.keys(this.pendingConnectionModeByDevice || {}).length > 0;
+      const translated = (this.$t(errorMsg) !== errorMsg) ? this.$t(errorMsg) : errorMsg;
+      this.callShowMessageBox(`SetConnectionMode failed: ${translated}`, 'error');
+
+      // 失败后也尝试恢复一致性（尤其是主相机/导星镜同驱动时）
+      if (deviceType === 'MainCamera' || deviceType === 'Guider') {
+        this.ensureMainGuiderModeConsistency(deviceType);
+      }
     },
     loadBindDeviceList(deviceObject) {
       console.log('loadBindDeviceList:', deviceObject);
@@ -7192,7 +9568,8 @@ export default {
       this.$bus.$emit('loadBindDeviceTypeList', deviceTypeObject);
       deviceTypeObject.forEach(deviceType => {
         const { Type, DeviceName, DriverName, isbind } = deviceType;
-        this.updateDevicesConnect(Type, DeviceName, DriverName, isbind);
+        // 刷新/恢复阶段常会触发此列表回传，默认静默更新，避免频繁弹窗
+        this.updateDevicesConnect(Type, DeviceName, DriverName, isbind, { silent: true });
       });
     },
     updateSelectedDriver(driverType) {
@@ -7200,10 +9577,36 @@ export default {
       this.selectedDriver = null;
       this.devices.forEach(device => {
         if (device.driverType === driverType) {
-          this.selectedDriver = device.driverName
+          // 防护：过滤掉 SDK/INDI 占位符，避免将连接模式误当作驱动名称
+          const driverName = device.driverName || '';
+          const upperName = String(driverName).toUpperCase();
+          if (driverName && upperName !== 'SDK' && upperName !== 'INDI') {
+            this.selectedDriver = driverName;
+          }
         }
       });
       console.log('Current drivers:', this.selectedDriver);
+
+      // 同步"连接模式"显示，并根据驱动能力刷新 supportSDK
+      const dev = this.devices.find(d => d.driverType === driverType);
+      if (dev) {
+        this.selectedConnectionMode = dev.connectionMode || 'INDI';
+        // 防护：只有在 driverName 有效时才刷新
+        const driverName = dev.driverName || '';
+        const upperName = String(driverName).toUpperCase();
+        if (driverName && upperName !== 'SDK' && upperName !== 'INDI') {
+          this.refreshSdkSupportAndModeForDevice(driverType, driverName);
+        } else {
+          dev.supportSDK = false;
+          dev.connectionMode = 'INDI';
+          this.selectedConnectionMode = 'INDI';
+        }
+      }
+
+      // 打开设备页/刷新 UI 时，若主相机与导星镜同驱动，确保模式一致（并处理 SDK 连接锁定）
+      if (driverType === 'MainCamera' || driverType === 'Guider') {
+        this.ensureMainGuiderModeConsistency(driverType);
+      }
     },
     startLoading() {
       this.loadingDeviceSelection = true;
@@ -7215,9 +9618,12 @@ export default {
       console.log('deleteDeviceAllocationList:', deviceName);
       this.$bus.$emit('deleteDeviceAllocationList', deviceName);
     },
-    UnBindingDevice(type, name, driverName) {
+    UnBindingDevice(type, name) {
+      // 解绑只改变“绑定状态”，不应污染/清空 driverName（尤其是 SDK 模式下会导致后续逻辑错乱）
+      const dev = (this.devices || []).find(d => d && d.driverType === type);
+      const driverName = dev ? dev.driverName : '';
       console.log('UnBindingDevice:', type, name, driverName);
-      this.updateDevicesConnect(type, name, driverName, false);
+      this.updateDevicesConnect(type, '', driverName, false, { silent: true });
     },
 
     displayErrorImage() {
@@ -7285,8 +9691,15 @@ export default {
 
         // 将 ROI 左上角按中心反推，并约束在图像范围内
         const half = side / 2;
-        const imgW = this.mainCameraSizeX;
-        const imgH = this.mainCameraSizeY;
+        // ROI 边界约束以当前渲染底图尺寸为准（瓦片模式下 tileGPM / bufferCanvas）
+        const imgW =
+          (this.bufferCanvas && this.bufferCanvas.width) ? this.bufferCanvas.width :
+            (this.tileGPM && this.tileGPM.imageWidth) ? Number(this.tileGPM.imageWidth) :
+              Number(this.mainCameraSizeX);
+        const imgH =
+          (this.bufferCanvas && this.bufferCanvas.height) ? this.bufferCanvas.height :
+            (this.tileGPM && this.tileGPM.imageHeight) ? Number(this.tileGPM.imageHeight) :
+              Number(this.mainCameraSizeY);
 
         let roiX = desiredCenterX - half;
         let roiY = desiredCenterY - half;
@@ -7333,6 +9746,12 @@ export default {
       this.currentX = event.clientX;
       this.currentY = event.clientY;
 
+      // 关键：鼠标拖出 canvas 或窗口后，canvas 可能收不到 mouseup，导致 isDragging 永远为 true（“粘鼠标”）
+      // 因此拖动期间把 mousemove/mouseup 绑定到 document，并用 window blur 兜底结束拖动
+      document.addEventListener('mousemove', this.handleMouseMove);
+      document.addEventListener('mouseup', this.handleMouseUp);
+      window.addEventListener('blur', this.handleMouseUp);
+
       // 设置一个定时器，每100ms执行一次鼠标移动的逻辑
       this.moveIntervalId = setInterval(() => {
         if (!this.isDragging) return;
@@ -7350,11 +9769,21 @@ export default {
         if (newVisibleY < 0) {
           newVisibleY = 0;
         }
-        if (newVisibleX > this.mainCameraSizeX) {
-          newVisibleX = this.mainCameraSizeX;
+        // 关键修复：拖动边界应以“当前渲染底图”的尺寸为准（瓦片模式下是 tileGPM / bufferCanvas），
+        // 避免 mainCameraSizeX/Y 与瓦片基准尺寸不一致导致无法拖动/被钳制回原位。
+        const boundW =
+          (this.bufferCanvas && this.bufferCanvas.width) ? this.bufferCanvas.width :
+            (this.tileGPM && this.tileGPM.imageWidth) ? Number(this.tileGPM.imageWidth) :
+              Number(this.mainCameraSizeX);
+        const boundH =
+          (this.bufferCanvas && this.bufferCanvas.height) ? this.bufferCanvas.height :
+            (this.tileGPM && this.tileGPM.imageHeight) ? Number(this.tileGPM.imageHeight) :
+              Number(this.mainCameraSizeY);
+        if (Number.isFinite(boundW) && boundW > 0 && newVisibleX > boundW) {
+          newVisibleX = boundW;
         }
-        if (newVisibleY > this.mainCameraSizeY) {
-          newVisibleY = this.mainCameraSizeY;
+        if (Number.isFinite(boundH) && boundH > 0 && newVisibleY > boundH) {
+          newVisibleY = boundH;
         }
 
         this.visibleX = newVisibleX;
@@ -7363,6 +9792,8 @@ export default {
         this.startX = this.currentX;
         this.startY = this.currentY;
         this.drawImageData();
+        // 触发瓦片重新加载
+        this.onViewportChange();
         // this.SendConsoleLogMsg('拖动事件,拖动距离:' + dx + ',' + dy, 'info');
       }, 100);
     },
@@ -7379,18 +9810,40 @@ export default {
       // 清除定时器
       clearInterval(this.moveIntervalId);
       this.moveIntervalId = null;
+
+      // 清理全局监听，避免残留导致状态错乱
+      document.removeEventListener('mousemove', this.handleMouseMove);
+      document.removeEventListener('mouseup', this.handleMouseUp);
+      window.removeEventListener('blur', this.handleMouseUp);
     },
     handleWheel(event) {
       // this.SendConsoleLogMsg('触发鼠标滚轮事件:', 'info');
       if (this.drawImgData == null) return;
-      const scaleChange = event.deltaY > 0 ? 0.1 : -0.1; // 根据滚轮的滚动方向，计算缩放比例的变化量
-      let newScale = this.scale + scaleChange; // 更新缩放比例
-      if (newScale < 0.1) {
-        newScale = 0.1;
+      // 缩放范围：
+      // - 0.1 ~ 1.0：原有 10 档（同时影响瓦片层级映射）
+      // - 0.01 ~ 0.1：新增 10 档（仅做缩放，不再细分瓦片层级）
+      const MIN_SCALE = 0.01;
+      const TILE_LEVEL_MIN_SCALE = 0.1;
+      const MAX_SCALE = 1.0;
+      const EPS = 1e-6;
+
+      const zoomOut = event.deltaY > 0; // deltaY>0 视为缩小（scale 变大）
+      let newScale = this.scale;
+      if (zoomOut) {
+        if (newScale < TILE_LEVEL_MIN_SCALE - EPS) {
+          newScale = Math.min(TILE_LEVEL_MIN_SCALE, Math.round((newScale + 0.01) * 100) / 100);
+        } else {
+          newScale = Math.min(MAX_SCALE, Math.round((newScale + 0.1) * 10) / 10);
+        }
+      } else {
+        if (newScale > TILE_LEVEL_MIN_SCALE + EPS) {
+          newScale = Math.max(TILE_LEVEL_MIN_SCALE, Math.round((newScale - 0.1) * 10) / 10);
+        } else {
+          newScale = Math.max(MIN_SCALE, Math.round((newScale - 0.01) * 100) / 100);
+        }
       }
-      if (newScale > 1) {
-        newScale = 1;
-      }
+      // 最终钳制，避免浮点越界
+      newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, newScale));
 
       // 如果已经有一个待执行的缩放操作，则直接返回
       if (this.pendingScaleChange) {
@@ -7405,7 +9858,10 @@ export default {
         if (newScale != this.scale) {
           this.scale = newScale; // 更新缩放比例
           this.$bus.$emit('setScale', this.scale);
+          this.emitTileLevelInfo();
           this.drawImageData();
+          // 触发瓦片重新加载
+          this.onViewportChange();
           this.SendConsoleLogMsg('缩放比例变化,缩放比例:' + newScale, 'info');
         } else {
           this.SendConsoleLogMsg('缩放比例没有变化,缩放比例:' + this.scale, 'info');
@@ -7439,8 +9895,15 @@ export default {
 
         // 将 ROI 左上角按中心反推，并约束在图像范围内
         const half = side / 2;
-        const imgW = this.mainCameraSizeX;
-        const imgH = this.mainCameraSizeY;
+        // ROI 边界约束以当前渲染底图尺寸为准（瓦片模式下 tileGPM / bufferCanvas）
+        const imgW =
+          (this.bufferCanvas && this.bufferCanvas.width) ? this.bufferCanvas.width :
+            (this.tileGPM && this.tileGPM.imageWidth) ? Number(this.tileGPM.imageWidth) :
+              Number(this.mainCameraSizeX);
+        const imgH =
+          (this.bufferCanvas && this.bufferCanvas.height) ? this.bufferCanvas.height :
+            (this.tileGPM && this.tileGPM.imageHeight) ? Number(this.tileGPM.imageHeight) :
+              Number(this.mainCameraSizeY);
 
         let roiX = desiredCenterX - half;
         let roiY = desiredCenterY - half;
@@ -7479,6 +9942,8 @@ export default {
     handleTouchStart(event) {
       if (this.drawImgData == null) return;
       // this.SendConsoleLogMsg('触发触摸开始事件:', 'info');
+      // 兜底：窗口失焦时强制结束触摸拖动/缩放，避免状态卡住
+      window.addEventListener('blur', this.handleTouchEnd);
       if (event.touches.length === 1) { // 单指触摸，开始拖动
         this.isOneTouch = true;
         // this.SendConsoleLogMsg('触发单指触摸事件', 'info');
@@ -7499,6 +9964,15 @@ export default {
         this.isOneTouch = false;
         // this.SendConsoleLogMsg('触发双指触摸事件', 'info');
         this.isDragging = true;
+        // 初始化两指坐标，避免使用旧值/默认0导致 startTouchDistance 计算错误
+        this.currentTouchX[0] = event.touches[0].clientX;
+        this.currentTouchY[0] = event.touches[0].clientY;
+        this.currentTouchX[1] = event.touches[1].clientX;
+        this.currentTouchY[1] = event.touches[1].clientY;
+        this.startTouchX[0] = this.currentTouchX[0];
+        this.startTouchY[0] = this.currentTouchY[0];
+        this.startTouchX[1] = this.currentTouchX[1];
+        this.startTouchY[1] = this.currentTouchY[1];
         // 计算两个触摸点之间的距离
         const dx = this.currentTouchX[0] - this.currentTouchX[1];
         const dy = this.currentTouchY[0] - this.currentTouchY[1];
@@ -7551,11 +10025,20 @@ export default {
           if (newVisibleY < 0) {
             newVisibleY = 0;
           }
-          if (newVisibleX > this.mainCameraSizeX) {
-            newVisibleX = this.mainCameraSizeX;
+          // 同鼠标拖动：边界使用当前渲染底图尺寸（瓦片模式下 tileGPM / bufferCanvas）
+          const boundW =
+            (this.bufferCanvas && this.bufferCanvas.width) ? this.bufferCanvas.width :
+              (this.tileGPM && this.tileGPM.imageWidth) ? Number(this.tileGPM.imageWidth) :
+                Number(this.mainCameraSizeX);
+          const boundH =
+            (this.bufferCanvas && this.bufferCanvas.height) ? this.bufferCanvas.height :
+              (this.tileGPM && this.tileGPM.imageHeight) ? Number(this.tileGPM.imageHeight) :
+                Number(this.mainCameraSizeY);
+          if (Number.isFinite(boundW) && boundW > 0 && newVisibleX > boundW) {
+            newVisibleX = boundW;
           }
-          if (newVisibleY > this.mainCameraSizeY) {
-            newVisibleY = this.mainCameraSizeY;
+          if (Number.isFinite(boundH) && boundH > 0 && newVisibleY > boundH) {
+            newVisibleY = boundH;
           }
 
           this.visibleX = newVisibleX;
@@ -7565,6 +10048,8 @@ export default {
           this.startTouchY[0] = this.currentTouchY[0];
 
           this.drawImageData();
+          // 触发瓦片重新加载
+          this.onViewportChange();
         }, 100);
 
       } else if (event.touches.length >= 2) {
@@ -7583,7 +10068,8 @@ export default {
         }
         // 设置一个定时器，每100ms执行一次缩放逻辑
         this.zoomIntervalId = setInterval(() => {
-          if (!this.isDragging || !this.isOneTouch) return;
+          // 双指缩放时 isOneTouch=false；这里原本条件写反会导致缩放逻辑永远不执行
+          if (!this.isDragging || this.isOneTouch) return;
           const dx = this.currentTouchX[0] - this.currentTouchX[1];
           const dy = this.currentTouchY[0] - this.currentTouchY[1];
           const distance = Math.sqrt(dx * dx + dy * dy);
@@ -7595,17 +10081,20 @@ export default {
           const scaleChange = distance / this.startTouchDistance;
           this.SendConsoleLogMsg('距离变化比例 scaleChange:' + scaleChange, 'info');
           let newScale = this.scale * scaleChange; // 更新缩放比例
-          if (newScale < 0.1) {
-            newScale = 0.1;
+          if (newScale < 0.01) {
+            newScale = 0.01;
           }
-          if (newScale > 1) {
-            newScale = 1;
+          if (newScale > 1.0) {
+            newScale = 1.0;
           }
           if (newScale != this.scale) {
             this.SendConsoleLogMsg('缩放比例变化,缩放比例:' + newScale, 'info');
             this.scale = newScale; // 更新缩放比例
             this.$bus.$emit('setScale', this.scale);
+            this.emitTileLevelInfo();
             this.drawImageData();
+            // 触发瓦片重新加载
+            this.onViewportChange();
           } else {
             this.SendConsoleLogMsg('缩放比例没有变化,缩放比例:' + this.scale, 'info');
           }
@@ -7619,6 +10108,7 @@ export default {
     handleTouchEnd(event) {
       // this.SendConsoleLogMsg('触发触摸结束事件:', 'info');
       this.isDragging = false; // 停止拖动
+      window.removeEventListener('blur', this.handleTouchEnd);
       // 清除定时器
       if (this.moveIntervalId) {
         clearInterval(this.moveIntervalId);
@@ -7632,19 +10122,36 @@ export default {
 
     ScaleChange(type) {
       if (this.drawImgData == null) return;
+      // 缩放范围：
+      // - 0.1 ~ 1.0：原有 10 档（影响瓦片层级）
+      // - 0.01 ~ 0.1：新增 10 档（仅缩放）
+      const MIN_SCALE = 0.01;
+      const TILE_LEVEL_MIN_SCALE = 0.1;
+      const MAX_SCALE = 1.0;
+      const EPS = 1e-6;
+
       if (type == '+') {
-        this.scale -= 0.1;
+        // 放大（scale 变小）
+        if (this.scale > TILE_LEVEL_MIN_SCALE + EPS) {
+          this.scale = Math.max(TILE_LEVEL_MIN_SCALE, Math.round((this.scale - 0.1) * 10) / 10);
+        } else {
+          this.scale = Math.max(MIN_SCALE, Math.round((this.scale - 0.01) * 100) / 100);
+        }
       } else if (type == '-') {
-        this.scale += 0.1;
+        // 缩小（scale 变大）
+        if (this.scale < TILE_LEVEL_MIN_SCALE - EPS) {
+          this.scale = Math.min(TILE_LEVEL_MIN_SCALE, Math.round((this.scale + 0.01) * 100) / 100);
+        } else {
+          this.scale = Math.min(MAX_SCALE, Math.round((this.scale + 0.1) * 10) / 10);
+        }
       }
-      if (this.scale < 0.1) {
-        this.scale = 0.1;
-      }
-      if (this.scale > 1) {
-        this.scale = 1;
-      }
+      // 最终钳制，避免浮点越界
+      this.scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, this.scale));
       this.$bus.$emit('setScale', this.scale);
+      this.emitTileLevelInfo();
       this.drawImageData();
+      // 触发瓦片重新加载
+      this.onViewportChange();
     },
 
     // 显示ROI图像
@@ -7657,9 +10164,14 @@ export default {
         this.SendConsoleLogMsg('Image is being transmitted, current processing is slow, skipping one frame.', 'warning');
         return;
       }
-      if (this.isDownloadingImageName == "" || this.isDownloadingImageName == null) {
-        this.SendConsoleLogMsg('isDownloadingImageName is empty or null', 'error');
-        // 终止循环拍摄
+      // 兼容瓦片模式：
+      // - 旧“bin整图”链路会在 readBinFile() 里设置 isDownloadingImageName
+      // - 新瓦片金字塔链路不会再触发 readBinFile()，因此不能用 isDownloadingImageName 作为 ROI 显示的前置条件
+      // 只要瓦片 GPM 已就绪（tileGPM 存在），就允许 ROI 叠加继续工作
+      const hasBaseImage = !!this.tileGPM || !(this.isDownloadingImageName == "" || this.isDownloadingImageName == null);
+      if (!hasBaseImage) {
+        this.SendConsoleLogMsg('Base image not ready (no TileGPM and isDownloadingImageName is empty). Stop ROI loop.', 'error');
+        // 终止循环拍摄（避免前端没有底图时无限拉取 ROI 帧）
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'FocusLoopShooting:false');
         return;
       }
@@ -7683,29 +10195,64 @@ export default {
           let src, imgData, targetImg8;
           try {
             const uint16Array = new Uint16Array(buffer);
-            let newWidth = parseInt(this.RedBoxSideLength / this.cameraBin);
-            let newHeight = parseInt(this.RedBoxSideLength / this.cameraBin);
+            // ROI 帧尺寸要与后端写入保持一致：
+            // - 非瓦片模式：使用 cameraBin
+            // - 瓦片模式：后端可能把 MainCameraBinning 固定回 1（坐标不缩放），但 ROI 叠加仍按 previewBinningFactor 写出
+            //   所以这里优先使用 tileGPM.previewBinningFactor
+            const roiBinFactor = (this.tileGPM && this.tileGPM.previewBinningFactor)
+              ? parseInt(this.tileGPM.previewBinningFactor)
+              : parseInt(this.cameraBin || 1);
+            let newWidth = parseInt(this.RedBoxSideLength / roiBinFactor);
+            let newHeight = parseInt(this.RedBoxSideLength / roiBinFactor);
             if (newWidth % 2 != 0) {
               newWidth = newWidth - 1;
             }
             if (newHeight % 2 != 0) {
               newHeight = newHeight - 1;
             }
-            if (uint16Array.length !== newWidth * newHeight) {
-              this.SendConsoleLogMsg('uint16Array.length (' + uint16Array.length + ') !== newWidth * newHeight (' + newWidth * newHeight + ')', 'error');
-              return;
+            const expectedLen = newWidth * newHeight;
+            if (uint16Array.length !== expectedLen) {
+              // 容错：若前端 bin 状态不同步，尝试从 buffer 长度推断正方形边长
+              const inferredSide = Math.round(Math.sqrt(uint16Array.length));
+              if (inferredSide * inferredSide === uint16Array.length) {
+                this.SendConsoleLogMsg(
+                  `ROI buffer size mismatch, fallback to inferred side. ` +
+                  `len=${uint16Array.length}, expected=${expectedLen} (${newWidth}x${newHeight}), ` +
+                  `inferred=${inferredSide}x${inferredSide}, roiBinFactor=${roiBinFactor}, cameraBin=${this.cameraBin}`,
+                  'warning'
+                );
+                newWidth = inferredSide;
+                newHeight = inferredSide;
+              } else {
+                this.SendConsoleLogMsg(
+                  `uint16Array.length (${uint16Array.length}) !== newWidth * newHeight (${expectedLen}), ` +
+                  `and cannot infer square side (sqrt=${Math.sqrt(uint16Array.length)}).`,
+                  'error'
+                );
+                return;
+              }
             }
             // 创建一个空的 Mat 对象
             src = new cv.Mat(newHeight, newWidth, cv.CV_16UC1);
             src.data16U.set(uint16Array);
             let time2 = performance.now();
             this.SendConsoleLogMsg('创建mat对象时间: ' + (time2 - time1).toFixed(0) + 'ms', 'info');
-            if (this.lastImageProcessParams.isColorCamera == 'true' || this.lastImageProcessParams.isColorCamera == 'True' || this.lastImageProcessParams.isColorCamera) {
-              targetImg8 = this.applyStretchAndGain(src, this.lastImageProcessParams.analysis, 'bayer', this.lastImageProcessParams.CFA, this.lastImageProcessParams.blackLevel, this.lastImageProcessParams.whiteLevel);
-
+            // 瓦片模式下 ROI 显示参数应与 tileGPM 保持一致（白平衡/黑白点/CFA）
+            if (this.tileGPM) {
+              const gpm = this.tileGPM;
+              const isColorCamera = gpm.cfa && gpm.cfa !== '' && gpm.cfa !== 'null';
+              if (isColorCamera) {
+                const analysis = { whiteBalance: { gainR: gpm.gainR ?? 1, gainB: gpm.gainB ?? 1 } };
+                targetImg8 = this.applyStretchAndGain(src, analysis, 'bayer', gpm.cfa, gpm.blackLevel, gpm.whiteLevel);
+              } else {
+                targetImg8 = this.applyStretchAndGain(src, { gainR: 1, gainB: 1, offset: 0 }, 'gray', gpm.cfa, gpm.blackLevel, gpm.whiteLevel);
+              }
             } else {
-              targetImg8 = this.applyStretchAndGain(src, this.lastImageProcessParams.analysis, 'gray', this.lastImageProcessParams.CFA, this.lastImageProcessParams.blackLevel, this.lastImageProcessParams.whiteLevel);
-
+              if (this.lastImageProcessParams.isColorCamera == 'true' || this.lastImageProcessParams.isColorCamera == 'True' || this.lastImageProcessParams.isColorCamera) {
+                targetImg8 = this.applyStretchAndGain(src, this.lastImageProcessParams.analysis, 'bayer', this.lastImageProcessParams.CFA, this.lastImageProcessParams.blackLevel, this.lastImageProcessParams.whiteLevel);
+              } else {
+                targetImg8 = this.applyStretchAndGain(src, this.lastImageProcessParams.analysis, 'gray', this.lastImageProcessParams.CFA, this.lastImageProcessParams.blackLevel, this.lastImageProcessParams.whiteLevel);
+              }
             }
             time1 = performance.now();
             this.SendConsoleLogMsg('applyStretchAndGain时间: ' + (time1 - time2).toFixed(0) + 'ms', 'info');
@@ -7716,9 +10263,21 @@ export default {
             imgData = new ImageData(new Uint8ClampedArray(targetImg8.data), targetImg8.cols, targetImg8.rows);
             targetImg8.delete();
             targetImg8 = null;
-            // 在指定位置开始绘制图像
-            // this.bufferCtx.clearRect(this.ROI_x, this.ROI_y, targetImg8.cols, targetImg8.rows);
-            this.bufferCtx.putImageData(imgData, this.ROI_x, this.ROI_y);
+            // 以消息携带的 ROI 坐标为准（若缺失则回退当前状态）
+            const x = Number.isFinite(destX) ? destX : this.ROI_x;
+            const y = Number.isFinite(destY) ? destY : this.ROI_y;
+
+            if (this.tileGPM) {
+              // 瓦片模式：保存为叠加层，由 renderTiles() 在每次瓦片重绘后自动叠加，避免丢失
+              this.roiOverlayImageData = imgData;
+              this.roiOverlayX = x;
+              this.roiOverlayY = y;
+              this.applyRoiOverlay();
+            } else {
+              // 非瓦片模式：直接写入缓冲画布（旧逻辑）
+              // this.bufferCtx.clearRect(x, y, imgData.width, imgData.height);
+              this.bufferCtx.putImageData(imgData, x, y);
+            }
             // this.SendConsoleLogMsg('绘制一次ROI数据:' + fileName + ':' + this.ROI_x + ':' + this.ROI_y, 'info');
             // 标注识别到的星点位置
             // time2 = performance.now();
@@ -7771,7 +10330,28 @@ export default {
         this.isFocusLoopShooting = true;
       } else {
         this.isFocusLoopShooting = false;
+        // 退出 ROI 循环时，清空 ROI 叠加层，避免停留在瓦片画面上造成误导
+        this.roiOverlayImageData = null;
       }
+    },
+
+    /**
+     * 将 ROI 叠加层应用到 bufferCanvas（仅影响显示层，不污染瓦片缓存）
+     * - 瓦片模式下 renderTiles() 每次拷贝 tileCanvas → bufferCanvas 后都会调用本方法，保证 ROI 不被覆盖
+     */
+    applyRoiOverlay() {
+      if (!this.roiOverlayImageData || !this.bufferCtx || !this.bufferCanvas) return;
+
+      const x = Math.max(0, Math.floor(this.roiOverlayX || 0));
+      const y = Math.max(0, Math.floor(this.roiOverlayY || 0));
+
+      // 边界保护：避免越界导致异常
+      const w = this.roiOverlayImageData.width;
+      const h = this.roiOverlayImageData.height;
+      if (x >= this.bufferCanvas.width || y >= this.bufferCanvas.height) return;
+      if (x + w <= 0 || y + h <= 0) return;
+
+      this.bufferCtx.putImageData(this.roiOverlayImageData, x, y);
     },
     setShowSelectStar(state) {
       this.showSelectStar = state;
@@ -7815,6 +10395,12 @@ export default {
             if (item) {
               item.value = parameters[parameter] === 'true' || parameters[parameter] === true;
             }
+          } else if (parameter === 'USB Traffic') {
+            // 仅在需要时动态插入（位置：Offset 后）
+            const usbItem = this.ensureMainCameraUsbTrafficItem();
+            if (usbItem) {
+              usbItem.value = parseInt(parameters[parameter], 10);
+            }
           }else {
             console.error(`未找到参数：${parameter}`);
           }
@@ -7842,6 +10428,7 @@ export default {
     },
     // 现有的加减函数需要修改
     decrementAndNotify(item) {
+      if (this.isCurrentDeviceUnbound) return;
       if (item.value > item.inputMin) {
         item.value -= item.inputStep;
         this.handleConfigChange(item.label, item.value);
@@ -7849,6 +10436,7 @@ export default {
     },
 
     incrementAndNotify(item) {
+      if (this.isCurrentDeviceUnbound) return;
       if (item.value < item.inputMax) {
         item.value += item.inputStep;
         this.handleConfigChange(item.label, item.value);
@@ -7857,6 +10445,7 @@ export default {
 
     // 通用的配置更改处理函数
     handleConfigChange(label, value) {
+      if (this.isCurrentDeviceUnbound) return;
       console.log(`配置已更改: ${label} = ${value}`);
       if (value !== '') {
         // 主相机参数更改处理
@@ -7873,6 +10462,8 @@ export default {
         }else if (label === 'Offset') {
           this.cameraOffset = parseFloat(value);
           this.sendMessage('Vue_Command', 'ImageOffset:' + this.cameraOffset);
+        }else if (label === 'USB Traffic') {
+          this.sendMessage('Vue_Command', 'SetUsbTraffic:' + parseInt(value));
         }else if (label === 'Self Exposure Time (ms)') {
           let IntValue = parseInt(value); // 将值转换为 Int 类型
           if (IntValue <= 0) {
@@ -7889,7 +10480,25 @@ export default {
           this.sendMessage('Vue_Command', 'SetMainCameraSaveFailedParse:' + (value === 'true' || value === true));
         }else if (label === 'Save Folder') {
           this.sendMessage('Vue_Command', 'SetMainCameraSaveFolder:' + value);
-        }else{
+        }else if (label === 'LoopCaptureNum') {
+          this.sendMessage('Vue_Command', 'SetMainCameraLoopCaptureNum:' + value);
+        }else if (label === 'Capture Mode') {
+          // 仅前端本地控制：决定拍摄按钮行为（Single: takeExposure / Burst: takeExposureBurst / Live: 预览不触发拍摄）
+          const v = String(value || 'Single');
+          this.$bus.$emit('SetCaptureMode', v);
+          // 同步到后端：主相机采集模式（Single/Live/Burst）
+          this.sendMessage('Vue_Command', 'SetMainCameraCaptureMode:' + v);
+          this.SendConsoleLogMsg('Capture Mode = ' + v, 'info');
+        }else if (label === 'Burst Frames') {
+          // 仅前端本地控制：Burst 连续采集帧数
+          let n = parseInt(value, 10);
+          if (!Number.isFinite(n) || isNaN(n)) n = 20;
+          if (n < 1) n = 1;
+          if (n > 1024) n = 1024;
+          this.$bus.$emit('SetBurstFrames', n);
+          this.SendConsoleLogMsg('Burst Frames = ' + n, 'info');
+        }
+        else{
           this.SendConsoleLogMsg(label + ':' + value, 'info');
           this.$bus.$emit(label, label + ':' + value);
         }
@@ -8002,6 +10611,75 @@ export default {
     },
   },
   computed: {
+    showConnectionModeSelector() {
+      try {
+        if (!this.CurrentDriverType) return false;
+        if (!this.selectedDriver) return false;
+        // 仅在"设备未连接"页面显示（模板块已限制，这里再兜底一次）
+        if (this.DeviceIsConnected) return false;
+        const driverItem = (this.drivers || []).find(d => d.value === this.selectedDriver);
+        const driverLabel = driverItem ? driverItem.label : '';
+        // 使用匹配规则判断是否支持 SDK
+        return this.isDriverSupportSDK(this.CurrentDriverType, this.selectedDriver, driverLabel);
+      } catch (e) {
+        return false;
+      }
+    },
+    // ConnectionMode 下拉框：根据“SDK已连接锁定”动态禁用 INDI 选项（仅对同驱动的主相机/导星镜生效）
+    connectionModeItemsForCurrentDevice() {
+      const items = (this.connectionModeItems || []).map(i => ({ ...i }));
+      const t = this.CurrentDriverType;
+      const isPair = (t === 'MainCamera' || t === 'Guider');
+      const lockToSdk = isPair && this.isMainGuiderSameDriver() && this.anySdkConnectedInMainGuider();
+      const lockToIndi = isPair && this.isMainGuiderSameDriver() && !lockToSdk && this.anyIndiConnectedInMainGuider();
+
+      return items.map(it => {
+        const v = String(it.value || '').toUpperCase();
+        if (v === 'INDI') return { ...it, disabled: !!lockToSdk };
+        if (v === 'SDK') return { ...it, disabled: !!lockToIndi };
+        return { ...it, disabled: false };
+      });
+    },
+    currentDevice() {
+      return (this.devices || []).find(d => d.driverType === this.CurrentDriverType) || null;
+    },
+    // 未绑定：后端会返回空 deviceName，然后前端用 "Not Bind Device" 占位
+    isCurrentDeviceUnbound() {
+      const dev = this.currentDevice;
+      return !!(dev && dev.isConnected && this.isNotBindDevice(dev.device));
+    },
+    menuDrawerWidth() {
+      return 170;
+    },
+    submenuDrawerWidth() {
+      return 200;
+    },
+    submenuLeft() {
+      // submenu 默认跟随主菜单抽屉的宽度偏移；主菜单关闭时回到左侧
+      return (this.nav ? this.menuDrawerWidth : 0) + 'px';
+    },
+    submenuParamsStyle() {
+      // 将模板里“绝对定位 + padding + 底部预留”抽离出来，减少内联样式噪音
+      return {
+        position: 'absolute',
+        top: '60px',
+        bottom: (this.DeviceIsConnected ? '60px' : '10px'),
+        left: 0,
+        right: 0,
+        paddingRight: '5px',
+        paddingBottom: '80px',
+        paddingLeft: '5px',
+        boxSizing: 'border-box'
+      }
+    },
+    submenuContentKey() {
+      // 只重建子菜单的内容区（不重建滚动容器），避免 v-select/v-slider 等内部缓存导致 UI 不刷新
+      const t = this.CurrentDriverType || '';
+      const c = this.DeviceIsConnected ? '1' : '0';
+      const d = this.selectedDriver || '';
+      const m = this.selectedConnectionMode || '';
+      return `${t}|${c}|${d}|${m}|${this.submenuRenderNonce}`;
+    },
     nav: {
       get: function () {
         console.log('nav:', this.$store.state.showNavigationDrawer);
@@ -8117,6 +10795,16 @@ export default {
     CurrentDriverType(newVal) {
       // 当 CurrentDriverType 变化时，更新 selectedDriver
       this.updateSelectedDriver(newVal);
+      this.bumpSubmenuRender();
+    },
+    selectedDriver() {
+      this.bumpSubmenuRender();
+    },
+    DeviceIsConnected() {
+      this.bumpSubmenuRender();
+    },
+    selectedConnectionMode() {
+      this.bumpSubmenuRender();
     }
   },
   mounted: function () {
@@ -8263,6 +10951,12 @@ export default {
 
     document.removeEventListener('wheel', this.preventDefault);
 
+    // 若销毁时仍在拖动，确保清理全局监听，避免“粘鼠标”残留
+    document.removeEventListener('mousemove', this.handleMouseMove);
+    document.removeEventListener('mouseup', this.handleMouseUp);
+    window.removeEventListener('blur', this.handleMouseUp);
+    window.removeEventListener('blur', this.handleTouchEnd);
+
     // 清理极轴校准相关的圆圈
     if (this.calibrationCircles) {
       this.calibrationCircles.forEach(circle => {
@@ -8291,6 +10985,13 @@ export default {
 </script>
 
 <style>
+/* 全局关闭 UI 毛玻璃模糊（backdrop-filter） */
+.no-backdrop-blur,
+.no-backdrop-blur * {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
 body {
   background-color: black;
   /* 禁用文本选择 */
@@ -8405,6 +11106,8 @@ body,
   position: absolute;
   top: 0;
   left: 0;
+  /* 避免瓦片首帧/清屏阶段出现“透明画布透底”闪屏 */
+  background-color: #000;
 }
 
 #guiderCamera-canvas {
@@ -8413,6 +11116,8 @@ body,
   position: absolute;
   top: 0;
   left: 0;
+  /* 同上：导星画布也保持不透明背景 */
+  background-color: #000;
 }
 
 .right_panel {
@@ -8489,11 +11194,89 @@ body,
   color: #4dc251;
 }
 
+.not-bind-device {
+  color: #ffd54f;
+}
+
 .btn-confirm {
   width: 60px;
   height: 30px;
   background-color: rgba(255, 255, 255, 0.1);
   border-radius: 10px;
+}
+
+.btn-confirm--green {
+  background-color: green !important;
+}
+
+.btn-confirm--red {
+  background-color: red !important;
+}
+
+.menu-navigation-drawer,
+.submenu-navigation-drawer {
+  backdrop-filter: blur(5px);
+  background-color: rgba(0, 0, 0, 0.1) !important;
+}
+
+.submenu-page {
+  position: relative;
+  width: 200px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.submenu-page-title {
+  position: absolute;
+  top: 0px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: clamp(14px, 4vw, 30px);
+  color: rgba(255, 255, 255, 0.5);
+  user-select: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 190px;
+  display: inline-block;
+  z-index: 1;
+}
+
+.submenu-center {
+  text-align: center;
+}
+
+.submenu-section-title {
+  display: inline-block;
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.5);
+  user-select: none;
+}
+
+.submenu-connection-mode {
+  margin-top: 6px;
+}
+
+.submenu-serial-select {
+  margin-top: 8px;
+}
+
+.submenu-bottom-actions {
+  position: absolute;
+  bottom: 10px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  z-index: 2;
+}
+
+.submenu-footer-spacer {
+  height: 5px;
+  flex-shrink: 0;
 }
 
 .btn-slider {

@@ -9,8 +9,8 @@
 // repository.
 
 <template>
-  <v-card v-if="selectedObject" transparent style="background: rgba(66, 66, 66, 0.3);">
-    <v-btn icon style="position: absolute; right: 0" v-on:click.native="unselect()"><v-icon>mdi-close</v-icon></v-btn>
+  <v-card v-if="selectedObject" transparent style="background: rgba(66, 66, 66, 0.3);" data-testid="ui-selected-object-info-root">
+    <v-btn icon style="position: absolute; right: 0" v-on:click.native="unselect()" data-testid="ui-selected-object-info-btn-auto"><v-icon>mdi-close</v-icon></v-btn>
     <v-card-title primary-title>
       <div style="width: 100%">
         <img :src="icon" height="48" width="48" align="left" style="margin-top: 3px; margin-right: 10px"/>
@@ -24,25 +24,38 @@
       <v-row v-if="otherNames.length > 1" style="width: 100%;">
         <v-col cols="12">
           <span style="position: absolute;">{{ $t('Also known as') }}</span><span style="padding-left: 33.3333%">&nbsp;</span><span class="text-caption white--text" v-for="mname in otherNames1to7" :key="mname" style="margin-right: 15px; font-weight: 500;">{{ mname }}</span>
-          <v-btn small icon class="grey--text" v-if="otherNames.length > 8" v-on:click.native="showMinorNames = !showMinorNames" style="margin-top: -5px; margin-bottom: -5px;"><v-icon>mdi-dots-horizontal</v-icon></v-btn>
+          <v-btn
+            small
+            icon
+            class="grey--text"
+            v-if="otherNames.length > 8"
+            data-testid="ui-selected-object-info-btn-grey-text"
+            v-on:click.native="showMinorNames = !showMinorNames"
+            style="margin-top: -5px; margin-bottom: -5px;"
+          ><v-icon>mdi-dots-horizontal</v-icon></v-btn>
           <span class="text-caption white--text" v-for="mname in otherNames8andMore" :key="mname" style="margin-right: 15px; font-weight: 500">{{ mname }}</span>
         </v-col>
       </v-row>
     </v-card-text>
     <v-card-text>
-      <template v-for="item in items">
-        <v-row style="width: 100%" :key="item.key" no-gutters>
-          <v-col cols="4" style="color: #dddddd">{{ item.key }}</v-col>
-          <v-col cols="8" style="font-weight: 500" class="white--text"><span v-html="item.value"></span></v-col>
-        </v-row>
-      </template>
+      <v-row
+        v-for="item in items"
+        :key="item.key"
+        style="width: 100%"
+        no-gutters
+      >
+        <v-col cols="4" style="color: #dddddd">{{ item.key }}</v-col>
+        <v-col cols="8" style="font-weight: 500" class="white--text"><span v-html="item.value"></span></v-col>
+      </v-row>
       <div style="margin-top: 15px" class="white--text" v-html="wikipediaSummary"></div>
     </v-card-text>
     <v-card-actions style="margin-top: -25px">
       <v-spacer/>
-      <template v-for="item in pluginsSelectedInfoExtraGuiComponents">
-        <component :is="item" :key="item"></component>
-      </template>
+      <component
+        v-for="item in pluginsSelectedInfoExtraGuiComponents"
+        :key="item"
+        :is="item"
+      />
     </v-card-actions>
     <v-dialog v-model="showShareLinkDialog" width="500px" absolute>
       <v-card style="height: 180px" class="secondary white--text">
@@ -59,23 +72,47 @@
         </v-card-text>
       </v-card>
     </v-dialog>
-    <div v-if="$store.state.showSelectedInfoButtons" style="position: absolute; right: 0px; bottom: -50px;">
-      <v-btn v-if="showPointToButton" fab small color="transparent" v-on:click.native="lockToSelection()">
-        <img src="@/assets/images/svg/ui/point_to.svg" height="40px" style="min-height: 40px; pointer-events: none;"></img>
+    <div data-testid="ui-selected-object-info-action-buttons" style="position: absolute; right: 0px; bottom: 6px;">
+      <v-btn
+        v-if="showPointToButton"
+        fab
+        small
+        color="transparent"
+        v-on:click.native="lockToSelection()"
+        data-testid="ui-selected-object-info-btn-point-to"
+      >
+        <img
+          src="@/assets/images/svg/ui/point_to.svg"
+          height="40px"
+          style="min-height: 40px; pointer-events: none;"
+          data-testid="ui-selected-object-info-img-point-to"
+        ></img>
       </v-btn>
       <!-- <v-btn v-if="showPointToButton" fab small color="transparent" v-on:click.native="printName()">
         <v-icon>mdi-share</v-icon>
       </v-btn> -->
 
       <!-- <v-btn v-if="!showPointToButton" fab small color="transparent" @click.native="showShareLinkDialog = !showShareLinkDialog"> -->
-      <v-btn v-if="!showPointToButton" fab small color="transparent" @click.native="MountGoto()">
-        <img src="@/assets/images/svg/ui/goto.svg" height="40px" style="min-height: 40px; pointer-events: none;"></img>
+      <v-btn
+        v-if="!showPointToButton"
+        fab
+        small
+        color="transparent"
+        @click.native="MountGoto()"
+        data-testid="ui-selected-object-info-btn-goto"
+      >
+        <img
+          src="@/assets/images/svg/ui/goto.svg"
+          height="40px"
+          style="min-height: 40px; pointer-events: none;"
+          data-testid="ui-selected-object-info-img-goto"
+        ></img>
       </v-btn>
 
-      <v-btn v-if="!showPointToButton" fab small color="transparent" @mousedown="zoomOutButtonClicked()">
+      <v-btn v-if="!showPointToButton" fab small color="transparent" @click="zoomOutButtonClicked()" @touchstart.stop.prevent="zoomOutButtonClicked()">
         <img :class="{bt_disabled: !zoomOutButtonEnabled}" src="@/assets/images/svg/ui/remove_circle_outline.svg" height="40px" style="min-height: 40px"></img>
       </v-btn>
-      <v-btn v-if="!showPointToButton" fab small color="transparent" @mousedown="zoomInButtonClicked()">
+      <v-btn v-if="!showPointToButton" fab small color="transparent" @click="zoomInButtonClicked()" @touchstart.stop.prevent="zoomInButtonClicked()">
         <img :class="{bt_disabled: !zoomInButtonEnabled}" src="@/assets/images/svg/ui/add_circle_outline.svg" height="40px" style="min-height: 40px"></img>
       </v-btn>
 
@@ -281,13 +318,26 @@ export default {
         const raf = that.$stel.a2af(a, 1)
         return '<div class="radecVal">' + raf.sign + formatInt(raf.degrees, 2) + '<span class="radecUnit">°</span></div><div class="radecVal">' + formatInt(raf.arcminutes, 2) + '<span class="radecUnit">\'</span></div><div class="radecVal">' + formatInt(raf.arcseconds, 2) + '.' + raf.fraction + '<span class="radecUnit">"</span></div>'
       }
-      const posCIRS = this.$stel.convertFrame(this.$stel.core.observer, 'ICRF', 'JNOW', obj.getInfo('radec'))
+      // 获取J2000坐标（ICRF坐标系，固定历元，不随时间变化）
+      const radecJ2000 = obj.getInfo('radec')
+      const radecJ2000Sph = this.$stel.c2s(radecJ2000)
+      const raJ2000 = this.$stel.anp(radecJ2000Sph[0])
+      const decJ2000 = this.$stel.anpm(radecJ2000Sph[1])
+      
+      // 获取当前历元坐标（JNOW，用于显示）
+      const posCIRS = this.$stel.convertFrame(this.$stel.core.observer, 'ICRF', 'JNOW', radecJ2000)
       const radecCIRS = this.$stel.c2s(posCIRS)
       const raCIRS = this.$stel.anp(radecCIRS[0])
       const decCIRS = this.$stel.anpm(radecCIRS[1])
+      console.log('ra_J2000:', raJ2000, ' dec_J2000:', decJ2000)
       console.log('ra_JNOW:', raCIRS, ' dec_JNOW:', decCIRS)
-      this.TargetRa = raCIRS;
-      this.TargetDec = decCIRS;
+      
+      // 保存J2000坐标用于Goto和任务计划表
+      this.TargetRa = raJ2000;
+      this.TargetDec = decJ2000;
+      // 保存JNOW坐标用于显示（可选）
+      this.TargetRaJNOW = raCIRS;
+      this.TargetDecJNOW = decCIRS;
       ret.push({
         key: that.$t('Ra/Dec'),
         value: formatRA(raCIRS) + '&nbsp;&nbsp;&nbsp;' + formatDec(decCIRS)
@@ -364,10 +414,10 @@ export default {
       this.$bus.$emit('SendConsoleLogMsg', 'SelectedObject:' + Name, 'info');
       this.$bus.$emit('insertObjName',Name);
 
-      // Math.floor(this.TargetRa * 100) / 100;
-      // Math.floor(this.TargetDec * 100) / 100;
-
+      // 发送J2000坐标（固定历元，用于望远镜Goto和任务计划表）
+      // TargetRa和TargetDec现在存储的是J2000坐标
       this.$bus.$emit('TargetRaDec','Ra:' + Math.floor(this.TargetRa * 1000000) / 1000000 + ',' + 'Dec:' + Math.floor(this.TargetDec * 1000000) / 1000000);
+      console.log('Emitted J2000 coordinates for Goto/Schedule');
     },
     MountGoto: function () {
       this.$bus.$emit('MountGoto');

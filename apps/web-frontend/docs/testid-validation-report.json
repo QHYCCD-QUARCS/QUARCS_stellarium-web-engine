@@ -1,0 +1,137 @@
+{
+  "summary": {
+    "totalTestIds": 620,
+    "totalComponents": 55,
+    "totalIssues": 4,
+    "byType": {
+      "naming": 4
+    },
+    "bySeverity": {
+      "warning": 3,
+      "info": 1
+    }
+  },
+  "issues": [
+    {
+      "type": "naming",
+      "severity": "warning",
+      "testId": "e2e-probes",
+      "file": "App.vue",
+      "line": 18,
+      "message": "测试标识 \"e2e-probes\" 未使用规范的前缀",
+      "suggestion": "建议使用以下前缀之一: pa-, cp-, mcp-, fp-, imp-, scp-, hp-, dap-, dp-, sd-, chart-, tb-, gui-, ui-, bb-",
+      "expectedPrefixes": [
+        "pa-",
+        "cp-",
+        "mcp-",
+        "fp-",
+        "imp-",
+        "scp-",
+        "hp-",
+        "dap-",
+        "dp-",
+        "sd-",
+        "chart-",
+        "tb-",
+        "gui-",
+        "ui-",
+        "bb-"
+      ]
+    },
+    {
+      "type": "naming",
+      "severity": "warning",
+      "testId": "e2e-device-X-conn",
+      "file": "App.vue",
+      "line": 25,
+      "message": "测试标识 \"e2e-device-X-conn\" 未使用规范的前缀",
+      "suggestion": "建议使用以下前缀之一: pa-, cp-, mcp-, fp-, imp-, scp-, hp-, dap-, dp-, sd-, chart-, tb-, gui-, ui-, bb-",
+      "expectedPrefixes": [
+        "pa-",
+        "cp-",
+        "mcp-",
+        "fp-",
+        "imp-",
+        "scp-",
+        "hp-",
+        "dap-",
+        "dp-",
+        "sd-",
+        "chart-",
+        "tb-",
+        "gui-",
+        "ui-",
+        "bb-"
+      ]
+    },
+    {
+      "type": "naming",
+      "severity": "warning",
+      "testId": "e2e-tilegpm",
+      "file": "App.vue",
+      "line": 32,
+      "message": "测试标识 \"e2e-tilegpm\" 未使用规范的前缀",
+      "suggestion": "建议使用以下前缀之一: pa-, cp-, mcp-, fp-, imp-, scp-, hp-, dap-, dp-, sd-, chart-, tb-, gui-, ui-, bb-",
+      "expectedPrefixes": [
+        "pa-",
+        "cp-",
+        "mcp-",
+        "fp-",
+        "imp-",
+        "scp-",
+        "hp-",
+        "dap-",
+        "dp-",
+        "sd-",
+        "chart-",
+        "tb-",
+        "gui-",
+        "ui-",
+        "bb-"
+      ]
+    },
+    {
+      "type": "naming",
+      "severity": "info",
+      "testId": "ui-components-location-focal-inputs-act-handle-keyboard-input",
+      "file": "components/LocationFocalInputs.vue",
+      "line": 76,
+      "message": "测试标识 \"ui-components-location-focal-inputs-act-handle-keyboard-input\" 过长 (61 字符)",
+      "suggestion": "建议保持在 60 字符以内"
+    }
+  ],
+  "namingConventions": {
+    "prefixes": {
+      "pa-": "极轴校准 (AutomaticPolarAlignmentCalibration)",
+      "cp-": "拍摄面板 (CapturePanel)",
+      "mcp-": "赤道仪控制 (MountControlPanel)",
+      "fp-": "调焦面板 (FocuserPanel)",
+      "imp-": "图像管理 (ImageManagerPanel)",
+      "scp-": "计划面板 (SchedulePanel)",
+      "hp-": "直方图面板 (HistogramPanel)",
+      "dap-": "设备分配 (DeviceAllocationPanel)",
+      "dp-": "设备选择器 (DevicePicker)",
+      "sd-": "设置对话框 (Settings-Dialog)",
+      "chart-": "图表组件",
+      "tb-": "工具栏 (toolbar)",
+      "gui-": "主界面 (gui)",
+      "ui-": "通用组件",
+      "bb-": "底部栏 (bottom-bar)"
+    },
+    "suffixes": {
+      "-panel": "面板容器",
+      "-dialog": "对话框",
+      "-btn-": "按钮",
+      "-icon-": "图标",
+      "-input-": "输入框",
+      "-label-": "标签",
+      "-value-": "数值显示",
+      "-list-": "列表",
+      "-item-": "列表项",
+      "-header-": "标题栏",
+      "-footer-": "底部栏",
+      "-content-": "内容区域"
+    }
+  },
+  "generatedAt": "2026-03-06T06:40:33.167Z"
+}

@@ -7,10 +7,10 @@
 // repository.
 
 <template>
-  <div style="position: relative;" v-click-outside="resetSearch">
-    <v-text-field ref="searchField" prepend-icon="mdi-magnify" :label="$t('Search...')" v-model="searchText" @keyup.native.esc="resetSearch()" hide-details single-line></v-text-field>
+  <div style="position: relative;" v-click-outside="resetSearch" data-testid="ui-skysource-search-root">
+    <v-text-field ref="searchField" prepend-icon="mdi-magnify" :label="$t('Search...')" v-model="searchText" @keyup.native.esc="resetSearch()" hide-details single-line data-testid="ui-skysource-search-input-search-field"></v-text-field>
     <v-list dense v-if="showList" two-line :style="listStyle">
-      <v-list-item v-for="source in autoCompleteChoices" :key="source.names[0]" @click="sourceClicked(source)">
+      <v-list-item v-for="source in autoCompleteChoices" :key="source.names[0]" @click="sourceClicked(source)" data-testid="ui-components-skysource-search-act-source-clicked">
         <v-list-item-action>
           <img :src="iconForSkySource(source)"/>
         </v-list-item-action>

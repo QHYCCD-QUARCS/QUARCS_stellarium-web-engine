@@ -1,116 +1,120 @@
 <template>
   <transition name="panel">
     <div class="mount-control-panel"
-      :style="{ top: top + 'px', right: right + 'px', width: width + 'px', height: height + 'px' }">
-      <div class="display-text-container">
+      :style="{ top: top + 'px', right: right + 'px', width: width + 'px', height: height + 'px' }"
+      data-testid="mcp-panel">
+      <div class="display-text-container" data-testid="mcp-display">
         <!-- 修改：使用紧凑的水平布局和缩写 -->
-        <div class="combined-text">
-          <div class="pier-side-text">{{ abbreviatedPierSide }}</div>
-          <div class="separator">|</div>
-          <div class="radec-text">
-            <span class="ra-line">{{ currentLatitude }}</span>
-            <span class="dec-line">{{ currentLongitude }}</span>
+        <div class="combined-text" data-testid="mcp-combined-text">
+          <div class="pier-side-text" data-testid="mcp-pier-side-text">{{ abbreviatedPierSide }}</div>
+          <div class="separator" data-testid="mcp-separator">|</div>
+          <div class="radec-text" data-testid="mcp-radec-text">
+            <span class="ra-line" data-testid="mcp-value-ra" :data-value="currentLatitude">{{ currentLatitude }}</span>
+            <span class="dec-line" data-testid="mcp-value-dec" :data-value="currentLongitude">{{ currentLongitude }}</span>
           </div>
         </div>
       </div>
 
-      <div class="Direction-Btn">
-        <button class="ra-plus no-select" @touchstart="handleMouseDownRA('plus')" @touchend="stopRA('plus')"
-          @mousedown="handleMouseDownRA('plus')" @mouseup="stopRA('plus')">
+      <div class="Direction-Btn" data-testid="mcp-direction-controls">
+        <button class="ra-plus no-select" @touchstart.stop.prevent="handleMouseDownRA('plus')" @touchend.stop.prevent="stopRA('plus')"
+          @mousedown="handleMouseDownRA('plus')" @mouseup="stopRA('plus')" data-testid="mcp-btn-ra-plus">
           <div style="display: flex; justify-content: center; align-items: center;">
             <img src="@/assets/images/svg/ui/RA+.svg" height="40px"
-              style="min-height: 40px; pointer-events: none;"></img>
+              style="min-height: 40px; pointer-events: none;" data-testid="mcp-img-ra-plus"></img>
           </div>
         </button>
-        <button class="ra-minus no-select" @touchstart="handleMouseDownRA('minus')" @touchend="stopRA('minus')"
-          @mousedown="handleMouseDownRA('minus')" @mouseup="stopRA('minus')">
+        <button class="ra-minus no-select" @touchstart.stop.prevent="handleMouseDownRA('minus')" @touchend.stop.prevent="stopRA('minus')"
+          @mousedown="handleMouseDownRA('minus')" @mouseup="stopRA('minus')" data-testid="mcp-btn-ra-minus">
           <div style="display: flex; justify-content: center; align-items: center;">
             <img src="@/assets/images/svg/ui/RA-.svg" height="40px"
-              style="min-height: 40px; pointer-events: none;"></img>
+              style="min-height: 40px; pointer-events: none;" data-testid="mcp-img-ra-minus"></img>
           </div>
         </button>
-        <button class="dec-plus no-select" @touchstart="handleMouseDownDEC('plus')" @touchend="stopDEC('plus')"
-          @mousedown="handleMouseDownDEC('plus')" @mouseup="stopDEC('plus')">
+        <button class="dec-plus no-select" @touchstart.stop.prevent="handleMouseDownDEC('plus')" @touchend.stop.prevent="stopDEC('plus')"
+          @mousedown="handleMouseDownDEC('plus')" @mouseup="stopDEC('plus')" data-testid="mcp-btn-dec-plus">
           <div style="display: flex; justify-content: center; align-items: center;">
             <img src="@/assets/images/svg/ui/DEC+.svg" height="40px"
-              style="min-height: 40px; pointer-events: none;"></img>
+              style="min-height: 40px; pointer-events: none;" data-testid="mcp-img-dec-plus"></img>
           </div>
         </button>
-        <button class="dec-minus no-select" @touchstart="handleMouseDownDEC('minus')" @touchend="stopDEC('minus')"
-          @mousedown="handleMouseDownDEC('minus')" @mouseup="stopDEC('minus')">
+        <button class="dec-minus no-select" @touchstart.stop.prevent="handleMouseDownDEC('minus')" @touchend.stop.prevent="stopDEC('minus')"
+          @mousedown="handleMouseDownDEC('minus')" @mouseup="stopDEC('minus')" data-testid="mcp-btn-dec-minus">
           <div style="display: flex; justify-content: center; align-items: center;">
             <img src="@/assets/images/svg/ui/DEC-.svg" height="40px"
-              style="min-height: 40px; pointer-events: none;"></img>
+              style="min-height: 40px; pointer-events: none;" data-testid="mcp-img-dec-minus"></img>
           </div>
         </button>
       </div>
 
-      <div>
-        <button class="btn-stop no-select" @click="stop"><v-icon> mdi-stop-circle-outline </v-icon></button>
+      <div data-testid="mcp-stop-container">
+        <button class="btn-stop no-select" @click="stop" data-testid="mcp-btn-stop"><v-icon data-testid="mcp-icon-stop"> mdi-stop-circle-outline </v-icon></button>
       </div>
 
-      <div>
-        <button class="btn-speed custom-button no-select" @click="MountSlewRateSwitch">
-          <span style="position:absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);">{{ MountSpeed
+      <div data-testid="mcp-speed-container">
+        <button class="btn-speed custom-button no-select" @click="MountSlewRateSwitch" data-testid="mcp-btn-speed" :data-value="MountSpeed">
+          <span style="position:absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);" data-testid="mcp-speed-value">{{ MountSpeed
             }}</span>
           <div style="display: flex; justify-content: center; align-items: center;">
             <img src="@/assets/images/svg/ui/SPEED.svg" height="25px"
-              style="min-height: 25px; pointer-events: none;"></img>
+              style="min-height: 25px; pointer-events: none;" data-testid="mcp-img-speed"></img>
           </div>
         </button>
       </div>
 
-      <div v-if="showButtons">
+      <div v-if="showButtons" data-testid="mcp-function-buttons">
         <button v-bind:class="{ 'btn-park-on no-select': ParkSwitch, 'btn-park no-select': !ParkSwitch, 'processing': isParkProcessing, 'error-animation': isErrorPark }"
-          @click="handleMountPark">
+          @click="handleMountPark" data-testid="mcp-btn-park" :data-state="ParkSwitch ? 'on' : 'off'" :data-processing="isParkProcessing">
           <div style="display: flex; justify-content: center; align-items: center;">
             <img src="@/assets/images/svg/ui/Park.svg" height="25px"
-              style="min-height: 25px; pointer-events: none;"></img>
+              style="min-height: 25px; pointer-events: none;" data-testid="mcp-img-park"></img>
           </div>
         </button>
         <button v-bind:class="{ 'btn-track-on no-select': TrackSwitch, 'btn-track no-select': !TrackSwitch, 'processing': isTrackProcessing, 'error-animation': isErrorTrack }"
-          @click="handleMountTrack"><v-icon> mdi-target </v-icon></button>
-        <button class="custom-button btn-home no-select" :class="{'processing': isHomeProcessing, 'error-animation': isErrorHome}" @click="handleMountHome">
+          @click="handleMountTrack" data-testid="mcp-btn-track" :data-state="TrackSwitch ? 'on' : 'off'" :data-processing="isTrackProcessing"><v-icon data-testid="mcp-icon-track"> mdi-target </v-icon></button>
+        <button class="custom-button btn-home no-select" :class="{'processing': isHomeProcessing, 'error-animation': isErrorHome}" @click="handleMountHome"
+          data-testid="mcp-btn-home" :data-processing="isHomeProcessing">
           <div style="display: flex; justify-content: center; align-items: center;">
             <img src="@/assets/images/svg/ui/Home.svg" height="20px"
-              style="min-height: 20px; pointer-events: none;"></img>
+              style="min-height: 20px; pointer-events: none;" data-testid="mcp-img-home"></img>
           </div>
         </button>
-        <button class="custom-button btn-sync no-select" :class="{'processing': isSyncProcessing, 'error-animation': isErrorSync}" @click="handleMountSYNC">
+        <button class="custom-button btn-sync no-select" :class="{'processing': isSyncProcessing, 'error-animation': isErrorSync}" @click="handleMountSYNC"
+          data-testid="mcp-btn-sync" :data-processing="isSyncProcessing">
           <div style="display: flex; justify-content: center; align-items: center;">
             <img src="@/assets/images/svg/ui/Sync.svg" height="20px"
-              style="min-height: 20px; pointer-events: none;"></img>
+              style="min-height: 20px; pointer-events: none;" data-testid="mcp-img-sync"></img>
           </div>
         </button>
 
-        <button class="custom-button btn-slove no-select" :class="{'processing': isSolveProcessing, 'error-animation': isErrorSolve}" @click="handleSolveSYNC">
+        <button class="custom-button btn-slove no-select" :class="{'processing': isSolveProcessing, 'error-animation': isErrorSolve}" @click="handleSolveSYNC"
+          data-testid="mcp-btn-solve" :data-processing="isSolveProcessing">
           <div style="display: flex; justify-content: center; align-items: center;">
             <img src="@/assets/images/svg/ui/Solve.svg" height="25px"
-              style="min-height: 25px; pointer-events: none;"></img>
+              style="min-height: 25px; pointer-events: none;" data-testid="mcp-img-solve"></img>
           </div>
         </button>
       </div>
 
-      <div>
-        <span v-if="isIDLE" class="icon-container">
+      <div data-testid="mcp-status">
+        <span v-if="isIDLE" class="icon-container" data-testid="mcp-status-indicator-idle" data-state="idle">
           <div style="display: flex; justify-content: center; align-items: center;">
             <img src="@/assets/images/svg/ui/Status-idle.svg" height="15px"
-              style="min-height: 15px; pointer-events: none;"></img>
+              style="min-height: 15px; pointer-events: none;" data-testid="mcp-img-status-idle"></img>
           </div>
         </span>
-        <span v-else class="icon-container">
+        <span v-else class="icon-container" data-testid="mcp-status-indicator-busy" data-state="busy">
           <div style="display: flex; justify-content: center; align-items: center;">
             <img src="@/assets/images/svg/ui/Status-busy.svg" height="15px"
-              style="min-height: 15px; pointer-events: none;"></img>
+              style="min-height: 15px; pointer-events: none;" data-testid="mcp-img-status-busy"></img>
           </div>
         </span>
       </div>
 
-      <div>
-        <button class="btn-close no-select" @click="PanelClose">
+      <div data-testid="mcp-close-container">
+        <button class="btn-close no-select" @click="PanelClose" data-testid="mcp-btn-close">
           <div style="display: flex; justify-content: center; align-items: center;">
             <img src="@/assets/images/svg/ui/OFF.svg" height="12px"
-              style="min-height: 12px; pointer-events: none;"></img>
+              style="min-height: 12px; pointer-events: none;" data-testid="mcp-img-close"></img>
           </div>
         </button>
       </div>
@@ -330,6 +334,15 @@ export default {
       }, 1000);
     },
     SolveSYNC() {
+      // 仅限制：解析同步（主相机未绑定时禁止）
+      if (!this.$store.getters['device/isDeviceBound']('MainCamera')) {
+        this.$bus.$emit(
+          'showMsgBox',
+          this.$t('MainCameraNotBoundAction', { action: this.$t('Feature_SolveSync') }),
+          'error'
+        );
+        return;
+      }
       // 解算通常需要主相机与赤道仪共同参与
       const mountCheck = this.$canUseDevice('Mount', 'SolveSync');
       const camCheck = this.$canUseDevice('MainCamera', 'SolveSync');

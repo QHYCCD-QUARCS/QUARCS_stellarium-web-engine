@@ -7,7 +7,7 @@
       :attach="true"
       content-class="radec-dialog"
       eager
-    >
+     data-testid="ui-ra-dec-dialog-root">
       <v-card>
         <v-card-title class="text-h5">{{ this.$t('Input Target Coordinates') }}</v-card-title>
   
@@ -29,8 +29,7 @@
                 @keydown.native="filterKeysRA"
                 @wheel.native.prevent
                 :inputmode="isMobile ? 'decimal' : null"
-                :pattern="mobilePatternRA"
-              />
+                :pattern="mobilePatternRA" data-testid="ui-ra-dec-dialog-input-ra-str" />
   
               <v-btn-toggle
                 v-model="raMode"
@@ -38,8 +37,8 @@
                 mandatory
                 class="ml-2"
               >
-                <v-btn value="h">h</v-btn>
-                <v-btn value="deg">°</v-btn>
+                <v-btn value="h" data-testid="ui-ra-dec-dialog-btn-auto">h</v-btn>
+                <v-btn value="deg" data-testid="ui-ra-dec-dialog-btn-auto-2">°</v-btn>
               </v-btn-toggle>
             </div>
   
@@ -57,8 +56,7 @@
               @keydown.native="filterKeysDEC"
               @wheel.native.prevent
               :inputmode="isMobile ? 'decimal' : null"
-              pattern="-?[0-9]*[.,]?[0-9]*"
-            />
+              pattern="-?[0-9]*[.,]?[0-9]*" data-testid="ui-ra-dec-dialog-input-dec-str" />
           </v-form>
   
           <div class="text-caption mt-2" style="opacity:.7">
@@ -68,8 +66,8 @@
   
         <v-card-actions>
           <v-spacer />
-          <v-btn text @click="onCancel">{{ this.$t('Cancel') }}</v-btn>
-          <v-btn color="primary" :disabled="!valid" @click="onOK">{{ this.$t('Confirm') }}</v-btn>
+          <v-btn text @click="onCancel" data-testid="ui-ra-dec-dialog-btn-on-cancel">{{ this.$t('Cancel') }}</v-btn>
+          <v-btn color="primary" :disabled="!valid" @click="onOK" data-testid="ui-ra-dec-dialog-btn-on-ok">{{ this.$t('Confirm') }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>

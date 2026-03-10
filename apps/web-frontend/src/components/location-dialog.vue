@@ -7,7 +7,12 @@
 // repository.
 
 <template>
-<v-dialog max-width="600" v-model="$store.state.showLocationDialog">
+<v-dialog
+  max-width="600"
+  v-model="$store.state.showLocationDialog"
+  data-testid="ui-location-dialog-root"
+  :data-state="$store.state.showLocationDialog ? 'open' : 'closed'"
+>
   <v-container v-if="$store.state.showLocationDialog" class="secondary white--text">
     <v-row>
       <v-col cols="4">
@@ -22,7 +27,7 @@
           @focus="isMobile ? openNumberKeyboard('manualLatitude', $event) : null"
           @click="isMobile ? openNumberKeyboard('manualLatitude', $event) : null"
           @blur="isMobile ? handleNumberBlur('manualLatitude') : null"
-        ></v-text-field>
+         data-testid="ui-location-dialog-input-latitude"></v-text-field>
       </v-col>
       <v-col cols="4">
         <v-text-field 
@@ -36,15 +41,15 @@
           @focus="isMobile ? openNumberKeyboard('manualLongitude', $event) : null"
           @click="isMobile ? openNumberKeyboard('manualLongitude', $event) : null"
           @blur="isMobile ? handleNumberBlur('manualLongitude') : null"
-        ></v-text-field>
+         data-testid="ui-location-dialog-input-longitude"></v-text-field>
       </v-col>
       <v-col cols="4">
         <v-spacer></v-spacer>
-        <v-btn @click="saveManualCoordinates" color="primary">Save Manual Coordinates</v-btn>
+        <v-btn @click="saveManualCoordinates" color="primary" data-testid="ui-location-dialog-btn-save-manual-coordinates">Save Manual Coordinates</v-btn>
       </v-col>
     </v-row>
     <v-card color="secondary" flat>
-      <v-switch :label="$t('Use Autolocation')" v-model="useAutoLocation" @change="handleAutoLocationChange"></v-switch>
+      <v-switch :label="$t('Use Autolocation')" v-model="useAutoLocation" @change="handleAutoLocationChange" data-testid="ui-location-dialog-switch-handle-auto-location-change"></v-switch>
     </v-card>
     <location-mgr v-on:locationSelected="setLocation" :knownLocations="[]" :startLocation="$store.state.currentLocation" :realLocation="$store.state.autoDetectedLocation"></location-mgr>
     
@@ -58,8 +63,7 @@
       @input="handleKeyboardInput"
       @backspace="handleKeyboardBackspace"
       @confirm="handleKeyboardConfirm"
-      @close="closeNumberKeyboard"
-    />
+      @close="closeNumberKeyboard" data-testid="ui-components-location-dialog-act-handle-keyboard-input" />
   </v-container>
 </v-dialog>
 </template>

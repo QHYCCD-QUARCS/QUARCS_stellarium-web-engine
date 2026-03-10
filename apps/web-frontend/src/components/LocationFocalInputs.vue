@@ -1,7 +1,7 @@
 <template>
-    <div class="location-inputs">
+    <div class="location-inputs" data-testid="ui-location-focal-inputs-root">
         <!-- 小尺寸显示 -->
-        <div v-if="!isExpanded" class="compact-view" @click="expandInputs">
+        <div v-if="!isExpanded" class="compact-view" @click="expandInputs" data-testid="ui-components-location-focal-inputs-act-expand-inputs">
             <div class="compact-info">
                 <span>{{ $t('longitude') }}: {{ longitude || '--' }}°</span>
                 <span>{{ $t('latitude') }}: {{ latitude || '--' }}°</span>
@@ -26,7 +26,7 @@
                     @click="isMobile ? openNumberKeyboard('longitude', $event) : null"
                     @blur="isMobile ? handleNumberBlur('longitude') : handleInput()"
                     @touchstart.stop @touchmove.stop
-                    @touchend.stop></v-text-field>
+                    @touchend.stop data-testid="ui-location-focal-inputs-input-t"></v-text-field>
                 <v-text-field 
                     :value="isMobile && currentKeyboardItem === 'latitude' ? keyboardInputValue : latitude"
                     :label="$t('latitude')" 
@@ -41,7 +41,7 @@
                     @click="isMobile ? openNumberKeyboard('latitude', $event) : null"
                     @blur="isMobile ? handleNumberBlur('latitude') : handleInput()"
                     @touchstart.stop @touchmove.stop
-                    @touchend.stop></v-text-field>
+                    @touchend.stop data-testid="ui-location-focal-inputs-input-t-2"></v-text-field>
                 <v-text-field 
                     :value="isMobile && currentKeyboardItem === 'focalLength' ? keyboardInputValue : focalLength"
                     :label="$t('focalLength')" 
@@ -56,8 +56,8 @@
                     @click="isMobile ? openNumberKeyboard('focalLength', $event) : null"
                     @blur="isMobile ? handleNumberBlur('focalLength') : handleInput()"
                     @touchstart.stop @touchmove.stop
-                    @touchend.stop></v-text-field>
-                <v-btn class="close-btn" icon @click="collapseInputs">
+                    @touchend.stop data-testid="ui-location-focal-inputs-input-t-3"></v-text-field>
+                <v-btn class="close-btn" icon @click="collapseInputs" data-testid="ui-location-focal-inputs-btn-collapse-inputs">
                     <v-icon>mdi-close</v-icon>
                 </v-btn>
             </div>
@@ -73,8 +73,7 @@
             @input="handleKeyboardInput"
             @backspace="handleKeyboardBackspace"
             @confirm="handleKeyboardConfirm"
-            @close="closeNumberKeyboard"
-        />
+            @close="closeNumberKeyboard" data-testid="ui-components-location-focal-inputs-act-handle-keyboard-input" />
     </div>
 </template>
 

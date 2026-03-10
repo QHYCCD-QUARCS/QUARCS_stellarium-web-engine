@@ -7,7 +7,7 @@
 // repository.
 
 <template>
-<v-dialog max-width='600' v-model="$store.state.showPlanetsVisibilityDialog">
+<v-dialog max-width='600' v-model="$store.state.showPlanetsVisibilityDialog" data-testid="ui-planets-visibility-root">
   <v-card v-if="$store.state.showPlanetsVisibilityDialog" transparent class="secondary white--text">
     <v-card-title><div class="text-h5">{{ $t('Planets Visibility') }}</div></v-card-title>
     <v-card-text>{{ $t('Night from {0} to {1}', [startDate.format('MMMM Do'), endDate.format('MMMM Do')]) }}</v-card-text>

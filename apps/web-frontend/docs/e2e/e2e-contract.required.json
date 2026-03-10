@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "description": "E2E 必需 UI 契约（菜单全功能 + Schedule）。用于 validate-testids 门禁校验。",
+  "required": [
+    {
+      "kind": "exact",
+      "id": "ui-app-menu-drawer",
+      "requiresDataState": true,
+      "allowedStates": ["open", "closed"]
+    },
+
+    { "kind": "exact", "id": "ui-app-menu-quit" },
+    { "kind": "exact", "id": "ui-app-menu-general-settings" },
+    { "kind": "exact", "id": "ui-app-menu-open-power-manager" },
+    { "kind": "exact", "id": "ui-app-menu-connect-all", "requiresDataState": true, "allowedStates": ["busy", "idle"] },
+    { "kind": "exact", "id": "ui-app-menu-disconnect-all" },
+    { "kind": "exact", "id": "ui-app-menu-device-allocation" },
+    { "kind": "exact", "id": "ui-app-menu-calibrate-polar-axis" },
+    { "kind": "exact", "id": "ui-app-menu-open-image-manager" },
+    { "kind": "exact", "id": "ui-app-menu-open-debug-log" },
+    { "kind": "exact", "id": "ui-app-menu-location" },
+    { "kind": "exact", "id": "ui-app-menu-refresh-page" },
+    { "kind": "exact", "id": "ui-app-menu-data-credits" },
+
+    {
+      "kind": "pattern",
+      "patternType": "regex",
+      "pattern": "^ui-app-menu-device-[A-Za-z0-9_]+$",
+      "note": "设备动态菜单项：按 driverType 固定，不包含 index"
+    },
+
+    { "kind": "exact", "id": "ui-view-settings-dialog-root", "requiresDataState": true, "allowedStates": ["open", "closed"] },
+    { "kind": "exact", "id": "ui-power-manager-root", "requiresDataState": true, "allowedStates": ["open", "closed"] },
+
+    { "kind": "exact", "id": "dap-root", "requiresDataState": true, "allowedStates": ["open", "closed"] },
+    { "kind": "exact", "id": "pa-root", "requiresDataState": true, "allowedStates": ["idle", "running"] },
+
+    { "kind": "exact", "id": "imp-root", "requiresDataState": true, "allowedStates": ["open", "closed"] },
+    { "kind": "pattern", "patternType": "regex", "pattern": "ui-image-folder-root-" },
+    { "kind": "pattern", "patternType": "regex", "pattern": "ui-image-folder-file-" },
+
+    { "kind": "exact", "id": "ui-indi-debug-dialog-root", "requiresDataState": true, "allowedStates": ["open", "closed"] },
+    { "kind": "exact", "id": "ui-location-dialog-root", "requiresDataState": true, "allowedStates": ["open", "closed"] },
+    { "kind": "exact", "id": "ui-data-credits-dialog-root", "requiresDataState": true, "allowedStates": ["open", "closed"] },
+    { "kind": "exact", "id": "ui-confirm-dialog-root", "requiresDataState": true, "allowedStates": ["open", "closed"] },
+    { "kind": "exact", "id": "ui-confirm-dialog-btn-confirm" },
+    { "kind": "exact", "id": "ui-confirm-dialog-btn-cancel" },
+
+    { "kind": "exact", "id": "tb-btn-toggle-schedule-panel" },
+    { "kind": "exact", "id": "scp-root", "requiresDataState": true, "allowedStates": ["open", "closed"] },
+    {
+      "kind": "exact",
+      "id": "scp-root",
+      "requiresDataAttr": { "name": "data-run", "allowed": ["running", "idle", "paused"] }
+    },
+    { "kind": "exact", "id": "scp-btn-toggle-schedule", "requiresDataState": true, "allowedStates": ["running", "idle", "paused"] },
+    { "kind": "exact", "id": "scp-btn-add-row" },
+    { "kind": "exact", "id": "scp-btn-delete-selected-row" },
+    { "kind": "exact", "id": "scp-btn-open-save-preset-dialog" },
+    { "kind": "exact", "id": "scp-btn-open-load-preset-dialog" },
+    { "kind": "exact", "id": "scp-btn-close-panel" },
+    { "kind": "exact", "id": "scp-act-select-cell" }
+  ]
+}
+

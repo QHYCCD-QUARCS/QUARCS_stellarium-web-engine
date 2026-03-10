@@ -1,13 +1,27 @@
 <template>
   <div :class="{ 'DevicePicker': !PickerSelect, 'DevicePicker-select': PickerSelect, 'DevicePicker-bind': DeviceBind }"
        :style="{ width: width + 'px', height: height + 'px' }"
-       @click="togglePicker">
+       @click="togglePicker"
+       data-testid="dp-picker"
+       :data-state="DeviceBind ? 'bound' : (PickerSelect ? 'selected' : 'normal')"
+       :data-index="PickerIndex">
 
-    <span class="device-type" style="position: absolute; top: 10px; left: 8px; color: rgba(255, 255, 255, 0.7); user-select: none;"> {{ DeviceType }}</span>
+    <span class="device-type" style="position: absolute; top: 10px; left: 8px; color: rgba(255, 255, 255, 0.7); user-select: none;" data-testid="dp-device-type"> {{ DeviceType }}</span>
 
-    <span class="device-name" style="position: absolute; bottom: 8px; left: 8px; color: rgba(255, 255, 255, 0.7); user-select: none;"> {{ DeviceName }}</span>
+    <span class="device-name" style="position: absolute; bottom: 8px; left: 8px; color: rgba(255, 255, 255, 0.7); user-select: none;" data-testid="dp-device-name"> {{ DeviceName }}</span>
   
-    <button v-show="!OnCamera" @click="DeviceSwitch" class="btn-Connect"> {{ DeviceBind ? '[Unbind]' : '[Bind]' }} </button>
+    <!-- 阻止按钮点击冒泡到外层卡片（外层 @click 会切换选中类型，导致右侧待分配列表按类型过滤后"消失"） -->
+    <button
+      v-show="!OnCamera"
+      class="btn-Connect"
+      @click.stop="DeviceSwitch"
+      @mousedown.stop
+      @touchstart.stop
+      data-testid="dp-btn-toggle-bind"
+      :data-state="DeviceBind ? 'bound' : 'unbound'"
+    >
+      {{ DeviceBind ? '[Unbind]' : '[Bind]' }}
+    </button>
   </div>
 </template>
 

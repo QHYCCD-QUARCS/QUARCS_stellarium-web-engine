@@ -7,23 +7,23 @@
 // repository.
 
 <template>
-  <v-card width="400" style="backdrop-filter: blur(5px); background-color: rgba(64, 64, 64, 0.5);" class="dateTimePicker">
+  <v-card width="400" style="backdrop-filter: blur(5px); background-color: rgba(64, 64, 64, 0.5);" class="dateTimePicker" data-testid="ui-date-time-picker-root">
     <v-container>
       <v-row justify="space-between" no-gutters class="ma-3">
         <div>
-          <v-btn text icon class="up_down_bt" style="margin-left: 16px" @mousedown="incTime('years')" @mouseup="synchronizeTime" @touchstart.prevent="incTime('years')" @touchend.prevent="synchronizeTime"><v-icon>mdi-menu-up</v-icon></v-btn>
-          <v-btn text icon class="up_down_bt" style="margin-left: 21px" @mousedown="incTime('months')" @mouseup="synchronizeTime" @touchstart.prevent="incTime('months')" @touchend.prevent="synchronizeTime"><v-icon>mdi-menu-up</v-icon></v-btn>
-          <v-btn text icon class="up_down_bt" style="margin-left: 8px"  @mousedown="incTime('days')" @mouseup="synchronizeTime" @touchstart.prevent="incTime('days')" @touchend.prevent="synchronizeTime  "><v-icon>mdi-menu-up</v-icon></v-btn>
+          <v-btn text icon class="up_down_bt" style="margin-left: 16px" @mousedown="incTime('years')" @mouseup="synchronizeTime" @touchstart.prevent="incTime('years')" @touchend.prevent="synchronizeTime" data-testid="ui-date-time-picker-btn-inc-time"><v-icon>mdi-menu-up</v-icon></v-btn>
+          <v-btn text icon class="up_down_bt" style="margin-left: 21px" @mousedown="incTime('months')" @mouseup="synchronizeTime" @touchstart.prevent="incTime('months')" @touchend.prevent="synchronizeTime" data-testid="ui-date-time-picker-btn-inc-time-2"><v-icon>mdi-menu-up</v-icon></v-btn>
+          <v-btn text icon class="up_down_bt" style="margin-left: 8px"  @mousedown="incTime('days')" @mouseup="synchronizeTime" @touchstart.prevent="incTime('days')" @touchend.prevent="synchronizeTime  " data-testid="ui-date-time-picker-btn-inc-time-3"><v-icon>mdi-menu-up</v-icon></v-btn>
           <h1>{{ date }}</h1>
-          <v-btn text icon class="up_down_bt" style="margin-left: 16px" @mousedown="decTime('years')" @mouseup="synchronizeTime" @touchstart.prevent="decTime('years')" @touchend.prevent="synchronizeTime"><v-icon>mdi-menu-down</v-icon></v-btn>
-          <v-btn text icon class="up_down_bt" style="margin-left: 21px" @mousedown="decTime('months')" @mouseup="synchronizeTime" @touchstart.prevent="decTime('months')" @touchend.prevent="synchronizeTime  "><v-icon>mdi-menu-down</v-icon></v-btn>
-          <v-btn text icon class="up_down_bt" style="margin-left: 8px"  @mousedown="decTime('days')" @mouseup="synchronizeTime" @touchstart.prevent="decTime('days')" @touchend.prevent="synchronizeTime  "><v-icon>mdi-menu-down</v-icon></v-btn>
+          <v-btn text icon class="up_down_bt" style="margin-left: 16px" @mousedown="decTime('years')" @mouseup="synchronizeTime" @touchstart.prevent="decTime('years')" @touchend.prevent="synchronizeTime" data-testid="ui-date-time-picker-btn-dec-time"><v-icon>mdi-menu-down</v-icon></v-btn>
+          <v-btn text icon class="up_down_bt" style="margin-left: 21px" @mousedown="decTime('months')" @mouseup="synchronizeTime" @touchstart.prevent="decTime('months')" @touchend.prevent="synchronizeTime  " data-testid="ui-date-time-picker-btn-dec-time-2"><v-icon>mdi-menu-down</v-icon></v-btn>
+          <v-btn text icon class="up_down_bt" style="margin-left: 8px"  @mousedown="decTime('days')" @mouseup="synchronizeTime" @touchstart.prevent="decTime('days')" @touchend.prevent="synchronizeTime  " data-testid="ui-date-time-picker-btn-dec-time-3"><v-icon>mdi-menu-down</v-icon></v-btn>
         </div>
         <div>
         <div>
         <v-tooltip top>
           <template v-slot:activator="{ on }">
-            <v-btn text icon @click="resetTime" style="margin-top: 5px" v-on="on"><v-icon>mdi-history</v-icon></v-btn>
+            <v-btn text icon @click="resetTime" style="margin-top: 5px" v-on="on" data-testid="ui-date-time-picker-btn-reset-time"><v-icon>mdi-history</v-icon></v-btn>
           </template>
           <span>{{ $t('Back to real time') }}</span>
         </v-tooltip>

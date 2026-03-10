@@ -1,7 +1,7 @@
 <template>
-  <div class="Dial-Knob-Rect" :style="{ '--positionX': positionX + 'px', '--secondPositionX': secondPositionX + 'px', top: top + 'px', left: left + 'px', width: width + 'px', height: height + 'px' }">
-    <div class="indicator" @mousedown="startDrag" @mouseup="stopDrag" @touchstart="startDragMobile" @touchmove="onDragMobile" @touchend="stopDragMobile"></div>
-    <div class="second-indicator" @mousedown="startSecondDrag" @mouseup="stopSecondDrag" @touchstart="startSecondDragMobile" @touchmove="onSecondDragMobile" @touchend="stopSecondDragMobile"></div>
+  <div class="Dial-Knob-Rect" :style="{ '--positionX': positionX + 'px', '--secondPositionX': secondPositionX + 'px', top: top + 'px', left: left + 'px', width: width + 'px', height: height + 'px' }" data-testid="ui-dial-knob-root">
+    <div class="indicator" @mousedown="startDrag" @mouseup="stopDrag" @touchstart="startDragMobile" @touchmove="onDragMobile" @touchend="stopDragMobile" data-testid="ui-components-dial-knob-act-start-drag"></div>
+    <div class="second-indicator" @mousedown="startSecondDrag" @mouseup="stopSecondDrag" @touchstart="startSecondDragMobile" @touchmove="onSecondDragMobile" @touchend="stopSecondDragMobile" data-testid="ui-components-dial-knob-act-start-second-drag"></div>
 
     <!-- 底部下标：显示当前区间/全图的最小值与最大值 -->
     <div class="dial-labels">
@@ -71,6 +71,19 @@ export default {
   },
   beforeDestroy() {
     window.removeEventListener('resize', this.setMaxWidth);
+    // 若组件销毁时仍处于拖拽中，确保清理全局监听，避免出现“粘鼠标/持续拖拽”的残留状态
+    this.dragging = false;
+    this.secondDragging = false;
+    document.removeEventListener("mousemove", this.onDrag);
+    document.removeEventListener("mouseup", this.stopDrag);
+    document.removeEventListener("touchmove", this.onDragMobile);
+    document.removeEventListener("touchend", this.stopDragMobile);
+    document.removeEventListener("mousemove", this.onSecondDrag);
+    document.removeEventListener("mouseup", this.stopSecondDrag);
+    document.removeEventListener("touchmove", this.onSecondDragMobile);
+    document.removeEventListener("touchend", this.stopSecondDragMobile);
+    window.removeEventListener("blur", this.stopDrag);
+    window.removeEventListener("blur", this.stopSecondDrag);
   },
   methods: {
     setMaxWidth() {
@@ -83,15 +96,18 @@ export default {
       this.startPositionX = event.clientX - this.positionX;
       document.addEventListener("mousemove", this.onDrag);
       document.addEventListener("mouseup", this.stopDrag);
+      // 关键：如果鼠标按住拖出浏览器/窗口外再松开，document 可能收不到 mouseup，
+      // 这里监听 window blur 来强制结束拖拽，避免“粘鼠标”
+      window.addEventListener("blur", this.stopDrag);
     },
     onDrag(event) {
       if (this.dragging) {
         const clientX = event.touches ? event.touches[0].clientX : event.clientX;
         const newPositionX = clientX - this.startPositionX;
 
-        // 确保滑块在组件范围内
-        this.positionX = Math.max(0, Math.min(newPositionX, this.secondPositionX));
-        this.positionX = Math.max(0, Math.min(newPositionX, this.width - this.DialWidth));
+        // 确保滑块在组件范围内，且不超过右侧滑块（保留 DialWidth 最小间距）
+        const maxX = Math.min(this.width - this.DialWidth, this.secondPositionX - this.DialWidth);
+        this.positionX = Math.max(0, Math.min(newPositionX, maxX));
 
         if (this.secondPositionX - this.positionX < this.DialWidth) {
           this.secondPositionX = this.positionX + this.DialWidth;
@@ -104,6 +120,7 @@ export default {
       this.dragging = false;
       document.removeEventListener("mousemove", this.onDrag);
       document.removeEventListener("mouseup", this.stopDrag);
+      window.removeEventListener("blur", this.stopDrag);
       
       const HistMin = this.mappedWidth(this.positionX);
       const HistMax = this.mappedWidth(this.secondPositionX);
@@ -117,14 +134,15 @@ export default {
       this.startPositionX = event.touches[0].clientX - this.positionX;
       document.addEventListener("touchmove", this.onDragMobile);
       document.addEventListener("touchend", this.stopDragMobile);
+      window.addEventListener("blur", this.stopDragMobile);
     },
     onDragMobile(event) {
       if (this.dragging) {
         const clientX = event.touches[0].clientX;
         const newPositionX = clientX - this.startPositionX;
-        // 确保滑块在组件范围内
-        this.positionX = Math.max(0, Math.min(newPositionX, this.secondPositionX));
-        this.positionX = Math.max(0, Math.min(newPositionX, this.width - this.DialWidth));
+        // 确保滑块在组件范围内，且不超过右侧滑块（保留 DialWidth 最小间距）
+        const maxX = Math.min(this.width - this.DialWidth, this.secondPositionX - this.DialWidth);
+        this.positionX = Math.max(0, Math.min(newPositionX, maxX));
 
         if (this.secondPositionX - this.positionX < this.DialWidth) {
           this.secondPositionX = this.positionX + this.DialWidth;
@@ -137,6 +155,7 @@ export default {
       this.dragging = false;
       document.removeEventListener("touchmove", this.onDragMobile);
       document.removeEventListener("touchend", this.stopDragMobile);
+      window.removeEventListener("blur", this.stopDragMobile);
 
       const HistMin = this.mappedWidth(this.positionX);
       const HistMax = this.mappedWidth(this.secondPositionX);
@@ -151,6 +170,8 @@ export default {
       this.secondStartPositionX = event.clientX - this.secondPositionX;
       document.addEventListener("mousemove", this.onSecondDrag);
       document.addEventListener("mouseup", this.stopSecondDrag);
+      // 同上：窗口失焦时强制结束，避免拖拽状态卡住
+      window.addEventListener("blur", this.stopSecondDrag);
     },
     onSecondDrag(event) {
       if (this.secondDragging) {
@@ -171,6 +192,7 @@ export default {
       this.secondDragging = false;
       document.removeEventListener("mousemove", this.onSecondDrag);
       document.removeEventListener("mouseup", this.stopSecondDrag);
+      window.removeEventListener("blur", this.stopSecondDrag);
       
       const HistMin = this.mappedWidth(this.positionX);
       const HistMax = this.mappedWidth(this.secondPositionX);
@@ -184,14 +206,17 @@ export default {
       this.secondStartPositionX = event.touches[0].clientX - this.secondPositionX;
       document.addEventListener("touchmove", this.onSecondDragMobile);
       document.addEventListener("touchend", this.stopSecondDragMobile);
+      window.addEventListener("blur", this.stopSecondDragMobile);
     },
     onSecondDragMobile(event) {
       if (this.secondDragging) {
         const clientX = event.touches[0].clientX;
         const newSecondPositionX = clientX - this.secondStartPositionX;
-        // 确保滑块在组件范围内
-        this.secondPositionX = Math.max(this.positionX, Math.min(newSecondPositionX, this.width));
-        this.secondPositionX = Math.max(this.DialWidth, Math.min(newSecondPositionX, this.width));
+        // 确保滑块在组件范围内，且不小于左侧滑块（保留 DialWidth 最小间距）
+        this.secondPositionX = Math.max(
+          this.positionX + this.DialWidth,
+          Math.min(newSecondPositionX, this.width)
+        );
 
         if (this.secondPositionX - this.positionX < this.DialWidth) {
           this.positionX = this.secondPositionX - this.DialWidth;
@@ -204,6 +229,7 @@ export default {
       this.secondDragging = false;
       document.removeEventListener("touchmove", this.onSecondDragMobile);
       document.removeEventListener("touchend", this.stopSecondDragMobile);
+      window.removeEventListener("blur", this.stopSecondDragMobile);
 
       const HistMin = this.mappedWidth(this.positionX);
       const HistMax = this.mappedWidth(this.secondPositionX);
@@ -243,6 +269,8 @@ export default {
     // 与直方图区间模式同步
     setRangeMode(flag) {
       this.useEffectiveRange = flag;
+      const modeText = flag ? '区间模式' : '全图模式';
+      console.log(`[Dial-Knob] 切换到${modeText}: autoRange=[${this.autoMin}, ${this.autoMax}], window=[${this.windowMin}, ${this.windowMax}]`);
       // 切换模式时，重新根据当前窗口刷新滑块位置
       this.ChangeDialPosition(this.windowMin, this.windowMax);
     },
