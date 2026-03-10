@@ -542,6 +542,8 @@
   "Device Config Items": "设备配置项",
   "Guider Focal Length (mm)": "导星镜焦距 (mm)",
   "Multi Star Guider": "多星导星",
+  "RA Single Guide Direction": "RA 单向导星方向",
+  "DEC Single Guide Direction": "DEC 单向导星方向",
   "Guider Gain": "导星增益",
   "Calibration step (ms)": "校准步长 (ms)",
   "Ra Aggression": "赤经激进度",

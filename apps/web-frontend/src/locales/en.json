@@ -194,6 +194,8 @@
   "Device Config Items": "Device Config Items",
   "Guider Focal Length (mm)": "Guider Focal Length (mm)",
   "Multi Star Guider": "Multi Star Guider",
+  "RA Single Guide Direction": "RA Single Guide Direction",
+  "DEC Single Guide Direction": "DEC Single Guide Direction",
   "Guider Gain": "Guider Gain",
   "Calibration step (ms)": "Calibration step (ms)",
   "Ra Aggression": "Ra Aggression",
