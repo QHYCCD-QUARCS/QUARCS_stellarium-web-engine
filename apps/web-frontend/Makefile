@@ -79,23 +79,35 @@ build:
 
 build-with-tiles:
 	@echo "检查离线地图瓦片数据..."
-	@if [ ! -d "../../tile-server/tiles" ]; then \
-		echo "错误: 离线地图瓦片数据不存在，请先运行下载脚本"; \
-		echo "cd ../../tile-server && python3 download-tiles.py"; \
-		exit 1; \
-	fi
 	@echo "开始构建包含离线地图的版本..."
 	@echo "提示：瓦片数据约 8.7 万文件，全量复制会非常慢。"
 	@echo "可通过设置 TILES_MODE=symlink（默认）用软链接加速；设置 TILES_MODE=copy 生成自包含产物（慢）。"
 	@set -e; \
+	TILES_SRC="$${TILES_SRC_DIR:-}"; \
+	if [ -z "$$TILES_SRC" ]; then \
+		for candidate in "$$(readlink -f ../../tile-server/tiles 2>/dev/null || true)" "$$(readlink -f ../tile-server/tiles 2>/dev/null || true)" "$$(readlink -f tile-server/tiles 2>/dev/null || true)"; do \
+			if [ -n "$$candidate" ] && [ -d "$$candidate" ]; then \
+				TILES_SRC="$$candidate"; \
+				break; \
+			fi; \
+		done; \
+	fi; \
+	if [ -z "$$TILES_SRC" ] || [ ! -d "$$TILES_SRC" ]; then \
+		echo "错误: 离线地图瓦片数据不存在。"; \
+		echo "请设置 TILES_SRC_DIR=/absolute/path/to/tiles，或把 tiles 放到以下任一路径："; \
+		echo "  - ../../tile-server/tiles"; \
+		echo "  - ../tile-server/tiles"; \
+		echo "  - ./tile-server/tiles"; \
+		exit 1; \
+	fi; \
+	echo "[tiles] source=$$TILES_SRC"; \
 	TILES_MODE=$${TILES_MODE:-symlink}; \
 	if [ "$$TILES_MODE" = "copy" ]; then \
 		echo "[tiles] mode=copy (webpack 构建阶段复制到 dist/tiles)"; \
-		SWE_TILES_MODE=copy $(WITH_NVM) && npm run build; \
+		TILES_SRC_DIR="$$TILES_SRC" SWE_TILES_MODE=copy $(WITH_NVM) && npm run build; \
 	else \
-		echo "[tiles] mode=symlink (构建后建立 dist/tiles -> ../../tile-server/tiles)"; \
-		SWE_TILES_MODE=none $(WITH_NVM) && npm run build; \
-		TILES_SRC="$$(readlink -f ../../tile-server/tiles)"; \
+		echo "[tiles] mode=symlink (构建后建立 dist/tiles -> $$TILES_SRC)"; \
+		TILES_SRC_DIR="$$TILES_SRC" SWE_TILES_MODE=none $(WITH_NVM) && npm run build; \
 		mkdir -p dist; \
 		rm -rf dist/tiles; \
 		ln -sfn "$$TILES_SRC" dist/tiles; \

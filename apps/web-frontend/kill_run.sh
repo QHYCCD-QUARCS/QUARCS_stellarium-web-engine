@@ -19,6 +19,30 @@ log() { printf '%s\n' "$*"; }
 warn() { printf 'WARN: %s\n' "$*" >&2; }
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 2; }
 
+resolve_tiles_dir() {
+  local candidate
+  local candidates=()
+
+  if [ -n "${TILES_SRC_DIR:-}" ]; then
+    candidates+=("${TILES_SRC_DIR}")
+  fi
+
+  candidates+=(
+    "../../tile-server/tiles"
+    "../tile-server/tiles"
+    "tile-server/tiles"
+  )
+
+  for candidate in "${candidates[@]}"; do
+    if [ -d "${candidate}" ]; then
+      readlink -f "${candidate}"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
 step() {
   local name="$1"; shift
   local start end
@@ -135,12 +159,19 @@ maybe_update_engine() {
 build_frontend() {
   # Ensure node is correct BEFORE calling make (make will inherit PATH)
   ensure_node
+  local tiles_dir=""
+  local tiles_env=""
 
-  if [ ! -d ../../tile-server/tiles ]; then
-    warn "未找到 ../../tile-server/tiles，build-with-tiles 会失败"
+  tiles_dir="$(resolve_tiles_dir || true)"
+  tiles_env="${TILES_SRC_DIR:-${tiles_dir}}"
+
+  if [ -z "${tiles_dir}" ]; then
+    warn "未找到离线瓦片目录，build-with-tiles 可能失败；可设置 TILES_SRC_DIR=/path/to/tiles"
+  else
+    log "[tiles] source=${tiles_dir}"
   fi
 
-  TILES_MODE="${TILES_MODE}" NODE_VER="${NODE_VER}" NVM_DIR="${NVM_DIR}" make build-with-tiles
+  TILES_MODE="${TILES_MODE}" TILES_SRC_DIR="${tiles_env}" NODE_VER="${NODE_VER}" NVM_DIR="${NVM_DIR}" make build-with-tiles
   check_file dist/index.html
 
   # tiles 可能是软链接或目录

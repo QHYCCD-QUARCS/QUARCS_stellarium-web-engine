@@ -1,3 +1,4 @@
+const fs = require('fs');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
 const path = require('path');
 
@@ -14,6 +15,22 @@ function envBool(name, defaultValue = false) {
 const tilesMode = String(process.env.SWE_TILES_MODE || '').toLowerCase();
 const copyTiles = envBool('SWE_COPY_TILES', tilesMode === 'copy');
 const copySkydata = envBool('SWE_COPY_SKYDATA', false);
+
+function resolveTilesPath() {
+  const candidates = [];
+
+  if (process.env.TILES_SRC_DIR) {
+    candidates.push(process.env.TILES_SRC_DIR);
+  }
+
+  candidates.push(
+    path.resolve(__dirname, '../../tile-server/tiles'),
+    path.resolve(__dirname, '../tile-server/tiles'),
+    path.resolve(__dirname, 'tile-server/tiles')
+  );
+
+  return candidates.find(p => fs.existsSync(p));
+}
 
 module.exports = {
   runtimeCompiler: true,
@@ -89,8 +106,14 @@ module.exports = {
     plugins: (() => {
       const patterns = [];
       if (copyTiles) {
+        const tilesPath = resolveTilesPath();
+        if (!tilesPath) {
+          throw new Error(
+            'Tiles directory not found. Set TILES_SRC_DIR or provide tiles in ../../tile-server/tiles, ../tile-server/tiles, or ./tile-server/tiles.'
+          );
+        }
         patterns.push({
-          from: path.resolve(__dirname, '../../tile-server/tiles'),
+          from: tilesPath,
           to: 'tiles',
           ignore: ['**/.DS_Store', '**/Thumbs.db']
         });
