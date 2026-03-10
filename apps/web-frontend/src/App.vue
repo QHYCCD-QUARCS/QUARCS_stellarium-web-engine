@@ -157,7 +157,8 @@
 
               <!-- 选择框类型 -->
               <v-select v-if="item.inputType === 'select'" v-model="item.value" :label="$t(item.label)"
-                @change="handleConfigChange(item.label, item.value)" :items="item.selectValue" class="config-input">
+                @change="handleConfigChange(item.label, item.value)" 
+                :items="getFilteredSelectOptions(item)" class="config-input">
               </v-select>
 
               <!-- 开关类型 -->
@@ -775,6 +776,8 @@ export default {
       GuiderConfigItems: [
         { driverType: 'Guider', label: 'Guider Focal Length (mm)', value: '', inputType: 'text' },
         { driverType: 'Guider', label: 'Multi Star Guider', value: false, inputType: 'switch' },
+        { driverType: 'Guider', label: 'RA Single Guide Direction', value: 'AUTO', inputType: 'select', selectValue: ['AUTO', 'WEST', 'EAST'] },
+        { driverType: 'Guider', label: 'DEC Single Guide Direction', value: 'AUTO', inputType: 'select', selectValue: ['AUTO', 'NORTH', 'SOUTH'] },
         // { driverType: 'Guider', label: 'Guider Pixel size', value: '', inputType: 'text'},
         // { driverType: 'Guider', label: 'Guider Gain', value: '', inputType: 'slider', inputMin: 0, inputMax: 100, inputStep: 1 },
         // { driverType: 'Guider', label: 'Calibration step (ms)', value: '', inputType: 'text' },
@@ -1067,6 +1070,8 @@ export default {
     this.$bus.$on('Focal Length (mm)', this.FocalLengthSet);
     this.$bus.$on('Guider Focal Length (mm)', this.GuiderFocalLengthSet);
     this.$bus.$on('Multi Star Guider', this.MultiStarGuiderSet);
+    this.$bus.$on('RA Single Guide Direction', this.GuiderRaSingleGuideDirSet);
+    this.$bus.$on('DEC Single Guide Direction', this.GuiderDecSingleGuideDirSet);
     this.$bus.$on('Guider Pixel size', this.GuiderPixelSizeSet);
     this.$bus.$on('Guider Gain', this.GuiderGainSet);
     this.$bus.$on('Calibration step (ms)', this.CalibrationDurationSet);
@@ -1686,11 +1691,13 @@ export default {
                   const row = parts[2];
                   this.$bus.$emit("GuideSize", col, row);
                 }
+                break;
 
               case 'AddScatterChartData':
                 if (parts.length === 3) {
-                  const Data_x = parts[1];
-                  const Data_y = parts[2];
+                  const Data_x = Number(parts[1]);
+                  const Data_y = Number(parts[2]);
+                  if (!Number.isFinite(Data_x) || !Number.isFinite(Data_y)) break;
                   const newDataPoint = [Data_x, Data_y];
                   this.$bus.$emit('AddScatterChartData', newDataPoint);
                 }
@@ -1698,12 +1705,25 @@ export default {
 
               case 'AddLineChartData':
                 if (parts.length === 4) {
-                  const Data_x = parts[1];
-                  const Data_Ra = parts[2];
-                  const Data_Dec = parts[3];
+                  const Data_x = Number(parts[1]);
+                  const Data_Ra = Number(parts[2]);
+                  const Data_Dec = Number(parts[3]);
+                  if (!Number.isFinite(Data_x) || !Number.isFinite(Data_Ra) || !Number.isFinite(Data_Dec)) break;
                   const newDataPoint_Ra = [Data_x, Data_Ra];
                   const newDataPoint_Dec = [Data_x, Data_Dec];
                   this.$bus.$emit('AddLineChartData', newDataPoint_Ra, newDataPoint_Dec);
+                }
+                break;
+
+              // RMS（与 PHD2 一致：RA/DEC/Total）
+              // Qt 端格式：AddRMSErrorData:<raRms>:<decRms>:<totalRms>
+              case 'AddRMSErrorData':
+                if (parts.length === 4) {
+                  const ra = Number(parts[1]);
+                  const dec = Number(parts[2]);
+                  const total = Number(parts[3]);
+                  if (!Number.isFinite(ra) || !Number.isFinite(dec) || !Number.isFinite(total)) break;
+                  this.$bus.$emit('AddRMSErrorData', ra, dec, total);
                 }
                 break;
 
@@ -2221,6 +2241,8 @@ export default {
                   const Box_X = parseInt(parts[3], 10);
                   const Box_Y = parseInt(parts[4], 10);
                   this.DrawPHD2Box(PHD2ImageSize_X, PHD2ImageSize_Y, Box_X, Box_Y);
+                  // 同步把“锁定星点”的原始像素坐标广播给 UI（用于显示导星的是哪颗星）
+                  this.$bus.$emit('GuiderLockStar', PHD2ImageSize_X, PHD2ImageSize_Y, Box_X, Box_Y);
                 }
                 break;
 
@@ -2246,6 +2268,26 @@ export default {
                   const Cross_Y = parseInt(parts[4], 10);
                   this.DrawPHD2Cross(PHD2ImageSize_X, PHD2ImageSize_Y, Cross_X, Cross_Y);
                 }
+                break;
+
+              // 内置导星（GuiderCore）消息
+              case 'GuiderCoreState':
+                if (parts.length === 2) {
+                  const state = parseInt(parts[1], 10);
+                  this.$bus.$emit('GuiderCoreState', state);
+                }
+                break;
+              case 'GuiderCalibration':
+                // 形如：GuiderCalibration:cameraAngleDeg=...:orthoErrDeg=...:...
+                this.$bus.$emit('GuiderCalibration', data.message);
+                break;
+              case 'GuiderPulse':
+                // 形如：GuiderPulse:NORTH:110:raErrPx=...:decErrPx=...
+                this.$bus.$emit('GuiderPulse', data.message);
+                break;
+              case 'GuiderStarSelected':
+                // 形如：GuiderStarSelected:x=885.00:y=366.00:snr=806.3:hfd=4.47
+                this.$bus.$emit('GuiderStarSelected', data.message);
                 break;
 
               case 'QTClientVersion':
@@ -2364,6 +2406,18 @@ export default {
                   this.SendConsoleLogMsg('Configure Recovery:' + parts[1] + ',' + parts[2], 'info');
                   this.$bus.$emit(ConfigName, ConfigValue);
 
+                  // 小工具：按 label 更新 GuiderConfigItems，避免依赖固定下标（新增/删减配置项时不易出错）
+                  const setGuiderItemValue = (label, value) => {
+                    const item = this.GuiderConfigItems.find(it => it.label === label);
+                    if (item) {
+                      // 如果是下拉框类型，确保值在选项中（如果不在，则动态添加）
+                      if (item.inputType === 'select' && item.selectValue && !item.selectValue.includes(value)) {
+                        item.selectValue.push(value);
+                      }
+                      item.value = value;
+                    }
+                  };
+
                   if (parts[1] === 'FocalLength') {
                     this.TelescopesConfigItems[0].value = parts[2];
                     for (const device of this.devices) {
@@ -2380,7 +2434,7 @@ export default {
                   }
 
                   if (parts[1] === 'GuiderFocalLength') {
-                    this.GuiderConfigItems[0].value = parts[2];
+                    setGuiderItemValue('Guider Focal Length (mm)', parts[2]);
                     this.$bus.$emit('AppSendMessage', 'Vue_Command', 'GuiderFocalLength:' + parts[2]);
                   }
 
@@ -2393,28 +2447,68 @@ export default {
                   }
 
                   if (parts[1] === 'MultiStarGuider') {
-                    this.GuiderConfigItems[1].value = (parts[2] === 'true');
+                    setGuiderItemValue('Multi Star Guider', (parts[2] === 'true'));
                     this.$bus.$emit('AppSendMessage', 'Vue_Command', 'MultiStarGuider:' + parts[2]);
                   }
 
                   if (parts[1] === 'GuiderGain') {
-                    this.GuiderConfigItems[2].value = parts[2];
+                    setGuiderItemValue('Guider Gain', parts[2]);
                     this.$bus.$emit('AppSendMessage', 'Vue_Command', 'GuiderGain:' + parts[2]);
                   }
 
                   if (parts[1] === 'CalibrationDuration') {
-                    this.GuiderConfigItems[3].value = parts[2];
+                    setGuiderItemValue('Calibration step (ms)', parts[2]);
                     this.$bus.$emit('AppSendMessage', 'Vue_Command', 'CalibrationDuration:' + parts[2]);
                   }
 
                   if (parts[1] === 'RaAggression') {
-                    this.GuiderConfigItems[4].value = parts[2];
+                    setGuiderItemValue('Ra Aggression', parts[2]);
                     this.$bus.$emit('AppSendMessage', 'Vue_Command', 'RaAggression:' + parts[2]);
                   }
 
                   if (parts[1] === 'DecAggression') {
-                    this.GuiderConfigItems[5].value = parts[2];
+                    setGuiderItemValue('Dec Aggression', parts[2]);
                     this.$bus.$emit('AppSendMessage', 'Vue_Command', 'DecAggression:' + parts[2]);
+                  }
+
+                  // 新增：单向导星方向（内置导星）
+                  if (parts[1] === 'GuiderRaGuideDir') {
+                    setGuiderItemValue('RA Single Guide Direction', parts[2]);
+                    this.$bus.$emit('AppSendMessage', 'Vue_Command', 'GuiderRaGuideDir:' + parts[2]);
+                  }
+                  if (parts[1] === 'GuiderDecGuideDir') {
+                    setGuiderItemValue('DEC Single Guide Direction', parts[2]);
+                    this.$bus.$emit('AppSendMessage', 'Vue_Command', 'GuiderDecGuideDir:' + parts[2]);
+                  }
+                }
+                break;
+
+              case 'Configure':
+                // 处理 Configure: 消息（与 ConfigureRecovery: 类似，但不发送到后端）
+                if (parts.length === 3) {
+                  const ConfigName = parts[1];
+                  const ConfigValue = parts[2];
+                  console.log('Configure:', ConfigName, ',', ConfigValue);
+                  
+                  // 小工具：按 label 更新 GuiderConfigItems
+                  const setGuiderItemValue = (label, value) => {
+                    const item = this.GuiderConfigItems.find(it => it.label === label);
+                    if (item) {
+                      // 如果是下拉框类型，确保值在选项中（如果不在，则动态添加，用于显示）
+                      // 这样当后端发送 "AUTO (EAST)" 时，下拉框能正确显示
+                      if (item.inputType === 'select' && item.selectValue && !item.selectValue.includes(value)) {
+                        item.selectValue.push(value);
+                      }
+                      item.value = value;
+                    }
+                  };
+
+                  // 处理导星方向配置
+                  if (ConfigName === 'GuiderRaGuideDir') {
+                    setGuiderItemValue('RA Single Guide Direction', ConfigValue);
+                  }
+                  if (ConfigName === 'GuiderDecGuideDir') {
+                    setGuiderItemValue('DEC Single Guide Direction', ConfigValue);
                   }
                 }
                 break;
@@ -3275,6 +3369,38 @@ export default {
                   this.$bus.$emit('sendCurrentConnectedDevices', this.devices);
                 }
                 break;
+
+              // ===== 内置导星（GuiderCore）消息（用于 UI 显示/避免“未处理命令”刷屏） =====
+              case 'GuiderCoreState':
+                if (parts.length === 2) {
+                  const state = parseInt(parts[1], 10);
+                  this.$bus.$emit('GuiderCoreState', state);
+                }
+                break;
+              case 'GuiderCoreInfo':
+                // 形如：GuiderCoreInfo:任意文本（通常是中文提示/日志）
+                {
+                  const msg = parts.length >= 2 ? parts.slice(1).join(':') : '';
+                  if (msg) {
+                    // 进入前端日志（控制台/自定义 console log）
+                    this.SendConsoleLogMsg(msg, 'info');
+                    // 同步抛给组件（如果后续想在界面上显示导星提示）
+                    this.$bus.$emit('GuiderCoreInfo', msg);
+                  }
+                }
+                break;
+              case 'GuiderCalibration':
+                // 形如：GuiderCalibration:cameraAngleDeg=...:orthoErrDeg=...:...
+                this.$bus.$emit('GuiderCalibration', data.message);
+                break;
+              case 'GuiderPulse':
+                // 形如：GuiderPulse:NORTH:110:raErrPx=...:decErrPx=...
+                this.$bus.$emit('GuiderPulse', data.message);
+                break;
+              case 'GuiderStarSelected':
+                // 形如：GuiderStarSelected:x=885.00:y=366.00:snr=806.3:hfd=4.47
+                this.$bus.$emit('GuiderStarSelected', data.message);
+                break;
               default:
                 console.warn('未处理命令: ', data.message);
                 break;
@@ -4065,6 +4191,41 @@ export default {
       this.SendConsoleLogMsg('Multi Star Guider is set to:' + value, 'info');
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'MultiStarGuider:' + value);
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'saveToConfigFile:MultiStarGuider:' + value);
+    },
+
+    // 内置导星：单向导星方向配置（RA/DEC）
+    GuiderRaSingleGuideDirSet(payload) {
+      const [signal, value] = payload.split(':');
+      let dir = String(value || '').trim().toUpperCase();
+      // 如果包含括号，提取括号内的方向（用于显示），但发送时只发送 AUTO
+      if (dir.startsWith('AUTO')) {
+        // 保持 "AUTO" 或 "AUTO (EAST)" 格式
+        dir = dir; // 保持原样
+      } else if (dir !== 'WEST' && dir !== 'EAST') {
+        return;
+      }
+      this.SendConsoleLogMsg('RA Single Guide Direction is set to:' + dir, 'info');
+      // 发送时，如果是 AUTO 格式，只发送 AUTO（不带括号）
+      const sendDir = dir.startsWith('AUTO') ? 'AUTO' : dir;
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'GuiderRaGuideDir:' + sendDir);
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'saveToConfigFile:GuiderRaGuideDir:' + sendDir);
+    },
+
+    GuiderDecSingleGuideDirSet(payload) {
+      const [signal, value] = payload.split(':');
+      let dir = String(value || '').trim().toUpperCase();
+      // 如果包含括号，提取括号内的方向（用于显示），但发送时只发送 AUTO
+      if (dir.startsWith('AUTO')) {
+        // 保持 "AUTO" 或 "AUTO (SOUTH)" 格式
+        dir = dir; // 保持原样
+      } else if (dir !== 'NORTH' && dir !== 'SOUTH') {
+        return;
+      }
+      this.SendConsoleLogMsg('DEC Single Guide Direction is set to:' + dir, 'info');
+      // 发送时，如果是 AUTO 格式，只发送 AUTO（不带括号）
+      const sendDir = dir.startsWith('AUTO') ? 'AUTO' : dir;
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'GuiderDecGuideDir:' + sendDir);
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'saveToConfigFile:GuiderDecGuideDir:' + sendDir);
     },
 
     GuiderPixelSizeSet(payload) {
@@ -7855,6 +8016,30 @@ export default {
       }
     },
 
+    // 获取过滤后的下拉框选项：只显示基本选项（不包含括号），但保留当前值（如果当前值是动态添加的）
+    getFilteredSelectOptions(item) {
+      if (!item || !item.selectValue || !Array.isArray(item.selectValue)) {
+        return [];
+      }
+      // 基本选项：不包含括号的选项
+      // 处理字符串和数字类型的选项：只有字符串才检查是否包含括号
+      const basicOptions = item.selectValue.filter(opt => {
+        if (typeof opt === 'string') {
+          return !opt.includes('(') && !opt.includes(')');
+        }
+        // 对于数字或其他类型，直接包含
+        return true;
+      });
+      // 如果当前值包含括号（如 "AUTO (EAST)"），将其也添加到选项中以便显示
+      if (item.value && typeof item.value === 'string' && item.value.includes('(') && item.value.includes(')')) {
+        // 确保当前值在选项中
+        if (!basicOptions.includes(item.value)) {
+          return [...basicOptions, item.value];
+        }
+      }
+      return basicOptions;
+    },
+
     // 通用的配置更改处理函数
     handleConfigChange(label, value) {
       console.log(`配置已更改: ${label} = ${value}`);
@@ -7889,6 +8074,18 @@ export default {
           this.sendMessage('Vue_Command', 'SetMainCameraSaveFailedParse:' + (value === 'true' || value === true));
         }else if (label === 'Save Folder') {
           this.sendMessage('Vue_Command', 'SetMainCameraSaveFolder:' + value);
+        }else if (label === 'RA Single Guide Direction' || label === 'DEC Single Guide Direction') {
+          // 处理导星方向：如果用户选择了 "AUTO (EAST)" 等动态添加的值，转换为基本选项
+          // 但这种情况不应该发生，因为用户只能看到基本选项
+          // 这里主要是为了安全处理
+          let normalizedValue = value;
+          if (value.startsWith('AUTO')) {
+            // 如果包含括号，提取基本值（但保持显示为带括号的格式）
+            // 用户选择时，应该只选择基本选项，所以这里主要是防御性处理
+            normalizedValue = value; // 保持原值，由 GuiderRaSingleGuideDirSet 处理
+          }
+          this.SendConsoleLogMsg(label + ':' + normalizedValue, 'info');
+          this.$bus.$emit(label, label + ':' + normalizedValue);
         }else{
           this.SendConsoleLogMsg(label + ':' + value, 'info');
           this.$bus.$emit(label, label + ':' + value);

@@ -15,6 +15,15 @@
     <div v-show="showPHD2BoxAndCross && PHD2BoxView" :class="SwitchPHD2BoxClass"
       :style="{ top: PHD2Box_Y + 'px', left: PHD2Box_X + 'px', width: PHD2Box_Width + 'px', height: PHD2Box_Height + 'px' }">
     </div>
+    <!-- 导星星点信息（仿 PHD2：在锁星框旁显示当前导星星点坐标/质量） -->
+    <div
+      v-show="showPHD2BoxAndCross && PHD2BoxView && hasGuiderLockStar"
+      class="guider-lock-label"
+      :class="{ 'guider-lock-label-flash': guiderLockFlash }"
+      :style="{ top: (PHD2Box_Y - 18) + 'px', left: (PHD2Box_X + PHD2Box_Width + 6) + 'px' }"
+    >
+      {{ guiderLockLabel }}
+    </div>
     <div v-show="showPHD2BoxAndCross && PHD2CrossView" :class="SwitchPHD2CrossClass"
       :style="{ top: 0 + 'px', left: PHD2Cross_X + 'px', width: 1 + 'px', height: PHD2Cross_Height + 'px' }"></div>
     <div v-show="showPHD2BoxAndCross && PHD2CrossView" :class="SwitchPHD2CrossClass"
@@ -550,6 +559,16 @@ export default {
       PHD2BoxView: true,
       PHD2CrossView: true,
 
+      // 导星锁星信息（用于显示“正在导哪一颗星点”）
+      guiderLockImgW: 0,
+      guiderLockImgH: 0,
+      guiderLockRawX: null,
+      guiderLockRawY: null,
+      guiderLockSNR: null,
+      guiderLockHFD: null,
+      guiderLockFlash: false,
+      guiderLockFlashTimer: null,
+
       loadingImageSolve: false,
 
       currentPolarAxisStep: 1,
@@ -639,6 +658,8 @@ export default {
     this.$bus.$on('GuiderStatus', this.GuiderStatus);
     this.$bus.$on('PHD2StarBoxView', this.togglePHD2StarBox);
     this.$bus.$on('PHD2StarCrossView', this.togglePHD2StarCross);
+    this.$bus.$on('GuiderLockStar', this.onGuiderLockStar);
+    this.$bus.$on('GuiderStarSelected', this.onGuiderStarSelected);
     this.$bus.$on("ImageSolveFinished", this.ImageSolveFinished);
     // this.$bus.$on('Focal Length (mm)', this.FocalLengthSet);
     this.$bus.$on('SetFocalLengthNum', this.FocalLengthSet);
@@ -669,6 +690,18 @@ export default {
     
     // this.resizeRedBox(1920, 1080);
     // this.$bus.$emit('syncROI_length');
+  },
+  beforeDestroy() {
+    try {
+      this.$bus.$off('GuiderLockStar', this.onGuiderLockStar);
+      this.$bus.$off('GuiderStarSelected', this.onGuiderStarSelected);
+    } catch (e) {
+      // ignore
+    }
+    if (this.guiderLockFlashTimer) {
+      clearTimeout(this.guiderLockFlashTimer);
+      this.guiderLockFlashTimer = null;
+    }
   },
   methods: {
     toggleFloatingBox() {
@@ -901,6 +934,8 @@ export default {
         this.CurrentGuiderStatus = 'InGuiding';
       } else if (status === 'InCalibration') {
         this.CurrentGuiderStatus = 'InCalibration';
+      } else if (status === 'InDirectionDetection') {
+        this.CurrentGuiderStatus = 'InDirectionDetection';
       } else if (status === 'StarLostAlert') {
         this.CurrentGuiderStatus = 'StarLostAlert';
       } else if (status === 'Connected') {
@@ -1500,6 +1535,12 @@ export default {
         this.PHD2BoxView = true;
       } else {
         this.PHD2BoxView = false;
+        // 关闭覆盖层时同步清理上一次的星点信息，避免下次启动仍显示旧值
+        this.guiderLockRawX = null;
+        this.guiderLockRawY = null;
+        this.guiderLockSNR = null;
+        this.guiderLockHFD = null;
+        this.guiderLockFlash = false;
       }
     },
     togglePHD2StarCross(Crossview) {
@@ -1507,6 +1548,52 @@ export default {
         this.PHD2CrossView = true;
       } else {
         this.PHD2CrossView = false;
+      }
+    },
+
+    onGuiderLockStar(imgW, imgH, x, y) {
+      const prevX = this.guiderLockRawX;
+      const prevY = this.guiderLockRawY;
+
+      this.guiderLockImgW = imgW;
+      this.guiderLockImgH = imgH;
+      this.guiderLockRawX = x;
+      this.guiderLockRawY = y;
+
+      // 若锁星发生明显跳变，闪一下提示（可直观看到“导星目标换星了”）
+      if (prevX !== null && prevY !== null) {
+        const dx = x - prevX;
+        const dy = y - prevY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist >= 8) {
+          this.guiderLockFlash = true;
+          if (this.guiderLockFlashTimer) clearTimeout(this.guiderLockFlashTimer);
+          this.guiderLockFlashTimer = setTimeout(() => {
+            this.guiderLockFlash = false;
+          }, 800);
+        }
+      }
+    },
+
+    onGuiderStarSelected(message) {
+      // 形如：GuiderStarSelected:x=885.00:y=366.00:snr=806.3:hfd=4.47
+      try {
+        const parts = String(message).split(':');
+        const kv = {};
+        for (let i = 1; i < parts.length; i++) {
+          const seg = parts[i];
+          const eq = seg.indexOf('=');
+          if (eq === -1) continue;
+          const k = seg.slice(0, eq);
+          const v = seg.slice(eq + 1);
+          if (k) kv[k] = v;
+        }
+        if (kv.x !== undefined) this.guiderLockRawX = Math.round(Number(kv.x));
+        if (kv.y !== undefined) this.guiderLockRawY = Math.round(Number(kv.y));
+        if (kv.snr !== undefined) this.guiderLockSNR = Number(kv.snr);
+        if (kv.hfd !== undefined) this.guiderLockHFD = Number(kv.hfd);
+      } catch (e) {
+        // ignore parse errors
       }
     },
 
@@ -1732,6 +1819,7 @@ export default {
         {
           'box-InGuiding': this.CurrentGuiderStatus === 'InGuiding',
           'box-InCalibration': this.CurrentGuiderStatus === 'InCalibration',
+          'box-InDirectionDetection': this.CurrentGuiderStatus === 'InDirectionDetection',
           'box-StarLostAlert': this.CurrentGuiderStatus === 'StarLostAlert',
           'box-null': this.CurrentGuiderStatus === 'null',
           'box-Connected': this.CurrentGuiderStatus === 'Connected',
@@ -1743,11 +1831,22 @@ export default {
         {
           'cross-InGuiding': this.CurrentGuiderStatus === 'InGuiding',
           'cross-InCalibration': this.CurrentGuiderStatus === 'InCalibration',
+          'cross-InDirectionDetection': this.CurrentGuiderStatus === 'InDirectionDetection',
           'cross-StarLostAlert': this.CurrentGuiderStatus === 'StarLostAlert',
           'cross-null': this.CurrentGuiderStatus === 'null',
           'cross-Connected': this.CurrentGuiderStatus === 'Connected',
         }
       ];
+    },
+    hasGuiderLockStar() {
+      return Number.isFinite(this.guiderLockRawX) && Number.isFinite(this.guiderLockRawY);
+    },
+    guiderLockLabel() {
+      if (!this.hasGuiderLockStar) return '';
+      const xy = `导星星点: (${this.guiderLockRawX}, ${this.guiderLockRawY})`;
+      const snr = Number.isFinite(this.guiderLockSNR) ? `  SNR=${this.guiderLockSNR.toFixed(1)}` : '';
+      const hfd = Number.isFinite(this.guiderLockHFD) ? `  HFD=${this.guiderLockHFD.toFixed(2)}` : '';
+      return xy + snr + hfd;
     },
     currentPolarAxisStepTips() {
       return this.PolarAxisStepTips[this.currentPolarAxisStep - 1];
@@ -2203,6 +2302,13 @@ export default {
   outline: 1px solid rgba(255, 165, 0, 1);
 }
 
+.box-InDirectionDetection {
+  position: absolute;
+  background-color: transparent;
+  box-sizing: border-box;
+  outline: 1px solid rgba(0, 100, 255, 1);
+}
+
 .box-StarLostAlert {
   position: absolute;
   background-color: transparent;
@@ -2227,6 +2333,11 @@ export default {
   background-color: rgba(255, 165, 0, 1);
 }
 
+.cross-InDirectionDetection {
+  position: absolute;
+  background-color: rgba(0, 100, 255, 1);
+}
+
 .cross-StarLostAlert {
   position: absolute;
   background-color: rgba(255, 0, 0, 1);
@@ -2247,6 +2358,24 @@ export default {
   background-color: transparent;
   box-sizing: border-box;
   outline: 1px solid rgba(51, 218, 121, 1);
+}
+
+.guider-lock-label {
+  position: absolute;
+  padding: 2px 6px;
+  font-size: 11px;
+  line-height: 14px;
+  color: rgba(255, 255, 255, 0.95);
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 6px;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.guider-lock-label-flash {
+  border-color: rgba(255, 255, 0, 0.9);
+  box-shadow: 0 0 10px rgba(255, 255, 0, 0.35);
 }
 
 .PolarAxisTips {
