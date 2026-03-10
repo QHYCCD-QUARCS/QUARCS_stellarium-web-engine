@@ -27,6 +27,7 @@ nvm use $(NODE_VER) >/dev/null || { \
 	echo "       Run: nvm install $(NODE_VER)"; \
 	exit 2; \
 }; \
+export NODE_OPTIONS="--openssl-legacy-provider $${NODE_OPTIONS:-}"; \
 node -v >/dev/null
 endef
 
@@ -66,6 +67,7 @@ setup: Dockerfile Dockerfile.jsbuild
 
 dev:
 	docker run -it -p 8080:8080 -p 8888:8888 $(DOCKER_MOUNTS) \
+		-e NODE_OPTIONS=--openssl-legacy-provider \
 		-e HTTPS=true \
 		-e SSL_CRT_FILE=/app/certs/server.crt \
 		-e SSL_KEY_FILE=/app/certs/server.key \
@@ -75,7 +77,7 @@ lint:
 	docker run -it -p 8080:8080 -p 8888:8888 $(DOCKER_MOUNTS) stellarium-web-dev npm run lint
 
 build:
-	docker run -it $(DOCKER_MOUNTS) stellarium-web-dev npm run build
+	docker run -it $(DOCKER_MOUNTS) -e NODE_OPTIONS=--openssl-legacy-provider stellarium-web-dev npm run build
 
 build-with-tiles:
 	@echo "检查离线地图瓦片数据..."

@@ -5,9 +5,9 @@
   "description": "Stellarium Web is an online planetarium that lets you discover the night sky. It's easy to use and beautiful.",
   "author": "Stellarium Labs <contact@stellarium-labs.com>",
   "scripts": {
-    "build": "vue-cli-service build",
+    "build": "NODE_OPTIONS=--openssl-legacy-provider vue-cli-service build",
     "lint": "vue-cli-service lint",
-    "dev": "vue-cli-service serve",
+    "dev": "NODE_OPTIONS=--openssl-legacy-provider vue-cli-service serve",
     "i18n": "vue-cli-service i18n:report",
     "e2e": "npx playwright test",
     "e2e:scenario": "E2E_SCENARIO=tests/e2e/scenarios/example.yaml npx playwright test",
