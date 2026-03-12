@@ -194,7 +194,7 @@
                 v-model="item.value"
                 :label="$t(item.label)"
                 :disabled="isCurrentDeviceUnbound"
-                @input="handleConfigChange(item.label, item.value)"
+                @input="handleConfigChange(item.label, item.value, item.driverType)"
                 class="config-input"
                 :data-testid="
                   'ui-config-'
@@ -273,7 +273,7 @@
                     :max="item.inputMax"
                     :min="item.inputMin"
                     :disabled="isCurrentDeviceUnbound"
-                    @change="handleConfigChange(item.label, item.value)"
+                    @change="handleConfigChange(item.label, item.value, item.driverType)"
                     color="white"
                     class="align-center slider-control"
                     :data-testid="
@@ -314,7 +314,7 @@
                 v-model="item.value"
                 :label="$t(item.label)"
                 :disabled="isCurrentDeviceUnbound"
-                @change="handleConfigChange(item.label, item.value)"
+                @change="handleConfigChange(item.label, item.value, item.driverType)"
                 :items="item.selectValue"
                 class="config-input"
                 :data-testid="
@@ -333,7 +333,7 @@
                 v-model="item.value"
                 :label="$t(item.label)"
                 :disabled="isCurrentDeviceUnbound"
-                @change="handleConfigChange(item.label, item.value)"
+                @change="handleConfigChange(item.label, item.value, item.driverType)"
                 class="config-switch"
                 :data-testid="
                   'ui-config-'
@@ -1052,6 +1052,12 @@ export default {
       MainCameraGainMin: 0,
       MainCameraGainMax: 0,
 
+      GuiderOffsetMin: 0,
+      GuiderOffsetMax: 0,
+
+      GuiderGainMin: 0,
+      GuiderGainMax: 0,
+
       devices: [
         { name: '导星镜', driverType: 'Guider', type: 'CCDs', ListNum: "1", isget: false, device: '', BaudRate: 9600, driverName: '', usbSerialPath: '', sdkVersion: '', supportSDK: false, connectionMode: 'INDI', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_Guider' },
         { name: '主相机', driverType: 'MainCamera', type: 'CCDs', ListNum: "20", isget: false, device: '', BaudRate: 9600, driverName: '', usbSerialPath: '', sdkVersion: '', supportSDK: false, connectionMode: 'INDI', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_MainCamera' },
@@ -1068,6 +1074,8 @@ export default {
         { driverType: 'Guider', label: 'Multi Star Guider', value: false, inputType: 'switch' },
         { driverType: 'Guider', label: 'RA Single Guide Direction', value: 'AUTO', inputType: 'select', selectValue: ['AUTO', 'WEST', 'EAST'] },
         { driverType: 'Guider', label: 'DEC Single Guide Direction', value: 'AUTO', inputType: 'select', selectValue: ['AUTO', 'NORTH', 'SOUTH'] },
+        { driverType: 'Guider', label: 'Gain', value: 0, inputType: 'slider', inputMin: 0, inputMax: 0, inputStep: 1 },
+        { driverType: 'Guider', label: 'Offset', value: 0, inputType: 'slider', inputMin: 0, inputMax: 0, inputStep: 1 },
         // { driverType: 'Guider', label: 'Guider Pixel size', value: '', inputType: 'text'},
         // { driverType: 'Guider', label: 'Guider Gain', value: '', inputType: 'slider', inputMin: 0, inputMax: 100, inputStep: 1 },
         // { driverType: 'Guider', label: 'Calibration step (ms)', value: '', inputType: 'text' },
@@ -1697,7 +1705,7 @@ export default {
       this.$set(item, '_disabled', true);
 
       // 可选：更新文字或发送事件
-      this.handleConfigChange(item.label, true);
+      this.handleConfigChange(item.label, true, item.driverType);
     },
 
     reEnableButton(label) {
@@ -1834,7 +1842,7 @@ export default {
 
       // 回写并通知
       item.value = v;
-      this.handleConfigChange(item.label, v);
+      this.handleConfigChange(item.label, v, item.driverType);
     },
 
     // 数字键盘相关方法
@@ -2931,6 +2939,22 @@ export default {
                 }
                 break;
 
+              case 'GuiderOffsetRange':
+                if (parts.length === 4) {
+                  this.GuiderOffsetMin = parts[1];
+                  this.GuiderOffsetMax = parts[2];
+                  const guiderOffsetValue = parts[3];
+
+                  const offsetItem = this.GuiderConfigItems.find(item => item.label === 'Offset');
+                  if (offsetItem) {
+                    offsetItem.inputMin = parseInt(this.GuiderOffsetMin, 10);
+                    offsetItem.inputMax = parseInt(this.GuiderOffsetMax, 10);
+                    offsetItem.value = parseInt(guiderOffsetValue, 10);
+                  }
+                  this.bumpSubmenuRender();
+                }
+                break;
+
               case 'MainCameraUsbTrafficRange':
                 // MainCameraUsbTrafficRange:min:max:value:step(可选)
                 if (parts.length >= 4) {
@@ -2964,6 +2988,22 @@ export default {
                     gainItem.inputMin = parseInt(this.MainCameraGainMin, 10);
                     gainItem.inputMax = parseInt(this.MainCameraGainMax, 10);
                     gainItem.value = parseInt(MainCameraGainValue, 10);
+                  }
+                  this.bumpSubmenuRender();
+                }
+                break;
+
+              case 'GuiderGainRange':
+                if (parts.length === 4) {
+                  this.GuiderGainMin = parts[1];
+                  this.GuiderGainMax = parts[2];
+                  const guiderGainValue = parts[3];
+
+                  const gainItem = this.GuiderConfigItems.find(item => item.label === 'Gain');
+                  if (gainItem) {
+                    gainItem.inputMin = parseInt(this.GuiderGainMin, 10);
+                    gainItem.inputMax = parseInt(this.GuiderGainMax, 10);
+                    gainItem.value = parseInt(guiderGainValue, 10);
                   }
                   this.bumpSubmenuRender();
                 }
@@ -3202,8 +3242,13 @@ export default {
                   }
 
                   if (parts[1] === 'GuiderGain') {
-                    setGuiderItemValue('Guider Gain', parts[2]);
-                    this.$bus.$emit('AppSendMessage', 'Vue_Command', 'GuiderGain:' + parts[2]);
+                    setGuiderItemValue('Gain', parts[2]);
+                    this.$bus.$emit('AppSendMessage', 'Vue_Command', 'SetGuiderGain:' + parts[2]);
+                  }
+
+                  if (parts[1] === 'GuiderOffset') {
+                    setGuiderItemValue('Offset', parts[2]);
+                    this.$bus.$emit('AppSendMessage', 'Vue_Command', 'SetGuiderOffset:' + parts[2]);
                   }
 
                   if (parts[1] === 'CalibrationDuration') {
@@ -10616,7 +10661,7 @@ export default {
       if (this.isCurrentDeviceUnbound) return;
       if (item.value > item.inputMin) {
         item.value -= item.inputStep;
-        this.handleConfigChange(item.label, item.value);
+        this.handleConfigChange(item.label, item.value, item.driverType);
       }
     },
 
@@ -10624,17 +10669,21 @@ export default {
       if (this.isCurrentDeviceUnbound) return;
       if (item.value < item.inputMax) {
         item.value += item.inputStep;
-        this.handleConfigChange(item.label, item.value);
+        this.handleConfigChange(item.label, item.value, item.driverType);
       }
     },
 
     // 通用的配置更改处理函数
-    handleConfigChange(label, value) {
+    handleConfigChange(label, value, driverType = '') {
       if (this.isCurrentDeviceUnbound) return;
       console.log(`配置已更改: ${label} = ${value}`);
       if (value !== '') {
+        if (driverType === 'Guider' && label === 'Gain') {
+          this.sendMessage('Vue_Command', 'SetGuiderGain:' + parseInt(value));
+        } else if (driverType === 'Guider' && label === 'Offset') {
+          this.sendMessage('Vue_Command', 'SetGuiderOffset:' + parseInt(value));
         // 主相机参数更改处理
-        if (label === 'ImageCFA') {
+        } else if (label === 'ImageCFA') {
           this.ImageCFASet(value);
         }else if (label === 'Binning') {
           this.cameraBin = parseInt(value);
