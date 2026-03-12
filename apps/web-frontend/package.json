@@ -10,6 +10,7 @@
     "dev": "NODE_OPTIONS=--openssl-legacy-provider vue-cli-service serve",
     "i18n": "vue-cli-service i18n:report",
     "e2e": "npx playwright test",
+    "e2e:test001:sequential": "bash scripts/run-test001-sequential.sh",
     "e2e:scenario": "E2E_SCENARIO=tests/e2e/scenarios/example.yaml npx playwright test",
     "e2e:qhyccd:sdk:capture": "npx playwright test tests/e2e/qhyccd-flow-runner.spec.ts --headed",
     "mcp:e2e": "node scripts/mcp-e2e-server.mjs",

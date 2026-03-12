@@ -6,7 +6,7 @@
 # The terms of the AGPL v3 license can be found in the main directory of this
 # repository.
 
-.PHONY: setup build dev start start-https i18n lint gen-cert gen-es6 gen-es6-debug gen-es6-prof update-engine update-engine-debug build-with-tiles
+.PHONY: setup build dev start start-https i18n lint gen-cert gen-es6 gen-es6-debug gen-es6-prof update-engine update-engine-debug build-with-tiles e2e-test001-sequential
 
 # ---- Force bash (needed for "source" and nvm) ----
 SHELL := /bin/bash
@@ -78,6 +78,10 @@ dev:
 
 lint:
 	docker run -it -p 8080:8080 -p 8888:8888 $(DOCKER_MOUNTS) stellarium-web-dev npm run lint
+
+# test001 依次测试：每项先跑 1 次，通过再跑 2 次（共 3 次）；失败记录到 test-results/*.report.txt
+e2e-test001-sequential:
+	$(WITH_NVM) && npm run e2e:test001:sequential
 
 build:
 	docker run -it $(DOCKER_MOUNTS) -e NODE_OPTIONS=--openssl-legacy-provider stellarium-web-dev npm run build

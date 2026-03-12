@@ -2,13 +2,14 @@
   <transition name="panel">
     <div
       class="ImageManager-panel"
+      :class="{ 'compact-mobile': isMobileCompact }"
       :style="{ bottom: bottom + 'px', top: top + 'px', left: left + 'px', right: right + 'px' }"
       data-testid="imp-root"
       :data-state="isOpen ? 'open' : 'closed'"
     >
       <div class="panel-header">
         <div class="panel-actions">
-          <button class="custom-button btn-MoveUSB no-select" @click="MoveFileToUSB" data-testid="imp-btn-move-file-to-usb">
+          <button class="custom-button btn-MoveUSB no-select" @click="MoveFileToUSB" :disabled="!hasUSBDevice" data-testid="imp-btn-move-file-to-usb">
             <div class="icon-center"><img src="@/assets/images/svg/ui/USB Flash Drive.svg" height="20px" style="min-height: 20px; pointer-events: none;"></div>
           </button>
           <button class="custom-button btn-Delete no-select" @click="DeleteBtnClick" data-testid="imp-btn-delete-btn-click">
@@ -19,23 +20,17 @@
           <button class="custom-button btn-ImageFileSwitch btn-ImageFileSwitch-fixed no-select" @click="ImageFileSwitch" data-testid="imp-btn-image-file-switch"><v-icon color="rgba(255, 255, 255)">mdi-folder-sync-outline</v-icon></button>
         </div>
 
-        <div class="panel-pagination">
-          <button class="custom-button btn-PrevPage no-select" @click="prevPage" data-testid="imp-btn-prev-page"><div class="icon-center"><img src="@/assets/images/svg/ui/arrow-left.svg" height="20px" style="min-height: 20px; pointer-events: none;"></div></button>
-          <button class="custom-button btn-NextPage no-select" @click="nextPage" data-testid="imp-btn-next-page"><div class="icon-center"><img src="@/assets/images/svg/ui/arrow-right.svg" height="20px" style="min-height: 20px; pointer-events: none;"></div></button>
-          <span class="page-indicator">{{ $t('Page') }} {{ currentPage + 1 }} / {{ totalPage + 1 }}</span>
-        </div>
-
         <button class="btn-close no-select" @click="PanelClose" data-testid="imp-btn-panel-close"><div class="icon-center"><img src="@/assets/images/svg/ui/OFF.svg" height="12px" style="min-height: 12px; pointer-events: none;"></div></button>
       </div>
 
-      <span :class="{ 'span-USB-Info-Normal': !isUSBWarning, 'span-USB-Info-Warning': isUSBWarning }">{{ $t(USB_Info) }}</span>
+      <span v-if="displayUSBInfo" :class="{ 'span-USB-Info-Normal': !isUSBWarning, 'span-USB-Info-Warning': isUSBWarning }">{{ displayUSBInfo }}</span>
 
       <div class="browser-layout">
         <aside class="folder-sidebar">
           <div class="pane-header">
             <div>
               <div class="pane-title">{{ $t('Folders') }}</div>
-              <div class="pane-subtitle">{{ $t('Keep folder batch actions, but browse images directly.') }}</div>
+              <div v-if="!isMobileCompact" class="pane-subtitle">{{ $t('Keep folder batch actions, but browse images directly.') }}</div>
             </div>
             <div class="pane-badge">{{ imageFolders.length }}</div>
           </div>
@@ -43,7 +38,7 @@
           <div v-if="isNoFolders" class="sidebar-empty" data-testid="imp-txt-no-folders">{{ $t('There are no image folders') }}</div>
           <div v-else class="folder-list">
             <button
-              v-for="(item, index) in displayedItems"
+              v-for="(item, index) in imageFolders"
               :key="folderKey(item)"
               class="folder-item"
               :class="{ active: isCurrentFolder(item), selected: item.isSelected }"
@@ -59,7 +54,7 @@
               <div class="folder-item-meta">{{ getFolderMeta(item) }}</div>
             </button>
           </div>
-          <div class="sidebar-summary">
+          <div v-if="!isMobileCompact" class="sidebar-summary">
             <div>{{ folderSelectionSummary }}</div>
             <div>{{ fileSelectionSummary }}</div>
           </div>
@@ -72,17 +67,17 @@
               <div class="pane-subtitle" data-testid="imp-txt-current-folder">{{ currentFolderLabel }}</div>
             </div>
             <div class="workspace-toolbar-actions">
-              <span class="toolbar-summary">{{ selectionSummary }}</span>
+              <span v-if="!isMobileCompact" class="toolbar-summary">{{ selectionSummary }}</span>
               <button class="secondary-action-btn" @click="refreshCurrentFolder" :disabled="!currentFolder">{{ $t('Refresh') }}</button>
             </div>
           </div>
 
-          <div v-if="!currentFolder" class="workspace-empty">{{ $t('Select a folder to load image files.') }}</div>
+          <div v-if="!currentFolder" class="workspace-empty">{{ isMobileCompact ? $t('Select a folder') : $t('Select a folder to load image files.') }}</div>
           <div v-else class="workspace-body">
             <div class="file-list-panel">
               <div class="list-header"><span>{{ $t('Image List') }}</span><span>{{ currentFolderFiles.length }}</span></div>
-              <div v-if="currentFolderLoading" class="workspace-state">{{ $t('Loading image files...') }}</div>
-              <div v-else-if="currentFolderFiles.length === 0" class="workspace-state">{{ $t('No image files in this folder.') }}</div>
+              <div v-if="currentFolderLoading" class="workspace-state">{{ isMobileCompact ? $t('Loading...') : $t('Loading image files...') }}</div>
+              <div v-else-if="currentFolderFiles.length === 0" class="workspace-state">{{ isMobileCompact ? $t('No images') : $t('No image files in this folder.') }}</div>
               <div v-else class="file-list">
                 <div
                   v-for="(file, index) in currentFolderFiles"
@@ -101,7 +96,7 @@
                   <div class="file-row-actions">
                     <button class="file-action-btn" @click.stop="openFile(file)">{{ $t('Open') }}</button>
                     <button class="file-action-btn" @click.stop="downloadSingleFile(file)">{{ $t('Download') }}</button>
-                    <button class="file-action-btn" @click.stop="moveSingleFile(file)">USB</button>
+                    <button class="file-action-btn" @click.stop="moveSingleFile(file)" :disabled="!hasUSBDevice">USB</button>
                     <button class="file-action-btn danger" @click.stop="prepareDeleteFiles([file.imageName])">{{ $t('Delete') }}</button>
                   </div>
                 </div>
@@ -142,7 +137,7 @@
             <div class="usb-select-content">
               <div class="download-confirm-row">{{ usbConfirmSummary }}</div>
               <div class="download-confirm-row">{{ $t('Target') }}: {{ usbConfirmTargetName }}</div>
-              <div class="download-confirm-hint">{{ $t('Files will be copied to the selected USB drive. This may take a while.') }}</div>
+              <div v-if="!isMobileCompact" class="download-confirm-hint">{{ $t('Files will be copied to the selected USB drive. This may take a while.') }}</div>
               <div class="download-confirm-actions">
                 <button class="download-action-btn" @click="closeUSBConfirmDialog" data-testid="imp-btn-cancel-usb-confirm">{{ $t('Cancel') }}</button>
                 <button class="download-action-btn primary" @click="confirmUSBMove" data-testid="imp-btn-confirm-usb-transfer">{{ $t('Confirm') }}</button>
@@ -161,7 +156,7 @@
             </div>
             <div class="usb-select-content">
               <div class="download-confirm-row">{{ deleteConfirmationText }}</div>
-              <div class="download-confirm-hint">{{ $t('This action cannot be undone.') }}</div>
+              <div v-if="!isMobileCompact" class="download-confirm-hint">{{ $t('This action cannot be undone.') }}</div>
               <div class="download-confirm-actions">
                 <button class="download-action-btn" @click="closeDeleteConfirmDialog" data-testid="imp-btn-cancel-delete-confirm">{{ $t('Cancel') }}</button>
                 <button class="download-action-btn primary danger" @click="confirmDelete" data-testid="imp-btn-confirm-delete">{{ $t('Confirm') }}</button>
@@ -188,7 +183,7 @@
                   <option :value="3">3</option>
                 </select>
               </div>
-              <div class="download-confirm-hint">{{ $t('Before downloading, the browser will try to let you choose a save location. If not supported, files fall back to the system download folder.') }}</div>
+              <div v-if="!isMobileCompact" class="download-confirm-hint">{{ $t('Before downloading, the browser will try to let you choose a save location. If not supported, files fall back to the system download folder.') }}</div>
               <div class="download-confirm-actions">
                 <button class="download-action-btn" @click="closeDownloadConfirmDialog" data-testid="imp-btn-close-download-confirm-dialog-2">{{ $t('Cancel') }}</button>
                 <button class="download-action-btn primary" @click="confirmStartDownload" data-testid="imp-btn-confirm-start-download">{{ $t('Start Download') }}</button>
@@ -206,7 +201,7 @@
               <button class="usb-select-close" @click="closeDownloadLocationReminderDialog" data-testid="imp-btn-close-download-location-reminder-dialog"><v-icon color="rgba(255, 255, 255, 0.7)">mdi-close</v-icon></button>
             </div>
             <div class="usb-select-content">
-              <div class="download-confirm-hint">{{ $t('This browser cannot choose a save path directly inside the page, so downloads will use the system default folder.') }}</div>
+              <div v-if="!isMobileCompact" class="download-confirm-hint">{{ $t('This browser cannot choose a save path directly inside the page, so downloads will use the system default folder.') }}</div>
               <div class="download-confirm-actions">
                 <button class="download-action-btn" @click="cancelDownloadLocationReminderDialog" data-testid="imp-btn-cancel-download-location-reminder-dialog">{{ $t('Cancel') }}</button>
                 <button class="download-action-btn primary" @click="continueStartDownloadAfterReminder" data-testid="imp-btn-continue-download-location-reminder-dialog">{{ $t('Continue') }}</button>
@@ -272,9 +267,6 @@ export default {
       left: 0,
       right: 0,
       top: 40,
-      itemsPerPage: 12,
-      currentPage: 0,
-      totalPage: 0,
       showDeleteConfirmDialog: false,
       isNoFolders: true,
       ImageFile: 'Capture Image',
@@ -316,19 +308,27 @@ export default {
       showDownloadLocationReminderDialog: false,
       pendingStartDownloadFiles: null,
       pendingStartDownloadToken: '',
+      viewportWidth: 1024,
+      viewportHeight: 768,
+      screenWidth: 1024,
+      screenHeight: 768,
+      devicePixelRatioValue: 1,
+      maxTouchPoints: 0,
     };
   },
   computed: {
-    displayedItems() {
-      const startIndex = this.currentPage * this.itemsPerPage;
-      return this.imageFolders.slice(startIndex, Math.min(startIndex + this.itemsPerPage, this.imageFolders.length));
+    isMobileCompact() {
+      const viewportShortSide = Math.min(this.viewportWidth || 0, this.viewportHeight || 0);
+      const screenShortSide = Math.min(this.screenWidth || 0, this.screenHeight || 0);
+      const physicalShortSide = screenShortSide * Math.max(1, this.devicePixelRatioValue || 1);
+      return this.isProbablyMobile() && (viewportShortSide <= 900 || screenShortSide <= 1080 || physicalShortSide <= 1440);
     },
     selectedFolders() { return this.imageFolders.filter((folder) => folder && folder.isSelected); },
     selectedFileObjects() { return this.currentFolderFiles.filter((file) => file && file.isSelect); },
     selectedFileNames() { return this.selectedFileObjects.map((file) => file.imageName); },
     currentFolder() { return this.imageFolders.find((folder) => this.folderKey(folder) === this.currentFolderKey) || null; },
     currentFolderDisplayIndex() {
-      const idx = this.displayedItems.findIndex((folder) => this.folderKey(folder) === this.currentFolderKey);
+      const idx = this.imageFolders.findIndex((folder) => this.folderKey(folder) === this.currentFolderKey);
       return idx >= 0 ? idx : 0;
     },
     currentFile() { return this.currentFolderFiles.find((file) => file.imageName === this.currentFileName) || null; },
@@ -346,8 +346,18 @@ export default {
       if (this.currentFile) return this.$t('Single image actions are ready');
       return this.$t('No selection');
     },
+    hasUSBDevice() {
+      return this.USBList.length > 0;
+    },
+    displayUSBInfo() {
+      if (!this.isMobileCompact) return this.$t(this.USB_Info);
+      if (this.USBList.length === 0) return '';
+      if (this.USBList.length === 1) return 'USB';
+      return this.USBList.length + ' USB';
+    },
     currentFolderLabel() {
-      if (!this.currentFolder) return this.$t('No folder loaded');
+      if (!this.currentFolder) return this.isMobileCompact ? this.$t('No folder') : this.$t('No folder loaded');
+      if (this.isMobileCompact) return this.getFolderName(this.currentFolder);
       return this.ImageFile + ' / ' + this.getFolderName(this.currentFolder);
     },
     deleteConfirmationText() {
@@ -376,31 +386,37 @@ export default {
     downloadConcurrency() { this.pumpDownloadQueue(); },
   },
   created() {
-    this.$bus.$on('calculateTotalPage', this.calculateTotalPage);
     this.$bus.$on('ShowAllImageFolder', this.updateImageFolders);
     this.$bus.$on('USB_Name_Sapce', this.updateUSBdata);
     this.$bus.$on('ClearUSBList', this.clearUSBList);
     this.$bus.$on('DownloadManifest', this.onDownloadManifest);
     this.$bus.$on('ImageFilesName', this.onImageFilesName);
   },
+  mounted() {
+    this.updateViewportWidth();
+    if (typeof window !== 'undefined') window.addEventListener('resize', this.updateViewportWidth);
+  },
   beforeDestroy() {
-    this.$bus.$off('calculateTotalPage', this.calculateTotalPage);
     this.$bus.$off('ShowAllImageFolder', this.updateImageFolders);
     this.$bus.$off('USB_Name_Sapce', this.updateUSBdata);
     this.$bus.$off('ClearUSBList', this.clearUSBList);
     this.$bus.$off('DownloadManifest', this.onDownloadManifest);
     this.$bus.$off('ImageFilesName', this.onImageFilesName);
+    if (typeof window !== 'undefined') window.removeEventListener('resize', this.updateViewportWidth);
   },
   methods: {
-    nextPage() {
-      this.totalPage = Math.max(0, Math.ceil(this.imageFolders.length / this.itemsPerPage) - 1);
-      if (this.currentPage < this.totalPage) this.currentPage += 1;
-    },
-    prevPage() {
-      if (this.currentPage > 0) this.currentPage -= 1;
-    },
-    calculateTotalPage() {
-      this.totalPage = Math.max(0, Math.ceil(this.imageFolders.length / this.itemsPerPage) - 1);
+    updateViewportWidth() {
+      if (typeof window === 'undefined') return;
+      if (typeof window.innerWidth === 'number') this.viewportWidth = window.innerWidth;
+      if (typeof window.innerHeight === 'number') this.viewportHeight = window.innerHeight;
+      if (window.screen) {
+        const screenWidth = Number(window.screen.width) || 0;
+        const screenHeight = Number(window.screen.height) || 0;
+        if (screenWidth > 0) this.screenWidth = screenWidth;
+        if (screenHeight > 0) this.screenHeight = screenHeight;
+      }
+      if (typeof window.devicePixelRatio === 'number' && window.devicePixelRatio > 0) this.devicePixelRatioValue = window.devicePixelRatio;
+      if (typeof navigator !== 'undefined' && typeof navigator.maxTouchPoints === 'number') this.maxTouchPoints = navigator.maxTouchPoints;
     },
     PanelClose() {
       this.cancelDeleteState();
@@ -434,9 +450,7 @@ export default {
     },
     ImageFileSwitch() {
       this.fileTypeIndex = (this.fileTypeIndex + 1) % 3;
-      this.currentPage = 0;
       this.syncImageFoldersFromType();
-      this.calculateTotalPage();
       this.ensureCurrentFolderSelection(true);
       this.cancelDeleteState();
     },
@@ -482,7 +496,10 @@ export default {
     parseImageFileList(fileList, folderKey) {
       const previousSelection = this.selectedFileNames.slice();
       const openedName = this.currentFile ? this.currentFile.imageName : '';
+      const typeName = this.extractFolderTypeFromKey(folderKey);
       const folderName = this.extractFolderNameFromKey(folderKey);
+      const targetFolder = this.getFoldersByTypeName(typeName).find((folder) => this.getFolderName(folder) === folderName);
+      const folderSelected = !!(targetFolder && targetFolder.isSelected);
       return String(fileList || '')
         .split(';')
         .map((item) => item.trim())
@@ -495,7 +512,7 @@ export default {
           extension: this.getFileExtension(name),
           relativePath: folderName ? folderName + '/' + name : name,
           metaText: this.buildFileMetaText(name, folderName),
-          isSelect: previousSelection.indexOf(name) >= 0,
+          isSelect: folderSelected || previousSelection.indexOf(name) >= 0,
           isOpen: openedName === name,
         }));
     },
@@ -547,7 +564,7 @@ export default {
         this.selectFolder(existing);
         return;
       }
-      const first = this.displayedItems[0] || this.imageFolders[0];
+      const first = this.imageFolders[0];
       if (first) this.selectFolder(first);
     },
     onImageFilesName(fileList) {
@@ -578,6 +595,10 @@ export default {
       } else if (Array.isArray(this.folderFilesCache[key])) {
         const list = this.folderFilesCache[key].map((f) => Object.assign({}, f, { isSelect: selected }));
         this.folderFilesCache = Object.assign({}, this.folderFilesCache, { [key]: list });
+      }
+      if (selected && key !== this.currentFolderKey) {
+        this.selectFolder(folder);
+        return;
       }
       this.cancelDeleteState();
     },
@@ -613,15 +634,14 @@ export default {
       this.showDeleteConfirmDialog = false;
     },
     buildDeleteScope() {
-      if (this.selectedFileNames.length > 0) return { type: 'files', names: this.selectedFileNames.slice() };
       if (this.selectedFolders.length > 0) return { type: 'folders', folderNames: this.selectedFolders.map((folder) => this.getFolderName(folder)) };
-      if (this.currentFile && this.currentFolder) return { type: 'files', names: [this.currentFile.imageName] };
+      if (this.selectedFileNames.length > 0) return { type: 'files', names: this.selectedFileNames.slice() };
       return null;
     },
     DeleteBtnClick() {
       const scope = this.buildDeleteScope();
       if (!scope) {
-        this.$bus.$emit('SendConsoleLogMsg', 'No items selected for deletion.', 'warning');
+        this.$bus.$emit('SendConsoleLogMsg', this.$t('No items selected for deletion.'), 'warning');
         return;
       }
       this.pendingDeleteScope = scope;
@@ -682,25 +702,23 @@ export default {
       else if (typeName === 'ScheduleImage') this.ScheduleImageFolders = targetList;
       else this.SolveFailedImageFolders = targetList;
       this.syncImageFoldersFromType();
-      this.calculateTotalPage();
       if (uniqueNames.indexOf(this.extractFolderNameFromKey(this.currentFolderKey)) >= 0) this.clearCurrentFolder();
       this.ensureCurrentFolderSelection(false);
     },
     buildMoveScope() {
-      if (this.selectedFileNames.length > 0) return { type: 'files', names: this.selectedFileNames.slice() };
       if (this.selectedFolders.length > 0) return { type: 'folders', folderNames: this.selectedFolders.map((folder) => this.getFolderName(folder)) };
-      if (this.currentFile && this.currentFolder) return { type: 'files', names: [this.currentFile.imageName] };
+      if (this.selectedFileNames.length > 0) return { type: 'files', names: this.selectedFileNames.slice() };
       return null;
     },
     MoveFileToUSB() {
       this.cancelDeleteState();
       const scope = this.buildMoveScope();
       if (!scope) {
-        this.$bus.$emit('SendConsoleLogMsg', 'No items selected for USB move.', 'warning');
+        this.$bus.$emit('SendConsoleLogMsg', this.$t('No items selected for USB transfer.'), 'warning');
         return;
       }
       if (this.USBList.length === 0) {
-        this.$bus.$emit('SendConsoleLogMsg', 'No USB drive available.', 'warning');
+        this.$bus.$emit('SendConsoleLogMsg', this.$t('No USB drive available.'), 'warning');
         return;
       }
       this.pendingMoveScope = scope;
@@ -715,7 +733,7 @@ export default {
       if (!file) return;
       this.pendingMoveScope = { type: 'files', names: [file.imageName] };
       if (this.USBList.length === 0) {
-        this.$bus.$emit('SendConsoleLogMsg', 'No USB drive available.', 'warning');
+        this.$bus.$emit('SendConsoleLogMsg', this.$t('No USB drive available.'), 'warning');
         return;
       }
       if (this.USBList.length === 1) {
@@ -767,19 +785,15 @@ export default {
       this.selectedUSBName = '';
     },
     DownloadSelected() {
-      if (this.selectedFileNames.length > 0) {
-        this.requestDownloadFiles(this.selectedFileNames);
-        return;
-      }
       if (this.selectedFolders.length > 0) {
         this.requestDownloadFolders(this.selectedFolders.map((folder) => this.getFolderName(folder)));
         return;
       }
-      if (this.currentFile) {
-        this.requestDownloadFiles([this.currentFile.imageName]);
+      if (this.selectedFileNames.length > 0) {
+        this.requestDownloadFiles(this.selectedFileNames);
         return;
       }
-      this.$bus.$emit('SendConsoleLogMsg', 'No items selected for download.', 'warning');
+      this.$bus.$emit('SendConsoleLogMsg', this.$t('No items selected for download.'), 'warning');
     },
     downloadSingleFile(file) {
       if (file) this.requestDownloadFiles([file.imageName]);
@@ -796,12 +810,12 @@ export default {
     },
     onDownloadManifest(manifest) {
       if (!manifest || manifest.error) {
-        this.$bus.$emit('SendConsoleLogMsg', 'DownloadManifest error: ' + (manifest && manifest.error ? manifest.error : 'unknown'), 'error');
+        this.$bus.$emit('SendConsoleLogMsg', this.$t('Download manifest error: {0}', [manifest && manifest.error ? manifest.error : 'unknown']), 'error');
         return;
       }
       const files = Array.isArray(manifest.files) ? manifest.files : [];
       if (files.length === 0) {
-        this.$bus.$emit('SendConsoleLogMsg', 'DownloadManifest is empty.', 'warning');
+        this.$bus.$emit('SendConsoleLogMsg', this.$t('Download manifest is empty.'), 'warning');
         return;
       }
       this.pendingDownloadManifest = manifest;
@@ -864,8 +878,20 @@ export default {
     },
     isProbablyMobile() {
       try {
-        const ua = navigator && navigator.userAgent ? navigator.userAgent : '';
-        return /Android|iPhone|iPad|iPod|Mobile/i.test(ua);
+        const ua = typeof navigator !== 'undefined' && navigator && navigator.userAgent ? navigator.userAgent : '';
+        const mobileUA = /Android|iPhone|iPad|iPod|Mobile/i.test(ua);
+        const touchDevice = this.maxTouchPoints > 0 || (typeof window !== 'undefined' && 'ontouchstart' in window);
+        const viewportShortSide = Math.min(this.viewportWidth || 0, this.viewportHeight || 0);
+        const viewportLongSide = Math.max(this.viewportWidth || 0, this.viewportHeight || 0);
+        const screenShortSide = Math.min(this.screenWidth || 0, this.screenHeight || 0);
+        const screenLongSide = Math.max(this.screenWidth || 0, this.screenHeight || 0);
+        const physicalShortSide = screenShortSide * Math.max(1, this.devicePixelRatioValue || 1);
+        const physicalLongSide = screenLongSide * Math.max(1, this.devicePixelRatioValue || 1);
+        const smallViewport = viewportShortSide > 0 && viewportShortSide <= 900 && viewportLongSide <= 1600;
+        const smallScreen = screenShortSide > 0 && screenShortSide <= 1080 && screenLongSide <= 2560;
+        const compactPhysicalScreen = physicalShortSide > 0 && physicalShortSide <= 1440 && physicalLongSide <= 3200;
+        const touchCompactScreen = touchDevice && (smallViewport || smallScreen || compactPhysicalScreen);
+        return mobileUA || touchCompactScreen;
       } catch (error) {
         return false;
       }
@@ -946,7 +972,7 @@ export default {
       } catch (error) {
         if (error && (error.name === 'AbortError' || String(error).includes('AbortError'))) {
           task.status = 'cancelled';
-          task.error = 'Cancelled';
+          task.error = this.$t('Cancelled');
         } else {
           task.status = 'error';
           task.error = error && error.message ? error.message : String(error);
@@ -972,7 +998,7 @@ export default {
         } catch (error) {
           if (error && (error.name === 'AbortError' || String(error).includes('AbortError'))) {
             task.status = 'cancelled';
-            task.error = 'Cancelled';
+            task.error = this.$t('Cancelled');
           } else {
             task.status = 'error';
             task.error = error && error.message ? error.message : String(error);
@@ -1014,7 +1040,7 @@ export default {
       } catch (error) {
         if (error && (error.name === 'AbortError' || String(error).includes('AbortError'))) {
           task.status = 'cancelled';
-          task.error = 'Cancelled';
+          task.error = this.$t('Cancelled');
         } else {
           task.status = 'error';
           task.error = error && error.message ? error.message : String(error);
@@ -1084,7 +1110,7 @@ export default {
       }
       if (task.status === 'pending' || task.status === 'paused' || task.status === 'downloading' || task.status === 'error') {
         task.status = 'cancelled';
-        task.error = 'Cancelled';
+        task.error = this.$t('Cancelled');
         task.abortController = null;
         this.checkAndCleanupToken(task.token);
       }
@@ -1095,7 +1121,7 @@ export default {
           try { task.abortController.abort(); } catch (error) {}
         } else if (task && (task.status === 'pending' || task.status === 'paused' || task.status === 'error')) {
           task.status = 'cancelled';
-          task.error = 'Cancelled';
+          task.error = this.$t('Cancelled');
           this.checkAndCleanupToken(task.token);
         }
       });
@@ -1142,7 +1168,6 @@ export default {
         this.SolveFailedImageFolders = this.mergeFolderSelection(parsedData.SolveFailedFolderList, this.SolveFailedImageFolders);
       }
       this.syncImageFoldersFromType();
-      this.calculateTotalPage();
       this.ensureCurrentFolderSelection(!unchanged);
     },
     mergeFolderSelection(newList, oldList) {
@@ -1215,7 +1240,7 @@ export default {
 </script>
 
 <style scoped>
-.ImageManager-panel { pointer-events: auto; position: fixed; background: linear-gradient(180deg, rgba(18, 18, 18, 0.88) 0%, rgba(18, 18, 18, 0.78) 100%); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.14); box-shadow: 0 10px 40px rgba(0, 0, 0, 0.55); box-sizing: border-box; overflow: hidden; z-index: 820; }
+.ImageManager-panel { pointer-events: auto; position: fixed; background: linear-gradient(180deg, rgb(18, 18, 18) 0%, rgb(18, 18, 18) 100%); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.14); box-shadow: 0 10px 40px rgba(0, 0, 0, 0.55); box-sizing: border-box; overflow: hidden; z-index: 820; }
 .panel-enter-active { animation: showPanelAnimation 0.3s forwards; }
 .panel-leave-active { animation: hidePanelAnimation 0.3s forwards; }
 @keyframes showPanelAnimation { from { bottom: 100%; backdrop-filter: blur(0px); background-color: rgba(64, 64, 64, 0); } to { bottom: 0; backdrop-filter: blur(5px); background-color: rgba(64, 64, 64, 0.3); } }
@@ -1228,16 +1253,16 @@ export default {
 .panel-actions { position: relative; min-width: 290px; height: 36px; }
 .custom-button, .secondary-action-btn, .primary-action-btn, .file-action-btn, .download-action-btn, .download-icon-btn, .usb-select-close, .btn-close { border: none; border-radius: 10px; cursor: pointer; color: rgba(255, 255, 255, 0.9); background: rgba(255, 255, 255, 0.08); transition: background 0.2s ease; }
 .custom-button:hover, .secondary-action-btn:hover, .primary-action-btn:hover, .file-action-btn:hover, .download-action-btn:hover, .download-icon-btn:hover, .btn-close:hover { background: rgba(255, 255, 255, 0.16); }
-.btn-MoveUSB, .btn-Delete, .btn-Download, .btn-PrevPage, .btn-NextPage, .btn-ImageFileSwitch, .btn-close { position: absolute; width: 35px; height: 35px; }
-.btn-MoveUSB { left: 0; top: 0; } .btn-Delete { left: 45px; top: 0; } .btn-Download { left: 90px; top: 0; } .btn-ImageFileSwitch { left: 255px; top: 0; } .btn-PrevPage { left: 0; top: 0; } .btn-NextPage { left: 45px; top: 0; }
+.custom-button:disabled, .file-action-btn:disabled { cursor: not-allowed; background: rgba(255, 255, 255, 0.04); color: rgba(255, 255, 255, 0.35); opacity: 0.7; }
+.custom-button:disabled:hover, .file-action-btn:disabled:hover { background: rgba(255, 255, 255, 0.04); }
+.btn-MoveUSB, .btn-Delete, .btn-Download, .btn-ImageFileSwitch, .btn-close { position: absolute; width: 35px; height: 35px; }
+.btn-MoveUSB { left: 0; top: 0; } .btn-Delete { left: 45px; top: 0; } .btn-Download { left: 90px; top: 0; } .btn-ImageFileSwitch { left: 255px; top: 0; }
 .btn-close { position: static; }
 .ImageFileTip { position: absolute; left: 135px; top: 0; min-width: 110px; height: 35px; line-height: 35px; text-align: center; padding: 0 12px; font-size: 12px; }
-.panel-pagination { position: relative; width: 170px; height: 36px; }
-.page-indicator { position: absolute; left: 90px; top: 8px; color: rgba(255, 255, 255, 0.65); font-size: 12px; user-select: none; white-space: nowrap; }
 .span-USB-Info-Normal, .span-USB-Info-Warning { position: absolute; top: 56px; left: 20px; right: 20px; font-size: 12px; user-select: none; }
 .span-USB-Info-Normal { color: rgba(130, 220, 180, 0.92); } .span-USB-Info-Warning { color: rgba(255, 196, 120, 0.92); }
-.browser-layout { position: absolute; top: 84px; left: 20px; right: 20px; bottom: 20px; display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 18px; }
-.folder-sidebar, .workspace, .detail-card, .file-list-panel { background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 14px; backdrop-filter: blur(10px); }
+.browser-layout { position: absolute; top: 84px; left: 20px; right: 20px; bottom: 20px; display: grid; grid-template-columns: minmax(220px, 31%) minmax(360px, 69%); gap: 18px; min-width: 0; }
+.folder-sidebar, .workspace, .detail-card, .file-list-panel { background: rgb(28, 28, 28); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 14px; backdrop-filter: blur(10px); }
 .folder-sidebar { padding: 16px; display: flex; flex-direction: column; min-height: 0; }
 .pane-header, .workspace-toolbar, .list-header, .download-panel-header, .download-item-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .pane-title { color: rgba(255, 255, 255, 0.92); font-size: 16px; font-weight: 600; }
@@ -1251,11 +1276,12 @@ export default {
 .folder-item-meta { font-size: 11px; color: rgba(255, 255, 255, 0.6); }
 .sidebar-summary { margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.08); display: grid; gap: 6px; }
 .sidebar-empty, .workspace-empty, .workspace-state, .detail-empty { display: flex; align-items: center; justify-content: center; text-align: center; padding: 24px; min-height: 140px; }
-.workspace { padding: 16px; display: flex; flex-direction: column; min-width: 0; }
-.workspace-toolbar-actions, .detail-actions, .file-row-actions, .download-panel-controls, .download-item-actions, .download-confirm-actions, .download-confirm-controls { display: flex; align-items: center; gap: 8px; }
-.workspace-body { margin-top: 14px; display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(260px, 0.7fr); gap: 16px; min-height: 0; flex: 1; }
+.workspace { padding: 16px; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.workspace-toolbar-actions, .detail-actions, .file-row-actions, .download-panel-controls, .download-item-actions, .download-confirm-actions, .download-confirm-controls { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; }
+.workspace-body { margin-top: 14px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; min-height: 0; flex: 1; }
 .file-list-panel, .detail-card { padding: 14px; min-height: 0; }
-.file-list { margin-top: 12px; overflow: auto; display: flex; flex-direction: column; gap: 8px; max-height: calc(100vh - 290px); }
+.file-list-panel { display: flex; flex-direction: column; }
+.file-list { margin-top: 12px; overflow: auto; display: flex; flex-direction: column; gap: 8px; min-height: 0; flex: 1; max-height: none; }
 .file-row { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 12px; }
 .file-row.active { border-color: rgba(75, 155, 250, 0.66); background: rgba(75, 155, 250, 0.11); } .file-row.opened { box-shadow: inset 0 0 0 1px rgba(120, 220, 180, 0.45); }
 .detail-panel { display: grid; gap: 16px; } .detail-content, .protocol-note { margin-top: 12px; display: grid; gap: 10px; } .detail-actions { flex-wrap: wrap; }
@@ -1278,6 +1304,150 @@ export default {
 .download-bar-inner { height: 100%; background: linear-gradient(90deg, rgba(75, 155, 250, 0.9), rgba(120, 220, 180, 0.9)); }
 .download-fab { position: absolute; right: 20px; bottom: 20px; width: 48px; height: 48px; border: none; border-radius: 999px; background: rgba(75, 155, 250, 0.85); cursor: pointer; }
 .compact { padding: 6px 10px; }
+.compact-mobile .pane-subtitle,
+.compact-mobile .folder-item-subtitle,
+.compact-mobile .file-row-meta,
+.compact-mobile .download-subtitle { display: none; }
+.compact-mobile .panel-header { top: 6px; left: 8px; right: 8px; gap: 10px; }
+.compact-mobile .panel-actions { min-width: 250px; height: 35px; }
+.compact-mobile .span-USB-Info-Normal,
+.compact-mobile .span-USB-Info-Warning { top: 46px; left: 12px; right: 12px; font-size: 11px; }
+.compact-mobile .browser-layout { top: 64px; left: 12px; right: 12px; bottom: 12px; gap: 10px; }
+.compact-mobile .folder-sidebar,
+.compact-mobile .workspace { padding: 12px; background: rgb(28, 28, 28); }
+.compact-mobile .workspace-toolbar { gap: 8px; }
+.compact-mobile .workspace-body { margin-top: 6px; gap: 8px; }
+.compact-mobile .file-list-panel { padding: 0; background: transparent; border: none; border-radius: 0; backdrop-filter: none; }
+.compact-mobile .list-header { display: none; }
+.compact-mobile .folder-list,
+.compact-mobile .file-list { margin-top: 6px; }
+.compact-mobile .sidebar-empty,
+.compact-mobile .workspace-empty,
+.compact-mobile .workspace-state { min-height: 88px; padding: 16px; }
+.compact-mobile .folder-item,
+.compact-mobile .file-row { padding-top: 8px; padding-bottom: 8px; }
 code { color: rgba(130, 220, 255, 0.92); }
-@media (max-width: 1100px) { .browser-layout { grid-template-columns: 1fr; } .workspace-body { grid-template-columns: 1fr; } }
+@media (max-width: 768px) {
+  .ImageManager-panel {
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .panel-header {
+    position: static;
+    padding: 6px 10px 0;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 auto;
+    min-width: 0;
+  }
+  .panel-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: auto;
+    flex-wrap: wrap;
+    flex: 1 1 auto;
+  }
+  .btn-MoveUSB, .btn-Delete, .btn-Download, .btn-ImageFileSwitch, .btn-close {
+    position: static;
+    flex: 0 0 35px;
+  }
+  .ImageFileTip {
+    position: static;
+    min-width: 0;
+    height: auto;
+    line-height: 1.4;
+  }
+  .ImageFileTip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 35px;
+    padding: 8px 12px;
+  }
+  .span-USB-Info-Normal, .span-USB-Info-Warning {
+    position: static;
+    display: block;
+    margin: 2px 12px 0;
+    min-width: 0;
+    flex: 0 0 auto;
+  }
+  .browser-layout {
+    position: static;
+    left: auto;
+    right: auto;
+    top: auto;
+    bottom: auto;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    align-items: stretch;
+    gap: 8px;
+    margin: 4px 12px 12px;
+    min-width: 0;
+    min-height: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+  }
+  .folder-sidebar {
+    min-width: 0;
+    padding: 12px;
+    max-height: 34vh;
+  }
+  .workspace {
+    min-width: 0;
+    padding: 12px;
+  }
+  .pane-header, .workspace-toolbar, .list-header, .download-panel-header, .download-item-row {
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .pane-badge {
+    margin-left: auto;
+  }
+  .workspace-toolbar-actions, .file-row-actions, .download-panel-controls, .download-item-actions, .download-confirm-actions, .download-confirm-controls {
+    flex-wrap: wrap;
+  }
+  .workspace-toolbar {
+    gap: 8px;
+  }
+  .workspace-body {
+    margin-top: 6px;
+    gap: 8px;
+  }
+  .file-list-panel {
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    backdrop-filter: none;
+  }
+  .folder-list, .file-list {
+    margin-top: 8px;
+  }
+  .list-header {
+    padding: 0 2px;
+  }
+  .file-row {
+    grid-template-columns: 24px minmax(0, 1fr);
+    gap: 10px;
+  }
+  .file-row-actions {
+    grid-column: 1 / -1;
+    width: 100%;
+    overflow-x: auto;
+  }
+  .file-action-btn {
+    flex: 0 0 auto;
+    min-width: 78px;
+    text-align: center;
+  }
+  .download-panel {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    min-width: 0;
+  }
+}
 </style>

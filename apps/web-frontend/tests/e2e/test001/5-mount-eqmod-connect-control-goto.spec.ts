@@ -47,6 +47,11 @@
  * - 长列表场景仅滚动对应浮层/子容器，避免误滚主菜单导致元素定位失效。
  * - 菜单点击统一走 clickLocatorWithFallback（含可操作性检查与动作后等待）以降低偶发失败。
  * - 关闭流程末尾补一次 Escape 作为兜底，有助于清理残留遮罩并减少后续串扰。
+ *
+ * 定位与交互规范：
+ * - 以全局唯一的 data-testid 作为定位标准；控件缺 testid 时需在源码中补齐。
+ * - 禁止 force 类操作；所有交互先做可操作性检查（可见、可启用、scrollIntoView、trial 点击）。
+ * - 遮罩关闭使用 .v-overlay__scrim（Vuetify 内部无 testid），仅在可点击时点击，否则依赖 Escape。
  */
 
 import { test, expect, type Locator, type Page, type TestInfo } from '@playwright/test'
@@ -74,7 +79,7 @@ type MountFeatureFlags = {
 }
 
 const MOUNT_DRIVER_MATCH = /eqmod\s*mount|eqmod/i
-const MOUNT_CONNECT_WAIT_MS = 30_000
+const MOUNT_CONNECT_WAIT_MS = envNumber(process.env, 'E2E_MOUNT_CONNECT_WAIT_MS', 30_000)
 const MOUNT_GOTO_WAIT_MS = 90_000
 const MOUNT_ACTION_WAIT_MS = 120_000
 const JOG_HOLD_MS = 3_000
@@ -131,6 +136,10 @@ async function dismissOverlayScrimIfPresent(page: Page, maxRounds: number = 6) {
   }
 }
 
+/**
+ * 点击可见的遮罩层一次以关闭浮层（仅当可操作时点击，禁止 force）。
+ * 遮罩为 Vuetify .v-overlay__scrim，无 data-testid；若不可点击则跳过，由调用方 Escape 兜底。
+ */
 async function clickVisibleOverlayScrimOnce(page: Page): Promise<boolean> {
   const scrims = page.locator('.v-overlay__scrim')
   const count = await scrims.count()
@@ -138,8 +147,14 @@ async function clickVisibleOverlayScrimOnce(page: Page): Promise<boolean> {
     const scrim = scrims.nth(i)
     const visible = await scrim.isVisible().catch(() => false)
     if (!visible) continue
-    await scrim.click({ timeout: 1_500, force: true }).catch(() => {})
-    return true
+    await scrim.scrollIntoViewIfNeeded().catch(() => {})
+    try {
+      await scrim.click({ timeout: 1_500 })
+      return true
+    } catch {
+      // 遮罩可能被遮挡或不可接收点击，不强制点击，返回 false 由调用方用 Escape 兜底
+      return false
+    }
   }
   return false
 }
@@ -702,7 +717,7 @@ async function toggleTrackAndRestore(page: Page, report: RuntimeReport, timing: 
     let changed = before
     let toggled = false
 
-    // 阶段 A：尝试把 Track 从 before 切到另一个状态（重试 + force 兜底）
+    // 阶段 A：尝试把 Track 从 before 切到另一个状态（仅可操作性检查后点击，禁止 force）
     for (let i = 0; i < 6; i++) {
       await waitForMountIdleState(page)
       const current = (await btn.getAttribute('data-state')) ?? ''
@@ -711,12 +726,7 @@ async function toggleTrackAndRestore(page: Page, report: RuntimeReport, timing: 
         toggled = true
         break
       }
-      if (i % 2 === 0) {
-        await clickLocatorWithFallback(page, btn, timing)
-      } else {
-        await btn.click({ timeout: 8_000, force: true }).catch(() => {})
-        await waitAfterAction(page, timing)
-      }
+      await clickLocatorWithFallback(page, btn, timing)
       const switched = await expect
         .poll(async () => (await btn.getAttribute('data-state')) ?? '', { timeout: 8_000 })
         .not.toBe(before)
@@ -735,7 +745,7 @@ async function toggleTrackAndRestore(page: Page, report: RuntimeReport, timing: 
       return
     }
 
-    // 阶段 B：恢复到初始状态 before（重试 + force 兜底）
+    // 阶段 B：恢复到初始状态 before（仅可操作性检查后点击，禁止 force）
     let restored = false
     for (let i = 0; i < 6; i++) {
       const current = (await btn.getAttribute('data-state')) ?? ''
@@ -744,12 +754,7 @@ async function toggleTrackAndRestore(page: Page, report: RuntimeReport, timing: 
         break
       }
       await waitForMountIdleState(page)
-      if (i % 2 === 0) {
-        await clickLocatorWithFallback(page, btn, timing)
-      } else {
-        await btn.click({ timeout: 8_000, force: true }).catch(() => {})
-        await waitAfterAction(page, timing)
-      }
+      await clickLocatorWithFallback(page, btn, timing)
       await page.waitForTimeout(450)
     }
 
@@ -1029,27 +1034,6 @@ async function runMountConfigGotoByRaDecDialog(page: Page, report: RuntimeReport
       }
       await gotoBtn.scrollIntoViewIfNeeded().catch(() => {})
       await clickLocatorWithFallback(page, gotoBtn, timing)
-      opened = await waitDialogOpened(2_500)
-      if (opened) break
-
-      directGotoTriggered = await waitDirectGotoSignal(2_500)
-      if (directGotoTriggered) break
-
-      // 有些 Vuetify 场景首次 click 未真正触发，补一次 force click。
-      await gotoBtn.click({ timeout: 8_000, force: true }).catch(() => {})
-      await waitAfterAction(page, timing)
-      opened = await waitDialogOpened(2_500)
-      if (opened) break
-      directGotoTriggered = await waitDirectGotoSignal(2_500)
-      if (directGotoTriggered) break
-
-      // 再兜底一次：直接触发原生 click 事件，规避事件拦截。
-      await gotoBtn
-        .evaluate((el) => {
-          ;(el as HTMLElement).click()
-        })
-        .catch(() => {})
-      await waitAfterAction(page, timing)
       opened = await waitDialogOpened(2_500)
       if (opened) break
       directGotoTriggered = await waitDirectGotoSignal(2_500)

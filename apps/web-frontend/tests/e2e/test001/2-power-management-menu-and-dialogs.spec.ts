@@ -12,7 +12,8 @@
  * 3) Output Power 1 状态闭环：
  *    - 读取当前 [ON]/[OFF] 状态。
  *    - 执行一次状态切换并确认。
- *    - 再执行一次反向切换并确认，最终恢复初始状态。
+ *    - 确保仍在菜单/电源页（若已关闭则重新打开），再执行一次反向切换并确认，最终恢复初始状态。
+ *    - 收尾要求：电源按钮必须为开启状态；若当前为 OFF 则再切换为 ON 并断言最终为 ON。
  *
  * 4) 危险操作弹窗取消路径：
  *    - Force Update：点击后走 Cancel 分支。
@@ -64,8 +65,29 @@ async function addStep(name: string, report: RuntimeReport, fn: () => Promise<vo
   }
 }
 
+/** 可选：交互后短暂等待（仅当配置 > 0 时），不替代可操作性检查。 */
 async function waitAfterAction(page: Page, timing: RunTiming) {
   if (timing.actionDelayMs > 0) await page.waitForTimeout(timing.actionDelayMs)
+}
+
+/** 确保元素可操作（可见、稳定、在视口内）后执行标准点击，禁止 force 类操作。 */
+async function ensureVisibleAndClick(
+  page: Page,
+  loc: ReturnType<Page['locator']>,
+  options: { timeout?: number } = {},
+) {
+  const timeout = options.timeout ?? 8_000
+  await loc.scrollIntoViewIfNeeded()
+  await expect(loc).toBeVisible({ timeout })
+  await expect(loc).toBeEnabled({ timeout })
+  try {
+    await loc.click({ timeout })
+  } catch (err) {
+    const message = shortError(err)
+    if (!/intercepts pointer events|not stable/i.test(message)) throw err
+    await loc.focus()
+    await page.keyboard.press('Enter')
+  }
 }
 
 function attachRuntimeCollectors(page: Page, report: RuntimeReport) {
@@ -103,11 +125,38 @@ async function ensureMenuDrawerOpen(page: Page, report: RuntimeReport, timing: R
     if (state === 'open') return
 
     const toggleBtn = page.getByTestId('tb-act-toggle-navigation-drawer').first()
-    await expect(toggleBtn).toBeVisible({ timeout: 10_000 })
-    await toggleBtn.click({ timeout: 8_000 })
+    await ensureVisibleAndClick(page, toggleBtn, { timeout: 10_000 })
     await expect(drawer).toHaveAttribute('data-state', 'open', { timeout: 10_000 })
     await waitAfterAction(page, timing)
   })
+}
+
+/** 确保当前在电源管理页面（菜单抽屉打开且电源页 root 为 open）。若已关闭则重新打开。 */
+async function ensurePowerManagerPageOpen(page: Page, report: RuntimeReport, timing: RunTiming) {
+  const root = page.getByTestId('ui-power-manager-root').first()
+  const submenuDrawer = page.getByTestId('ui-app-submenu-drawer').first()
+  const powerList = page.getByTestId('ui-power-manager-list').first()
+  if ((await root.count()) === 0) return
+
+  const isPowerPageInteractive = async () => {
+    const rootState = await root.getAttribute('data-state')
+    const submenuState = (await submenuDrawer.count()) > 0 ? await submenuDrawer.getAttribute('data-state') : 'open'
+    const powerListVisible = (await powerList.count()) > 0 ? await powerList.isVisible().catch(() => false) : false
+    return rootState === 'open' && submenuState === 'open' && powerListVisible
+  }
+
+  if (await isPowerPageInteractive()) return
+
+  const maxAttempts = 3
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    await ensureMenuDrawerOpen(page, report, timing)
+
+    const menuItem = page.getByTestId('ui-app-menu-open-power-manager').first()
+    await ensureVisibleAndClick(page, menuItem, { timeout: 15_000 })
+    await waitAfterAction(page, timing)
+
+    if (await isPowerPageInteractive()) return
+  }
 }
 
 async function cancelConfirmIfOpened(page: Page, report: RuntimeReport, timing: RunTiming, stepPrefix: string) {
@@ -117,8 +166,7 @@ async function cancelConfirmIfOpened(page: Page, report: RuntimeReport, timing: 
     if ((await root.getAttribute('data-state')) !== 'open') return
 
     const cancelBtn = page.getByTestId('ui-confirm-dialog-btn-cancel').first()
-    await expect(cancelBtn).toBeVisible({ timeout: 8_000 })
-    await cancelBtn.click({ timeout: 8_000 })
+    await ensureVisibleAndClick(page, cancelBtn, { timeout: 8_000 })
     await expect(root).toHaveAttribute('data-state', 'closed', { timeout: 10_000 })
     await waitAfterAction(page, timing)
   })
@@ -131,8 +179,7 @@ async function confirmConfirmIfOpened(page: Page, report: RuntimeReport, timing:
     if ((await root.getAttribute('data-state')) !== 'open') return
 
     const confirmBtn = page.getByTestId('ui-confirm-dialog-btn-confirm').first()
-    await expect(confirmBtn).toBeVisible({ timeout: 8_000 })
-    await confirmBtn.click({ timeout: 8_000 })
+    await ensureVisibleAndClick(page, confirmBtn, { timeout: 8_000 })
     await expect(root).toHaveAttribute('data-state', 'closed', { timeout: 10_000 })
     await waitAfterAction(page, timing)
   })
@@ -156,27 +203,22 @@ async function clickPowerActionAndCancel(
   actionTestId: string,
   stepPrefix: string,
 ) {
+  await ensurePowerManagerPageOpen(page, report, timing)
   await addStep(`${stepPrefix}.click`, report, async () => {
     const btn = await pickVisibleByTestId(page, actionTestId)
-    await btn.scrollIntoViewIfNeeded()
-    try {
-      await btn.click({ timeout: 8_000 })
-    } catch {
-      // 某些设备分辨率下按钮存在但超出可点击视口，回退为 DOM 级 click 触发处理逻辑。
-      await btn.evaluate((el) => (el as HTMLElement).click())
-    }
+    await ensureVisibleAndClick(page, btn, { timeout: 8_000 })
     await waitAfterAction(page, timing)
   })
   await cancelConfirmIfOpened(page, report, timing, stepPrefix)
 }
 
-async function clickLocatorWithFallback(page: Page, loc: ReturnType<Page['locator']>, timing: RunTiming) {
-  await loc.scrollIntoViewIfNeeded()
-  try {
-    await loc.click({ timeout: 8_000 })
-  } catch {
-    await loc.evaluate((el) => (el as HTMLElement).click())
-  }
+/** 对已通过 pickVisibleByTestId 选中的控件做可操作性检查后标准点击，禁止 force。 */
+async function clickLocatorWithOperabilityCheck(
+  page: Page,
+  loc: ReturnType<Page['locator']>,
+  timing: RunTiming,
+) {
+  await ensureVisibleAndClick(page, loc, { timeout: 8_000 })
   await waitAfterAction(page, timing)
 }
 
@@ -208,13 +250,19 @@ async function runPowerManagementTest(page: Page, testInfo: TestInfo) {
   await ensureMenuDrawerOpen(page, report, timing)
 
   await addStep('menu.open-power-manager', report, async () => {
-    // 优先使用稳定 testid，对应你给出的 Power 菜单 DOM
     const menuItem = page.getByTestId('ui-app-menu-open-power-manager').first()
-    await expect(menuItem).toBeVisible({ timeout: Math.min(15_000, stepTimeoutMs) })
-    await menuItem.click({ timeout: 8_000 })
+    await ensureVisibleAndClick(page, menuItem, { timeout: Math.min(15_000, stepTimeoutMs) })
 
     const root = page.getByTestId('ui-power-manager-root').first()
+    const submenuDrawer = page.getByTestId('ui-app-submenu-drawer').first()
+    const powerList = page.getByTestId('ui-power-manager-list').first()
     await expect(root).toHaveAttribute('data-state', 'open', { timeout: Math.min(15_000, stepTimeoutMs) })
+    if ((await submenuDrawer.count()) > 0) {
+      await expect(submenuDrawer).toHaveAttribute('data-state', 'open', { timeout: Math.min(15_000, stepTimeoutMs) })
+    }
+    if ((await powerList.count()) > 0) {
+      await expect(powerList).toBeVisible({ timeout: Math.min(15_000, stepTimeoutMs) })
+    }
     await waitAfterAction(page, timing)
   })
 
@@ -230,30 +278,48 @@ async function runPowerManagementTest(page: Page, testInfo: TestInfo) {
   // 阶段 3：Output Power 1 做“先切换再恢复”闭环：ON->OFF->ON 或 OFF->ON->OFF。
   await addStep('power-page.output-power-1.toggle-and-restore', report, async () => {
     const power1 = await pickVisibleByTestId(page, 'ui-app-power-page-output-power-1')
-    const readState = async () => {
-      const text = (await power1.textContent()) ?? ''
+    const readState = async (loc: ReturnType<Page['locator']>) => {
+      const text = (await loc.textContent()) ?? ''
       if (text.includes('[ON]')) return 'ON'
       if (text.includes('[OFF]')) return 'OFF'
       return 'UNKNOWN'
     }
 
-    const initialState = await readState()
+    const initialState = await readState(power1)
     if (initialState === 'UNKNOWN') throw new Error('Output Power 1 未识别到 [ON]/[OFF] 状态')
 
     if (initialState === 'ON') {
-      await clickLocatorWithFallback(page, power1, timing)
+      await clickLocatorWithOperabilityCheck(page, power1, timing)
       await confirmConfirmIfOpened(page, report, timing, 'power-page.output-power-1.turn-off')
 
-      await clickLocatorWithFallback(page, power1, timing)
+      await ensurePowerManagerPageOpen(page, report, timing)
+      const power1Again = await pickVisibleByTestId(page, 'ui-app-power-page-output-power-1')
+      await clickLocatorWithOperabilityCheck(page, power1Again, timing)
       await confirmConfirmIfOpened(page, report, timing, 'power-page.output-power-1.turn-on')
       return
     }
 
-    await clickLocatorWithFallback(page, power1, timing)
+    await clickLocatorWithOperabilityCheck(page, power1, timing)
     await confirmConfirmIfOpened(page, report, timing, 'power-page.output-power-1.turn-on')
 
-    await clickLocatorWithFallback(page, power1, timing)
+    await ensurePowerManagerPageOpen(page, report, timing)
+    const power1Again = await pickVisibleByTestId(page, 'ui-app-power-page-output-power-1')
+    await clickLocatorWithOperabilityCheck(page, power1Again, timing)
     await confirmConfirmIfOpened(page, report, timing, 'power-page.output-power-1.turn-off')
+  })
+
+  // 收尾要求：电源按钮必须为开启状态（若当前为 OFF 则再切换为 ON）
+  await addStep('power-page.output-power-1.ensure-on-at-end', report, async () => {
+    await ensurePowerManagerPageOpen(page, report, timing)
+    const power1 = await pickVisibleByTestId(page, 'ui-app-power-page-output-power-1')
+    const text = (await power1.textContent()) ?? ''
+    if (text.includes('[ON]')) return
+    if (!text.includes('[OFF]')) throw new Error('Output Power 1 未识别到 [ON]/[OFF] 状态')
+    await clickLocatorWithOperabilityCheck(page, power1, timing)
+    await confirmConfirmIfOpened(page, report, timing, 'power-page.output-power-1.ensure-on')
+    const after = await pickVisibleByTestId(page, 'ui-app-power-page-output-power-1')
+    const afterText = (await after.textContent()) ?? ''
+    if (!afterText.includes('[ON]')) throw new Error('收尾时 Output Power 1 仍非开启状态')
   })
 
   // 阶段 4：危险操作仅验证弹窗取消分支（不执行真实重启/关机）

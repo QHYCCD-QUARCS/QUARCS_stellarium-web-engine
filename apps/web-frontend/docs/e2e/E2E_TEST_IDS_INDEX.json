@@ -453,7 +453,7 @@
       "lines": 1905,
       "suggestedPrefix": "imp-",
       "priority": "高",
-      "testIdCount": 32,
+      "testIdCount": 30,
       "testIds": [
         "imp-root",
         "imp-btn-move-file-to-usb",
@@ -462,8 +462,6 @@
         "imp-btn-download-selected",
         "imp-act-image-file-switch",
         "imp-btn-image-file-switch",
-        "imp-btn-prev-page",
-        "imp-btn-next-page",
         "imp-btn-panel-close",
         "imp-act-close-usbselect-dialog",
         "imp-act-usb-select-dialog",
@@ -3199,20 +3197,6 @@
     "imp-btn-image-file-switch": {
       "component": "components/ImageManagerPanel.vue",
       "line": 40,
-      "elementType": "button",
-      "hasDataState": false,
-      "dataState": null
-    },
-    "imp-btn-prev-page": {
-      "component": "components/ImageManagerPanel.vue",
-      "line": 50,
-      "elementType": "button",
-      "hasDataState": false,
-      "dataState": null
-    },
-    "imp-btn-next-page": {
-      "component": "components/ImageManagerPanel.vue",
-      "line": 55,
       "elementType": "button",
       "hasDataState": false,
       "dataState": null

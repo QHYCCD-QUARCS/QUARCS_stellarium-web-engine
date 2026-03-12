@@ -8,6 +8,10 @@
  *    - 默认值：510
  *    - 可通过环境变量 E2E_TELESCOPES_FOCAL_MM 动态覆盖
  * 4) 断言步骤无失败、页面无运行时异常。
+ *
+ * 定位与交互规范：
+ * - 以全局唯一的 data-testid 作为定位标准；控件缺 testid 时需在源码中补齐。
+ * - 禁止 force 类操作；所有交互先做可操作性检查（可见、可启用、scrollIntoView、trial 点击）。
  */
 
 import { test, expect, type Locator, type Page, type TestInfo } from '@playwright/test'
@@ -95,6 +99,21 @@ async function waitShort(page: Page, timing: RunTiming) {
   if (timing.shortDelayMs > 0) await page.waitForTimeout(timing.shortDelayMs)
 }
 
+/** 可操作性检查：可见、可启用、滚入视口、trial 点击；禁止 force 与 DOM 级点击。 */
+async function ensureLocatorActionable(loc: Locator, timeoutMs: number = 8_000) {
+  await expect(loc).toBeVisible({ timeout: timeoutMs })
+  await expect(loc).toBeEnabled({ timeout: timeoutMs })
+  await loc.scrollIntoViewIfNeeded().catch(() => {})
+  await loc.click({ timeout: timeoutMs, trial: true })
+}
+
+/** 先做可操作性检查再标准点击，禁止 force 与 evaluate(click)。 */
+async function clickLocatorWithFallback(page: Page, loc: Locator, timing: RunTiming, timeoutMs: number = 8_000) {
+  await ensureLocatorActionable(loc, timeoutMs)
+  await loc.click({ timeout: timeoutMs })
+  await waitAfterAction(page, timing)
+}
+
 async function ensureMenuDrawerOpen(page: Page, report: RuntimeReport, timing: RunTiming) {
   await addStep('menu.ensure-drawer-open', report, async () => {
     const drawer = page.getByTestId('ui-app-menu-drawer').first()
@@ -102,21 +121,11 @@ async function ensureMenuDrawerOpen(page: Page, report: RuntimeReport, timing: R
     const state = await drawer.getAttribute('data-state')
     if (state === 'open') return
     const toggleBtn = page.getByTestId('tb-act-toggle-navigation-drawer').first()
-    await expect(toggleBtn).toBeVisible({ timeout: 10_000 })
-    await toggleBtn.click({ timeout: 8_000 })
+    await ensureLocatorActionable(toggleBtn, 10_000)
+    await toggleBtn.click({ timeout: 10_000 })
     await expect(drawer).toHaveAttribute('data-state', 'open', { timeout: 10_000 })
     await waitAfterAction(page, timing)
   })
-}
-
-async function clickLocatorWithFallback(page: Page, loc: Locator, timing: RunTiming) {
-  await loc.scrollIntoViewIfNeeded().catch(() => {})
-  try {
-    await loc.click({ timeout: 8_000 })
-  } catch {
-    await loc.evaluate((el) => (el as HTMLElement).click())
-  }
-  await waitAfterAction(page, timing)
 }
 
 async function firstVisibleLocator(candidates: Locator): Promise<Locator | null> {
@@ -171,7 +180,7 @@ async function openTelescopesSubmenu(page: Page, report: RuntimeReport, timing: 
       if ((await telescopesItem.count()) > 0) {
         await telescopesItem.scrollIntoViewIfNeeded().catch(() => {})
         if (await telescopesItem.isVisible().catch(() => false)) {
-          await clickLocatorWithFallback(page, telescopesItem, timing)
+          await clickLocatorWithFallback(page, telescopesItem, timing, 8_000)
           await expect(devicePage).toHaveAttribute('data-state', 'open', { timeout: 8_000 })
           return
         }
@@ -192,10 +201,11 @@ async function openTelescopesSubmenu(page: Page, report: RuntimeReport, timing: 
 async function setTelescopesFocalLength(page: Page, report: RuntimeReport, timing: RunTiming, focalMm: string) {
   await addStep(`telescopes.set-focal-length-${focalMm}`, report, async () => {
     const paramsContainer = page.getByTestId('ui-app-submenu-params-container').first()
-    const focalCandidates = page.locator('[data-testid="ui-config-Telescopes-FocalLengthmm-number-0"]')
+    const focalCandidates = page.getByTestId('ui-config-Telescopes-FocalLengthmm-number-0')
     const focalInput = await findVisibleInScrollableContainer(page, paramsContainer, focalCandidates, 10)
     if (!focalInput) throw new Error('未找到可见焦距输入框（ui-config-Telescopes-FocalLengthmm-number-0）')
 
+    await ensureLocatorActionable(focalInput, 8_000)
     await focalInput.fill(focalMm, { timeout: 8_000 })
     await waitAfterAction(page, timing)
     await expect.poll(async () => ((await focalInput.inputValue().catch(() => '') || '').trim()), { timeout: 5_000 }).toBe(focalMm)

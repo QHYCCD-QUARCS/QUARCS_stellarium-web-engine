@@ -701,5 +701,12 @@
   "Transfer started to USB: {0}": "已开始向 USB 传输：{0}",
   "Confirm Deletion": "确认删除",
   "This action cannot be undone.": "此操作无法撤销。",
-  "Selected USB drive is no longer available.": "所选 USB 驱动器已不可用。"
+  "Selected USB drive is no longer available.": "所选 USB 驱动器已不可用。",
+  "No items selected for deletion.": "未选择要删除的项目。",
+  "No items selected for USB transfer.": "未选择要传输到 USB 的项目。",
+  "No USB drive available.": "没有可用的 USB 驱动器。",
+  "No items selected for download.": "未选择要下载的项目。",
+  "Download manifest error: {0}": "下载清单错误：{0}",
+  "Download manifest is empty.": "下载清单为空。",
+  "Cancelled": "已取消"
 }

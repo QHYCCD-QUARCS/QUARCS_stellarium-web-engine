@@ -1,9 +1,14 @@
 /// <reference types="node" />
+import path from 'path'
 import { defineConfig } from '@playwright/test'
 
 // 统一配置入口（所有默认值/环境变量含义都在这里）
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { DEFAULTS, envFlag, envNumber, envString } = require('./e2e.config.cjs')
+
+// 录屏/截图/trace 输出子目录：由各脚本设置 E2E_ARTIFACT_SUBDIR（如 run-test001-sequential.20260311_123456），避免不同脚本互相覆盖
+const artifactSubdir = process.env.E2E_ARTIFACT_SUBDIR
+const outputDir = artifactSubdir ? path.join('test-results', artifactSubdir) : 'test-results'
 
 /**
  * Playwright 配置（用于 E2E / MCP 动态测试）。
@@ -11,12 +16,14 @@ const { DEFAULTS, envFlag, envNumber, envString } = require('./e2e.config.cjs')
  * 说明：
  * - 默认 baseURL 指向本地 dev server（可通过 E2E_BASE_URL 覆盖）。
  * - 本仓库不自动启动 server（按你的要求由外部启动/连接）。
+ * - 脚本可通过 E2E_ARTIFACT_SUBDIR 指定本次运行的录屏/截图目录（如 <脚本名>.<时间戳>），实现按脚本分目录。
  */
 export default defineConfig({
   testDir: './tests/e2e',
   timeout: 60_000,
   expect: { timeout: 10_000 },
   reporter: 'list',
+  outputDir,
   // NOTE: Playwright 1.34 的 UseOptions 类型不包含 reducedMotion；这里用 as any 以保留运行时行为
   use: ({
     // 是否显示浏览器界面：
