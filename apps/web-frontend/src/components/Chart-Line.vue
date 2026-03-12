@@ -62,6 +62,17 @@ export default {
     this.$bus.$on('AddRMSErrorData', this.onBackendRms);
   },
   methods: {
+    isCompactLegend() {
+      return window.innerWidth <= 768;
+    },
+    formatLegendLabel(name) {
+      const compact = this.isCompactLegend();
+      if (name === 'RES') return compact ? `RES:${this.resolution}` : `分辨率: ${this.resolution}`;
+      if (name === 'RA') return compact ? `RA:${this.rmsRa}` : `RA RMS: ${this.rmsRa}`;
+      if (name === 'DEC') return compact ? `DEC:${this.rmsDec}` : `DEC RMS: ${this.rmsDec}`;
+      if (name === 'TOTAL') return compact ? `TOT:${this.rmsTotal}` : `Total RMS: ${this.rmsTotal}`;
+      return name;
+    },
     // PHD2：RA RMS = sqrt(mean(ra^2)), DEC RMS = sqrt(mean(dec^2)),
     // Total RMS = sqrt(mean(ra^2 + dec^2))
     recomputeRmsFromBuffers() {
@@ -107,6 +118,7 @@ export default {
       this.renderChart(this.xAxis_min, this.xAxis_max, this.yAxis_min, this.yAxis_max);
     },
     renderChart(x_min,x_max,y_min,y_max) {
+      const compactLegend = this.isCompactLegend();
       const option = {
         grid: {  
           left: '0%',
@@ -170,21 +182,18 @@ export default {
         ],
         legend: {
           data: ['RES', 'RA', 'DEC', 'TOTAL'],
-          formatter: (name) => {
-            if (name === 'RES') return `分辨率: ${this.resolution}`;
-            if (name === 'RA') return `RA RMS: ${this.rmsRa}`;
-            if (name === 'DEC') return `DEC RMS: ${this.rmsDec}`;
-            if (name === 'TOTAL') return `Total RMS: ${this.rmsTotal}`;
-            return name;
-          },
+          formatter: (name) => this.formatLegendLabel(name),
           top: -5,       // 设置图例距离顶部的距离
-          right: 5,      // 设置图例距离右侧的距离
-          itemWidth: 7,   // 设置图例项的宽度为5
+          left: compactLegend ? 2 : 'auto',
+          right: compactLegend ? 2 : 5,
+          itemWidth: compactLegend ? 5 : 7,
           itemHeight: 2,   // 设置图例项的高度为3
+          itemGap: compactLegend ? 4 : 10,
           textStyle: {
             color: 'white', // 设置字体颜色
-            fontSize: 8 // 设置字体大小
-          }
+            fontSize: compactLegend ? 6 : 8
+          },
+          selectedMode: false
         },
         series: [
           // 脉冲高度条（先画在底层，颜色暗淡一些；方向=误差反向）

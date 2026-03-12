@@ -5631,10 +5631,41 @@ export default {
       const incomingFrameId = (typeof gpm.frameId === 'number' && isFinite(gpm.frameId)) ? gpm.frameId : null;
       
       // 判定是否是新的瓦片会话（新图/新 session 才需要清空缓存和画布）
+      const prevGpm = this.tileGPM || {};
+      const prevPreviewBin = Number.isFinite(Number(prevGpm.previewBinningFactor))
+        ? Number(prevGpm.previewBinningFactor)
+        : null;
+      const nextPreviewBin = Number.isFinite(Number(gpm.previewBinningFactor))
+        ? Number(gpm.previewBinningFactor)
+        : null;
+      const prevPreviewWidth = Number.isFinite(Number(prevGpm.previewWidth))
+        ? Number(prevGpm.previewWidth)
+        : null;
+      const nextPreviewWidth = Number.isFinite(Number(gpm.previewWidth))
+        ? Number(gpm.previewWidth)
+        : null;
+      const prevPreviewHeight = Number.isFinite(Number(prevGpm.previewHeight))
+        ? Number(prevGpm.previewHeight)
+        : null;
+      const nextPreviewHeight = Number.isFinite(Number(gpm.previewHeight))
+        ? Number(gpm.previewHeight)
+        : null;
+      const prevMaxZoomLevel = Number.isFinite(Number(prevGpm.maxZoomLevel))
+        ? Number(prevGpm.maxZoomLevel)
+        : null;
+      const nextMaxZoomLevel = Number.isFinite(Number(gpm.maxZoomLevel))
+        ? Number(gpm.maxZoomLevel)
+        : null;
+
       const isNewSession =
         this.tileSessionId !== gpm.sessionId ||
         this.showImageSizeX !== gpm.imageWidth ||
-        this.showImageSizeY !== gpm.imageHeight;
+        this.showImageSizeY !== gpm.imageHeight ||
+        prevPreviewBin !== nextPreviewBin ||
+        prevPreviewWidth !== nextPreviewWidth ||
+        prevPreviewHeight !== nextPreviewHeight ||
+        prevMaxZoomLevel !== nextMaxZoomLevel ||
+        (prevGpm.cfa || 'null') !== (gpm.cfa || 'null');
 
       // live 覆盖写帧节流：高帧率下若每条 TileGPM 都立即清缓存/abort，会导致前端持续“重启加载”，
       // 表现为跳帧、卡顿、瓦片大量失败、缩放后长时间不刷新。
@@ -7491,20 +7522,20 @@ export default {
       const visibleTop = newVisibleY - newVisibleHeight / 2;
       const visibleBottom = newVisibleY + newVisibleHeight / 2;
 
-      // 计算 ROI 区域的边界
+      // ROI 在主画面中的边长应与当前预览倍率保持一致。
+      const roiDisplayLength = Math.max(2, Number(this.RedBoxSideLength || 0) / Math.max(1, Number(this.cameraBin) || 1));
       const roiLeft = this.ROI_x;
-      const roiRight = this.ROI_x + this.ROI_length;
+      const roiRight = this.ROI_x + roiDisplayLength;
       const roiTop = this.ROI_y;
-      const roiBottom = this.ROI_y + this.ROI_length;
+      const roiBottom = this.ROI_y + roiDisplayLength;
 
       // 判断 ROI 区域是否在可见区域内
       const isRoiInVisible = roiRight >= visibleLeft && roiLeft <= visibleRight && roiBottom >= visibleTop && roiTop <= visibleBottom;
 
       // 计算 ROI 区域在屏幕上的位置，中心点坐标
-      const roiScreenX = (this.ROI_x - visibleLeft) * (window.innerWidth / newVisibleWidth) + this.RedBoxSideLength * window.innerWidth / newVisibleWidth / 2;
-      const roiScreenY = (this.ROI_y - visibleTop) * (window.innerHeight / newVisibleHeight) + this.RedBoxSideLength * window.innerHeight / newVisibleHeight / 2;
-      // this.SendConsoleLogMsg('ROI 区域在屏幕上的位置: ' + roiScreenX + '*' + roiScreenY + '长度 ' + this.RedBoxSideLength * window.innerWidth / newVisibleWidth + '*' + this.RedBoxSideLength * window.innerHeight / newVisibleHeight, 'info');
-      this.$bus.$emit('setRedBoxLength', this.RedBoxSideLength * window.innerWidth / newVisibleWidth, this.RedBoxSideLength * window.innerHeight / newVisibleHeight);
+      const roiScreenX = (this.ROI_x - visibleLeft) * (window.innerWidth / newVisibleWidth) + roiDisplayLength * window.innerWidth / newVisibleWidth / 2;
+      const roiScreenY = (this.ROI_y - visibleTop) * (window.innerHeight / newVisibleHeight) + roiDisplayLength * window.innerHeight / newVisibleHeight / 2;
+      this.$bus.$emit('setRedBoxLength', roiDisplayLength * window.innerWidth / newVisibleWidth, roiDisplayLength * window.innerHeight / newVisibleHeight);
       this.$bus.$emit('setRedBoxPosition', roiScreenX, roiScreenY);
 
 
