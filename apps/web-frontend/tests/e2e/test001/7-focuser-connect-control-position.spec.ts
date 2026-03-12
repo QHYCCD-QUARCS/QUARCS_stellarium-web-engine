@@ -5,6 +5,8 @@
  * - 严禁使用 force 交互。
  * - 所有交互前执行可操作性检查（visible/enabled/scroll/trial click）。
  * - 自动校准与 ROI 循环拍摄仅做可操作性检查，不触发实际功能。
+ * - 定位以全局唯一的 data-testid 为准；testid 与源码、触发方式以
+ *   docs/testid-scan-report.md 与 docs/testid-validation-report.md 为核对依据。
  */
 
 import { test, expect, type Locator, type Page, type TestInfo } from '@playwright/test'
@@ -153,6 +155,28 @@ async function ensureMenuDrawerOpen(page: Page, report: RuntimeReport, timing: R
   }, { sync: { page, timing } })
 }
 
+/**
+ * 点击可见的遮罩层一次以关闭浮层（仅当可操作时点击，禁止 force）。
+ * 遮罩为 Vuetify .v-overlay__scrim，无 data-testid；若不可点击则跳过，由调用方 Escape 兜底。
+ */
+async function clickVisibleOverlayScrimOnce(page: Page): Promise<boolean> {
+  const scrims = page.locator('.v-overlay__scrim')
+  const count = await scrims.count()
+  for (let i = count - 1; i >= 0; i--) {
+    const scrim = scrims.nth(i)
+    const visible = await scrim.isVisible().catch(() => false)
+    if (!visible) continue
+    await scrim.scrollIntoViewIfNeeded().catch(() => {})
+    try {
+      await scrim.click({ timeout: 1_500 })
+      return true
+    } catch {
+      return false
+    }
+  }
+  return false
+}
+
 async function closeMenuAndSubmenu(page: Page, report: RuntimeReport, timing: RunTiming) {
   await addStep('menu.ensure-closed', report, async () => {
     const menuDrawer = page.getByTestId('ui-app-menu-drawer').first()
@@ -166,12 +190,14 @@ async function closeMenuAndSubmenu(page: Page, report: RuntimeReport, timing: Ru
       await page.keyboard.press('Escape').catch(() => {})
       await page.waitForTimeout(220)
       if (menuOpen || subOpen) {
-        const vp = page.viewportSize()
-        const x = vp ? Math.max(10, Math.floor(vp.width * 0.9)) : 1200
-        const y = vp ? Math.max(10, Math.floor(vp.height * 0.2)) : 120
-        await page.mouse.click(x, y)
-        await page.waitForTimeout(220)
+        const clicked = await clickVisibleOverlayScrimOnce(page)
+        if (clicked) await page.waitForTimeout(220)
       }
+    }
+
+    if ((await menuDrawer.getAttribute('data-state').catch(() => '')) === 'open') {
+      await page.keyboard.press('Escape').catch(() => {})
+      await page.waitForTimeout(220)
     }
 
     if ((await menuDrawer.count()) > 0) {
@@ -211,6 +237,7 @@ async function openFocuserSubmenu(page: Page, report: RuntimeReport, timing: Run
 
     for (let i = 0; i < 6; i++) {
       await ensureMenuDrawerOpen(page, report, timing)
+      // 仅调整抽屉内部滚动位置以使菜单项进入视口，非点击类交互
       await drawer
         .evaluate((el) => {
           ;(el as HTMLElement).scrollTop = 0
@@ -452,6 +479,9 @@ async function pressAndRelease(page: Page, loc: Locator, holdMs: number) {
   await page.mouse.up()
 }
 
+/** 短按时长（与 FocuserPanel 中 FocusAbort 的 pressDuration < 200 语义一致，触发单步移动） */
+const SHORT_PRESS_MS = 100
+
 async function runMoveActionAndRecord(
   page: Page,
   report: RuntimeReport,
@@ -465,8 +495,9 @@ async function runMoveActionAndRecord(
     const btn = page.getByTestId(buttonTestId).first()
     const before = await readCurrentPosition(page)
     await ensureLocatorActionable(btn, 8_000)
+    // FocuserPanel 左右键为 @mousedown/@mouseup，非 @click；短按用 pressAndRelease(<200ms)，长按用 pressAndRelease(≥200ms)
     if (mode === 'click') {
-      await btn.click({ timeout: 8_000 })
+      await pressAndRelease(page, btn, SHORT_PRESS_MS)
     } else {
       await pressAndRelease(page, btn, holdMs)
     }

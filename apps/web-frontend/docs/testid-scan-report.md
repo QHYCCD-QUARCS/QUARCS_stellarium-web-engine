@@ -469,8 +469,6 @@
 | `imp-btn-download-selected` | button | 34 | - |
 | `imp-act-image-file-switch` | span | 38 | - |
 | `imp-btn-image-file-switch` | button | 40 | - |
-| `imp-btn-prev-page` | button | 50 | - |
-| `imp-btn-next-page` | button | 55 | - |
 | `imp-btn-panel-close` | button | 68 | - |
 | `imp-txt-no-folders` | span | 85 | - |
 | `imp-act-overlay` | div | 90 | - |
@@ -1032,4 +1030,12 @@
 | 标识 | 元素 | 行号 | 状态属性 |
 |------|------|------|----------|
 | `ui-target-search-root` | div | 10 | - |
+
+---
+
+## E2E 用例与 testid 对应（电源管理）
+
+- **唯一性**：静态 testid 在单页内每个 id 仅出现一次（或按设计多实例用 `.first()` 取首）。动态 testid（如 `e2e-device-${driverType}-conn`、`ui-app-menu-device-${driverType}`）依赖运行时数据，同一时刻不同实例 id 不同，视为“逻辑唯一”。
+- **电源管理**：`ui-power-manager-root`、`ui-app-power-page-output-power-1/2`、`ui-app-power-page-restart`、`ui-app-power-page-shutdown`、`ui-app-power-page-force-update`、`ui-app-menu-open-power-manager` 以及确认弹窗 `ui-confirm-dialog-root`、`ui-confirm-dialog-btn-cancel`、`ui-confirm-dialog-btn-confirm` 和 `tb-act-toggle-navigation-drawer`、`ui-app-menu-drawer` 在 Power 功能范围内全局唯一，可直接作为 E2E 定位标准。
+- 针对具体 spec 的引用清单与触发方式校验见 **testid-validation-report.md** 中「按 E2E 用例的 testid 校验」。
 

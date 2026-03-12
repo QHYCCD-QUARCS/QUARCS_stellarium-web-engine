@@ -701,5 +701,12 @@
   "Transfer started to USB: {0}": "Transfer started to USB: {0}",
   "Confirm Deletion": "Confirm Deletion",
   "This action cannot be undone.": "This action cannot be undone.",
-  "Selected USB drive is no longer available.": "Selected USB drive is no longer available."
+  "Selected USB drive is no longer available.": "Selected USB drive is no longer available.",
+  "No items selected for deletion.": "No items selected for deletion.",
+  "No items selected for USB transfer.": "No items selected for USB transfer.",
+  "No USB drive available.": "No USB drive available.",
+  "No items selected for download.": "No items selected for download.",
+  "Download manifest error: {0}": "Download manifest error: {0}",
+  "Download manifest is empty.": "Download manifest is empty.",
+  "Cancelled": "Cancelled"
 }

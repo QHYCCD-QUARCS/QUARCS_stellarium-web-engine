@@ -204,6 +204,24 @@ async function ensureMenuDrawerOpen(page: Page, report: RuntimeReport, timing: R
   })
 }
 
+/** 关闭菜单抽屉，使主内容区与底部主切换按钮完全可见、可点击；仅当抽屉为 open 且切换按钮可见可点时点击，禁止 force。 */
+async function ensureMenuDrawerClosed(page: Page, report: RuntimeReport, timing: RunTiming) {
+  await addStep('menu.ensure-drawer-closed', report, async () => {
+    const drawer = page.getByTestId('ui-app-menu-drawer').first()
+    if ((await drawer.count()) === 0) return
+    const state = await drawer.getAttribute('data-state').catch(() => '')
+    if (state !== 'open') return
+    const toggleBtn = page.getByTestId('tb-act-toggle-navigation-drawer').first()
+    if ((await toggleBtn.count()) === 0) return
+    await expect(toggleBtn).toBeVisible({ timeout: 5_000 })
+    await expect(toggleBtn).toBeEnabled({ timeout: 2_000 })
+    await toggleBtn.scrollIntoViewIfNeeded().catch(() => {})
+    await clickLocatorWithFallback(page, toggleBtn, timing, { timeoutMs: 8_000 })
+    await expect(drawer).toHaveAttribute('data-state', 'closed', { timeout: 8_000 })
+    await waitShort(page, timing)
+  })
+}
+
 async function cancelConfirmIfOpened(page: Page, report: RuntimeReport, timing: RunTiming, stepPrefix: string) {
   await addStep(`${stepPrefix}.confirm.cancel-if-opened`, report, async () => {
     const root = page.getByTestId('ui-confirm-dialog-root').first()
@@ -515,47 +533,103 @@ async function bindDeviceInAllocationPanel(
 async function ensureChartPanelVisible(page: Page, report: RuntimeReport, timing: RunTiming) {
   await addStep('guider.ensure-chart-panel-visible', report, async () => {
     const chartRoot = page.getByTestId('ui-chart-component-root').first()
-
     const switchMain = page.getByTestId('gui-btn-switch-main-page').first()
     const toggleChart = page.getByTestId('gui-btn-toggle-charts-panel').first()
     const showCaptureBtn = page.getByTestId('gui-btn-show-capture-ui').first()
     const hideCaptureBtn = page.getByTestId('gui-btn-hide-capture-ui').first()
-    const guiderIndicator = page
-      .locator('[data-testid="gui-btn-switch-main-page"] img[src*="skymap"]')
-      .first()
+    const submenuDrawer = page.getByTestId('ui-app-submenu-drawer').first()
 
+    // 先关闭菜单抽屉，确保主内容区与底部主切换按钮完全露出、可点击（禁止 force，仅可见可点时操作）
+    await ensureMenuDrawerClosed(page, report, timing)
+    await page.waitForTimeout(600)
+
+    // 等待设备子抽屉（ui-app-submenu-drawer）关闭，否则会遮挡主内容区导致主切换按钮无法命中
+    await expect(submenuDrawer).toHaveAttribute('data-state', 'closed', { timeout: 8_000 }).catch(async () => {
+      if ((await submenuDrawer.getAttribute('data-state')) === 'open') {
+        await switchMain.scrollIntoViewIfNeeded().catch(() => {})
+        if (await switchMain.isVisible().catch(() => false)) {
+          await clickLocatorWithFallback(page, switchMain, timing, { requireStable: false, allowKeyboardTriggerOnUnstable: true })
+          await page.waitForTimeout(500)
+        }
+      }
+    })
+    await page.waitForTimeout(400)
+
+    // 导星页就绪：当前主页面为 GuiderCamera 且图表面板可见（以 data-current-main-page 为准；图表面板有 transition 需轮询等待）
     const isGuiderPageReady = async () => {
+      const currentPage = await switchMain.getAttribute('data-current-main-page').catch(() => '')
+      if (currentPage !== 'GuiderCamera') return false
       const chartVisible = await chartRoot.isVisible().catch(() => false)
-      if (!chartVisible) return false
-      const guiderIndicatorVisible = await guiderIndicator.isVisible().catch(() => false)
-      if (guiderIndicatorVisible) return true
+      if (chartVisible) return true
       const toggleChartVisible = await toggleChart.isVisible().catch(() => false)
       const showCaptureVisible = await showCaptureBtn.isVisible().catch(() => false)
       const hideCaptureVisible = await hideCaptureBtn.isVisible().catch(() => false)
-      // 兜底：导星页通常不存在主相机拍摄态按钮。
       return !toggleChartVisible && !showCaptureVisible && !hideCaptureVisible
     }
 
-    for (let i = 0; i < 8; i++) {
-      if (await isGuiderPageReady()) return
-
-      // 若在拍摄模式，尝试打开图表面板
-      if ((await toggleChart.count()) > 0 && (await toggleChart.isVisible().catch(() => false))) {
-        await clickLocatorWithFallback(page, toggleChart, timing)
-        if (await isGuiderPageReady()) return
+    // 当已在 GuiderCamera 时，轮询等待图表面板 transition 结束变为可见（最多 6s）
+    const waitForChartVisibleOnGuiderPage = async () => {
+      for (let w = 0; w < 12; w++) {
+        const currentPage = await switchMain.getAttribute('data-current-main-page').catch(() => '')
+        if (currentPage !== 'GuiderCamera') return false
+        if (await chartRoot.isVisible().catch(() => false)) return true
+        await page.waitForTimeout(500)
       }
-
-      // 循环切页：Stel -> MainCamera -> GuiderCamera -> Stel ...，直到落在导星页。
-      if ((await switchMain.count()) > 0 && (await switchMain.isVisible().catch(() => false))) {
-        await clickLocatorWithFallback(page, switchMain, timing)
-        await waitShort(page, timing)
-      } else if ((await switchMain.count()) > 0) {
-        await switchMain.evaluate((el) => (el as HTMLElement).click()).catch(() => {})
-        await waitShort(page, timing)
-      }
+      return false
     }
 
-    await expect.poll(async () => await isGuiderPageReady(), { timeout: 15_000 }).toBeTruthy()
+    // 等待主切换按钮出现（关闭抽屉后可能需短暂渲染）
+    await expect(switchMain).toBeVisible({ timeout: 12_000 })
+    await switchMain.scrollIntoViewIfNeeded().catch(() => {})
+
+    // 阶段 A：轮询触发主切换直到 data-current-main-page === 'GuiderCamera'（Stel -> MainCamera -> GuiderCamera 需 2 次）
+    // 先尝试标准 click（可见、可点、未遮挡）；否则 focus + Enter；再否则 Tab 到按钮后 Enter
+    await expect.poll(async () => {
+      const current = await switchMain.getAttribute('data-current-main-page').catch(() => '')
+      if (current === 'GuiderCamera') return true
+      if ((await switchMain.count()) === 0) return false
+      const visible = await switchMain.isVisible().catch(() => false)
+      const enabled = visible && (await switchMain.isEnabled().catch(() => false))
+      if (!visible || !enabled) {
+        await page.waitForTimeout(300)
+        return false
+      }
+      await switchMain.scrollIntoViewIfNeeded().catch(() => {})
+      const unobscured = await switchMain.evaluate((el) => {
+        const target = el as HTMLElement
+        const rect = target.getBoundingClientRect()
+        const [x, y] = [rect.left + rect.width / 2, rect.top + rect.height / 2]
+        const topEl = document.elementFromPoint(x, y)
+        return !!topEl && (topEl === target || target.contains(topEl))
+      }).catch(() => false)
+      if (unobscured) {
+        await switchMain.click({ timeout: 5_000 }).catch(() => {})
+      } else {
+        await switchMain.focus().catch(() => {})
+        await page.keyboard.press('Enter')
+        const focusedTestId = await page.evaluate(() => {
+          const el = document.activeElement
+          return el?.getAttribute?.('data-testid') ?? ''
+        }).catch(() => '')
+        if (focusedTestId !== 'gui-btn-switch-main-page') {
+          for (let t = 0; t < 15; t++) {
+            await page.keyboard.press('Tab')
+            await page.waitForTimeout(80)
+            const id = await page.evaluate(() => document.activeElement?.getAttribute?.('data-testid') ?? '').catch(() => '')
+            if (id === 'gui-btn-switch-main-page') break
+          }
+          await page.keyboard.press('Enter')
+        }
+      }
+      await waitShort(page, timing)
+      await page.waitForTimeout(600)
+      return (await switchMain.getAttribute('data-current-main-page').catch(() => '')) === 'GuiderCamera'
+    }, { timeout: 25_000 }).toBeTruthy()
+
+    // 阶段 B：已在 GuiderCamera，等待图表面板 transition 后可见
+    const chartOk = await waitForChartVisibleOnGuiderPage()
+    if (chartOk) return
+    await expect.poll(async () => await isGuiderPageReady(), { timeout: 8_000 }).toBeTruthy()
   })
 }
 

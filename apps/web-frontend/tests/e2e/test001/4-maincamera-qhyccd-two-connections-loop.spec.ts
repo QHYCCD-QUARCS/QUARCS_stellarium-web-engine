@@ -79,19 +79,20 @@ async function readLocatorDisplayText(loc: ReturnType<Page['locator']>) {
   return ariaLabel
 }
 
-async function clickLocatorWithFallback(
+/** 可操作性检查后点击：可见、可启用、滚动入视口后标准 click，禁止 force 与 evaluate(click)。 */
+async function clickWhenOperable(
   page: Page,
   loc: ReturnType<Page['locator']>,
   timing: RunTiming,
-  opts?: { timeoutMs?: number },
+  opts?: { timeoutMs?: number; skipEnabledCheck?: boolean },
 ) {
   const timeout = opts?.timeoutMs ?? 8_000
-  await loc.scrollIntoViewIfNeeded().catch(() => {})
-  try {
-    await loc.click({ timeout })
-  } catch {
-    await loc.evaluate((el) => (el as HTMLElement).click()).catch(() => {})
+  await loc.scrollIntoViewIfNeeded()
+  await expect(loc).toBeVisible({ timeout })
+  if (!opts?.skipEnabledCheck) {
+    await expect(loc).toBeEnabled({ timeout })
   }
+  await loc.click({ timeout })
   await waitAfterAction(page, timing)
 }
 
@@ -176,11 +177,11 @@ async function ensureMenuDrawerOpen(page: Page, report: RuntimeReport, timing: R
       if (await toggleBtn.isVisible().catch(() => false)) break
 
       if ((await showCaptureBtn.count()) > 0 && (await showCaptureBtn.isVisible().catch(() => false)) && i === 0) {
-        await clickLocatorWithFallback(page, showCaptureBtn, timing)
+        await clickWhenOperable(page, showCaptureBtn, timing)
       }
 
       if ((await switchMainBtn.count()) > 0 && (await switchMainBtn.isVisible().catch(() => false))) {
-        await clickLocatorWithFallback(page, switchMainBtn, timing)
+        await clickWhenOperable(page, switchMainBtn, timing)
       } else {
         await page.waitForTimeout(250)
       }
@@ -197,9 +198,8 @@ async function ensureMenuDrawerOpen(page: Page, report: RuntimeReport, timing: R
 
       const toggleVisible = await toggleBtn.isVisible().catch(() => false)
       if (toggleVisible) {
-        await toggleBtn.click({ timeout: 8_000 }).catch(() => {})
-      } else {
-        await toggleBtn.evaluate((el) => (el as HTMLElement).click()).catch(() => {})
+        await expect(toggleBtn).toBeEnabled({ timeout: 5_000 }).catch(() => {})
+        await toggleBtn.click({ timeout: 8_000 })
       }
 
       await page.waitForTimeout(350)
@@ -216,7 +216,9 @@ async function confirmConfirmIfOpened(page: Page, report: RuntimeReport, timing:
     if ((await root.count()) === 0) return
     if ((await root.getAttribute('data-state')) !== 'open') return
     const confirmBtn = page.getByTestId('ui-confirm-dialog-btn-confirm').first()
+    await confirmBtn.scrollIntoViewIfNeeded()
     await expect(confirmBtn).toBeVisible({ timeout: 8_000 })
+    await expect(confirmBtn).toBeEnabled({ timeout: 8_000 })
     await confirmBtn.click({ timeout: 8_000 })
     await expect(root).toHaveAttribute('data-state', 'closed', { timeout: 10_000 })
     await waitAfterAction(page, timing)
@@ -226,7 +228,9 @@ async function confirmConfirmIfOpened(page: Page, report: RuntimeReport, timing:
 async function disconnectAllWithConfirm(page: Page, report: RuntimeReport, timing: RunTiming) {
   await addStep('menu.disconnect-all.click', report, async () => {
     const btn = page.getByTestId('ui-app-menu-disconnect-all').first()
+    await btn.scrollIntoViewIfNeeded()
     await expect(btn).toBeVisible({ timeout: 8_000 })
+    await expect(btn).toBeEnabled({ timeout: 8_000 })
     await btn.click({ timeout: 8_000 })
     await waitAfterAction(page, timing)
   })
@@ -261,7 +265,7 @@ async function openMainCameraSubmenu(page: Page, report: RuntimeReport, timing: 
       }
       await mainCameraItem.scrollIntoViewIfNeeded().catch(() => {})
       if (await mainCameraItem.isVisible().catch(() => false)) {
-        await clickLocatorWithFallback(page, mainCameraItem, timing)
+        await clickWhenOperable(page, mainCameraItem, timing)
         const devicePage = page.getByTestId('ui-app-submenu-device-page').first()
         await expect(devicePage).toHaveAttribute('data-state', 'open', { timeout: 8_000 })
         return
@@ -275,7 +279,7 @@ async function openMainCameraSubmenu(page: Page, report: RuntimeReport, timing: 
       await waitShort(page, timing)
       await mainCameraItem.scrollIntoViewIfNeeded().catch(() => {})
       if (await mainCameraItem.isVisible().catch(() => false)) {
-        await clickLocatorWithFallback(page, mainCameraItem, timing)
+        await clickWhenOperable(page, mainCameraItem, timing)
         const devicePage = page.getByTestId('ui-app-submenu-device-page').first()
         await expect(devicePage).toHaveAttribute('data-state', 'open', { timeout: 8_000 })
         return
@@ -321,9 +325,9 @@ async function ensureMenuLayersClosed(page: Page, timing: RunTiming) {
   const isSubmenuOpen = async () => (await submenuDrawer.count()) > 0 && (await submenuDrawer.getAttribute('data-state')) === 'open'
   const toggleMenuDrawer = async () => {
     if (await toggleDrawerBtn.isVisible().catch(() => false)) {
-      await toggleDrawerBtn.click({ timeout: 8_000 }).catch(() => {})
-    } else {
-      await toggleDrawerBtn.evaluate((el) => (el as HTMLElement).click()).catch(() => {})
+      await toggleDrawerBtn.scrollIntoViewIfNeeded()
+      await expect(toggleDrawerBtn).toBeEnabled({ timeout: 5_000 }).catch(() => {})
+      await toggleDrawerBtn.click({ timeout: 8_000 })
     }
     await page.waitForTimeout(300)
   }
@@ -378,7 +382,7 @@ async function selectDriverByLabel(page: Page, report: RuntimeReport, timing: Ru
 
     const maxRetries = 10
     for (let retry = 0; retry < maxRetries; retry++) {
-      await clickLocatorWithFallback(page, select, timing)
+      await clickWhenOperable(page, select, timing)
 
       const menu = page.locator('.v-menu__content.menuable__content__active').first()
       const menuVisible = await menu.isVisible().catch(() => false)
@@ -414,7 +418,7 @@ async function selectDriverByLabel(page: Page, report: RuntimeReport, timing: Ru
         continue
       }
 
-      await clickLocatorWithFallback(page, option, timing)
+      await clickWhenOperable(page, option, timing)
       return
     }
 
@@ -440,7 +444,7 @@ async function selectConnectionMode(page: Page, report: RuntimeReport, timing: R
       return
     }
 
-    await clickLocatorWithFallback(page, select, timing)
+    await clickWhenOperable(page, select, timing)
 
     const menu = page.locator('.v-menu__content.menuable__content__active').first()
     await expect(menu).toBeVisible({ timeout: 8_000 })
@@ -449,7 +453,7 @@ async function selectConnectionMode(page: Page, report: RuntimeReport, timing: R
       await page.keyboard.press('Escape')
       throw new Error(`未找到连接模式选项：${mode}`)
     }
-    await clickLocatorWithFallback(page, option, timing)
+    await clickWhenOperable(page, option, timing)
     await expect.poll(async () => {
       const probeMode = ((await probe.getAttribute('data-connection-mode').catch(() => '')) || '').trim()
       if (probeMode) return probeMode
@@ -468,7 +472,7 @@ async function clickConnectMainCamera(page: Page, report: RuntimeReport, timing:
     for (let attempt = 0; attempt < 15; attempt++) {
       const visible = await btn.isVisible().catch(() => false)
       if (visible) {
-        await clickLocatorWithFallback(page, btn, timing)
+        await clickWhenOperable(page, btn, timing)
         return
       }
       console.log(`[WAIT ${attempt + 1}/15] 等待连接按钮出现...`)
@@ -491,7 +495,7 @@ async function clickDisconnectCurrentDevice(page: Page, report: RuntimeReport, t
     const btn = page.getByTestId('ui-app-btn-disconnect-driver').first()
     if ((await btn.count()) === 0) return
     if (!(await btn.isVisible().catch(() => false))) return
-    await clickLocatorWithFallback(page, btn, timing)
+    await clickWhenOperable(page, btn, timing)
   })
   await confirmConfirmIfOpened(page, report, timing, 'maincamera.disconnect')
 }
@@ -599,7 +603,7 @@ async function testCFWSwitchingInCapturePanel(
     const initialValue = await cfwValue.getAttribute('data-value').catch(() => '-')
     console.log(`[INFO] [${modePrefix}] 拍摄面板 CFW 初始位置: ${initialValue}`)
 
-    await clickLocatorWithFallback(page, cfwPlusBtn, timing)
+    await clickWhenOperable(page, cfwPlusBtn, timing)
     console.log(`[INFO] [${modePrefix}] 点击 CFW Plus 按钮`)
 
     const plusMoveSuccess = await waitCFWMoveComplete(page, timing)
@@ -612,7 +616,7 @@ async function testCFWSwitchingInCapturePanel(
 
     await page.waitForTimeout(500)
 
-    await clickLocatorWithFallback(page, cfwMinusBtn, timing)
+    await clickWhenOperable(page, cfwMinusBtn, timing)
     console.log(`[INFO] [${modePrefix}] 点击 CFW Minus 按钮`)
 
     const minusMoveSuccess = await waitCFWMoveComplete(page, timing)
@@ -629,7 +633,7 @@ async function openCFWSubmenu(page: Page, report: RuntimeReport, timing: RunTimi
   await addStep('menu.open-cfw-submenu', report, async () => {
     const cfwItem = page.getByTestId('ui-app-menu-device-CFW').first()
     await expect(cfwItem).toBeVisible({ timeout: 10_000 })
-    await clickLocatorWithFallback(page, cfwItem, timing)
+    await clickWhenOperable(page, cfwItem, timing)
     const devicePage = page.getByTestId('ui-app-submenu-device-page').first()
     await expect(devicePage).toHaveAttribute('data-state', 'open', { timeout: 8_000 })
   })
@@ -688,7 +692,7 @@ async function testCFWSwitchingInConfigMenu(
 
     console.log(`[INFO] [${modePrefix}] 开始配置菜单 CFW 切换测试 (第 ${iteration} 次)`)
 
-    await clickLocatorWithFallback(page, cfwNextBtn, timing)
+    await clickWhenOperable(page, cfwNextBtn, timing)
     console.log(`[INFO] [${modePrefix}] 点击 CFW Next 按钮`)
 
     const nextMoveSuccess = await waitCFWMenuMoveComplete(page, timing)
@@ -700,7 +704,7 @@ async function testCFWSwitchingInConfigMenu(
 
     await page.waitForTimeout(500)
 
-    await clickLocatorWithFallback(page, cfwPrevBtn, timing)
+    await clickWhenOperable(page, cfwPrevBtn, timing)
     console.log(`[INFO] [${modePrefix}] 点击 CFW Prev 按钮`)
 
     const prevMoveSuccess = await waitCFWMenuMoveComplete(page, timing)
@@ -779,7 +783,7 @@ async function bindDeviceInAllocationPanel(
   }
 
   const targetPicker = pickers.nth(targetPickerIndex)
-  await clickLocatorWithFallback(page, targetPicker, timing)
+  await clickWhenOperable(page, targetPicker, timing)
   await waitShort(page, timing)
 
   const deviceItems = panel.locator('[data-testid="dap-act-selected-device-name-2"]')
@@ -793,14 +797,14 @@ async function bindDeviceInAllocationPanel(
   await expect(firstDevice).toBeVisible({ timeout: 5_000 })
   const deviceName = await firstDevice.textContent()
   console.log(`[INFO] 选择设备: ${deviceName?.trim()}`)
-  await clickLocatorWithFallback(page, firstDevice, timing)
+  await clickWhenOperable(page, firstDevice, timing)
   await waitShort(page, timing)
 
   const bindBtn = targetPicker.getByTestId('dp-btn-toggle-bind')
   const bindBtnState = await bindBtn.getAttribute('data-state')
   if (bindBtnState === 'unbound') {
     await expect(bindBtn).toBeVisible({ timeout: 5_000 })
-    await clickLocatorWithFallback(page, bindBtn, timing)
+    await clickWhenOperable(page, bindBtn, timing)
     console.log(`[OK] 已点击 Bind 按钮绑定 ${targetRole}`)
     await waitAfterAction(page, timing)
   }
@@ -808,7 +812,7 @@ async function bindDeviceInAllocationPanel(
   await page.waitForTimeout(500)
   const closeBtn = page.getByTestId('dap-act-close-panel').first()
   if (await closeBtn.isVisible().catch(() => false)) {
-    await clickLocatorWithFallback(page, closeBtn, timing)
+    await clickWhenOperable(page, closeBtn, timing)
     console.log(`[OK] 已关闭设备分配面板`)
     await waitAfterAction(page, timing)
   }
@@ -829,26 +833,16 @@ async function ensureCapturePanelVisible(page: Page, report: RuntimeReport, timi
         await ensureMenuLayersClosed(page, timing)
       }
 
-      // 在主相机页但 UI 被隐藏时，优先展开拍摄控件；不可见时也尝试原生 click。
-      if ((await showCaptureBtn.count()) > 0) {
-        if (await showCaptureBtn.isVisible().catch(() => false)) {
-          await clickLocatorWithFallback(page, showCaptureBtn, timing)
-        } else {
-          await showCaptureBtn.evaluate((el) => (el as HTMLElement).click()).catch(() => {})
-          await page.waitForTimeout(250)
-        }
+      // 在主相机页但 UI 被隐藏时，优先展开拍摄控件；仅当按钮可见可点时点击。
+      if ((await showCaptureBtn.count()) > 0 && (await showCaptureBtn.isVisible().catch(() => false))) {
+        await clickWhenOperable(page, showCaptureBtn, timing)
         if (await capturePanel.isVisible().catch(() => false)) return
       }
 
-      // 某些状态下必须触发一次主页面切换才能显示拍摄面板；失败后立刻回到 MainCamera 子菜单纠偏。
+      // 某些状态下必须触发一次主页面切换才能显示拍摄面板；仅当按钮可见可点时点击。
       const switchMainBtn = page.getByTestId('gui-btn-switch-main-page').first()
-      if ((await switchMainBtn.count()) > 0) {
-        if (await switchMainBtn.isVisible().catch(() => false)) {
-          await clickLocatorWithFallback(page, switchMainBtn, timing)
-        } else {
-          await switchMainBtn.evaluate((el) => (el as HTMLElement).click()).catch(() => {})
-          await page.waitForTimeout(250)
-        }
+      if ((await switchMainBtn.count()) > 0 && (await switchMainBtn.isVisible().catch(() => false))) {
+        await clickWhenOperable(page, switchMainBtn, timing)
         if (await capturePanel.isVisible().catch(() => false)) return
       }
 
@@ -877,7 +871,7 @@ async function setExposureTime(page: Page, report: RuntimeReport, timing: RunTim
         console.log(`[OK] 曝光时间已设置为: ${targetTime}`)
         return
       }
-      await clickLocatorWithFallback(page, plusBtn, timing)
+      await clickWhenOperable(page, plusBtn, timing)
       await page.waitForTimeout(200)
     }
 
@@ -887,7 +881,7 @@ async function setExposureTime(page: Page, report: RuntimeReport, timing: RunTim
         console.log(`[OK] 曝光时间已设置为: ${targetTime}`)
         return
       }
-      await clickLocatorWithFallback(page, minusBtn, timing)
+      await clickWhenOperable(page, minusBtn, timing)
       await page.waitForTimeout(200)
     }
 
@@ -905,12 +899,11 @@ function parseExposureMs(expTime: string): number {
   return unit === 's' ? value * 1000 : value
 }
 
-async function clickCaptureButtonNoDelay(loc: ReturnType<Page['locator']>) {
-  try {
-    await loc.click({ timeout: 5_000 })
-  } catch {
-    await loc.evaluate((el) => (el as HTMLElement).click()).catch(() => {})
-  }
+/** 拍摄按钮：先做可见与入视口检查，再标准 click（禁止 force / evaluate）。 */
+async function clickCaptureButtonWhenOperable(loc: ReturnType<Page['locator']>) {
+  await loc.scrollIntoViewIfNeeded()
+  await expect(loc).toBeVisible({ timeout: 5_000 })
+  await loc.click({ timeout: 5_000 })
 }
 
 async function ensureCaptureButtonHitTarget(page: Page, captureBtn: ReturnType<Page['locator']>) {
@@ -949,7 +942,7 @@ async function takeExposure(page: Page, report: RuntimeReport, timing: RunTiming
       }
 
       await ensureCaptureButtonHitTarget(page, captureBtn)
-      await clickCaptureButtonNoDelay(captureBtn)
+      await clickCaptureButtonWhenOperable(captureBtn)
       console.log(`[INFO] 开始曝光，等待 ${waitMs}ms + 缓冲时间...`)
 
       for (let attempt = 0; attempt < 12; attempt++) {
@@ -970,7 +963,7 @@ async function takeExposure(page: Page, report: RuntimeReport, timing: RunTiming
       throw new Error('点击拍摄后未检测到相机进入 busy 状态（含一次重试），疑似本次曝光未触发')
     }
 
-    const totalWait = waitMs + 5000
+    const totalWait = waitMs + 15_000
     const startTime = Date.now()
     while (Date.now() - startTime < totalWait) {
       const state = await statusProbe.getAttribute('data-state').catch(() => 'unknown')
@@ -1047,7 +1040,7 @@ async function adjustSliderParameter(
     }
 
     for (let i = 0; i < clicks; i++) {
-      await clickLocatorWithFallback(page, btn, timing)
+      await clickWhenOperable(page, btn, timing)
       await page.waitForTimeout(100)
     }
     console.log(`[OK] ${label} ${direction === 'increase' ? '增加' : '减少'} ${clicks} 次`)
@@ -1055,11 +1048,13 @@ async function adjustSliderParameter(
 }
 
 async function getSliderValue(page: Page, label: string): Promise<number | null> {
-  const labelSpan = page.locator(`.slider-label:has-text("${label}:")`).first()
-  if ((await labelSpan.count()) === 0) return null
-  const text = await labelSpan.textContent()
+  const labelLoc = page.locator(`[data-testid^="ui-config-MainCamera-${label}-slider-label-"]`).first()
+  if ((await labelLoc.count()) === 0) return null
+  await labelLoc.scrollIntoViewIfNeeded()
+  if (!(await labelLoc.isVisible().catch(() => false))) return null
+  const text = await labelLoc.textContent()
   if (!text) return null
-  const match = text.match(new RegExp(`${label}:\\s*(\\d+)`))
+  const match = text.match(/:?\s*(\d+)\s*$/)
   return match ? parseInt(match[1], 10) : null
 }
 
@@ -1172,7 +1167,7 @@ async function runTestCycleForMode(
         }
         await ensureMenuLayersClosed(page, timing)
         await ensureCaptureButtonHitTarget(page, captureBtn)
-        await clickCaptureButtonNoDelay(captureBtn)
+        await clickCaptureButtonWhenOperable(captureBtn)
 
         for (let wait = 0; wait < 8; wait++) {
           const state = await statusProbe.getAttribute('data-state').catch(() => 'unknown')

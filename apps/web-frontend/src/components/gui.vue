@@ -133,6 +133,7 @@
         @click="SwitchMainPage"
         class="get-click btn-MainPageSwitch"
         data-testid="gui-btn-switch-main-page"
+        :data-current-main-page="CurrentMainPage"
       >
         <span v-if="CurrentMainPage === 'Stel'">
           <div style="display: flex; justify-content: center; align-items: center;">

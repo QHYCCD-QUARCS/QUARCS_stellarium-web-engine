@@ -2896,24 +2896,6 @@
           "preview": "<button class=\"custom-button btn-ImageFileSwitch btn-ImageFileSwitch-fixed no-select\" @click=\"ImageF..."
         },
         {
-          "id": "imp-btn-prev-page",
-          "line": 50,
-          "elementType": "button",
-          "hasDataState": false,
-          "dataState": null,
-          "dataAttrs": {},
-          "preview": "<button class=\"custom-button btn-PrevPage no-select\" @click=\"prevPage\" data-testid=\"imp-btn-prev-pag..."
-        },
-        {
-          "id": "imp-btn-next-page",
-          "line": 55,
-          "elementType": "button",
-          "hasDataState": false,
-          "dataState": null,
-          "dataAttrs": {},
-          "preview": "<button class=\"custom-button btn-NextPage no-select\" @click=\"nextPage\" data-testid=\"imp-btn-next-pag..."
-        },
-        {
           "id": "imp-btn-panel-close",
           "line": 68,
           "elementType": "button",

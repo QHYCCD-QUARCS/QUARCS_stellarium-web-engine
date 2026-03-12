@@ -232,7 +232,17 @@
 
               <!-- 滑动条类型 -->
               <div v-if="item.inputType === 'slider'" class="slider-container">
-                <span class="slider-label">
+                <span
+                  class="slider-label"
+                  :data-testid="
+                    'ui-config-'
+                    + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')
+                    + '-'
+                    + String(item.label || 'Field').replace(/[^A-Za-z0-9]+/g, '')
+                    + '-slider-label-'
+                    + index
+                  "
+                >
                   {{ $t(item.label) }}: {{ item.value }}
                 </span>
                 <div>
@@ -6747,6 +6757,51 @@ export default {
 
 
     /**
+     * 归一化拉伸区间，避免异常/过窄窗口把高亮图像压成黑色
+     * @param {number} blackLevel
+     * @param {number} whiteLevel
+     * @param {Object} options
+     * @param {boolean} options.highlightSafe - 高亮/过曝场景下扩大窗口
+     * @returns {{blackLevel:number, whiteLevel:number}}
+     */
+    normalizeStretchRange(blackLevel, whiteLevel, options = {}) {
+      const { highlightSafe = false } = options;
+      const maxValue = 65535;
+      const minRange = highlightSafe ? 4096 : 1;
+
+      let normalizedBlack = Number.isFinite(blackLevel) ? Math.round(blackLevel) : 0;
+      let normalizedWhite = Number.isFinite(whiteLevel) ? Math.round(whiteLevel) : maxValue;
+
+      normalizedBlack = Math.max(0, Math.min(maxValue - 1, normalizedBlack));
+      normalizedWhite = Math.max(1, Math.min(maxValue, normalizedWhite));
+
+      if (highlightSafe && normalizedWhite >= maxValue - 1) {
+        normalizedWhite = maxValue;
+        normalizedBlack = Math.max(0, Math.min(normalizedBlack, normalizedWhite - minRange));
+      }
+
+      if (normalizedWhite <= normalizedBlack) {
+        normalizedWhite = Math.min(maxValue, normalizedBlack + minRange);
+        normalizedBlack = Math.max(0, normalizedWhite - minRange);
+      }
+
+      if ((normalizedWhite - normalizedBlack) < minRange) {
+        if (highlightSafe && normalizedWhite >= maxValue - 1) {
+          normalizedWhite = maxValue;
+          normalizedBlack = Math.max(0, normalizedWhite - minRange);
+        } else {
+          normalizedWhite = Math.min(maxValue, normalizedBlack + minRange);
+          normalizedBlack = Math.max(0, normalizedWhite - minRange);
+        }
+      }
+
+      return {
+        blackLevel: normalizedBlack,
+        whiteLevel: normalizedWhite
+      };
+    },
+
+    /**
      * 获取自动拉伸参数，返回黑色和白色阈值
      * @param {cv.Mat} imgMat 输入的图像Mat对象
      * @param {int} mode 模式
@@ -6785,7 +6840,7 @@ export default {
       let blackLevel = Math.round(Math.max(0, mean - stdDev * a));
       let whiteLevel = Math.round(Math.min(maxValue, mean + stdDev * b));
 
-      // 边界与退化保护：避免全黑或 std=0 时“全白”
+      // 边界与退化保护：避免异常或退化窗口
       if (!Number.isFinite(blackLevel) || !Number.isFinite(whiteLevel)) {
         blackLevel = 0; whiteLevel = 1;
       }
@@ -6803,7 +6858,12 @@ export default {
         }
       }
 
-      return { blackLevel, whiteLevel };
+      // 过曝/高亮场景下，均值和方差会把窗口压得非常窄，前端显示会被拉成近黑。
+      // 这里在接近饱和时强制保留一个更宽的高亮窗口，让过曝图像至少维持“亮”而不是“黑”。
+      const isNearSaturation = mean >= maxValue * 0.9 || whiteLevel >= maxValue - 1;
+      return this.normalizeStretchRange(blackLevel, whiteLevel, {
+        highlightSafe: isNearSaturation
+      });
     },
 
     /**
@@ -7131,10 +7191,11 @@ export default {
      * @returns {cv.Mat} 处理后的8位RGBA图像
      */
     applyStretchAndGain(img16, analysis, imageType, bayerPattern = 'RGGB', blackLevel, whiteLevel) {
-      // 确保黑点小于白点
-      if (blackLevel >= whiteLevel) {
-        blackLevel = whiteLevel - 1;
-      }
+      const normalizedRange = this.normalizeStretchRange(blackLevel, whiteLevel, {
+        highlightSafe: whiteLevel >= 65534
+      });
+      blackLevel = normalizedRange.blackLevel;
+      whiteLevel = normalizedRange.whiteLevel;
 
       // 计算转换比例和偏移
       const scale = 255.0 / (whiteLevel - blackLevel);
@@ -7259,6 +7320,12 @@ export default {
      * @returns {Object} 包含LUT表的Object
      */
     getLUT(blackLevel, whiteLevel, gainR, gainB) {
+      const normalizedRange = this.normalizeStretchRange(blackLevel, whiteLevel, {
+        highlightSafe: whiteLevel >= 65534
+      });
+      blackLevel = normalizedRange.blackLevel;
+      whiteLevel = normalizedRange.whiteLevel;
+
       // 创建当前参数的快照
       const currentParams = `${blackLevel}_${whiteLevel}_${gainR}_${gainB}`;
 

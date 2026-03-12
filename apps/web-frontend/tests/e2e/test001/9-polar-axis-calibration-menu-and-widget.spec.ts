@@ -56,6 +56,7 @@ type RunTiming = {
 const MAINCAMERA_DRIVER_MATCH = /indi_qhy_ccd|qhyccd|QHY CCD|QHYminiCam/i
 const MOUNT_DRIVER_MATCH = /eqmod\s*mount|eqmod/i
 const CONNECT_WAIT_MS = 30_000
+const MOUNT_CONNECT_WAIT_MS = envNumber(process.env, 'E2E_MOUNT_CONNECT_WAIT_MS', 30_000)
 const PA_CALIBRATION_COMPLETE_TIMEOUT_MS = 10 * 60 * 1000 // 默认 10 分钟等待校准完成
 const MOUNT_ACTION_WAIT_MS = 120_000 // 赤道仪 Home 等动作等待超时
 const DEFAULT_FOCAL_MM = '510'
@@ -138,19 +139,18 @@ function buildReportText(report: RuntimeReport) {
   return lines.join('\n')
 }
 
-async function clickLocatorWithFallback(
+/** 可操作性检查后标准点击，禁止 force 与 DOM 级 evaluate(click) */
+async function clickLocatorWhenOperable(
   page: Page,
   loc: ReturnType<Page['locator']>,
   timing: RunTiming,
-  opts?: { timeoutMs?: number },
+  opts?: { timeoutMs?: number; checkEnabled?: boolean },
 ) {
   const timeout = opts?.timeoutMs ?? 8_000
   await loc.scrollIntoViewIfNeeded().catch(() => {})
-  try {
-    await loc.click({ timeout })
-  } catch {
-    await loc.evaluate((el) => (el as HTMLElement).click()).catch(() => {})
-  }
+  await expect(loc).toBeVisible({ timeout: Math.min(timeout, 10_000) })
+  if (opts?.checkEnabled) await expect(loc).toBeEnabled({ timeout: 5_000 })
+  await loc.click({ timeout })
   await waitAfterAction(page, timing)
 }
 
@@ -238,9 +238,9 @@ async function ensureMenuLayersClosed(page: Page, timing: RunTiming) {
     (await submenuDrawer.count()) > 0 && (await submenuDrawer.getAttribute('data-state')) === 'open'
   const toggleMenuDrawer = async () => {
     if (await toggleDrawerBtn.isVisible().catch(() => false)) {
+      await toggleDrawerBtn.scrollIntoViewIfNeeded().catch(() => {})
+      await expect(toggleDrawerBtn).toBeVisible({ timeout: 3_000 }).catch(() => null)
       await toggleDrawerBtn.click({ timeout: 8_000 }).catch(() => {})
-    } else {
-      await toggleDrawerBtn.evaluate((el) => (el as HTMLElement).click()).catch(() => {})
     }
     await page.waitForTimeout(300)
   }
@@ -291,7 +291,7 @@ async function openMainCameraSubmenu(page: Page, report: RuntimeReport, timing: 
       }
       await mainCameraItem.scrollIntoViewIfNeeded().catch(() => {})
       if (await mainCameraItem.isVisible().catch(() => false)) {
-        await clickLocatorWithFallback(page, mainCameraItem, timing)
+        await clickLocatorWhenOperable(page, mainCameraItem, timing)
         const devicePage = page.getByTestId('ui-app-submenu-device-page').first()
         await expect(devicePage).toHaveAttribute('data-state', 'open', { timeout: 8_000 })
         return
@@ -314,20 +314,13 @@ async function selectDriverByLabel(page: Page, report: RuntimeReport, timing: Ru
     }
 
     for (let retry = 0; retry < 10; retry++) {
-      await clickLocatorWithFallback(page, select, timing)
+      await clickLocatorWhenOperable(page, select, timing)
+      await page.waitForTimeout(350)
 
-      const menu = page.locator('.v-menu__content.menuable__content__active').first()
-      if (!(await menu.isVisible().catch(() => false))) {
-        await page.waitForTimeout(500)
-        continue
-      }
-      const option = menu.locator('.v-list-item').filter({ hasText: labelMatch }).first()
-      if ((await option.count()) > 0) {
-        await clickLocatorWithFallback(page, option, timing)
-        return
-      }
-      await page.keyboard.press('Escape')
-      await page.waitForTimeout(1000)
+      const selected = await clickMenuOptionWithScroll(page, timing, labelMatch)
+      if (selected) return
+      await page.keyboard.press('Escape').catch(() => {})
+      await page.waitForTimeout(700)
     }
     throw new Error(`未找到匹配 "${labelMatch.source}" 的驱动选项`)
   })
@@ -338,7 +331,7 @@ async function clickConnectMainCamera(page: Page, report: RuntimeReport, timing:
     const btn = page.getByTestId('ui-app-btn-connect-driver').first()
     for (let attempt = 0; attempt < 15; attempt++) {
       if (await btn.isVisible().catch(() => false)) {
-        await clickLocatorWithFallback(page, btn, timing)
+        await clickLocatorWhenOperable(page, btn, timing)
         return
       }
       await page.waitForTimeout(1000)
@@ -373,22 +366,22 @@ async function bindDeviceInAllocationPanel(
   if (targetPickerIndex === -1) return
 
   const targetPicker = pickers.nth(targetPickerIndex)
-  await clickLocatorWithFallback(page, targetPicker, timing)
+  await clickLocatorWhenOperable(page, targetPicker, timing)
   await waitShort(page, timing)
 
   const firstDevice = panel.locator('[data-testid="dap-act-selected-device-name-2"]').first()
   await expect(firstDevice).toBeVisible({ timeout: 5_000 })
-  await clickLocatorWithFallback(page, firstDevice, timing)
+  await clickLocatorWhenOperable(page, firstDevice, timing)
   await waitShort(page, timing)
 
   const bindBtn = targetPicker.getByTestId('dp-btn-toggle-bind')
   if ((await bindBtn.getAttribute('data-state')) === 'unbound') {
-    await clickLocatorWithFallback(page, bindBtn, timing)
+    await clickLocatorWhenOperable(page, bindBtn, timing)
   }
   await page.waitForTimeout(500)
   const closeBtn = page.getByTestId('dap-act-close-panel').first()
   if (await closeBtn.isVisible().catch(() => false)) {
-    await clickLocatorWithFallback(page, closeBtn, timing)
+    await clickLocatorWhenOperable(page, closeBtn, timing)
   }
 }
 
@@ -438,7 +431,7 @@ async function openMountSubmenu(page: Page, report: RuntimeReport, timing: RunTi
       if ((await mountItemByTestId.count()) > 0) {
         await mountItemByTestId.scrollIntoViewIfNeeded().catch(() => {})
         if (await mountItemByTestId.isVisible().catch(() => false)) {
-          await clickLocatorWithFallback(page, mountItemByTestId, timing)
+          await clickLocatorWhenOperable(page, mountItemByTestId, timing)
           await expect(devicePage).toHaveAttribute('data-state', 'open', { timeout: 8_000 })
           return
         }
@@ -470,7 +463,7 @@ async function clickMenuOptionWithScroll(
       if (!labelMatch.test(text)) continue
       await option.scrollIntoViewIfNeeded().catch(() => {})
       if (!(await option.isVisible().catch(() => false))) continue
-      await clickLocatorWithFallback(page, option, timing)
+      await clickLocatorWhenOperable(page, option, timing)
       return true
     }
     return false
@@ -517,7 +510,7 @@ async function selectMountDriverByLabel(page: Page, report: RuntimeReport, timin
     if (currentText && labelMatch.test(currentText)) return
 
     for (let retry = 0; retry < 10; retry++) {
-      await clickLocatorWithFallback(page, select, timing)
+      await clickLocatorWhenOperable(page, select, timing)
       await page.waitForTimeout(350)
 
       const anyOption = page.locator('[data-testid^="ui-app-select-confirm-driver-option-"]').first()
@@ -554,7 +547,7 @@ async function clickConnectMount(page: Page, report: RuntimeReport, timing: RunT
     const btn = page.getByTestId('ui-app-btn-connect-driver').first()
     for (let i = 0; i < 15; i++) {
       if (await btn.isVisible().catch(() => false)) {
-        await clickLocatorWithFallback(page, btn, timing)
+        await clickLocatorWhenOperable(page, btn, timing)
         return
       }
       await page.waitForTimeout(1000)
@@ -618,7 +611,7 @@ async function ensureMountControlPanelVisible(page: Page, report: RuntimeReport,
       await closeMenuByOutsideScrimSmart(page)
       await dismissOverlayScrimIfPresent(page, 1)
       if (await toggleBtn.isVisible().catch(() => false)) {
-        await clickLocatorWithFallback(page, toggleBtn, { actionDelayMs: 0, shortDelayMs: 0 }, { timeoutMs: 5_000 })
+        await clickLocatorWhenOperable(page, toggleBtn, { actionDelayMs: 0, shortDelayMs: 0 }, { timeoutMs: 5_000 })
       }
       await page.waitForTimeout(500)
     }
@@ -682,7 +675,7 @@ async function ensureParkDisabled(page: Page, report: RuntimeReport, timing: Run
 
     for (let i = 0; i < 4; i++) {
       await waitForMountIdleState(page)
-      await clickLocatorWithFallback(page, btn, timing)
+      await clickLocatorWhenOperable(page, btn, timing)
       const isOff = await expect
         .poll(async () => (await btn.getAttribute('data-state')) ?? '', { timeout: 20_000 })
         .toBe('off')
@@ -705,7 +698,7 @@ async function ensureParkEnabled(page: Page, report: RuntimeReport, timing: RunT
 
     for (let i = 0; i < 4; i++) {
       await waitForMountIdleState(page)
-      await clickLocatorWithFallback(page, btn, timing)
+      await clickLocatorWhenOperable(page, btn, timing)
       const isOn = await expect
         .poll(async () => (await btn.getAttribute('data-state')) ?? '', { timeout: 20_000 })
         .toBe('on')
@@ -731,7 +724,7 @@ async function ensureTrackEnabled(page: Page, report: RuntimeReport, timing: Run
 
     for (let i = 0; i < 4; i++) {
       await waitForMountIdleState(page)
-      await clickLocatorWithFallback(page, btn, timing)
+      await clickLocatorWhenOperable(page, btn, timing)
       const isOn = await expect
         .poll(async () => (await btn.getAttribute('data-state')) ?? '', { timeout: 20_000 })
         .toBe('on')
@@ -749,7 +742,7 @@ async function executeMountHomeAndWait(page: Page, report: RuntimeReport, timing
   await addStep('mount.home.click', report, async () => {
     await expect(homeBtn).toBeVisible({ timeout: 10_000 })
     await waitForMountIdleState(page)
-    await clickLocatorWithFallback(page, homeBtn, timing)
+    await clickLocatorWhenOperable(page, homeBtn, timing)
   })
 
   await addStep('mount.home.wait-processing-started', report, async () => {
@@ -818,7 +811,7 @@ async function openTelescopesSubmenu(page: Page, report: RuntimeReport, timing: 
       if ((await telescopesItem.count()) > 0) {
         await telescopesItem.scrollIntoViewIfNeeded().catch(() => {})
         if (await telescopesItem.isVisible().catch(() => false)) {
-          await clickLocatorWithFallback(page, telescopesItem, timing)
+          await clickLocatorWhenOperable(page, telescopesItem, timing)
           await expect(devicePage).toHaveAttribute('data-state', 'open', { timeout: 8_000 })
           return
         }
@@ -863,7 +856,7 @@ async function openLocationDialogAndSetLocation(
   await addStep('location.open-dialog', report, async () => {
     const menuItem = page.getByTestId('ui-app-menu-location').first()
     await expect(menuItem).toBeVisible({ timeout: 10_000 })
-    await clickLocatorWithFallback(page, menuItem, timing)
+    await clickLocatorWhenOperable(page, menuItem, timing)
     const dialog = page.getByTestId('ui-location-dialog-root').first()
     await expect(dialog).toHaveAttribute('data-state', 'open', { timeout: 8_000 })
     await waitAfterAction(page, timing)
@@ -887,13 +880,14 @@ async function openLocationDialogAndSetLocation(
   await addStep('location.save-coordinates', report, async () => {
     const saveBtn = page.getByTestId('ui-location-dialog-btn-save-manual-coordinates').first()
     await expect(saveBtn).toBeVisible({ timeout: 5_000 })
-    await clickLocatorWithFallback(page, saveBtn, timing)
+    await clickLocatorWhenOperable(page, saveBtn, timing)
     await page.waitForTimeout(300)
-    page.keyboard.press('Escape').catch(() => {})
+    await page.keyboard.press('Escape').catch(() => {})
     await page.waitForTimeout(200)
     const dialog = page.getByTestId('ui-location-dialog-root').first()
     if ((await dialog.getAttribute('data-state').catch(() => '')) === 'open') {
-      await page.mouse.click(10, 10).catch(() => {})
+      const closed = await clickVisibleOverlayScrimOnce(page)
+      if (!closed) await page.keyboard.press('Escape').catch(() => {})
       await page.waitForTimeout(200)
     }
     await waitAfterAction(page, timing)
@@ -962,7 +956,7 @@ async function runPolarAxisCalibrationTest(page: Page, testInfo: TestInfo) {
     await openMountSubmenu(page, report, timing)
     await selectMountDriverByLabel(page, report, timing, MOUNT_DRIVER_MATCH)
     await clickConnectMount(page, report, timing)
-    await waitForConnectionOrAllocation(page, report, timing, 'Mount', CONNECT_WAIT_MS)
+    await waitForConnectionOrAllocation(page, report, timing, 'Mount', MOUNT_CONNECT_WAIT_MS)
 
     await ensureMenuLayersClosed(page, timing)
     await waitShort(page, timing)
@@ -995,7 +989,7 @@ async function runPolarAxisCalibrationTest(page: Page, testInfo: TestInfo) {
   await addStep('menu.click-calibrate-polar-axis', report, async () => {
     const menuItem = page.getByTestId('ui-app-menu-calibrate-polar-axis').first()
     await expect(menuItem).toBeVisible({ timeout: Math.min(15_000, stepTimeoutMs) })
-    await clickLocatorWithFallback(page, menuItem, timing)
+    await clickLocatorWhenOperable(page, menuItem, timing)
   })
 
   // 阶段 3：等待并校验结果（主相机已绑定则显示 pa-widget，未绑定则显示错误提示）
@@ -1032,7 +1026,7 @@ async function runPolarAxisCalibrationTest(page: Page, testInfo: TestInfo) {
       const btn = page.getByTestId('pa-btn-auto-calibration').first()
       await expect(btn).toBeVisible({ timeout: 8_000 })
       await expect(btn).toBeEnabled({ timeout: 5_000 })
-      await clickLocatorWithFallback(page, btn, timing)
+      await clickLocatorWhenOperable(page, btn, timing)
       console.log('[OK] 已点击 Start Auto Calibration')
     })
 

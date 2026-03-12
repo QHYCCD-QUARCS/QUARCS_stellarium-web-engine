@@ -422,8 +422,6 @@ ImageManagerPanel,imp-btn-delete-btn-click,按钮：delete-btn-click,button,23,-
 ImageManagerPanel,imp-btn-download-selected,按钮：download-selected,button,34,-,-
 ImageManagerPanel,imp-act-image-file-switch,元素：image-file-switch,span,38,-,-
 ImageManagerPanel,imp-btn-image-file-switch,按钮：image-file-switch,button,40,-,-
-ImageManagerPanel,imp-btn-prev-page,按钮：prev-page,button,50,-,-
-ImageManagerPanel,imp-btn-next-page,按钮：next-page,button,55,-,-
 ImageManagerPanel,imp-btn-panel-close,按钮：panel-close,button,68,-,-
 ImageManagerPanel,imp-act-close-usbselect-dialog,元素：close-usbselect-dialog,div,95,-,-
 ImageManagerPanel,imp-act-usb-select-dialog,元素：usb-select-dialog,div,96,-,-

@@ -160,6 +160,13 @@ const CONFIG_DOCS = {
       scope: 'flow',
       descZh: '单个 Playwright 测试用例的总超时（test.setTimeout）。',
     },
+    {
+      key: 'mountConnectWaitMs',
+      env: 'E2E_MOUNT_CONNECT_WAIT_MS',
+      default: 30_000,
+      scope: 'flow',
+      descZh: 'Mount 连接或设备分配面板绑定等待超时（毫秒）；用例 5、9 使用。',
+    },
 
     // App 启动路径拼接相关（support/appStartPath.ts）
     {

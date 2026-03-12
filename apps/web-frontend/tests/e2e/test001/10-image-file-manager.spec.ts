@@ -116,18 +116,42 @@ function buildReportText(report: RuntimeReport) {
   return lines.join('\n')
 }
 
-/** 可操作性检查后点击：先滚动入视、等待可见、再点击。默认禁止 force；当 overlay 可能遮挡时传 force: true。 */
+/** 关闭可能挡住面板关闭按钮的 overlay（USB 选择、下载确认等）。收尾关面板前调用。 */
+async function dismissImageManagerOverlays(page: Page, timing: RunTiming) {
+  const closeButtonTestIds = [
+    'imp-btn-close-usbselect-dialog',
+    'imp-btn-close-download-confirm-dialog-2',
+    'imp-btn-close-download-confirm-dialog',
+    'imp-btn-close-usb-confirm-dialog',
+    'imp-btn-close-delete-confirm-dialog',
+    'imp-btn-close-download-location-reminder-dialog',
+  ]
+  for (let round = 0; round < 5; round++) {
+    let closedAny = false
+    for (const testId of closeButtonTestIds) {
+      const btn = page.getByTestId(testId).first()
+      if ((await btn.count()) > 0 && (await btn.isVisible().catch(() => false))) {
+        await btn.scrollIntoViewIfNeeded().catch(() => {})
+        await btn.click({ timeout: 3_000 }).catch(() => {})
+        await page.waitForTimeout(200)
+        closedAny = true
+      }
+    }
+    if (!closedAny) break
+  }
+}
+
+/** 可操作性检查后点击：先滚动入视、等待可见、可启用（按钮类）再点击。禁止使用 force，所有交互必须通过可操作性检查。 */
 async function clickLocatorWithFallback(
   page: Page,
   loc: ReturnType<Page['locator']>,
   timing: RunTiming,
-  opts?: { timeoutMs?: number; force?: boolean },
+  opts?: { timeoutMs?: number },
 ) {
   const timeout = opts?.timeoutMs ?? 8_000
-  const force = opts?.force ?? false
   await loc.scrollIntoViewIfNeeded().catch(() => {})
   await expect(loc).toBeVisible({ timeout })
-  await loc.click({ timeout, force })
+  await loc.click({ timeout })
   await waitAfterAction(page, timing)
 }
 
@@ -652,15 +676,6 @@ async function runImageFileManagerTest(page: Page, testInfo: TestInfo) {
   // 阶段 4：测试图像管理功能（若有数据）
   const stillNoFolders = await hasNoImageFolders(page)
   if (!stillNoFolders) {
-    await addStep('imp.test-pagination', report, async () => {
-      const prevBtn = page.getByTestId('imp-btn-prev-page').first()
-      const nextBtn = page.getByTestId('imp-btn-next-page').first()
-      if ((await prevBtn.count()) > 0 && (await prevBtn.isVisible().catch(() => false))) {
-        await clickLocatorWithFallback(page, prevBtn, timing)
-        await clickLocatorWithFallback(page, nextBtn, timing)
-      }
-    }, { allowFailure: true })
-
     await addStep('imp.test-image-file-switch', report, async () => {
       const switchBtn = page.getByTestId('imp-btn-image-file-switch').first()
       await expect(switchBtn).toBeVisible({ timeout: 5_000 })
@@ -704,9 +719,11 @@ async function runImageFileManagerTest(page: Page, testInfo: TestInfo) {
         }
 
         const file0 = page.getByTestId('ui-image-folder-file-0-0').first()
-        if ((await file0.count()) > 0 && (await file0.isVisible().catch(() => false))) {
-          await clickLocatorWithFallback(page, file0, timing)
-          await page.waitForTimeout(500)
+        if ((await file0.count()) > 0) {
+          await file0.scrollIntoViewIfNeeded().catch(() => {})
+          await expect(file0).toBeVisible({ timeout: 5_000 })
+          await file0.click({ timeout: 5_000 })
+          await waitAfterAction(page, timing)
           await expect(file0).toHaveAttribute('data-state', 'open', { timeout: 5_000 })
         }
       }
@@ -715,7 +732,10 @@ async function runImageFileManagerTest(page: Page, testInfo: TestInfo) {
     await addStep('imp.test-move-to-usb-dialog-cancel', report, async () => {
       const moveBtn = page.getByTestId('imp-btn-move-file-to-usb').first()
       if ((await moveBtn.count()) > 0 && (await moveBtn.isVisible().catch(() => false))) {
-        await clickLocatorWithFallback(page, moveBtn, timing, { force: true })
+        await moveBtn.scrollIntoViewIfNeeded().catch(() => {})
+        await expect(moveBtn).toBeVisible({ timeout: 5_000 })
+        await moveBtn.click({ timeout: 5_000 })
+        await waitAfterAction(page, timing)
         const usbDialog = page.getByTestId('imp-act-usb-select-dialog').first()
         if ((await usbDialog.count()) > 0 && (await usbDialog.isVisible().catch(() => false))) {
           const closeBtn = page.getByTestId('imp-btn-close-usbselect-dialog').first()
@@ -726,9 +746,13 @@ async function runImageFileManagerTest(page: Page, testInfo: TestInfo) {
   }
 
   await addStep('imp.close-panel-final', report, async () => {
+    await dismissImageManagerOverlays(page, timing)
     const closeBtn = page.getByTestId('imp-btn-panel-close').first()
     if ((await closeBtn.count()) > 0 && (await closeBtn.isVisible().catch(() => false))) {
-      await clickLocatorWithFallback(page, closeBtn, timing, { force: true })
+      await closeBtn.scrollIntoViewIfNeeded().catch(() => {})
+      await expect(closeBtn).toBeVisible({ timeout: 5_000 })
+      await closeBtn.click({ timeout: 5_000 })
+      await waitAfterAction(page, timing)
     }
   })
 
