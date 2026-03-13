@@ -1209,6 +1209,7 @@ export default {
 
       // ========================= 瓦片金字塔相关 =========================
       TILE_PATH_SUFFIX: 'img/capture-tiles',  // 与 nginx location /img/capture-tiles/ 对应
+      TILE_DEBUG: true,   // 瓦片调试：true 时在控制台打印加载/渲染诊断，定位“局部瓦片不对”等问题
       tileGPM: null,              // 全局处理元数据
       tileSessionId: null,        // 当前瓦片会话ID
       tileFrameId: null,          // 当前瓦片帧ID（用于丢弃旧帧瓦片/防错帧拉伸）
@@ -5676,7 +5677,7 @@ export default {
       // 保存GPM
       this.tileGPM = gpm;
       this.tileSessionId = gpm.sessionId;
-      // 注意：live 模式 sessionId 固定为 "live"，必须依赖 frameId 区分新旧帧
+      // 注意：后端每张图使用独立 session（live_<epoch>），frameId 仍用于错帧丢弃
       if (incomingFrameId !== null) {
         this.tileFrameId = incomingFrameId;
       } else if (this.tileFrameId == null) {
@@ -5706,9 +5707,7 @@ export default {
         this.currentVisibleTiles = new Set();
       }
       
-      // 重要：后端当前固定 sessionId="live"，并且每帧覆盖写 /dev/shm/capture-tiles/live/ 下的瓦片文件。
-      // 因此即使 sessionId/尺寸都不变（isNewSession=false），TileGPM 也代表“新一帧”，必须失效本地瓦片缓存，
-      // 否则前端会因为 tileRawDataCache 命中而跳过下载，画面看起来“永远不更新”。
+      // 重要：后端每张图使用独立目录（sessionId=live_<epoch>），新 GPM 即新会话；保留 isOverwriteLiveFrame 兼容旧后端 sessionId=live 覆盖写
       const isOverwriteLiveFrame = (!isNewSession) && (String(gpm.sessionId) === 'live');
 
       if (isNewSession || isOverwriteLiveFrame) {
@@ -6040,6 +6039,24 @@ export default {
         }
       }
       
+      if (this.TILE_DEBUG && tiles.length > 0) {
+        const sample = tiles.slice(0, 3).map(t => `${t.z}/${t.x}/${t.y}`);
+        const more = tiles.length > 3 ? ` ... +${tiles.length - 3} more` : '';
+        console.log('[Tile] calculateVisibleTiles', {
+          visibleRect: `(${Math.round(visibleLeft)},${Math.round(visibleTop)})-${Math.round(visibleRight - visibleLeft)}x${Math.round(visibleBottom - visibleTop)}`,
+          levelScale,
+          z,
+          startTileX,
+          startTileY,
+          endTileX,
+          endTileY,
+          maxTilesX,
+          maxTilesY,
+          count: tiles.length,
+          sample: sample.join(', ') + more
+        });
+      }
+
       // 最后兜底：在极端情况下若仍然没有任何瓦片（例如中心点/比例异常），将视野回到中心再试一次。
       if (tiles.length === 0 && gpm.imageWidth > 0 && gpm.imageHeight > 0) {
         const fallbackX = gpm.imageWidth / 2;
@@ -6190,7 +6207,15 @@ export default {
       ]);
 
       // 若期间已切换到新批次（新视窗/新帧），放弃本次渲染
-      if (batchId !== this.activeTileLoadBatchId) return;
+      if (batchId !== this.activeTileLoadBatchId) {
+        if (this.TILE_DEBUG) console.log('[Tile] loadVisibleTiles skip render (batch changed)', { batchId, active: this.activeTileLoadBatchId });
+        return;
+      }
+      if (this.TILE_DEBUG) {
+        const wanted = tiles.length;
+        const hasRaw = wanted - tilesToLoad.length;
+        console.log('[Tile] loadVisibleTiles barrier done', { batchId, wanted, hadRaw: hasRaw, toLoad: tilesToLoad.length, waitMs });
+      }
       this.renderTiles();
     },
 
@@ -6268,6 +6293,9 @@ export default {
       const abortController = new AbortController();
       this.tileAbortControllers.set(key, abortController);
       
+      if (this.TILE_DEBUG) {
+        console.log('[Tile] loadSingleTile start', { key, url: url.replace(/\?.*$/, '') });
+      }
       try {
         const response = await fetch(url, { 
           cache: 'no-store',
@@ -6275,6 +6303,9 @@ export default {
         });
         
         if (!response.ok) {
+          if (this.TILE_DEBUG) {
+            console.warn('[Tile] loadSingleTile HTTP error', { key, status: response.status, statusText: response.statusText });
+          }
           throw new Error(`Failed to load tile ${key}: ${response.status}`);
         }
         
@@ -6282,6 +6313,15 @@ export default {
 
         // 回包时校验：若期间已切换到新帧/新会话，直接丢弃，避免错帧拉伸/错帧缓存污染
         if (expectedSessionId !== this.tileSessionId || expectedFrameId !== this.tileFrameId) {
+          if (this.TILE_DEBUG) {
+            console.log('[Tile] loadSingleTile discarded (session/frame changed)', {
+              key,
+              expectedSession: expectedSessionId,
+              currentSession: this.tileSessionId,
+              expectedFrame: expectedFrameId,
+              currentFrame: this.tileFrameId
+            });
+          }
           this.tileAbortControllers.delete(key);
           return;
         }
@@ -6293,19 +6333,32 @@ export default {
           // 保存原始瓦片数据（用于白平衡等参数变化时重新处理）
           this.tileRawDataCache.set(key, tileData);
           
-          // 处理瓦片并缓存
-          const processedTile = this.processTile(tileData);
-          this.tileCache.set(key, { imageData: processedTile, paramsKey });
+          try {
+            const processedTile = this.processTile(tileData);
+            this.tileCache.set(key, { imageData: processedTile, paramsKey });
+            if (this.TILE_DEBUG) {
+              console.log('[Tile] loadSingleTile ok', { key, rawSize: `${tileData.width}x${tileData.height}`, outSize: `${processedTile.width}x${processedTile.height}` });
+            }
+          } catch (processErr) {
+            if (this.TILE_DEBUG) {
+              console.error('[Tile] processTile error', { key, err: processErr });
+            }
+            this.tileRawDataCache.delete(key);
+          }
           
           // 清理AbortController
           this.tileAbortControllers.delete(key);
+        } else {
+          if (this.TILE_DEBUG) {
+            console.warn('[Tile] loadSingleTile parseTileData returned null', { key, bufferBytes: buffer.byteLength });
+          }
         }
       } catch (error) {
         // 如果是取消请求，不输出错误
         if (error.name === 'AbortError') {
-          console.log(`Tile load cancelled: ${key}`);
+          if (this.TILE_DEBUG) console.log('[Tile] loadSingleTile cancelled', { key });
         } else {
-          console.error(`Error loading tile ${key}:`, error);
+          console.error('[Tile] loadSingleTile error', { key, error });
         }
         
         // 清理AbortController
@@ -6323,7 +6376,9 @@ export default {
      */
     parseTileData(buffer) {
       if (buffer.byteLength < 16) {
-        console.error('Tile data too small');
+        if (this.TILE_DEBUG) {
+          console.warn('[Tile] parseTileData: buffer too small', { byteLength: buffer.byteLength, need: 16 });
+        }
         return null;
       }
       
@@ -6332,6 +6387,14 @@ export default {
       const height = headerView.getInt32(4, true);
       const type = headerView.getInt32(8, true);  // CV_16UC1 = 2
       const border = headerView.getInt32(12, true) || 0; // 预留字段：瓦片外扩边界像素数（用于局部 Bayer 转换避免接缝）
+      
+      const expectedPixels = width * height * 2; // 16bit = 2 bytes per pixel
+      if (16 + expectedPixels > buffer.byteLength) {
+        if (this.TILE_DEBUG) {
+          console.warn('[Tile] parseTileData: buffer length mismatch', { width, height, expectedBytes: 16 + expectedPixels, actual: buffer.byteLength });
+        }
+        return null;
+      }
       
       // 提取像素数据
       const pixelData = new Uint16Array(buffer, 16);
@@ -6486,25 +6549,67 @@ export default {
           ? Array.from(this.currentVisibleTiles)
           : Array.from(this.tileCache.keys());
 
+      let drawnCount = 0;
+      let skipNoCache = 0;
+      let skipWrongZ = 0;
+      const drawDetails = this.TILE_DEBUG ? [] : null;
+
       for (const key of keysToDraw) {
         const cached = this.tileCache.get(key);
         const imageData = cached && cached.imageData;
-        if (!imageData) continue;
+        if (!imageData) {
+          skipNoCache++;
+          if (this.TILE_DEBUG) drawDetails.push({ key, reason: 'noCache' });
+          continue;
+        }
 
         const [tileZ, tileX, tileY] = key.split('/').map(Number);
-        if (tileZ !== z) continue; // 只绘制当前层级
+        if (tileZ !== z) {
+          skipWrongZ++;
+          if (this.TILE_DEBUG) drawDetails.push({ key, reason: 'wrongZ', tileZ, currentZ: z });
+          continue;
+        }
 
         const destX = tileX * T * levelScale;
         const destY = tileY * T * levelScale;
-        const destWidth = T * levelScale;
-        const destHeight = T * levelScale;
+        const fullTilePx = T * levelScale;
+        // 边缘瓦片：层级尺寸不能整除 T 时，最后一列/行只覆盖部分图像，需裁剪到图像边界，避免右侧/下侧拉伸错位
+        const destWidth = Math.min(fullTilePx, gpm.imageWidth - destX);
+        const destHeight = Math.min(fullTilePx, gpm.imageHeight - destY);
+        if (destWidth <= 0 || destHeight <= 0) continue;
+
+        // 若裁剪了目标区域，源图也按比例取对应区域，避免拉伸
+        const srcWidth = destWidth < fullTilePx ? (imageData.width * destWidth / fullTilePx) : imageData.width;
+        const srcHeight = destHeight < fullTilePx ? (imageData.height * destHeight / fullTilePx) : imageData.height;
 
         if (this._tileBlitCanvas.width !== imageData.width || this._tileBlitCanvas.height !== imageData.height) {
           this._tileBlitCanvas.width = imageData.width;
           this._tileBlitCanvas.height = imageData.height;
         }
         this._tileBlitCtx.putImageData(imageData, 0, 0);
-        ctx.drawImage(this._tileBlitCanvas, 0, 0, imageData.width, imageData.height, destX, destY, destWidth, destHeight);
+        ctx.drawImage(this._tileBlitCanvas, 0, 0, srcWidth, srcHeight, destX, destY, destWidth, destHeight);
+        drawnCount++;
+        if (this.TILE_DEBUG) {
+          drawDetails.push({
+            key,
+            dest: `(${Math.round(destX)},${Math.round(destY)}) ${Math.round(destWidth)}x${Math.round(destHeight)}`,
+            srcSize: `${imageData.width}x${imageData.height}`,
+            clipped: destWidth < fullTilePx || destHeight < fullTilePx
+          });
+        }
+      }
+
+      if (this.TILE_DEBUG && (drawnCount > 0 || skipNoCache > 0 || skipWrongZ > 0)) {
+        console.log('[Tile] renderTiles', {
+          canvasSize: `${this.tileCanvas.width}x${this.tileCanvas.height}`,
+          z,
+          levelScale,
+          keysTotal: keysToDraw.length,
+          drawn: drawnCount,
+          skipNoCache,
+          skipWrongZ,
+          sample: drawDetails.slice(0, 5)
+        });
       }
       
       // 将瓦片画布复制到缓冲画布
@@ -6695,6 +6800,23 @@ export default {
           analysis: analysis,
           isColorCamera: isColorCamera,
         };
+
+        // 传统模式白平衡：若本次是“计算增益”触发，将 analysis 中的增益写回 ImageGainR/ImageGainB 与配置项，与瓦片模式行为一致
+        if (this.calculateGain && analysis && analysis.whiteBalance) {
+          const gainR = analysis.whiteBalance.gainR;
+          const gainB = analysis.whiteBalance.gainB;
+          this.ImageGainR = gainR;
+          this.ImageGainB = gainB;
+          const GainRIndex = this.MainCameraConfigItems.findIndex(item => item.label === 'ImageGainR');
+          if (GainRIndex !== -1) {
+            this.MainCameraConfigItems[GainRIndex].value = gainR;
+          }
+          const GainBIndex = this.MainCameraConfigItems.findIndex(item => item.label === 'ImageGainB');
+          if (GainBIndex !== -1) {
+            this.MainCameraConfigItems[GainBIndex].value = gainB;
+          }
+          this.calculateGain = false;
+        }
 
         // 使用增益和拉伸，并转化为8位图像
         targetImg8 = await processAsync(() => {
@@ -7871,12 +7993,9 @@ export default {
         return;
       }
       
-      // 传统模式：使用processImage重新处理图像并计算增益
+      // 传统模式：使用 processImage 重新处理图像并计算增益；processImage 内会根据 this.calculateGain 将 analysis.whiteBalance 写回 ImageGainR/ImageGainB 与配置项
       this.calculateGain = true;
       this.processImage(this.ImageArrayBuffer, this.currentHistogramMin, this.currentHistogramMax, { calculateHistogram: false });
-      
-      // 注意：Gains会在processImage的回调中设置，这里不应该立即使用
-      // 移除了直接引用Gains的代码，因为它是异步获取的
       console.log('[calcWhiteBalanceGains] 已触发图像重新处理以计算白平衡');
     },
 

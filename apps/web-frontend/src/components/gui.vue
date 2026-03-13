@@ -315,6 +315,8 @@
     <div
       data-testid="ui-confirm-dialog-root"
       :data-state="ConfirmDialog ? 'open' : 'closed'"
+      :data-action="ConfirmToDo || ''"
+      :data-title="ConfirmDialogTitle || ''"
       style="display: contents;"
     >
       <v-dialog v-model="ConfirmDialog" width="260" persistent>
@@ -323,7 +325,7 @@
                这里必须显式加 .get-click(pointer-events: all) 才能让 Confirm Dialog 的按钮可点击（含 E2E）。 -->
           <v-card class="flashing-border get-click" style="backdrop-filter: blur(5px); background-color: rgba(64, 64, 64, 0.5);">
           <v-card-title style="font-size: 20px; display: flex; align-items: center; justify-content: space-between;">
-            <span>{{ $t(ConfirmDialogTitle) }}</span>
+            <span data-testid="ui-confirm-dialog-title">{{ $t(ConfirmDialogTitle) }}</span>
             <v-btn
               v-if="ConfirmToDo === 'startAutoFocus'"
               icon
@@ -337,10 +339,10 @@
           </v-card-title>
           <v-card-text style="font-size: 15px; margin-bottom: -20px; line-height: 1.5;">
             <span v-if="ConfirmToDo === 'startAutoFocus'">
-              {{ $t('Please confirm the auto focus mode') }}
+              <span data-testid="ui-confirm-dialog-text">{{ $t('Please confirm the auto focus mode') }}</span>
             </span>
             <span v-else>
-              {{ $t(ConfirmDialogText) }}
+              <span data-testid="ui-confirm-dialog-text">{{ $t(ConfirmDialogText) }}</span>
             </span>
           </v-card-text>
           <v-card-actions style="margin-top: -20px; padding-top: -20px;">
