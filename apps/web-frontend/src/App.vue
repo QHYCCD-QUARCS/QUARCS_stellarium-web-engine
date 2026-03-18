@@ -418,6 +418,14 @@
         data-testid="ui-power-manager-root"
         :data-state="isOpenPowerPage ? 'open' : 'closed'"
       >
+        <button
+          type="button"
+          @click="isOpenPowerPage = false"
+          data-testid="ui-power-manager-btn-close"
+          style="position: absolute; top: 10px; right: 10px; z-index: 2; color: rgba(255,255,255,0.7);"
+        >
+          <v-icon small>mdi-close</v-icon>
+        </button>
         <span
           style="position: absolute; top: 0px; left: 50%; transform: translateX(-50%); font-size: 26px; color: rgba(255, 255, 255, 0.5); user-select: none; white-space: nowrap; ">
           {{ $t('Power Management') }}
@@ -815,14 +823,33 @@
       </v-container>
     </v-main>
 
+    <!-- 主菜单打开时显示在遮罩之上的菜单按钮，便于点击关闭主菜单 -->
+    <div
+      v-if="nav"
+      class="menu-button-above-overlay"
+      @click.stop="$store.commit('toggleBool', 'showNavigationDrawer')"
+    >
+      <v-btn
+        icon
+        dark
+        data-testid="tb-act-toggle-navigation-drawer-overlay"
+        aria-label="Close menu"
+      >
+        <v-icon>mdi-menu</v-icon>
+      </v-btn>
+    </div>
+
     <v-dialog v-model="showDisconnectDialog" persistent max-width="290">
-      <v-card>
+      <v-card
+        :data-state="showDisconnectDialog ? 'open' : 'closed'"
+        data-testid="ui-app-disconnect-driver-dialog-root"
+      >
         <v-card-title class="text-h5">Confirm Action</v-card-title>
         <v-card-text>Are you sure you want to disconnect the driver {{ currentDisconnectDriverName }}?</v-card-text>
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn color="red darken-1" text @click="showDisconnectDialog = false">Cancel</v-btn>
-          <v-btn color="green darken-1" text @click="confirmDisconnect">Confirm</v-btn>
+          <v-btn color="red darken-1" text @click="showDisconnectDialog = false" data-testid="ui-app-disconnect-driver-dialog-btn-cancel">Cancel</v-btn>
+          <v-btn color="green darken-1" text @click="confirmDisconnect" data-testid="ui-app-disconnect-driver-dialog-btn-confirm">Confirm</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -1226,6 +1253,8 @@ export default {
       activeTileLoadBatchId: 0,   // 当前有效批次ID（视窗变化/新帧会覆盖旧批次）
       tileLoadWaiters: null,      // 等待某瓦片完成的回调 Map<"z/x/y", Function[]>
       tileBatchMaxWaitMs: 1200,   // 单批次最长等待时长（避免网络异常导致无限等待）
+      tileAllowIncrementalRender: false, // 首次批量渲染完成后，允许晚到瓦片增量补绘
+      tileRenderRaf: null,        // 合并晚到瓦片的重绘请求，避免每片都立即重绘
       tileCanvas: null,           // 瓦片合成画布
       tileCtx: null,              // 瓦片合成画布上下文
       viewportChangeTimer: null,  // 视窗变化防抖定时器
@@ -4122,7 +4151,7 @@ export default {
                 if (parts.length >= 2) {
                   const question = parts[1];
                   console.log('AutoFocusConfirm:', question);
-                  this.ShowConfirmDialog('自动对焦', question, 'AutoFocusConfirm');
+                  this.ShowConfirmDialog('自动对焦', question, 'startAutoFocus');
                 }
                 break;
 
@@ -5678,10 +5707,13 @@ export default {
         prevMaxZoomLevel !== nextMaxZoomLevel ||
         (prevGpm.cfa || 'null') !== (gpm.cfa || 'null');
 
+      const sessionIdStr = String(gpm.sessionId || '');
+      const isLiveSession = sessionIdStr === 'live' || sessionIdStr.startsWith('live_');
+
       // live 覆盖写帧节流：高帧率下若每条 TileGPM 都立即清缓存/abort，会导致前端持续“重启加载”，
       // 表现为跳帧、卡顿、瓦片大量失败、缩放后长时间不刷新。
-      // 策略：对 isNewSession=false 且 sessionId=live 的 TileGPM 做节流，只处理“最新一条”。
-      const isLiveOverwriteFrame = (!isNewSession) && (String(gpm.sessionId) === 'live');
+      // 策略：对 isNewSession=false 且 live 会话的 TileGPM 做节流，只处理“最新一条”。
+      const isLiveOverwriteFrame = (!isNewSession) && isLiveSession;
       if (isLiveOverwriteFrame) {
         const now = Date.now();
         const throttleMs = Number(this.liveTileGpmThrottleMs) || 250;
@@ -5702,6 +5734,13 @@ export default {
         this.liveTileGpmLastHandledAt = now;
       }
 
+      // 即将处理更新的 GPM 时，丢弃此前排队的旧 live GPM，避免定时器晚到后把界面回滚到旧帧。
+      if (this.pendingLiveTileGpmTimer) {
+        clearTimeout(this.pendingLiveTileGpmTimer);
+        this.pendingLiveTileGpmTimer = null;
+      }
+      this.pendingLiveTileGpm = null;
+
       // E2E：每次“真正处理”的 TileGPM 视为“出图成功”的关键标志（节流会合并掉中间帧）
       this.e2eTileGpmSeq = (Number(this.e2eTileGpmSeq) || 0) + 1;
 
@@ -5711,8 +5750,8 @@ export default {
       // 注意：后端每张图使用独立 session（live_<epoch>），frameId 仍用于错帧丢弃
       if (incomingFrameId !== null) {
         this.tileFrameId = incomingFrameId;
-      } else if (this.tileFrameId == null) {
-        // 兼容：后端未提供 frameId 时，退化为本地时间戳（仅用于避免缓存错帧）
+      } else if (isNewSession || this.tileFrameId == null) {
+        // 兼容：后端未提供 frameId 时，新会话必须生成新的本地帧号，避免沿用旧帧ID污染缓存/请求。
         this.tileFrameId = Date.now();
       }
       this.showImageSizeX = gpm.imageWidth;
@@ -5739,7 +5778,7 @@ export default {
       }
       
       // 重要：后端每张图使用独立目录（sessionId=live_<epoch>），新 GPM 即新会话；保留 isOverwriteLiveFrame 兼容旧后端 sessionId=live 覆盖写
-      const isOverwriteLiveFrame = (!isNewSession) && (String(gpm.sessionId) === 'live');
+      const isOverwriteLiveFrame = (!isNewSession) && isLiveSession;
 
       if (isNewSession || isOverwriteLiveFrame) {
         // 新会话或 live 覆盖写帧：清空瓦片缓存与队列，避免旧帧残留/命中缓存导致不刷新
@@ -6136,6 +6175,7 @@ export default {
       const gpm = this.tileGPM;
       const batchId = ++this.tileLoadBatchSeq;
       this.activeTileLoadBatchId = batchId;
+      this.tileAllowIncrementalRender = false;
       
       // 更新当前可见瓦片集合
       const newVisibleTiles = new Set(tiles.map(t => `${t.z}/${t.x}/${t.y}`));
@@ -6247,6 +6287,7 @@ export default {
         const hasRaw = wanted - tilesToLoad.length;
         console.log('[Tile] loadVisibleTiles barrier done', { batchId, wanted, hadRaw: hasRaw, toLoad: tilesToLoad.length, waitMs });
       }
+      this.tileAllowIncrementalRender = true;
       this.renderTiles();
     },
 
@@ -6300,6 +6341,20 @@ export default {
         } catch (e) {
           // ignore
         }
+      }
+    },
+
+    scheduleTileRender() {
+      if (this.tileRenderRaf != null) return;
+      const flush = () => {
+        this.tileRenderRaf = null;
+        if (!this.tileGPM || !this.tileCanvas) return;
+        this.renderTiles();
+      };
+      if (typeof requestAnimationFrame === 'function') {
+        this.tileRenderRaf = requestAnimationFrame(flush);
+      } else {
+        this.tileRenderRaf = setTimeout(flush, 0);
       }
     },
 
@@ -6369,6 +6424,16 @@ export default {
             this.tileCache.set(key, { imageData: processedTile, paramsKey });
             if (this.TILE_DEBUG) {
               console.log('[Tile] loadSingleTile ok', { key, rawSize: `${tileData.width}x${tileData.height}`, outSize: `${processedTile.width}x${processedTile.height}` });
+            }
+
+            const shouldPatchRender =
+              this.tileAllowIncrementalRender &&
+              expectedSessionId === this.tileSessionId &&
+              expectedFrameId === this.tileFrameId &&
+              this.currentVisibleTiles &&
+              this.currentVisibleTiles.has(key);
+            if (shouldPatchRender) {
+              this.scheduleTileRender();
             }
           } catch (processErr) {
             if (this.TILE_DEBUG) {
@@ -11157,6 +11222,13 @@ export default {
     },
   },
   watch: {
+    /** 主菜单关闭时同步关闭子菜单状态，避免 E2E 再次打开主菜单时误判“子菜单已打开”而跳过点击 */
+    '$store.state.showNavigationDrawer': function (isOpen) {
+      if (!isOpen) {
+        this.drawer_2 = false
+        this.isOpenDevicePage = false
+      }
+    },
     storeCurrentLocation: function (loc) {
       const DD2R = Math.PI / 180
       this.$stel.core.observer.latitude = loc.lat * DD2R
@@ -11600,7 +11672,24 @@ body,
 .menu-navigation-drawer,
 .submenu-navigation-drawer {
   backdrop-filter: blur(5px);
-  background-color: rgba(0, 0, 0, 0.1) !important;
+  /* 降低透明度，菜单栏更不透明便于阅读 */
+  background-color: rgba(0, 0, 0, 0.75) !important;
+}
+
+/* 主菜单抽屉整体下移，不遮挡顶部工具栏（工具栏高度 40px） */
+.v-navigation-drawer.menu-navigation-drawer {
+  top: 40px !important;
+  height: calc(100% - 40px) !important;
+  max-height: calc(100vh - 40px) !important;
+}
+
+/* 主菜单打开时浮在遮罩之上的菜单按钮，与顶部工具栏的菜单图标同一位置（z-index 高于 Vuetify overlay） */
+.menu-button-above-overlay {
+  position: fixed;
+  top: 2px;
+  left: 10px;
+  z-index: 100;
+  cursor: pointer;
 }
 
 .submenu-page {

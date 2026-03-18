@@ -1,0 +1,24 @@
+---
+description: AI-Control 文档化控制规则，按文档直接执行前端控制
+globs: {apps/web-frontend/AI-Control/**,apps/web-frontend/docs/**,apps/web-frontend/scripts/ai-control-*.ts,apps/web-frontend/scripts/mcp-e2e-server.mjs}
+alwaysApply: false
+---
+
+# AI-Control Session Usage
+
+- 把 `apps/web-frontend/AI-Control/README.md` 与 `apps/web-frontend/docs/web-page-structure.md` 视为 AI-Control 的事实来源；处理 AI 控制、E2E 控制、会话命令时，优先依据文档执行，无需先查源码，只有文档缺失或互相矛盾时才回看代码。
+- 优先使用会话模式，在同一已打开页面上执行命令；不要默认每次新开浏览器。
+- 标准流程固定为：确认会话已启动 `npm run e2e:ai-control:session` -> 先读 `GET /status` 或 `GET /status?command=xxx&flowParams=...` -> 检查 `blockers`、`preSteps`、`coreStepIds`、`suggestions` -> 再 `POST /run` 执行命令。
+- 默认端口是 `39281`；会话未启动时，应明确提示先启动，而不是假设工具可自动补齐。
+- 默认不要刷新页面；仅在用户明确要求回首页或命令确实需要时才传 `gotoHome: true`。
+- 默认不要断开全部设备；仅在用户明确要求或流程确有必要时才传 `resetBeforeConnect: true`。
+- busy 恢复策略遵循文档：`capture` 视命令而定为 `wait/reject`，`guiding` 为 `cancel`，`polarAxis` 为 `cancel`，`deviceAllocation` 为 `cancel`；先相信恢复层，不要自行发明额外绕路步骤。
+- 正式控制接口使用文档列出的命令名：`general-settings`、`power-management`、`switch-to-guider-page`、`guider-connect-capture`、`maincamera-connect-capture`、`mount-connect-control`、`mount-park`、`mount-panel`、`telescopes-focal-length`、`focuser-connect-control`、`cfw-capture-config`、`polar-axis-calibration`、`image-file-manager`。
+- 需要参数时，直接按 README 中定义的 `flowParams` 组织 JSON，不自行猜字段名。
+- 页面结构快速锚点：主菜单 `ui-app-menu-drawer`，设备二级抽屉 `ui-app-submenu-drawer`，主相机面板 `cp-panel`，导星面板 `ui-chart-component-root`，赤道仪面板 `mcp-panel`，确认弹窗 `ui-confirm-dialog-root`。
+- 常见业务面板锚点：通用设置 `ui-view-settings-dialog-root`，电源管理 `ui-power-manager-root`，设备分配 `dap-root`，极轴校准 `pa-widget`，图像管理 `imp-root`。
+- 主菜单关闭优先使用 `tb-act-toggle-navigation-drawer-overlay`；设备子菜单状态以 `ui-app-submenu-device-page[data-state]` 和 `ui-app-menu-device-{type}[data-selected]` 联合判断。
+- 交互原则必须保持真实链路：禁止 `force`；每个动作都遵守“前置检查 -> 执行动作 -> 后置确认”；完成标准是业务状态变化，不是“点击成功”。
+- 元素定位以稳定 `data-testid` 为主；不要把文本、层级、样式类名当正式依赖。
+- 若用户只是说“打开某页面/执行某命令”，优先映射成已有 CLI 命令；只有现有命令无法覆盖时，才考虑补步骤或改实现。
+- 当文档已给出命令、参数、状态锚点和恢复策略时，回答与实现都应直接引用这些约定，避免重新探索代码结构。

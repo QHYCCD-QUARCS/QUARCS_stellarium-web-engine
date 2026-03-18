@@ -181,20 +181,46 @@ export default {
     // 新增：子午面信息缩写
     abbreviatedPierSide() {
       if (!this.MountPierSide) return '';
-      
-      const pierSide = this.MountPierSide.toLowerCase();
-      if (pierSide.includes('east') || pierSide.includes('e')) {
+
+      const rawPierSide = String(this.MountPierSide).trim();
+      const compactPierSide = rawPierSide.toLowerCase().replace(/[^a-z]/g, '');
+      const pierSideTokens = rawPierSide.toLowerCase().split(/[^a-z]+/).filter(Boolean);
+
+      if (
+        compactPierSide === 'e' ||
+        pierSideTokens.includes('east') ||
+        compactPierSide.endsWith('east')
+      ) {
         return 'E';
-      } else if (pierSide.includes('west') || pierSide.includes('w')) {
+      }
+
+      if (
+        compactPierSide === 'w' ||
+        pierSideTokens.includes('west') ||
+        compactPierSide.endsWith('west')
+      ) {
         return 'W';
-      } else if (pierSide.includes('north') || pierSide.includes('n')) {
+      }
+
+      if (
+        compactPierSide === 'n' ||
+        pierSideTokens.includes('north') ||
+        compactPierSide.endsWith('north')
+      ) {
         return 'N';
-      } else if (pierSide.includes('south') || pierSide.includes('s')) {
+      }
+
+      if (
+        compactPierSide === 's' ||
+        pierSideTokens.includes('south') ||
+        compactPierSide.endsWith('south')
+      ) {
         return 'S';
       }
-      
-      // 如果是其他格式，尝试取第一个字符
-      return this.MountPierSide.charAt(0).toUpperCase();
+
+      // 兜底：仅在明确是单字符方向时才直接返回，避免 west 被 e 误判。
+      const fallbackDirection = rawPierSide.charAt(0).toUpperCase();
+      return ['E', 'W', 'N', 'S'].includes(fallbackDirection) ? fallbackDirection : rawPierSide.charAt(0).toUpperCase();
     }
   },
   created() {

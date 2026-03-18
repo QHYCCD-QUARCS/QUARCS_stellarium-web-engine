@@ -70,10 +70,20 @@
         </div>
       </span>
 
-      <card class="Card-Status" :style="{ width: openStatusCard ? '105px' : '30px' }" @click="toggleStatusCard">
+      <card
+        class="Card-Status"
+        :style="{ width: openStatusCard ? '105px' : '30px' }"
+        data-testid="tb-status-card"
+        :data-state="openStatusCard ? 'open' : 'closed'"
+        @click="toggleStatusCard"
+      >
 
-        <div style="position: absolute;" 
-          :style="{ top: openStatusCard ? '5px' : '0px', left: openStatusCard ? '5px' : '0px', width: openStatusCard ? '20px' : '15px', height: openStatusCard ? '20px' : '15px'}">
+        <div
+          style="position: absolute;"
+          data-testid="tb-status-maincamera"
+          :data-state="mainCameraStatusState"
+          :style="{ top: openStatusCard ? '5px' : '0px', left: openStatusCard ? '5px' : '0px', width: openStatusCard ? '20px' : '15px', height: openStatusCard ? '20px' : '15px'}"
+        >
           <span v-if="MainCameraInProgress&&MainCameraConnect">
             <div style="display: flex; justify-content: center; align-items: center;">
               <img src="@/assets/images/svg/ui/MainCamera-yellow.svg" :style="{height: openStatusCard ? '20px' : '15px'}" style="pointer-events: none;"></img>
@@ -97,8 +107,12 @@
           </span> -->
         </div>
 
-        <div style="position: absolute;" 
-          :style="{ top: openStatusCard ? '5px' : '0px', left: openStatusCard ? '30px' : '15px', width: openStatusCard ? '20px' : '15px', height: openStatusCard ? '20px' : '15px'}">
+        <div
+          style="position: absolute;"
+          data-testid="tb-status-mount"
+          :data-state="mountStatusState"
+          :style="{ top: openStatusCard ? '5px' : '0px', left: openStatusCard ? '30px' : '15px', width: openStatusCard ? '20px' : '15px', height: openStatusCard ? '20px' : '15px'}"
+        >
           <!-- <span v-if="MountInProgress&&MountConnect">
             <div style="display: flex; justify-content: center; align-items: center;">
               <img src="@/assets/images/svg/ui/Mount-red.svg" :style="{height: openStatusCard ? '20px' : '15px'}" style="pointer-events: none;"></img>
@@ -121,8 +135,12 @@
           </span>
         </div>
 
-        <div style="position: absolute;" 
-          :style="{ top: openStatusCard ? '5px' : '15px', left: openStatusCard ? '55px' : '0px', width: openStatusCard ? '20px' : '15px', height: openStatusCard ? '20px' : '15px'}">
+        <div
+          style="position: absolute;"
+          data-testid="tb-status-guider"
+          :data-state="guiderStatusState"
+          :style="{ top: openStatusCard ? '5px' : '15px', left: openStatusCard ? '55px' : '0px', width: openStatusCard ? '20px' : '15px', height: openStatusCard ? '20px' : '15px'}"
+        >
           <span v-if="!GuiderConnect">
             <div style="display: flex; justify-content: center; align-items: center;">
               <img src="@/assets/images/svg/ui/Guider-white.svg" :style="{height: openStatusCard ? '20px' : '15px'}" style="pointer-events: none;"></img>
@@ -150,8 +168,12 @@
           </span>
         </div>
 
-        <div style="position: absolute;" 
-          :style="{ top: openStatusCard ? '5px' : '15px', left: openStatusCard ? '80px' : '15px', width: openStatusCard ? '20px' : '15px', height: openStatusCard ? '20px' : '15px'}">
+        <div
+          style="position: absolute;"
+          data-testid="tb-status-focuser"
+          :data-state="focuserStatusState"
+          :style="{ top: openStatusCard ? '5px' : '15px', left: openStatusCard ? '80px' : '15px', width: openStatusCard ? '20px' : '15px', height: openStatusCard ? '20px' : '15px'}"
+        >
           <span v-if="CurrentFocusStatus === 0">
             <div style="display: flex; justify-content: center; align-items: center;">
               <img src="@/assets/images/svg/ui/Focuser-white.svg" :style="{height: openStatusCard ? '20px' : '15px'}" style="pointer-events: none;"></img>
@@ -295,6 +317,26 @@ export default {
     procFpsDisplay () {
       if (this.liveProcessFps == null || !isFinite(this.liveProcessFps)) return '-'
       return this.liveProcessFps.toFixed(1)
+    },
+    mainCameraStatusState () {
+      if (!this.MainCameraConnect) return 'disconnected'
+      return this.MainCameraInProgress ? 'busy' : 'connected'
+    },
+    mountStatusState () {
+      if (!this.MountConnect) return 'disconnected'
+      return this.MountInProgress ? 'busy' : 'connected'
+    },
+    guiderStatusState () {
+      if (!this.GuiderConnect) return 'disconnected'
+      if (this.GuiderInProgress) return this.GuiderError ? 'error-busy' : 'busy'
+      return this.GuiderError ? 'error' : 'connected'
+    },
+    focuserStatusState () {
+      if (this.CurrentFocusStatus === 0) return 'disconnected'
+      if (this.CurrentFocusStatus === 1) return 'connected'
+      if (this.CurrentFocusStatus === 2) return 'busy'
+      if (this.CurrentFocusStatus === 3) return 'error'
+      return 'unknown'
     },
     // cpuTemp: function () {
     //   return this.$store.state.cpuTemp

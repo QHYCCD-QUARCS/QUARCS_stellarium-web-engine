@@ -68,7 +68,7 @@
             </div>
             <div class="workspace-toolbar-actions">
               <span v-if="!isMobileCompact" class="toolbar-summary">{{ selectionSummary }}</span>
-              <button class="secondary-action-btn" @click="refreshCurrentFolder" :disabled="!currentFolder">{{ $t('Refresh') }}</button>
+              <button class="secondary-action-btn" @click="refreshCurrentFolder" :disabled="!currentFolder" data-testid="imp-btn-refresh-current-folder">{{ $t('Refresh') }}</button>
             </div>
           </div>
 

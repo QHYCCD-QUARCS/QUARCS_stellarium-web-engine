@@ -74,7 +74,8 @@
 | testid | 用途 | 源码位置 | 校验结果 |
 |--------|------|----------|----------|
 | ui-app-menu-drawer | 主菜单抽屉，检查 data-state | App.vue ~513 | ✅ 存在，唯一 |
-| tb-act-toggle-navigation-drawer | 打开/关闭菜单抽屉 | toolbar.vue ~12 | ✅ 存在，唯一 |
+| tb-act-toggle-navigation-drawer | 打开/关闭菜单抽屉（工具栏内） | toolbar.vue ~12 | ✅ 存在，唯一 |
+| tb-act-toggle-navigation-drawer-overlay | 主菜单打开时浮在遮罩上的关闭按钮，与顶部工具栏菜单图标同位置 | App.vue ~827 | ✅ 存在，唯一（仅主菜单打开时在 DOM） |
 | ui-confirm-dialog-root | 确认弹窗根，data-state open/closed | gui.vue ~315 | ✅ 存在，唯一 |
 | ui-confirm-dialog-btn-cancel | 弹窗取消按钮 | gui.vue ~371 | ✅ 存在，唯一 |
 | ui-confirm-dialog-btn-confirm | 弹窗确认按钮 | gui.vue ~378 | ✅ 存在，唯一 |
@@ -90,7 +91,7 @@
 
 | 控件 | 源码触发方式 | E2E 操作 |
 |------|--------------|----------|
-| 菜单抽屉开关 | `@click="toggleNavigationDrawer"` (toolbar.vue) | getByTestId + 可操作性检查后 click |
+| 菜单抽屉开关 | `@click="toggleNavigationDrawer"` (toolbar.vue) | getByTestId + 可操作性检查后 click；关闭时主菜单打开则优先点击 `tb-act-toggle-navigation-drawer-overlay`（App.vue，浮在遮罩上） |
 | Power 菜单项 | `@click.stop="openPowerManagerPage()"` (App.vue) | getByTestId + ensureVisibleAndClick |
 | Output Power 1/2 | `@click.stop="SwitchOutPutPower(1, ...)"` 或 `SwitchOutPutPower(2, ...)` (App.vue) | getByTestId + ensureVisibleAndClick |
 | Restart / Shutdown / Force Update | `@click.stop="RestartRaspberryPi()"` 等 (App.vue) | getByTestId + ensureVisibleAndClick |
@@ -147,7 +148,7 @@
 | 控件 | 源码触发方式 | E2E 操作 |
 |------|--------------|----------|
 | 菜单抽屉 / 确认弹窗按钮 | @click (toolbar.vue / gui.vue) | getByTestId + toBeVisible/toBeEnabled + scrollIntoViewIfNeeded + 未遮挡检查 + click，无 force |
-| 菜单抽屉关闭（ensureChartPanelVisible 前） | tb-act-toggle-navigation-drawer @click | 先 ensureMenuDrawerClosed：仅当 data-state=open 且切换按钮可见可点时点击，确保主切换按钮露出 |
+| 菜单抽屉关闭（ensureChartPanelVisible 前） | tb-act-toggle-navigation-drawer / tb-act-toggle-navigation-drawer-overlay | ensureMenuDrawerClosed：主菜单打开时优先点击遮罩上的 tb-act-toggle-navigation-drawer-overlay，否则 Escape 或工具栏 tb-act-toggle-navigation-drawer，确保主切换按钮露出 |
 | 导星菜单项 / 驱动与连接模式选择器 | @click (App.vue) | getByTestId + clickLocatorWithFallback |
 | 连接/断开按钮 | @click (App.vue) | getByTestId + 可见后 clickLocatorWithFallback |
 | 设备分配面板 dp-picker、dap-act-selected-device-name-2、dp-btn-toggle-bind、dap-act-close-panel | @click 等 (DevicePicker / DeviceAllocationPanel) | getByTestId + toBeVisible + clickLocatorWithFallback |

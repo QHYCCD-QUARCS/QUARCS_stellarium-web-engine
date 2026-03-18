@@ -24,6 +24,11 @@ export default defineConfig({
   expect: { timeout: 10_000 },
   reporter: 'list',
   outputDir,
+  projects: [
+    { name: 'e2e', testDir: './tests/e2e' },
+    // ai-control：单 worker + 各 spec 内可串行共用同一 page，避免每条命令重开网页
+    { name: 'ai-control', testDir: './AI-Control/e2e', workers: 1 },
+  ],
   // NOTE: Playwright 1.34 的 UseOptions 类型不包含 reducedMotion；这里用 as any 以保留运行时行为
   use: ({
     // 是否显示浏览器界面：

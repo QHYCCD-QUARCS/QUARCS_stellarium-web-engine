@@ -13,7 +13,7 @@
  * - waitForTestIdState：等待指定 testid 的 data-state（或自定义属性）等于给定值。
  * - selectVSelectItemText：点击 testid 对应选择器展开菜单，再在可见菜单项上点击（先精确匹配，再模糊），均不做 force 点击。
  * - gotoHome：goto getAppStartPath()，等待 ui-app-root 可见。
- * - ensureMenuDrawerOpen/Closed：根据 ui-app-menu-drawer 的 data-state 决定是否点击 tb-act-toggle-navigation-drawer。
+ * - ensureMenuDrawerOpen/Closed：根据 ui-app-menu-drawer 的 data-state；关闭时主菜单打开则优先点击 tb-act-toggle-navigation-drawer-overlay（遮罩上），否则 Escape 或 tb-act-toggle-navigation-drawer。
  * - ensureCaptureUiVisible：若 cp-panel 不可见则点击 gui-btn-show-capture-ui，再断言 cp-panel 可见。
  *
  * 规范：以全局唯一 data-testid 定位；参考 testid-validation-report.md、testid-scan-report.md。
@@ -194,6 +194,16 @@ export async function ensureMenuDrawerClosed(page: Page, timeout = 10_000) {
 
   const state = await drawer.getAttribute('data-state')
   if (state === 'closed') return
+
+  const overlayToggle = page.getByTestId('tb-act-toggle-navigation-drawer-overlay').first()
+  if (await overlayToggle.isVisible().catch(() => false)) {
+    await clickLocator(overlayToggle, timeout)
+    await expect(drawer).toHaveAttribute('data-state', 'closed', { timeout })
+    return
+  }
+
+  await page.keyboard.press('Escape').catch(() => {})
+  if ((await drawer.getAttribute('data-state').catch(() => null)) === 'closed') return
 
   const toggle = page.getByTestId('tb-act-toggle-navigation-drawer').first()
   await clickLocator(toggle, timeout)
