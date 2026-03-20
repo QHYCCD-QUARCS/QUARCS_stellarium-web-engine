@@ -1131,6 +1131,7 @@ export default {
         { driverType: 'MainCamera', label: 'Auto Save', value: false, inputType: 'switch' }, // 自动保存
         { driverType: 'MainCamera', label: 'Save Failed Parse', value: false, inputType: 'switch' }, // 保存解析失败图片
         { driverType: 'MainCamera', label: 'Save Folder', value: 'local', inputType: 'select' ,selectValue: ['local']}, // 保存文件夹
+        { driverType: 'MainCamera', label: 'Tile Build Mode', value: 'pyramid', inputType: 'select', selectValue: ['pyramid', 'merged_single_level'] }, // 瓦片构建模式
         // 循环拍摄
         // { driverType: 'MainCamera', label: 'Exposuer delay', value: 0, inputType: 'number' }, // 循环拍摄间隔时间
         // { driverType: 'MainCamera', label: 'Loop Capture', value: false, inputType: 'switch' },  // 循环拍摄
@@ -1254,6 +1255,8 @@ export default {
       tileLoadWaiters: null,      // 等待某瓦片完成的回调 Map<"z/x/y", Function[]>
       tileBatchMaxWaitMs: 1200,   // 单批次最长等待时长（避免网络异常导致无限等待）
       tileAllowIncrementalRender: false, // 首次批量渲染完成后，允许晚到瓦片增量补绘
+      tileRetryTimers: null,      // 后端尚未生成完成时的重试定时器 Map<"z/x/y", Timeout>
+      tileRetryCounts: null,      // 瓦片重试次数 Map<"z/x/y", number>
       tileRenderRaf: null,        // 合并晚到瓦片的重绘请求，避免每片都立即重绘
       tileCanvas: null,           // 瓦片合成画布
       tileCtx: null,              // 瓦片合成画布上下文
@@ -2347,6 +2350,7 @@ export default {
                 // - v1: TileGPM:{sessionId}:{imageWidth}:{imageHeight}:{tileSize}:{maxZoomLevel}:{blackLevel}:{whiteLevel}:{cfa}:{gainR}:{gainB}
                 // - v2(追加): ...:{previewWidth}:{previewHeight}:{previewBinningFactor}
                 // - v3(追加): ...:{frameId}
+                // - v4(追加): ...:{buildMode}
                 if (parts.length >= 11) {
                   const gpm = {
                     sessionId: parts[1],
@@ -2364,6 +2368,7 @@ export default {
                     previewHeight: (parts.length >= 14) ? parseInt(parts[12]) : null,
                     previewBinningFactor: (parts.length >= 14) ? parseInt(parts[13]) : null,
                     frameId: (parts.length >= 15) ? parseInt(parts[14]) : null,
+                    buildMode: (parts.length >= 16) ? parts[15] : 'pyramid',
                   };
                   this.handleTileGPM(gpm);
                 }
@@ -5660,11 +5665,16 @@ export default {
 
     // ========================= 瓦片金字塔方法 =========================
 
+    normalizeTileBuildModeValue(value) {
+      return String(value || '').trim() === 'merged_single_level' ? 'merged_single_level' : 'pyramid';
+    },
+
     /**
      * 处理后端发送的GPM消息
      * @param {Object} gpm - 全局处理元数据
      */
     async handleTileGPM(gpm) {
+      gpm.buildMode = this.normalizeTileBuildModeValue(gpm.buildMode);
       this.SendConsoleLogMsg(`Received TileGPM: session=${gpm.sessionId}, size=${gpm.imageWidth}x${gpm.imageHeight}, maxZoom=${gpm.maxZoomLevel}`, 'info');
 
       // frameId：用于让“瓦片下载回包/缓存写入”与“当前 GPM”强绑定，避免错帧拉伸（尤其是 live 覆盖写 + 异步 fetch）
@@ -5747,6 +5757,10 @@ export default {
       // 保存GPM
       this.tileGPM = gpm;
       this.tileSessionId = gpm.sessionId;
+      const tileBuildModeItem = this.MainCameraConfigItems.find(item => item.label === 'Tile Build Mode');
+      if (tileBuildModeItem) {
+        tileBuildModeItem.value = gpm.buildMode;
+      }
       // 注意：后端每张图使用独立 session（live_<epoch>），frameId 仍用于错帧丢弃
       if (incomingFrameId !== null) {
         this.tileFrameId = incomingFrameId;
@@ -5773,6 +5787,12 @@ export default {
       if (!this.tileAbortControllers) {
         this.tileAbortControllers = new Map();
       }
+      if (!this.tileRetryTimers) {
+        this.tileRetryTimers = new Map();
+      }
+      if (!this.tileRetryCounts) {
+        this.tileRetryCounts = new Map();
+      }
       if (!this.currentVisibleTiles) {
         this.currentVisibleTiles = new Set();
       }
@@ -5792,6 +5812,11 @@ export default {
           controller.abort();
         }
         this.tileAbortControllers.clear();
+        for (const timer of this.tileRetryTimers.values()) {
+          clearTimeout(timer);
+        }
+        this.tileRetryTimers.clear();
+        this.tileRetryCounts.clear();
 
         this.tileLoadQueue = [];
         this.currentTileLoads = 0;
@@ -6041,34 +6066,13 @@ export default {
       }
     },
 
-    /**
-     * 计算当前视窗需要加载的瓦片
-     * @returns {Array} 需要加载的瓦片列表 [{z, x, y}, ...]
-     */
-    calculateVisibleTiles() {
-      if (!this.tileGPM) return [];
-      
+    getCurrentVisibleRect() {
+      if (!this.tileGPM) return null;
+
       const gpm = this.tileGPM;
-      const T = gpm.tileSize;
-      
-      // 根据当前缩放级别选择合适的z层级（反向金字塔）
-      const z = this.calculateTileLevel(this.scale, gpm.maxZoomLevel);
-      
-      // 计算当前层级的图像尺寸（反向金字塔）
-      // z=0时是16倍缩小，z=maxZoomLevel时是原图
-      const levelScale = Math.pow(2, gpm.maxZoomLevel - z);
-      const levelWidth = Math.ceil(gpm.imageWidth / levelScale);
-      const levelHeight = Math.ceil(gpm.imageHeight / levelScale);
-      
-      // 计算可见区域在原图的像素范围
-      // 初始加载时visibleX/visibleY可能还没设置，使用图像中心
-      // 注意：visibleX/visibleY 可能为 0（合法边界值），不能用 `||` 回退
       let visibleX = Number.isFinite(this.visibleX) ? this.visibleX : gpm.imageWidth / 2;
       let visibleY = Number.isFinite(this.visibleY) ? this.visibleY : gpm.imageHeight / 2;
 
-      // 兜底：当视野中心点越界时（常见于先打开历史图像再切回实时拍摄图像），
-      // 会导致 startTileX > endTileX，从而 tiles 为空，画布表现为“透明/空白”。
-      // 这里将其钳制回图像边界内，并写回状态，避免依赖缩放事件来“修复”。
       const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
       const clampedX = clamp(visibleX, 0, gpm.imageWidth);
       const clampedY = clamp(visibleY, 0, gpm.imageHeight);
@@ -6085,80 +6089,117 @@ export default {
       const visibleTop = Math.max(0, visibleY - visibleHeight / 2);
       const visibleRight = Math.min(gpm.imageWidth, visibleLeft + visibleWidth);
       const visibleBottom = Math.min(gpm.imageHeight, visibleTop + visibleHeight);
-      
-      // 转换到当前层级的坐标
-      const levelLeft = visibleLeft / levelScale;
-      const levelTop = visibleTop / levelScale;
-      const levelRight = visibleRight / levelScale;
-      const levelBottom = visibleBottom / levelScale;
-      
-      // 计算需要的瓦片范围
-      const startTileX = Math.floor(levelLeft / T);
-      const startTileY = Math.floor(levelTop / T);
-      const endTileX = Math.floor(levelRight / T);
-      const endTileY = Math.floor(levelBottom / T);
-      
-      // 计算该层级的最大瓦片数
+
+      return {
+        centerX: visibleX,
+        centerY: visibleY,
+        left: visibleLeft,
+        top: visibleTop,
+        right: visibleRight,
+        bottom: visibleBottom,
+        width: Math.max(0, visibleRight - visibleLeft),
+        height: Math.max(0, visibleBottom - visibleTop),
+      };
+    },
+
+    calculateVisibleTilesForLevel(z, visibleRect = null) {
+      if (!this.tileGPM) return [];
+
+      const gpm = this.tileGPM;
+      const rect = visibleRect || this.getCurrentVisibleRect();
+      if (!rect) return [];
+
+      const T = gpm.tileSize;
+      const levelScale = Math.pow(2, gpm.maxZoomLevel - z);
+      const levelWidth = Math.ceil(gpm.imageWidth / levelScale);
+      const levelHeight = Math.ceil(gpm.imageHeight / levelScale);
+      const levelLeft = rect.left / levelScale;
+      const levelTop = rect.top / levelScale;
+      const levelRight = rect.right / levelScale;
+      const levelBottom = rect.bottom / levelScale;
       const maxTilesX = Math.ceil(levelWidth / T);
       const maxTilesY = Math.ceil(levelHeight / T);
-      
       const tiles = [];
-      for (let ty = startTileY; ty <= endTileY && ty < maxTilesY; ty++) {
-        for (let tx = startTileX; tx <= endTileX && tx < maxTilesX; tx++) {
+
+      const startTileX = Math.max(0, Math.floor(levelLeft / T));
+      const startTileY = Math.max(0, Math.floor(levelTop / T));
+      const endTileX = Math.min(maxTilesX - 1, Math.floor(levelRight / T));
+      const endTileY = Math.min(maxTilesY - 1, Math.floor(levelBottom / T));
+
+      for (let ty = startTileY; ty <= endTileY; ty++) {
+        for (let tx = startTileX; tx <= endTileX; tx++) {
           tiles.push({ z, x: tx, y: ty });
         }
       }
-      
-      if (this.TILE_DEBUG && tiles.length > 0) {
-        const sample = tiles.slice(0, 3).map(t => `${t.z}/${t.x}/${t.y}`);
-        const more = tiles.length > 3 ? ` ... +${tiles.length - 3} more` : '';
-        console.log('[Tile] calculateVisibleTiles', {
-          visibleRect: `(${Math.round(visibleLeft)},${Math.round(visibleTop)})-${Math.round(visibleRight - visibleLeft)}x${Math.round(visibleBottom - visibleTop)}`,
-          levelScale,
+
+      return tiles;
+    },
+
+    /**
+     * 计算当前视窗需要加载的渐进式瓦片
+     * @returns {Array} 需要加载的瓦片列表 [{z, x, y}, ...]
+     */
+    calculateVisibleTiles() {
+      if (!this.tileGPM) return [];
+
+      const gpm = this.tileGPM;
+      const currentZ = this.calculateTileLevel(this.scale, gpm.maxZoomLevel);
+      const requestMaxZ = gpm.maxZoomLevel;
+      const buildMode = this.normalizeTileBuildModeValue(gpm.buildMode);
+      const visibleRect = this.getCurrentVisibleRect();
+      if (!visibleRect) return [];
+
+      const tiles = [];
+      const seen = new Set();
+      const fullImageRect = {
+        centerX: gpm.imageWidth / 2,
+        centerY: gpm.imageHeight / 2,
+        left: 0,
+        top: 0,
+        right: gpm.imageWidth,
+        bottom: gpm.imageHeight,
+        width: gpm.imageWidth,
+        height: gpm.imageHeight,
+      };
+      // merged_single_level：仅两层——z=0 压缩合并整图 + z=maxZ 原图整图，均为 fullImageRect
+      const requestLevels = (buildMode === 'merged_single_level')
+        ? Array.from(new Set([0, requestMaxZ]))
+        : Array.from({ length: requestMaxZ + 1 }, (_, index) => index);
+
+      for (const z of requestLevels) {
+        const useFullImage = (buildMode === 'merged_single_level') || (z === 0);
+        const levelTiles = this.calculateVisibleTilesForLevel(
           z,
-          startTileX,
-          startTileY,
-          endTileX,
-          endTileY,
-          maxTilesX,
-          maxTilesY,
+          useFullImage ? fullImageRect : visibleRect
+        );
+        for (const tile of levelTiles) {
+          const key = `${tile.z}/${tile.x}/${tile.y}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          tiles.push(tile);
+        }
+      }
+
+      if (this.TILE_DEBUG && tiles.length > 0) {
+        const sample = tiles.slice(0, 6).map(t => `${t.z}/${t.x}/${t.y}`);
+        const more = tiles.length > 6 ? ` ... +${tiles.length - 6} more` : '';
+        console.log('[Tile] calculateVisibleTiles', {
+          visibleRect: `(${Math.round(visibleRect.left)},${Math.round(visibleRect.top)})-${Math.round(visibleRect.width)}x${Math.round(visibleRect.height)}`,
+          currentZ,
+          requestMaxZ,
+          buildMode,
+          levels: requestLevels.join(','),
           count: tiles.length,
           sample: sample.join(', ') + more
         });
       }
 
-      // 最后兜底：在极端情况下若仍然没有任何瓦片（例如中心点/比例异常），将视野回到中心再试一次。
       if (tiles.length === 0 && gpm.imageWidth > 0 && gpm.imageHeight > 0) {
-        const fallbackX = gpm.imageWidth / 2;
-        const fallbackY = gpm.imageHeight / 2;
-        this.visibleX = fallbackX;
-        this.visibleY = fallbackY;
-
-        // 重新计算一次（避免递归调用本函数导致潜在死循环）
-        const visibleWidth2 = gpm.imageWidth * this.scale;
-        const visibleHeight2 = visibleWidth2 / (this.ImageProportion || (this.CanvasWidth / this.CanvasHeight));
-        const visibleLeft2 = Math.max(0, fallbackX - visibleWidth2 / 2);
-        const visibleTop2 = Math.max(0, fallbackY - visibleHeight2 / 2);
-        const visibleRight2 = Math.min(gpm.imageWidth, visibleLeft2 + visibleWidth2);
-        const visibleBottom2 = Math.min(gpm.imageHeight, visibleTop2 + visibleHeight2);
-
-        const levelLeft2 = visibleLeft2 / levelScale;
-        const levelTop2 = visibleTop2 / levelScale;
-        const levelRight2 = visibleRight2 / levelScale;
-        const levelBottom2 = visibleBottom2 / levelScale;
-
-        const startTileX2 = Math.floor(levelLeft2 / T);
-        const startTileY2 = Math.floor(levelTop2 / T);
-        const endTileX2 = Math.floor(levelRight2 / T);
-        const endTileY2 = Math.floor(levelBottom2 / T);
-
-        for (let ty = startTileY2; ty <= endTileY2 && ty < maxTilesY; ty++) {
-          for (let tx = startTileX2; tx <= endTileX2 && tx < maxTilesX; tx++) {
-            tiles.push({ z, x: tx, y: ty });
-          }
-        }
+        this.visibleX = gpm.imageWidth / 2;
+        this.visibleY = gpm.imageHeight / 2;
+        return this.calculateVisibleTiles();
       }
-      
+
       return tiles;
     },
 
@@ -6175,7 +6216,7 @@ export default {
       const gpm = this.tileGPM;
       const batchId = ++this.tileLoadBatchSeq;
       this.activeTileLoadBatchId = batchId;
-      this.tileAllowIncrementalRender = false;
+      this.tileAllowIncrementalRender = true;
       
       // 更新当前可见瓦片集合
       const newVisibleTiles = new Set(tiles.map(t => `${t.z}/${t.x}/${t.y}`));
@@ -6186,6 +6227,13 @@ export default {
           controller.abort();
           this.tileAbortControllers.delete(key);
           this.tilePendingLoads.delete(key);
+        }
+      }
+      for (const [key, timer] of this.tileRetryTimers.entries()) {
+        if (!newVisibleTiles.has(key)) {
+          clearTimeout(timer);
+          this.tileRetryTimers.delete(key);
+          this.tileRetryCounts.delete(key);
         }
       }
       
@@ -6206,6 +6254,13 @@ export default {
         const key = `${t.z}/${t.x}/${t.y}`;
         const hasRaw = this.tileRawDataCache && this.tileRawDataCache.has(key);
         if (!hasRaw) continue;
+        if (this.tileRetryTimers && this.tileRetryTimers.has(key)) {
+          clearTimeout(this.tileRetryTimers.get(key));
+          this.tileRetryTimers.delete(key);
+        }
+        if (this.tileRetryCounts) {
+          this.tileRetryCounts.delete(key);
+        }
 
         const cached = this.tileCache && this.tileCache.get(key);
         const needReprocess = !cached || cached.paramsKey !== paramsKey;
@@ -6227,21 +6282,10 @@ export default {
         return !hasRaw && !this.tilePendingLoads.has(key);
       });
 
-      const waitVisiblePromises = tiles.map(t => {
-        const key = `${t.z}/${t.x}/${t.y}`;
-        const hasRaw = this.tileRawDataCache && this.tileRawDataCache.has(key);
-        if (hasRaw) return Promise.resolve();
-        return this.waitForTileSettled(key);
-      });
-      
-      // 计算视口中心（用于优先级排序）
-      const centerX = (Number.isFinite(this.visibleX) ? this.visibleX : (gpm.imageWidth / 2)) / gpm.imageWidth;
-      const centerY = (Number.isFinite(this.visibleY) ? this.visibleY : (gpm.imageHeight / 2)) / gpm.imageHeight;
-      
-      // 按优先级排序瓦片：
-      // 1. 距离视口中心越近优先级越高
-      // 2. 当前缩放层级优先于其他层级
-      const currentZ = this.calculateTileLevel(this.scale, gpm.maxZoomLevel);
+      // 计算视口中心（用于同一层级内排序）
+      const visibleRect = this.getCurrentVisibleRect();
+      const centerX = (visibleRect ? visibleRect.centerX : (gpm.imageWidth / 2)) / gpm.imageWidth;
+      const centerY = (visibleRect ? visibleRect.centerY : (gpm.imageHeight / 2)) / gpm.imageHeight;
       
       tilesToLoad.forEach(tile => {
         const levelScale = Math.pow(2, gpm.maxZoomLevel - tile.z);
@@ -6257,8 +6301,11 @@ export default {
         const dy = tileCenterY - centerY;
         const distance = Math.sqrt(dx * dx + dy * dy);
         
-        // 优先级：当前层级的瓦片优先，然后按距离排序
-        tile.priority = (tile.z === currentZ ? 0 : 1000) + distance;
+        // 渐进式优先级：
+        // 1. 先拉最低分辨率层，尽快给出全局粗图
+        // 2. 再按层级逐步细化
+        // 3. 同层内优先离视口中心更近的瓦片
+        tile.priority = tile.z * 1000 + distance;
       });
       
       // 按优先级排序（优先级值越小越优先）
@@ -6267,28 +6314,16 @@ export default {
       // 将瓦片添加到加载队列（插入到队列前面）
       this.tileLoadQueue.unshift(...tilesToLoad);
       
+      // 先用已缓存的低层/高层瓦片立即重绘一遍，再等待后续下载逐步覆盖
+      this.renderTiles();
+
       // 开始处理加载队列
       this.processLoadQueue();
 
-      // 屏障：等待“当前可视范围”瓦片就绪（或超时）后再统一渲染，避免逐瓦片补齐造成闪烁
-      const waitMs = Math.max(100, Number(this.tileBatchMaxWaitMs) || 1200);
-      await Promise.race([
-        Promise.all(waitVisiblePromises),
-        new Promise(resolve => setTimeout(resolve, waitMs)),
-      ]);
-
-      // 若期间已切换到新批次（新视窗/新帧），放弃本次渲染
-      if (batchId !== this.activeTileLoadBatchId) {
-        if (this.TILE_DEBUG) console.log('[Tile] loadVisibleTiles skip render (batch changed)', { batchId, active: this.activeTileLoadBatchId });
-        return;
+      // 若当前批次没有新下载任务，主动触发一次收敛渲染，避免仅依赖异步补绘。
+      if (tilesToLoad.length === 0 && batchId === this.activeTileLoadBatchId) {
+        this.renderTiles();
       }
-      if (this.TILE_DEBUG) {
-        const wanted = tiles.length;
-        const hasRaw = wanted - tilesToLoad.length;
-        console.log('[Tile] loadVisibleTiles barrier done', { batchId, wanted, hadRaw: hasRaw, toLoad: tilesToLoad.length, waitMs });
-      }
-      this.tileAllowIncrementalRender = true;
-      this.renderTiles();
     },
 
     /**
@@ -6344,6 +6379,43 @@ export default {
       }
     },
 
+    scheduleTileRetry(tile, expectedSessionId, expectedFrameId) {
+      if (!tile || !this.currentVisibleTiles) return;
+      const key = `${tile.z}/${tile.x}/${tile.y}`;
+      if (!this.currentVisibleTiles.has(key)) return;
+      if (expectedSessionId !== this.tileSessionId || expectedFrameId !== this.tileFrameId) return;
+      if (!this.tileRetryTimers) {
+        this.tileRetryTimers = new Map();
+      }
+      if (!this.tileRetryCounts) {
+        this.tileRetryCounts = new Map();
+      }
+      if (this.tileRetryTimers.has(key)) return;
+
+      const retryCount = (this.tileRetryCounts.get(key) || 0) + 1;
+      this.tileRetryCounts.set(key, retryCount);
+      const delayMs = Math.min(1500, 120 * Math.pow(1.6, Math.max(0, retryCount - 1)));
+      const timer = setTimeout(() => {
+        this.tileRetryTimers.delete(key);
+        if (expectedSessionId !== this.tileSessionId || expectedFrameId !== this.tileFrameId) return;
+        if (!this.currentVisibleTiles || !this.currentVisibleTiles.has(key)) return;
+        if ((this.tileRawDataCache && this.tileRawDataCache.has(key)) || this.tilePendingLoads.has(key)) return;
+
+        this.tileLoadQueue.unshift({
+          z: tile.z,
+          x: tile.x,
+          y: tile.y,
+          priority: -1,
+        });
+        this.processLoadQueue();
+      }, delayMs);
+
+      this.tileRetryTimers.set(key, timer);
+      if (this.TILE_DEBUG) {
+        console.log('[Tile] schedule retry', { key, retryCount, delayMs });
+      }
+    },
+
     scheduleTileRender() {
       if (this.tileRenderRaf != null) return;
       const flush = () => {
@@ -6392,7 +6464,9 @@ export default {
           if (this.TILE_DEBUG) {
             console.warn('[Tile] loadSingleTile HTTP error', { key, status: response.status, statusText: response.statusText });
           }
-          throw new Error(`Failed to load tile ${key}: ${response.status}`);
+          const httpError = new Error(`Failed to load tile ${key}: ${response.status}`);
+          httpError.status = response.status;
+          throw httpError;
         }
         
         const buffer = await response.arrayBuffer();
@@ -6418,6 +6492,13 @@ export default {
           const paramsKey = this.getTileRenderParamsKey();
           // 保存原始瓦片数据（用于白平衡等参数变化时重新处理）
           this.tileRawDataCache.set(key, tileData);
+          if (this.tileRetryTimers && this.tileRetryTimers.has(key)) {
+            clearTimeout(this.tileRetryTimers.get(key));
+            this.tileRetryTimers.delete(key);
+          }
+          if (this.tileRetryCounts) {
+            this.tileRetryCounts.delete(key);
+          }
           
           try {
             const processedTile = this.processTile(tileData);
@@ -6453,6 +6534,11 @@ export default {
         // 如果是取消请求，不输出错误
         if (error.name === 'AbortError') {
           if (this.TILE_DEBUG) console.log('[Tile] loadSingleTile cancelled', { key });
+        } else if (error && error.status === 404) {
+          this.scheduleTileRetry(tile, expectedSessionId, expectedFrameId);
+          if (this.TILE_DEBUG) {
+            console.log('[Tile] loadSingleTile 404, will retry', { key });
+          }
         } else {
           console.error('[Tile] loadSingleTile error', { key, error });
         }
@@ -6575,9 +6661,12 @@ export default {
       
       // 获取当前应该显示的层级（反向金字塔）
       const z = this.calculateTileLevel(this.scale, gpm.maxZoomLevel);
+      const buildMode = this.normalizeTileBuildModeValue(gpm.buildMode);
+      const isMergedSingleLevel = (buildMode === 'merged_single_level');
 
       // 若缩放导致瓦片层级切换：清理“当前可视区域”，避免旧层级瓦片残留造成“看起来没有更新”的错觉
-      // 只清一次（每次层级切换清一次），避免每块瓦片加载都清空导致闪烁
+      // merged_single_level 模式：不在此处清空视口，因 z=0 全图会先绘制并覆盖旧 currentZ，currentZ 再逐片叠加即可实现渐进覆盖
+      // pyramid 模式：需清空视口以移除旧层级瓦片
       if (this._tileLastRenderedZ === undefined) {
         this._tileLastRenderedZ = z;
       } else if (this._tileLastRenderedZ !== z) {
@@ -6594,7 +6683,6 @@ export default {
         const h = Math.max(0, bottom - top);
 
         // 层级变化日志：用于确认缩放是否触发了新层级瓦片加载
-        // 注意：scale 越小表示越放大；z 越大表示越高精度（接近原图）
         try {
           const msg = `[TileLevelChange] session=${this.tileSessionId} z:${prevZ} -> ${z} scale=${Number(this.scale).toFixed(3)} center=(${Math.round(cx)},${Math.round(cy)}) visible=(${Math.round(left)},${Math.round(top)})-${Math.round(w)}x${Math.round(h)}`;
           console.log(msg);
@@ -6603,7 +6691,8 @@ export default {
           // ignore logging errors
         }
 
-        if (w > 0 && h > 0) {
+        // pyramid 模式：清空视口以移除旧层级；merged_single_level 跳过，由 z=0 全图重绘覆盖
+        if (!isMergedSingleLevel && w > 0 && h > 0) {
           ctx.clearRect(left, top, w, h);
         }
         this._tileLastRenderedZ = z;
@@ -6644,10 +6733,16 @@ export default {
         (this.currentVisibleTiles && this.currentVisibleTiles.size > 0)
           ? Array.from(this.currentVisibleTiles)
           : Array.from(this.tileCache.keys());
+      keysToDraw.sort((a, b) => {
+        const [az, ax, ay] = a.split('/').map(Number);
+        const [bz, bx, by] = b.split('/').map(Number);
+        if (az !== bz) return az - bz;
+        if (ay !== by) return ay - by;
+        return ax - bx;
+      });
 
       let drawnCount = 0;
       let skipNoCache = 0;
-      let skipWrongZ = 0;
       const drawDetails = this.TILE_DEBUG ? [] : null;
 
       for (const key of keysToDraw) {
@@ -6660,15 +6755,11 @@ export default {
         }
 
         const [tileZ, tileX, tileY] = key.split('/').map(Number);
-        if (tileZ !== z) {
-          skipWrongZ++;
-          if (this.TILE_DEBUG) drawDetails.push({ key, reason: 'wrongZ', tileZ, currentZ: z });
-          continue;
-        }
+        const tileLevelScale = Math.pow(2, gpm.maxZoomLevel - tileZ);
 
-        const destX = tileX * T * levelScale;
-        const destY = tileY * T * levelScale;
-        const fullTilePx = T * levelScale;
+        const destX = tileX * T * tileLevelScale;
+        const destY = tileY * T * tileLevelScale;
+        const fullTilePx = T * tileLevelScale;
         // 边缘瓦片：层级尺寸不能整除 T 时，最后一列/行只覆盖部分图像，需裁剪到图像边界，避免右侧/下侧拉伸错位
         const destWidth = Math.min(fullTilePx, gpm.imageWidth - destX);
         const destHeight = Math.min(fullTilePx, gpm.imageHeight - destY);
@@ -6695,7 +6786,7 @@ export default {
         }
       }
 
-      if (this.TILE_DEBUG && (drawnCount > 0 || skipNoCache > 0 || skipWrongZ > 0)) {
+      if (this.TILE_DEBUG && (drawnCount > 0 || skipNoCache > 0)) {
         console.log('[Tile] renderTiles', {
           canvasSize: `${this.tileCanvas.width}x${this.tileCanvas.height}`,
           z,
@@ -6703,7 +6794,6 @@ export default {
           keysTotal: keysToDraw.length,
           drawn: drawnCount,
           skipNoCache,
-          skipWrongZ,
           sample: drawDetails.slice(0, 5)
         });
       }
@@ -10929,6 +11019,15 @@ export default {
           this.sendMessage('Vue_Command', 'SetMainCameraSaveFailedParse:' + (value === 'true' || value === true));
         }else if (label === 'Save Folder') {
           this.sendMessage('Vue_Command', 'SetMainCameraSaveFolder:' + value);
+        }else if (label === 'Tile Build Mode') {
+          const normalizedMode = this.normalizeTileBuildModeValue(value);
+          this.sendMessage('Vue_Command', 'SetMainCameraTileBuildMode:' + normalizedMode);
+          if (this.tileGPM) {
+            this.tileGPM.buildMode = normalizedMode;
+            this.tileCanvasNeedsClear = true;
+            this.rememberTileViewportState();
+            this.loadVisibleTiles();
+          }
         }else if (label === 'LoopCaptureNum') {
           this.sendMessage('Vue_Command', 'SetMainCameraLoopCaptureNum:' + value);
         }else if (label === 'Capture Mode') {

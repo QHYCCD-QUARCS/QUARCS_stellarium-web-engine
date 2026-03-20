@@ -12,6 +12,7 @@ SKYDATA_MODE="${SKYDATA_MODE:-}"      # sudo 默认 copy；普通用户默认 sy
 ENGINE_UPDATE="${ENGINE_UPDATE:-1}"   # 1=make update-engine, 0=跳过（默认跳过：该步骤需要 docker 且耗时较长）
 BUMP_VERSION="${BUMP_VERSION:-0}"     # 1=更新 .env 中 VUE_APP_VERSION, 0=保持不变（默认不改：避免触发前端全量重建）
 WAIT_SERVERS="${WAIT_SERVERS:-1}"     # 1=启动后保持前台运行（wait），0=启动后直接返回
+BUILD_ONLY="${BUILD_ONLY:-0}"         # 1=仅构建 dist/ 后退出，不启动本地 HTTP/HTTPS 预览（供 quarcs-update 等部署脚本使用）
 
 # Pin Node via nvm to avoid /usr/bin/node (v12) breaking modern JS syntax (??, etc.)
 NODE_VER="${NODE_VER:-20}"
@@ -362,6 +363,16 @@ start_services() {
   # 允许服务启动
   sleep 0.5
 }
+
+if [ "${BUILD_ONLY}" = "1" ]; then
+  step "停止服务（释放端口 ${PORT_HTTP}/${PORT_HTTPS}）" stop_services
+  step "（可选）更新前端版本号 .env: VUE_APP_VERSION" maybe_bump_version
+  step "（可选）编译并更新 stellarium-web-engine (wasm/js)" maybe_update_engine
+  step "构建前端（tiles: ${TILES_MODE}）" build_frontend
+  log ""
+  log "BUILD_ONLY=1：已生成 dist/，未启动本地 HTTP/HTTPS 预览。"
+  exit 0
+fi
 
 step "停止服务（释放端口 ${PORT_HTTP}/${PORT_HTTPS}）" stop_services
 step "（可选）更新前端版本号 .env: VUE_APP_VERSION" maybe_bump_version
