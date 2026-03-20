@@ -1,6 +1,14 @@
 <template>
 <transition name="panel">
-  <div class="chart-panel" :style="{ bottom: bottom + 'px', left: ComponentPadding + 'px', right: ComponentPadding + 'px', height: height + 'px' }" data-testid="ui-chart-component-root">
+  <div
+    class="chart-panel"
+    :style="{ bottom: bottom + 'px', left: ComponentPadding + 'px', right: ComponentPadding + 'px', height: height + 'px' }"
+    data-testid="ui-chart-component-root"
+    :data-exp-time-ms="String(ExpTime)"
+    :data-loop-exp-state="isLoopping ? 'on' : 'off'"
+    :data-guiding="isGuiding ? 'true' : 'false'"
+    :data-guider-status="CurrentGuiderStatus"
+  >
     <LineChart ref="linechart" class="line-chart"/>
     
     <ScatterChart ref="scatterchart" class="scatter-chart"/>
@@ -23,13 +31,23 @@
       <button class="btn-Style" :class="GuiderSwitchBtnClass"
         @mousedown="startPress" @mouseup="endPress" @mouseleave="cancelPress"
         @touchstart.stop.prevent="startPress" @touchend.stop.prevent="endPress"
-        @touchcancel.stop.prevent="cancelPress" data-testid="ui-chart-component-btn-start-press">
+        @touchcancel.stop.prevent="cancelPress"
+        data-testid="ui-chart-component-btn-start-press"
+        :data-guiding="isGuiding ? 'true' : 'false'"
+        :data-status="CurrentGuiderStatus"
+        :aria-pressed="isGuiding ? 'true' : 'false'">
+
         <div style="display: flex; justify-content: center; align-items: center;">
           <img src="@/assets/images/svg/ui/Guider.svg" height="20px" style="min-height: 20px; pointer-events: none;"></img>
         </div>
       </button>
 
-      <button class="btn-Style" @click="ExpTimeSwitch" data-testid="ui-chart-component-btn-exp-time-switch">
+      <button
+        class="btn-Style"
+        @click="ExpTimeSwitch"
+        data-testid="ui-chart-component-btn-exp-time-switch"
+        :data-exp-time-ms="String(ExpTime)"
+      >
         <span v-if="ExpTime === 1000">
           <div style="display: flex; justify-content: center; align-items: center;">
             <img src="@/assets/images/svg/ui/Exp-1000.svg" height="25px" style="min-height: 25px; pointer-events: none;"></img>

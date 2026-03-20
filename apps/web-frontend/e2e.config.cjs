@@ -149,7 +149,7 @@ const CONFIG_DOCS = {
     {
       key: 'stepTimeoutMs',
       env: 'E2E_STEP_TIMEOUT_MS',
-      default: 30_000,
+      default: 5_000,
       scope: 'flow',
       descZh: '导航/后端相关步骤默认超时（page.setDefaultNavigationTimeout / step 兜底超时）。',
     },
@@ -335,7 +335,7 @@ const DEFAULTS = Object.freeze({
     downloadDir: docDefault('downloadDir', './playwright-downloads') || './playwright-downloads',
     goalMaxSteps: docDefault('goalMaxSteps', 30),
     uiTimeoutMs: docDefault('uiTimeoutMs', 2_000),
-    stepTimeoutMs: docDefault('stepTimeoutMs', 30_000),
+    stepTimeoutMs: docDefault('stepTimeoutMs', 5_000),
     testTimeoutMs: docDefault('testTimeoutMs', 10 * 60_000),
     appPath: docDefault('appPath', '/'),
     ws: docDefault('ws', ''),

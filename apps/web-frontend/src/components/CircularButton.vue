@@ -1,5 +1,5 @@
 <template>
-  <div class="circular-button no-select" data-testid="ui-circular-button-root">
+  <div class="circular-button no-select" :data-testid="$attrs['data-testid'] || 'ui-circular-button-root'">
     <svg
       v-bind="$attrs"
       @touchstart.prevent="handleMouseDown($event)" @touchend.prevent="handleMouseUp($event)"

@@ -736,6 +736,165 @@ mcp.registerTool(
   },
 )
 
+/** AI-Control 命令名列表（与 AI-Control/scenario/cliFlows.ts CLI_COMMANDS 一致） */
+const AI_CONTROL_COMMANDS = [
+  'general-settings',
+  'power-management',
+  'guider-connect-capture',
+  'maincamera-connect-capture',
+  'mount-connect-control',
+  'telescopes-focal-length',
+  'focuser-connect-control',
+  'cfw-capture-config',
+  'polar-axis-calibration',
+  'image-file-manager',
+]
+
+/**
+ * 工具：列出 AI-Control 可用命令名（供 AI 选择要执行的动作）
+ */
+mcp.registerTool(
+  'ai_control_list_commands',
+  {
+    description:
+      '列出 AI-Control 全部命令名。用于让 AI 知道可以控制前端的哪些功能（通用设置、电源管理、导星/主相机连接拍摄、赤道仪、焦距、电调、滤镜轮、极轴校准、图像管理等）。',
+    inputSchema: z.object({}),
+  },
+  async () => ({
+    content: [
+      {
+        type: 'text',
+        text: JSON.stringify(
+          {
+            commands: AI_CONTROL_COMMANDS,
+            note: '在已打开的会话页上执行请用 ai_control_run_command_on_session（需先 npm run e2e:ai-control:session）；否则用 ai_control_run_command 每次新开浏览器执行。',
+          },
+          null,
+          2,
+        ),
+      },
+    ],
+  }),
+)
+
+/**
+ * 工具：执行一条 AI-Control 命令（在浏览器中打开页面并执行对应业务动作）
+ */
+mcp.registerTool(
+  'ai_control_run_command',
+  {
+    description:
+      '在浏览器中执行一条 AI-Control 命令，控制前端完成对应业务动作（如打开通用设置、电源管理、连接设备并拍摄等）。每次调用会启动一次 Playwright 运行该命令。',
+    inputSchema: z.object({
+      commandName: z
+        .string()
+        .refine((c) => AI_CONTROL_COMMANDS.includes(c), {
+          message: `commandName 须为: ${AI_CONTROL_COMMANDS.join(', ')}`,
+        })
+        .describe('命令名，可用 ai_control_list_commands 查看完整列表'),
+      flowParams: z.record(z.any()).optional().describe('可选参数，如 general-settings 的 resetBeforeConnect、generalSettingsInteract 等'),
+      baseUrl: z.string().optional().describe('覆盖 E2E_BASE_URL'),
+      headed: z.boolean().optional().describe('是否显示浏览器窗口，默认 true'),
+      timeoutSec: z.number().int().min(30).max(600).optional().describe('本次运行超时秒数，默认 300'),
+    }),
+  },
+  async ({ commandName, flowParams, baseUrl, headed, timeoutSec }) => {
+    const timeoutMs = (timeoutSec ?? 300) * 1000
+    const env = {
+      E2E_AI_CONTROL_COMMAND: commandName,
+      ...(flowParams && Object.keys(flowParams).length > 0 ? { E2E_FLOW_PARAMS_JSON: JSON.stringify(flowParams) } : {}),
+      ...(baseUrl ? { E2E_BASE_URL: baseUrl } : {}),
+      ...(headed !== undefined ? { E2E_HEADED: headed ? '1' : '0' } : {}),
+    }
+
+    const args = [
+      'playwright',
+      'test',
+      'AI-Control/e2e/run-one-command.spec.ts',
+      '--project=ai-control',
+      '--workers=1',
+      '--timeout',
+      String(Math.min(timeoutMs - 5000, 600_000)),
+    ]
+    if (env.E2E_HEADED !== '0') args.push('--headed')
+
+    const res = await runCommand({
+      cmd: 'npx',
+      args,
+      cwd: WEB_FRONTEND_ROOT,
+      env,
+      timeoutMs,
+    })
+
+    const summary = {
+      ok: res.code === 0 && !res.killedByTimeout,
+      commandName,
+      exitCode: res.code,
+      killedByTimeout: res.killedByTimeout,
+      stdoutTail: tailLines(res.stdout, 100),
+      stderrTail: tailLines(res.stderr, 100),
+    }
+    return {
+      content: [{ type: 'text', text: JSON.stringify(summary, null, 2) }],
+    }
+  },
+)
+
+/** 会话模式 HTTP 服务默认端口（与 ai-control-session.ts 中 E2E_AI_CONTROL_SESSION_PORT 一致） */
+const AI_CONTROL_SESSION_DEFAULT_PORT = 39281
+
+/**
+ * 工具：在「已打开的会话页面」上执行一条命令（对话模式，与用户共用同一页）
+ * 使用前需先在本机启动会话：cd apps/web-frontend && npm run e2e:ai-control:session
+ */
+mcp.registerTool(
+  'ai_control_run_command_on_session',
+  {
+    description:
+      '在用户已启动的 AI-Control 会话（同一浏览器页）上执行一条命令。必须先由用户运行 npm run e2e:ai-control:session 启动会话并保持运行，AI 调用本工具时会将命令发送到该会话，在同一页上执行，实现「AI 使用对话模式」。若会话未启动会返回错误提示。',
+    inputSchema: z.object({
+      commandName: z
+        .string()
+        .refine((c) => AI_CONTROL_COMMANDS.includes(c), {
+          message: `commandName 须为: ${AI_CONTROL_COMMANDS.join(', ')}`,
+        })
+        .describe('命令名'),
+      flowParams: z.record(z.any()).optional().describe('可选参数'),
+      sessionPort: z.number().int().min(1).max(65535).optional().describe(`会话 HTTP 端口，默认 ${AI_CONTROL_SESSION_DEFAULT_PORT}`),
+    }),
+  },
+  async ({ commandName, flowParams, sessionPort }) => {
+    const port = sessionPort ?? AI_CONTROL_SESSION_DEFAULT_PORT
+    const url = `http://127.0.0.1:${port}/run`
+    let res
+    try {
+      res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ commandName, flowParams: flowParams ?? {} }),
+      })
+    } catch (err) {
+      const message = err?.message ?? String(err)
+      const hint = message.includes('ECONNREFUSED') || message.includes('fetch failed')
+        ? '会话未启动。请先在终端执行: cd apps/web-frontend && npm run e2e:ai-control:session'
+        : message
+      return {
+        content: [{ type: 'text', text: JSON.stringify({ ok: false, error: hint }, null, 2) }],
+      }
+    }
+    const text = await res.text()
+    let body
+    try {
+      body = text ? JSON.parse(text) : {}
+    } catch {
+      body = { ok: false, error: text || 'Invalid response' }
+    }
+    return {
+      content: [{ type: 'text', text: JSON.stringify(body, null, 2) }],
+    }
+  },
+)
+
 /**
  * 工具：列出可用 flow steps（避免一次返回过大，默认带 limit）
  */

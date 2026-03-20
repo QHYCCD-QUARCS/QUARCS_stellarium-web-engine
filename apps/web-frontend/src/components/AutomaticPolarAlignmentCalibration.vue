@@ -27,6 +27,14 @@
         <div class="minimized-controls" data-testid="pa-minimized-controls">
           <button
             class="minimized-btn"
+            @click="closeInterface"
+            :title="$t('Close')"
+            data-testid="pa-btn-close-minimized"
+          >
+            <v-icon data-testid="pa-icon-close-minimized">mdi-close</v-icon>
+          </button>
+          <button
+            class="minimized-btn"
             @click="toggleMinimize"
             :title="$t('Expand')"
             data-testid="pa-btn-expand-from-minimized"
@@ -85,6 +93,14 @@
         </div>
 
         <div class="header-controls" data-testid="pa-header-controls">
+          <button
+            class="header-btn"
+            @click="closeInterface"
+            :title="$t('Close')"
+            data-testid="pa-btn-close"
+          >
+            <v-icon data-testid="pa-icon-close">mdi-close</v-icon>
+          </button>
           <button
             class="header-btn"
             @click="toggleCollapse"
@@ -1195,6 +1211,12 @@ export default {
         // 更新缓存的尺寸信息
         this.updateCachedDimensions()
         this.addLog(this.isMinimized ? this.$t('Interface Minimized') : this.$t('Interface Expanded'), 'info')
+      },
+
+      closeInterface() {
+        this.showTrajectoryOverlay = false
+        this.disableOverlayEventCapture()
+        this.hideInterface()
       },
 
       toggleCollapse() {

@@ -17,9 +17,17 @@
  */
 import { expect } from '@playwright/test'
 import type { FlowContext, StepRegistry } from '../core/flowTypes'
+import { CONFIRM_ACTION, CONFIRM_DIALOG_ROOT_TESTID } from '../shared/dialogConstants'
+import { createStepError } from '../shared/errors'
 import { clickByTestId } from '../shared/interaction'
 import { ensureMenuDrawerOpen } from '../shared/navigation'
-import { confirmDialogIfOpen, waitForConfirmDialogOpen } from './dialogSteps'
+import { sleep } from '../shared/interaction'
+import {
+  confirmDialogIfOpen,
+  disconnectAllDialogIfOpen,
+  waitForConfirmDialogOpen,
+  waitForDisconnectAllDialogOpen,
+} from './dialogSteps'
 
 type MenuOpenSpec = {
   menuTestId: string
@@ -55,19 +63,26 @@ async function isMenuResultOpen(ctx: FlowContext, spec: MenuOpenSpec) {
 
 async function assertMenuResultOpen(ctx: FlowContext, spec: MenuOpenSpec, timeout: number) {
   const root = ctx.page.getByTestId(spec.resultTestId).first()
-  await expect(root, `${spec.resultLabel} 应已打开`).toBeVisible({ timeout })
   if (spec.resultState) {
-    await expect(root).toHaveAttribute(spec.resultAttr ?? 'data-state', spec.resultState, { timeout })
+    await expect(root, `${spec.resultLabel} 应已打开 (data-state)`).toHaveAttribute(
+      spec.resultAttr ?? 'data-state',
+      spec.resultState,
+      { timeout },
+    )
   }
   if (spec.resultAction) {
     await expect(root).toHaveAttribute(spec.resultActionAttr ?? 'data-action', spec.resultAction, { timeout })
   }
+  // 以 data-state 为业务结果；v-dialog 等组件在过渡期可能被判为不可见，仅校验状态即可
+  if (!spec.resultState && !spec.resultAction) {
+    await expect(root, `${spec.resultLabel} 应已可见`).toBeVisible({ timeout })
+  }
 }
 
 async function assertNoUnexpectedConfirmDialog(ctx: FlowContext, spec: MenuOpenSpec, timeout: number) {
-  if (spec.resultTestId !== 'ui-confirm-dialog-root' || !spec.resultAction) return
+  if (spec.resultTestId !== CONFIRM_DIALOG_ROOT_TESTID || !spec.resultAction) return
 
-  const root = ctx.page.getByTestId('ui-confirm-dialog-root').first()
+  const root = ctx.page.getByTestId(CONFIRM_DIALOG_ROOT_TESTID).first()
   if (!(await root.isVisible().catch(() => false))) return
 
   const currentAction = await root.getAttribute(spec.resultActionAttr ?? 'data-action').catch(() => null)
@@ -76,37 +91,72 @@ async function assertNoUnexpectedConfirmDialog(ctx: FlowContext, spec: MenuOpenS
     return
   }
 
-  throw new Error(
-    `当前已打开其他确认弹窗，无法执行 ${spec.menuTestId}: expected=${spec.resultAction}, actual=${currentAction ?? 'unknown'}`,
+  throw createStepError(
+    'menu.ensureMenuResultOpen',
+    'postcondition',
+    `当前已打开其他确认弹窗，无法执行 ${spec.menuTestId}`,
+    { expectedAction: spec.resultAction, actualAction: currentAction ?? 'unknown' },
   )
 }
 
 async function ensureMenuResultOpen(ctx: FlowContext, params: Record<string, any>, spec: MenuOpenSpec) {
   const timeout = resolveTimeout(ctx, params)
+  await sleep(400)
   if (await isMenuResultOpen(ctx, spec)) return
 
   await assertNoUnexpectedConfirmDialog(ctx, spec, timeout)
   console.log(`[ai-control] ${spec.menuTestId} 前置步骤: menu.drawer.open`)
   await ensureMenuDrawerOpen(ctx.page, timeout)
   await clickByTestId(ctx.page, spec.menuTestId, timeout)
+  await sleep(600)
+
+  const isSettingsDialog = spec.resultTestId === 'ui-view-settings-dialog-root'
+  if (isSettingsDialog && !(await isMenuResultOpen(ctx, spec))) {
+    await ctx.page.keyboard.press('Escape')
+    await sleep(400)
+    await ensureMenuDrawerOpen(ctx.page, timeout)
+    await clickByTestId(ctx.page, spec.menuTestId, timeout)
+    await sleep(800)
+  }
   await assertMenuResultOpen(ctx, spec, timeout)
   console.log(`[ai-control] ${spec.menuTestId} 后置确认: ${spec.resultLabel} 已打开`)
 }
 
+function allowMissingDisconnectAllDialog(params: Record<string, any>) {
+  return params.allowMissing !== false
+}
+
+/** 打开“断开全部”确认弹窗。有设备连接时才会弹窗，无设备连接时不会弹窗，此时直接返回 false。 */
 async function openDisconnectAllConfirm(ctx: FlowContext, params: Record<string, any>) {
   const timeout = resolveTimeout(ctx, params)
-  const dialogRoot = ctx.page.getByTestId('ui-confirm-dialog-root').first()
+  const dialogRoot = ctx.page.getByTestId(CONFIRM_DIALOG_ROOT_TESTID).first()
 
   if (await dialogRoot.isVisible().catch(() => false)) {
-    await waitForConfirmDialogOpen(ctx.page, timeout, { expectedAction: 'disconnectAllDevice' })
-    return
+    await waitForDisconnectAllDialogOpen(ctx.page, timeout)
+    return true
   }
 
   console.log('[ai-control] menu.openDisconnectAllConfirm 前置步骤: menu.drawer.open')
   await ensureMenuDrawerOpen(ctx.page, timeout)
   await clickByTestId(ctx.page, 'ui-app-menu-disconnect-all', timeout)
-  await waitForConfirmDialogOpen(ctx.page, Math.min(8000, timeout), { expectedAction: 'disconnectAllDevice' })
+  const waitMs = Math.min(8000, timeout)
+  const dialog = await waitForDisconnectAllDialogOpen(ctx.page, waitMs, {
+    allowMissing: allowMissingDisconnectAllDialog(params),
+  }).catch((error) => {
+    throw createStepError(
+      'menu.openDisconnectAllConfirm',
+      'postcondition',
+      '等待断开全部确认弹窗超时',
+      { waitMs },
+      error,
+    )
+  })
+  if (!dialog) {
+    console.log('[ai-control] menu.openDisconnectAllConfirm: 无设备连接时不弹窗，跳过')
+    return false
+  }
   console.log('[ai-control] menu.openDisconnectAllConfirm 后置确认: 确认弹窗已出现')
+  return true
 }
 
 export function makeMenuStepRegistry(): StepRegistry {
@@ -144,10 +194,13 @@ export function makeMenuStepRegistry(): StepRegistry {
   })
 
   registry.set('menu.disconnectAll', {
+    description: '断开全部设备',
     async run(ctx, params) {
       const timeout = resolveTimeout(ctx, params)
-      await openDisconnectAllConfirm(ctx, params)
-      await confirmDialogIfOpen(ctx.page, 'confirm', timeout, { expectedAction: 'disconnectAllDevice' })
+      const opened = await openDisconnectAllConfirm(ctx, params)
+      await disconnectAllDialogIfOpen(ctx.page, 'confirm', timeout, {
+        allowMissing: allowMissingDisconnectAllDialog(params) && !opened,
+      })
       console.log('[ai-control] menu.disconnectAll 后置确认: 断开全部确认弹窗已处理')
     },
   })
@@ -164,7 +217,23 @@ export function makeMenuStepRegistry(): StepRegistry {
     },
   })
 
+  registry.set('menu.ensureGeneralSettingsClosed', {
+    description: '若通用设置对话框已打开则关闭，便于后续 openGeneralSettings 从已知关闭态打开',
+    async run(ctx, params) {
+      const root = ctx.page.getByTestId('ui-view-settings-dialog-root').first()
+      const state = await root.getAttribute('data-state').catch(() => null)
+      if (state !== 'open') return
+      for (let i = 0; i < 3; i += 1) {
+        await ctx.page.keyboard.press('Escape')
+        await sleep(300)
+      }
+      await root.waitFor({ state: 'hidden', timeout: 4000 }).catch(() => {})
+      await sleep(200)
+    },
+  })
+
   registry.set('menu.openGeneralSettings', {
+    description: '打开总设置对话框',
     async run(ctx, params) {
       await ensureMenuResultOpen(ctx, params, {
         menuTestId: 'ui-app-menu-general-settings',
@@ -255,10 +324,10 @@ export function makeMenuStepRegistry(): StepRegistry {
     async run(ctx, params) {
       await ensureMenuResultOpen(ctx, params, {
         menuTestId: 'ui-app-menu-refresh-page',
-        resultTestId: 'ui-confirm-dialog-root',
+        resultTestId: CONFIRM_DIALOG_ROOT_TESTID,
         resultLabel: '刷新确认弹窗',
         resultState: 'open',
-        resultAction: 'Refresh',
+        resultAction: CONFIRM_ACTION.REFRESH,
       })
     },
   })
