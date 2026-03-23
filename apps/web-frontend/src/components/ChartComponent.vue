@@ -214,6 +214,9 @@ export default {
 
     GuiderSwitch() {
       if(this.isLoopping) {
+        if (!this.isGuiding) {
+          this.DataClear();
+        }
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'GuiderSwitch:'+!this.isGuiding);
       } else {
         this.$bus.$emit('showMsgBox', 'Please open the loop exposure first.', 'error');
