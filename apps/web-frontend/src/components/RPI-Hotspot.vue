@@ -28,6 +28,85 @@
         {{ $t('Please connect to the new hotspot in the mobile phone system settings, it will take about a minute to wait.') }}
       </span>
 
+      <!-- ===== Network mode (minimal UI) ===== -->
+      <div class="NetBox">
+        <div class="NetRow">
+          <span class="NetLabel">Mode</span>
+          <span class="NetValue">{{ netStatus.mode || '-' }}</span>
+        </div>
+        <div class="NetRow">
+          <span class="NetLabel">wlan</span>
+          <span class="NetValue">{{ netStatus.wlan_ip || '-' }}</span>
+        </div>
+        <div class="NetRow">
+          <span class="NetLabel">eth</span>
+          <span class="NetValue">{{ netStatus.eth_ip || '-' }}</span>
+        </div>
+        <div class="NetRow">
+          <span class="NetLabel">gw</span>
+          <span class="NetValue">{{ netStatus.gateway || '-' }}</span>
+        </div>
+        <div class="NetRow">
+          <span class="NetLabel">ZeroTier</span>
+          <span class="NetValue">{{ netStatus.zerotier || '-' }}</span>
+        </div>
+
+        <div class="NetBtns">
+          <button class="custom-button btn-Net no-select" @click="SwitchToWAN">
+            <span>Enter WAN</span>
+          </button>
+          <button class="custom-button btn-Net no-select" @click="SwitchToAP">
+            <span>Back AP</span>
+          </button>
+          <button class="custom-button btn-Net no-select" @click="RequestNetStatus">
+            <span>Refresh</span>
+          </button>
+        </div>
+        <div class="NetHint">
+          <span v-if="netBusy">Switching network… This may disconnect your phone temporarily.</span>
+          <span v-else>Tip: Enter WAN will turn off hotspot (phone may disconnect). If WAN fails it will fallback to AP.</span>
+        </div>
+      </div>
+
+      <!-- ===== Wi‑Fi uplink setup (scan + save) ===== -->
+      <div class="WifiBox">
+        <div class="WifiTitle">Uplink Wi‑Fi</div>
+        <div class="WifiRow">
+          <button class="custom-button btn-Net no-select" @click="ScanWifi">
+            <span v-if="!wifiScanning">Scan</span>
+            <span v-else>Scanning…</span>
+          </button>
+          <span class="WifiHint">Save to profile: {{ uplinkProfile }}</span>
+        </div>
+
+        <v-select
+          class="WifiSelect"
+          :items="wifiItems"
+          item-text="text"
+          item-value="ssid"
+          label="Choose SSID"
+          v-model="wifiSelectedSsid"
+          variant="outlined"
+          dense
+        ></v-select>
+
+        <v-text-field
+          class="WifiPsk"
+          label="Password"
+          v-model="wifiPsk"
+          variant="outlined"
+          type="password"
+        ></v-text-field>
+
+        <div class="WifiRow">
+          <button class="custom-button btn-Net no-select" @click="SaveUplinkWifi">
+            <span v-if="!wifiSaving">Save</span>
+            <span v-else>Saving…</span>
+          </button>
+          <span class="WifiHint2">After saving, Enter WAN will try Ethernet first, then this Wi‑Fi.</span>
+        </div>
+      </div>
+
     </div>
   </transition>
 </template>
@@ -47,12 +126,30 @@ export default {
       defaultShow: false,
 
       isUpdated: false,
+
+      // network mode status (from Qt: NetStatus|{...})
+      netStatus: {},
+      netBusy: false,
+
+      // Wi‑Fi uplink setup
+      uplinkProfile: 'wan-uplink',
+      wifiScanning: false,
+      wifiSaving: false,
+      wifiScanResults: [],
+      wifiSelectedSsid: '',
+      wifiPsk: '',
       
     };
   },
   created() {
     this.$bus.$on('HotspotName', this.CurrentHotspotName);
     this.$bus.$on('EditHotspotNameSuccess', this.UpdateSuccess);
+    this.$bus.$on('NetStatus', this.OnNetStatus);
+    this.$bus.$on('NetModeResult', this.OnNetModeResult);
+    this.$bus.$on('WiFiScan', this.OnWiFiScan);
+    this.$bus.$on('WiFiSaveResult', this.OnWiFiSaveResult);
+    // when dialog toggles, request status once
+    this.$bus.$on('toggleRPIHotspotDialog', this.RequestNetStatus);
   },
   methods: {
     CurrentHotspotName(name) {
@@ -89,6 +186,99 @@ export default {
       this.$bus.$emit('SendConsoleLogMsg', 'Update Hotspot Name Success.', 'info');
     },
 
+    RequestNetStatus() {
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'netStatus');
+    },
+    OnNetStatus(obj) {
+      this.netStatus = obj || {};
+      this.netBusy = false;
+    },
+    OnNetModeResult(res) {
+      this.netBusy = false;
+      if (res && res.result === 'ok') {
+        this.$bus.$emit('SendConsoleLogMsg', `NetMode ${res.mode} OK`, 'info');
+      } else {
+        const detail = (res && res.detail) ? res.detail : '';
+        this.$bus.$emit('SendConsoleLogMsg', `NetMode ${res ? res.mode : ''} FAIL ${detail}`, 'warning');
+      }
+      // always refresh status after a mode command
+      this.RequestNetStatus();
+    },
+    SwitchToWAN() {
+      const ok = window.confirm('Enter WAN will turn off hotspot and may disconnect your phone. Continue?');
+      if (!ok) return;
+      this.netBusy = true;
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'netMode:wan');
+      this.$bus.$emit('SendConsoleLogMsg', 'Switch network -> WAN', 'info');
+    },
+    SwitchToAP() {
+      this.netBusy = true;
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'netMode:ap');
+      this.$bus.$emit('SendConsoleLogMsg', 'Switch network -> AP', 'info');
+    },
+
+    b64EncodeUtf8(str) {
+      // Vue2 build target: use btoa with utf8 conversion
+      try {
+        return btoa(unescape(encodeURIComponent(str)));
+      } catch (e) {
+        console.error('b64EncodeUtf8 failed', e);
+        return '';
+      }
+    },
+    ScanWifi() {
+      if (this.wifiScanning) return;
+      this.wifiScanning = true;
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'wifiScan');
+      this.$bus.$emit('SendConsoleLogMsg', 'WiFi scan requested', 'info');
+    },
+    OnWiFiScan(arr) {
+      this.wifiScanning = false;
+      this.wifiScanResults = Array.isArray(arr) ? arr : [];
+      if (!this.wifiSelectedSsid && this.wifiScanResults.length > 0) {
+        this.wifiSelectedSsid = this.wifiScanResults[0].ssid || '';
+      }
+    },
+    SaveUplinkWifi() {
+      if (this.wifiSaving) return;
+      if (!this.wifiSelectedSsid) {
+        this.$bus.$emit('SendConsoleLogMsg', 'Please choose SSID', 'warning');
+        return;
+      }
+      if (!this.wifiPsk) {
+        this.$bus.$emit('SendConsoleLogMsg', 'Please input password', 'warning');
+        return;
+      }
+      const payloadObj = { name: this.uplinkProfile, ssid: this.wifiSelectedSsid, psk: this.wifiPsk };
+      const b64 = this.b64EncodeUtf8(JSON.stringify(payloadObj));
+      if (!b64) {
+        this.$bus.$emit('SendConsoleLogMsg', 'Encode WiFi payload failed', 'warning');
+        return;
+      }
+      this.wifiSaving = true;
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'wifiSaveB64|' + b64);
+      this.$bus.$emit('SendConsoleLogMsg', 'WiFi uplink saved request sent', 'info');
+    },
+    OnWiFiSaveResult(res) {
+      // action: save / scan
+      if (res && res.action === 'scan') {
+        this.wifiScanning = false;
+        if (res.result !== 'ok') {
+          const detail = (res && res.detail) ? res.detail : '';
+          this.$bus.$emit('SendConsoleLogMsg', 'WiFi scan FAIL ' + detail, 'warning');
+        }
+        return;
+      }
+
+      this.wifiSaving = false;
+      if (res && res.result === 'ok') {
+        this.$bus.$emit('SendConsoleLogMsg', 'WiFi uplink saved OK', 'info');
+      } else {
+        const detail = (res && res.detail) ? res.detail : '';
+        this.$bus.$emit('SendConsoleLogMsg', 'WiFi uplink save FAIL ' + detail, 'warning');
+      }
+    },
+
   },
   computed: {
     isEdited() {
@@ -96,9 +286,17 @@ export default {
     },
     DialogHeight() {
       if (this.isUpdated) {
-        return 140;
+        return 560;
       }
-      return this.isEdited ? 100 : 60;
+      return this.isEdited ? 560 : 520;
+    },
+    wifiItems() {
+      // Show strongest first
+      const list = (this.wifiScanResults || []).slice().sort((a, b) => (b.signal || 0) - (a.signal || 0));
+      return list.map(x => ({
+        ssid: x.ssid,
+        text: `${x.ssid}  (${x.signal || 0}%)  ${x.security || ''}`
+      }));
     }
   }
 };
@@ -111,7 +309,8 @@ export default {
   background-color: rgba(64, 64, 64, 0.5);
   backdrop-filter: blur(5px);
   box-sizing: border-box;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto; /* prevent Wi-Fi section from being clipped on smaller viewports */
   left: 50%;
   width: 30%;
   transform: translateX(-50%);
@@ -344,6 +543,81 @@ export default {
   color: rgba(255, 0, 0, 0.7); 
   user-select: none;
   line-height: 1;
+}
+
+.NetBox {
+  position: absolute;
+  left: 5%;
+  top: 115px;
+  width: 90%;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 11px;
+  user-select: none;
+}
+.NetRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 2px 0;
+}
+.NetLabel {
+  opacity: 0.7;
+  width: 70px;
+}
+.NetValue {
+  flex: 1;
+  text-align: right;
+  font-family: monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.NetBtns {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.btn-Net {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  background-color: rgba(0, 0, 0, 0.25);
+  color: rgba(255, 255, 255, 0.9);
+}
+.btn-Net:active {
+  transform: scale(0.98);
+}
+.NetHint {
+  margin-top: 6px;
+  font-size: 10px;
+  opacity: 0.75;
+}
+
+.WifiBox {
+  position: absolute;
+  left: 5%;
+  top: 255px;
+  width: 90%;
+  color: rgba(255, 255, 255, 0.9);
+}
+.WifiTitle {
+  font-size: 12px;
+  opacity: 0.85;
+  margin-bottom: 6px;
+}
+.WifiRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0;
+}
+.WifiHint, .WifiHint2 {
+  font-size: 10px;
+  opacity: 0.7;
+}
+.WifiSelect, .WifiPsk {
+  width: 100%;
+  margin-top: 6px;
 }
 
 </style>

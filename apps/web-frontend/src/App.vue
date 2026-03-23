@@ -1514,6 +1514,50 @@ export default {
             return;
           }
           let acceptMessage = false;
+          // ===== Network mode / ZeroTier integration (no ':' split) =====
+          // NOTE: `data.message` contains ':' for JSON, so we must handle it BEFORE the big switch.
+          if (data.message.startsWith('NetStatus|')) {
+            acceptMessage = true;
+            const payload = data.message.substring('NetStatus|'.length);
+            try {
+              const obj = JSON.parse(payload);
+              this.$bus.$emit('NetStatus', obj);
+            } catch (e) {
+              console.error('NetStatus JSON parse failed:', e, payload);
+              this.$bus.$emit('SendConsoleLogMsg', 'NetStatus JSON parse failed', 'warning');
+            }
+          }
+          if (data.message.startsWith('WiFiScan|')) {
+            acceptMessage = true;
+            const payload = data.message.substring('WiFiScan|'.length);
+            try {
+              const arr = JSON.parse(payload);
+              this.$bus.$emit('WiFiScan', arr);
+            } catch (e) {
+              console.error('WiFiScan JSON parse failed:', e, payload);
+              this.$bus.$emit('SendConsoleLogMsg', 'WiFiScan JSON parse failed', 'warning');
+            }
+          }
+          if (data.message.startsWith('WiFiSaveResult|')) {
+            acceptMessage = true;
+            const parts = data.message.split('|');
+            // WiFiSaveResult|<save|scan>|<ok|fail>|<detail?>
+            const action = parts[1] || '';
+            const result = parts[2] || '';
+            const detail = parts.slice(3).join('|');
+            this.$bus.$emit('WiFiSaveResult', { action, result, detail });
+          }
+          if (data.message.startsWith('NetModeResult|')) {
+            acceptMessage = true;
+            const parts = data.message.split('|');
+            // NetModeResult|<ap|wan>|<ok|fail>|<detail?>
+            if (parts.length >= 3) {
+              const mode = parts[1];
+              const result = parts[2];
+              const detail = parts.slice(3).join('|');
+              this.$bus.$emit('NetModeResult', { mode, result, detail });
+            }
+          }
           if (data.message.startsWith('StagingScheduleData:')) {
             console.log('------------------------------');
             acceptMessage = true;
