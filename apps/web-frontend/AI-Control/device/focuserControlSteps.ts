@@ -2,14 +2,11 @@ import { expect } from '@playwright/test'
 import type { FlowContext, StepRegistry } from '../core/flowTypes'
 import {
   CONFIRM_ACTION,
-  CONFIRM_DIALOG_BTN_AUTOFOCUS_COARSE,
-  CONFIRM_DIALOG_BTN_AUTOFOCUS_FINE,
-  CONFIRM_DIALOG_BTN_CANCEL,
 } from '../shared/dialogConstants'
 import { clickByTestId, clickLocator, deviceProbeTestId, sleep } from '../shared/interaction'
 import { ensureCaptureUiVisible } from '../shared/navigation'
 import { createStepError } from '../shared/errors'
-import { confirmDialogIfOpen } from '../menu/dialogSteps'
+import { actConfirmDialogIfOpen, confirmDialogIfOpen } from '../menu/dialogSteps'
 
 type FocuserMoveParams = {
   direction: 'left' | 'right'
@@ -131,12 +128,9 @@ async function startCalibration(ctx: FlowContext, mode: boolean | 'cancel') {
 async function startAutoFocus(ctx: FlowContext, mode: 'coarse' | 'fine' | 'cancel') {
   await clickByTestId(ctx.page, 'fp-btn-auto-focus-2', ctx.stepTimeoutMs)
   await sleep(250)
-  if (mode === 'cancel') {
-    await clickByTestId(ctx.page, CONFIRM_DIALOG_BTN_CANCEL, ctx.stepTimeoutMs)
-    return
-  }
-  const buttonTestId = mode === 'coarse' ? CONFIRM_DIALOG_BTN_AUTOFOCUS_COARSE : CONFIRM_DIALOG_BTN_AUTOFOCUS_FINE
-  await clickByTestId(ctx.page, buttonTestId, ctx.stepTimeoutMs)
+  await actConfirmDialogIfOpen(ctx.page, mode, ctx.stepTimeoutMs, {
+    expectedAction: CONFIRM_ACTION.START_AUTO_FOCUS,
+  })
   await sleep(250)
 }
 

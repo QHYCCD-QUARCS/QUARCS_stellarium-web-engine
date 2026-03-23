@@ -12,7 +12,7 @@
  * - E2E_GOTO_HOME：是否先刷新页面（device.gotoHome），1/true 为 true；未设或 0/false 为 false（默认不刷新）。
  * - E2E_GENERAL_SETTINGS_RESTORE_AFTER_MS：交互后还原等待毫秒数。
  * - E2E_FOCAL_LENGTH_MM：望远镜焦距（mm），用于 telescopes-focal-length 等。
- * - E2E_DRIVER_TEXT：驱动文案（如 QHYCCD、EQMod），用于设备连接类命令。
+ * - E2E_DRIVER_TEXT：驱动文案（如 QHY CCD、QHYCCD、EQMod），用于设备连接类命令。
  * - E2E_CONNECTION_MODE_TEXT：连接模式（如 SDK、INDI），用于设备连接类命令。
  * - E2E_DO_CAPTURE：主相机命令是否执行拍摄（1/0 或 true/false）。
  * - E2E_CAPTURE_GAIN / E2E_CAPTURE_OFFSET：主相机增益、偏置（数字）。
@@ -31,9 +31,9 @@
  * - E2E_GUIDER_RA_DIRECTION / E2E_GUIDER_DEC_DIRECTION：导星菜单 RA/DEC 单步导星方向。
  * - E2E_GUIDER_EXPOSURE：导星页曝光档位（500ms、1s、2s）。
  * - E2E_GUIDER_INTERACT_JSON：导星页交互对象（loopExposure/guiding/dataClear/rangeSwitch/recalibrate/expTime）。
- * - E2E_POWER_MANAGEMENT_INTERACT：逗号分隔的 key（output1、output2、restart），仅这些项为 true，用于 power-management 打开后的页面内交互。
+ * - E2E_POWER_MANAGEMENT_INTERACT：逗号分隔的 key（output1/2、restart-quarcs、restart、shutdown、force-update 等），用于 power-management 打开后的页面内交互。
  * - E2E_IMAGE_MANAGER_INTERACT：逗号分隔的 key（moveToUsb、delete、download、imageFileSwitch、refresh、panelClose），仅这些项为 true，用于 image-file-manager 打开后面板内交互。
- * - E2E_FOCUSER_INTERACT_JSON / E2E_CFW_INTERACT_JSON / E2E_POLAR_AXIS_INTERACT_JSON：复杂交互对象的 JSON。
+ * - E2E_FOCUSER_INTERACT_JSON / E2E_CFW_INTERACT_JSON / E2E_POLAR_AXIS_INTERACT_JSON / E2E_SCHEDULE_INTERACT_JSON：复杂交互对象的 JSON。
  *
  * 示例：只执行清理更新包
  *   E2E_GENERAL_SETTINGS_INTERACT=memoryTab,clearBoxConfirm,close E2E_CLEAR_BOX_OPTION=update-pack npx playwright test AI-Control/e2e/general-settings.spec.ts -g "参数由环境变量"
@@ -118,6 +118,8 @@ export function resolveFlowParamsFromEnv(defaults: Partial<CliFlowParams> = {}):
     if (pmKeys.includes('output1-off')) powerManagementInteract.output1 = false
     if (pmKeys.includes('output2-on')) powerManagementInteract.output2 = true
     if (pmKeys.includes('output2-off')) powerManagementInteract.output2 = false
+    if (pmKeys.includes('restart-quarcs-confirm')) powerManagementInteract.restartQuarcsServer = 'confirm'
+    if (pmKeys.includes('restart-quarcs-cancel')) powerManagementInteract.restartQuarcsServer = 'cancel'
     if (pmKeys.includes('restart-confirm')) powerManagementInteract.restart = 'confirm'
     if (pmKeys.includes('restart-cancel')) powerManagementInteract.restart = 'cancel'
     if (pmKeys.includes('shutdown-confirm')) powerManagementInteract.shutdown = 'confirm'
@@ -249,6 +251,9 @@ export function resolveFlowParamsFromEnv(defaults: Partial<CliFlowParams> = {}):
 
   const guiderInteract = parseJsonObject<CliFlowParams['guiderInteract']>(env.E2E_GUIDER_INTERACT_JSON)
   if (guiderInteract) merged.guiderInteract = guiderInteract
+
+  const scheduleInteract = parseJsonObject<CliFlowParams['scheduleInteract']>(env.E2E_SCHEDULE_INTERACT_JSON)
+  if (scheduleInteract) merged.scheduleInteract = scheduleInteract
 
   return merged as CliFlowParams
 }

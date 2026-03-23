@@ -6,14 +6,15 @@
  * 2) disconnect-all        - 断开全部设备（独立命令）
  * 3) device-disconnect     - 按参数断开单个设备（如 Mount / MainCamera）
  * 4) power-management      - 电源管理（打开电源管理页）
- * 5) guider-connect-capture - 导星镜连接并执行导星专用控制（Guider + QHYCCD）
- * 6) maincamera-connect-capture - 主相机连接，并按参数决定是否拍摄（MainCamera + QHYCCD）
+ * 5) guider-connect-capture - 导星镜连接并执行导星专用控制（Guider + 默认 QHY 驱动文案）
+ * 6) maincamera-connect-capture - 主相机连接，并按参数决定是否拍摄（MainCamera + 默认 QHY 驱动文案）
  * 7) mount-connect-control - 赤道仪连接与控制（Mount + EQMod）
  * 8) telescopes-focal-length - 望远镜焦距设置（Telescopes 子菜单 + 焦距 510）
  * 9) focuser-connect-control - 电调连接与控制（Focuser）
  * 10) cfw-capture-config    - 滤镜轮拍摄与配置（主相机连接 + CFW 切换）
  * 11) polar-axis-calibration - 极轴校准（打开极轴校准页面）
  * 12) image-file-manager   - 图像文件管理（打开图像管理面板）
+ * 13) task-schedule        - 任务计划表（工具栏打开面板，可选表格/预设交互）
  *
  * 使用方式：runFlowByCommand(ctx, registry, 'general-settings') 或通过 MCP/脚本传入命令名。
  */
@@ -26,7 +27,10 @@ import type { CfwInteractParams } from '../device/cfwControlSteps'
 import type { PolarAxisInteractParams } from '../device/polarAxisSteps'
 import type { GuiderInteractParams } from '../device/guiderControlSteps'
 import { createStepError } from '../shared/errors'
+import { DEFAULT_QHY_DRIVER_TEXT } from '../shared/driverDefaults'
 import { buildDeviceConnectCaptureFlow } from './businessFlows'
+import type { ScheduleInteractParams } from '../device/scheduleSteps'
+import { hasAnyScheduleInteraction } from '../device/scheduleSteps'
 
 /** CLI 可用命令名。general-settings 不传 generalSettingsInteract 时仅打开对话框，传则按参数执行对话框内各项交互 */
 export const CLI_COMMANDS = [
@@ -45,6 +49,7 @@ export const CLI_COMMANDS = [
   'cfw-capture-config',
   'polar-axis-calibration',
   'image-file-manager',
+  'task-schedule',
 ] as const
 
 export type CliCommandName = (typeof CLI_COMMANDS)[number]
@@ -80,7 +85,7 @@ export type CliFlowParams = {
   focalLengthMm?: string
   /** 是否在执行前先断开当前命令目标设备，默认 false（不执行断开） */
   resetBeforeConnect?: boolean
-  /** 主相机/导星镜等驱动文案，如 QHYCCD、EQMod */
+  /** 主相机/导星镜等驱动文案，如 QHY CCD（默认）、QHYCCD、EQMod */
   driverText?: string
   /** 连接模式，如 SDK、INDI */
   connectionModeText?: string
@@ -138,7 +143,7 @@ export type CliFlowParams = {
   generalSettingsLanguageItemText?: string
   /** general-settings selectLanguage：切换后是否再切回该项（还原），不传则不还原 */
   generalSettingsLanguageRestoreItemText?: string
-  /** power-management：打开电源管理页后执行的页面内交互；为 true 的 key 会依次执行（output1/output2 为点击对应输出开关，restart 为点击重启按钮） */
+  /** power-management：打开电源管理页后执行的页面内交互；依次执行（output1/output2 为输出开关；restartQuarcsServer 为经管理进程重启 Qt；restart 为树莓派重启） */
   powerManagementInteract?: PowerManagementInteractParams
   /** image-file-manager：打开图像管理面板后执行的面板内交互；为 true 的 key 会依次执行（见 README 图像管理） */
   imageManagerInteract?: Partial<Record<'moveToUsb' | 'delete' | 'download' | 'imageFileSwitch' | 'refresh' | 'panelClose', boolean>>
@@ -156,6 +161,8 @@ export type CliFlowParams = {
   polarAxisInteract?: PolarAxisInteractParams
   /** guider-connect-capture：连接后执行的导星页交互 */
   guiderInteract?: GuiderInteractParams
+  /** task-schedule：打开面板后的计划表内交互（未传则仅打开面板） */
+  scheduleInteract?: ScheduleInteractParams
 }
 
 function hasGuiderConfigParams(p: CliFlowParams): boolean {
@@ -229,7 +236,7 @@ function buildDeviceConnectCalls(args: {
 function buildGuiderControlFlow(p: CliFlowParams, opts: { gotoHome: boolean; resetBeforeConnect: boolean }): FlowStepCall[] {
   const calls = buildDeviceConnectCalls({
     deviceType: 'Guider',
-    driverText: p.driverText ?? 'QHYCCD',
+    driverText: p.driverText ?? DEFAULT_QHY_DRIVER_TEXT,
     connectionModeText: p.connectionModeText ?? 'SDK',
     gotoHome: opts.gotoHome,
     resetBeforeConnect: opts.resetBeforeConnect,
@@ -421,6 +428,7 @@ export function getFlowCallsByCommand(
     case 'power-management': {
       const calls: FlowStepCall[] = []
       if (doGotoHome) calls.push({ id: 'device.gotoHome' })
+      calls.push({ id: 'menu.closePowerManager' })
       calls.push({ id: 'menu.openPowerManager' })
       if (p.powerManagementInteract && typeof p.powerManagementInteract === 'object') {
         calls.push({ id: 'power.applyInteract', params: p.powerManagementInteract })
@@ -442,7 +450,7 @@ export function getFlowCallsByCommand(
     case 'maincamera-connect-capture': {
       return buildDeviceConnectCaptureFlow({
         deviceType: 'MainCamera',
-        driverText: p.driverText ?? 'QHYCCD',
+        driverText: p.driverText ?? DEFAULT_QHY_DRIVER_TEXT,
         connectionModeText: p.connectionModeText ?? 'SDK',
         doCapture: p.doCapture,
         doSave: p.doSave ?? false,
@@ -558,7 +566,7 @@ export function getFlowCallsByCommand(
     case 'cfw-capture-config': {
       const calls = buildDeviceConnectCalls({
         deviceType: 'MainCamera',
-        driverText: p.driverText ?? 'QHYCCD',
+        driverText: p.driverText ?? DEFAULT_QHY_DRIVER_TEXT,
         connectionModeText: p.connectionModeText ?? 'SDK',
         gotoHome: doGotoHome,
         resetBeforeConnect: reset,
@@ -606,6 +614,16 @@ export function getFlowCallsByCommand(
       }
       if (im?.panelClose) {
         calls.push({ id: 'ui.click', params: { testId: 'imp-btn-panel-close' } })
+      }
+      return calls
+    }
+
+    case 'task-schedule': {
+      const calls: FlowStepCall[] = []
+      if (doGotoHome) calls.push({ id: 'device.gotoHome' })
+      calls.push({ id: 'schedule.panel.ensureOpen' })
+      if (p.scheduleInteract && hasAnyScheduleInteraction(p.scheduleInteract)) {
+        calls.push({ id: 'schedule.applyInteract', params: p.scheduleInteract })
       }
       return calls
     }

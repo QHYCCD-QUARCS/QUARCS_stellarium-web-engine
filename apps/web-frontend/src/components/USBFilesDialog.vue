@@ -1,5 +1,5 @@
 <template>
-  <v-dialog max-width="800" v-model="$store.state.showUSBFilesDialog" scrollable data-testid="ui-usbfiles-dialog-root">
+  <v-dialog max-width="800" v-model="$store.state.showUSBFilesDialog" scrollable data-testid="ui-usbfiles-dialog-root" :data-state="$store.state.showUSBFilesDialog ? 'open' : 'closed'">
     <v-card v-if="$store.state.showUSBFilesDialog" class="qs-settings-card" elevation="0" style="backdrop-filter: blur(5px); background-color: rgba(64, 64, 64, 0.3);">
       <v-card-title class="qs-title">
         <div>{{ $t('USB Files') }}</div>

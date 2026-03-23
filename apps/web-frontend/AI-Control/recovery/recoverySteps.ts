@@ -1,6 +1,8 @@
 import { expect } from '@playwright/test'
 import type { FlowContext, StepRegistry } from '../core/flowTypes'
 import {
+  closeStatefulDialogByButtonIfOpen,
+  closeStatefulDialogByEscapeIfOpen,
   confirmDialogIfOpen,
   disconnectDriverDialogIfOpen,
   imageManagerDialogIfOpen,
@@ -25,20 +27,6 @@ async function dismissBlockingOverlay(ctx: FlowContext, timeout: number) {
   }
 
   await overlay.waitFor({ state: 'hidden', timeout: Math.min(timeout, 6000) }).catch(() => {})
-}
-
-async function escapeCloseIfVisible(ctx: FlowContext, testId: string, timeout: number) {
-  const root = ctx.page.getByTestId(testId).first()
-  const visible = await root.isVisible().catch(() => false)
-  if (!visible) return
-
-  for (let i = 0; i < 3; i += 1) {
-    await ctx.page.keyboard.press('Escape').catch(() => {})
-    await sleep(250)
-    if (!(await root.isVisible().catch(() => false))) return
-  }
-
-  await expect(root).not.toBeVisible({ timeout: Math.min(timeout, 5000) })
 }
 
 async function stopPolarAxisIfRunning(ctx: FlowContext, timeout: number) {
@@ -221,19 +209,124 @@ export function makeRecoveryStepRegistry(): StepRegistry {
 
   registry.set('menu.closeLocationDialog', {
     async run(ctx, params) {
-      await escapeCloseIfVisible(ctx, 'ui-location-dialog-root', params.timeoutMs ?? ctx.stepTimeoutMs)
+      await closeStatefulDialogByEscapeIfOpen(ctx.page, params.timeoutMs ?? ctx.stepTimeoutMs, {
+        rootTestId: 'ui-location-dialog-root',
+      })
     },
   })
 
   registry.set('menu.closeDataCredits', {
     async run(ctx, params) {
-      await escapeCloseIfVisible(ctx, 'ui-data-credits-dialog-root', params.timeoutMs ?? ctx.stepTimeoutMs)
+      await closeStatefulDialogByEscapeIfOpen(ctx.page, params.timeoutMs ?? ctx.stepTimeoutMs, {
+        rootTestId: 'ui-data-credits-dialog-root',
+      })
     },
   })
 
   registry.set('menu.closeDebugLog', {
     async run(ctx, params) {
-      await escapeCloseIfVisible(ctx, 'ui-indi-debug-dialog-root', params.timeoutMs ?? ctx.stepTimeoutMs)
+      await closeStatefulDialogByEscapeIfOpen(ctx.page, params.timeoutMs ?? ctx.stepTimeoutMs, {
+        rootTestId: 'ui-indi-debug-dialog-root',
+      })
+    },
+  })
+
+  registry.set('menu.closeSchedulePanel', {
+    async run(ctx, params) {
+      const timeout = params.timeoutMs ?? ctx.stepTimeoutMs
+      const root = ctx.page.getByTestId('scp-root').first()
+      const state = await root.getAttribute('data-state').catch(() => null)
+      if (state !== 'open') return
+
+      const preset = ctx.page.getByTestId('scp-preset-dialog-root').first()
+      if (await preset.isVisible().catch(() => false)) {
+        await clickByTestId(ctx.page, 'scp-preset-btn-close', timeout)
+        await sleep(200)
+      }
+
+      await clickByTestId(ctx.page, 'scp-btn-close-panel', timeout)
+      await expect(root).toHaveAttribute('data-state', 'closed', { timeout })
+    },
+  })
+
+  registry.set('menu.closeUsbFiles', {
+    async run(ctx, params) {
+      await closeStatefulDialogByButtonIfOpen(ctx.page, params.timeoutMs ?? ctx.stepTimeoutMs, {
+        rootTestId: 'ui-usbfiles-dialog-root',
+        closeButtonTestId: 'ui-usbfiles-dialog-btn-blue-text',
+      })
+    },
+  })
+
+  registry.set('menu.closePlanetsVisibility', {
+    async run(ctx, params) {
+      await closeStatefulDialogByButtonIfOpen(ctx.page, params.timeoutMs ?? ctx.stepTimeoutMs, {
+        rootTestId: 'ui-planets-visibility-root',
+        closeButtonTestId: 'ui-planets-visibility-btn-close',
+      })
+    },
+  })
+
+  registry.set('menu.closeRaDecDialog', {
+    async run(ctx, params) {
+      await closeStatefulDialogByButtonIfOpen(ctx.page, params.timeoutMs ?? ctx.stepTimeoutMs, {
+        rootTestId: 'ui-ra-dec-dialog-root',
+        closeButtonTestId: 'ui-ra-dec-dialog-btn-on-cancel',
+      })
+    },
+  })
+
+  registry.set('menu.closeSettingsDialogMount', {
+    async run(ctx, params) {
+      await closeStatefulDialogByButtonIfOpen(ctx.page, params.timeoutMs ?? ctx.stepTimeoutMs, {
+        rootTestId: 'ui-settings-dialog-mount-root',
+        closeButtonTestId: 'ui-settings-dialog-mount-btn-close-dialog',
+      })
+    },
+  })
+
+  registry.set('menu.closeSettingsDialogGuider', {
+    async run(ctx, params) {
+      await closeStatefulDialogByButtonIfOpen(ctx.page, params.timeoutMs ?? ctx.stepTimeoutMs, {
+        rootTestId: 'ui-settings-dialog-guider-root',
+        closeButtonTestId: 'ui-settings-dialog-guider-btn-close-dialog',
+      })
+    },
+  })
+
+  registry.set('menu.closeSettingsDialogMainCamera', {
+    async run(ctx, params) {
+      await closeStatefulDialogByButtonIfOpen(ctx.page, params.timeoutMs ?? ctx.stepTimeoutMs, {
+        rootTestId: 'ui-settings-dialog-main-camera-root',
+        closeButtonTestId: 'ui-settings-dialog-main-camera-btn-close-dialog',
+      })
+    },
+  })
+
+  registry.set('menu.closeSettingsDialogFocuser', {
+    async run(ctx, params) {
+      await closeStatefulDialogByButtonIfOpen(ctx.page, params.timeoutMs ?? ctx.stepTimeoutMs, {
+        rootTestId: 'ui-settings-dialog-focuser-root',
+        closeButtonTestId: 'ui-settings-dialog-focuser-btn-close-dialog',
+      })
+    },
+  })
+
+  registry.set('menu.closeSettingsDialogCfw', {
+    async run(ctx, params) {
+      await closeStatefulDialogByButtonIfOpen(ctx.page, params.timeoutMs ?? ctx.stepTimeoutMs, {
+        rootTestId: 'ui-settings-dialog-cfw-root',
+        closeButtonTestId: 'ui-settings-dialog-cfw-btn-close-dialog',
+      })
+    },
+  })
+
+  registry.set('menu.closeSettingsDialogPoleCamera', {
+    async run(ctx, params) {
+      await closeStatefulDialogByButtonIfOpen(ctx.page, params.timeoutMs ?? ctx.stepTimeoutMs, {
+        rootTestId: 'ui-settings-dialog-pole-camera-root',
+        closeButtonTestId: 'ui-settings-dialog-pole-camera-btn-close-dialog',
+      })
     },
   })
 

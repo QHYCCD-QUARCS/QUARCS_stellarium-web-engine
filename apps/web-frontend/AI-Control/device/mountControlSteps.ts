@@ -132,7 +132,6 @@ export function makeMountControlStepRegistry(): StepRegistry {
   /**
    * 确保赤道仪 Park 为开启状态（主界面 Mount 控制面板，非设备侧栏）。
    * 若 mcp-panel 不可见则点击 gui-btn-toggle-mount-panel 打开；若 mcp-btn-park 的 data-state 非 'on' 则点击该按钮，最后断言 data-state=on。
-   * 参考 tests/e2e/flows/mountSteps.ts 与 04-mount-park.spec.ts。
    */
   registry.set('mount.ensureParkedForTest', {
     async run(ctx, params) {

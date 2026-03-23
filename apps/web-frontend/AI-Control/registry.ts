@@ -21,6 +21,7 @@ import { makeCfwControlStepRegistry } from './device/cfwControlSteps'
 import { makePolarAxisStepRegistry } from './device/polarAxisSteps'
 import { makeGuiderControlStepRegistry } from './device/guiderControlSteps'
 import { makeQhyccdAliasStepRegistry } from './device/qhyccdAliasSteps'
+import { makeScheduleStepRegistry } from './device/scheduleSteps'
 import { makeRecoveryStepRegistry } from './recovery/recoverySteps'
 
 export function makeAiControlRegistry(): StepRegistry {
@@ -40,6 +41,7 @@ export function makeAiControlRegistry(): StepRegistry {
     makePolarAxisStepRegistry(),
     makeGuiderControlStepRegistry(),
     makeQhyccdAliasStepRegistry(),
+    makeScheduleStepRegistry(),
     makeRecoveryStepRegistry(),
   )
 }

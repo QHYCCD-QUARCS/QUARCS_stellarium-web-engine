@@ -7,12 +7,6 @@
  */
 import { expect, type Page } from '@playwright/test'
 import type { FlowContext, StepRegistry } from '../core/flowTypes'
-import {
-  CONFIRM_DIALOG_BTN_CONFIRM,
-  CONFIRM_DIALOG_ROOT_TESTID,
-  DISCONNECT_DRIVER_DIALOG_BTN_CONFIRM,
-  DISCONNECT_DRIVER_DIALOG_ROOT_TESTID,
-} from '../shared/dialogConstants'
 import { createStepError } from '../shared/errors'
 import {
   MESSAGE_BOX_ROOT_TESTID,
@@ -22,6 +16,7 @@ import {
 import { clickByTestId, clickLocator, deviceProbeTestId, waitForTestIdState, sleep } from '../shared/interaction'
 import { ensureCaptureUiVisible } from '../shared/navigation'
 import { openDeviceSubmenu } from '../menu/drawerSteps'
+import { confirmDialogIfOpen, disconnectDriverDialogIfOpen } from '../menu/dialogSteps'
 
 const EXPOSURE_PRESETS = ['1ms', '10ms', '100ms', '1s', '5s', '10s', '30s', '60s', '120s', '300s', '600s']
 
@@ -175,16 +170,8 @@ export function makeCaptureStepRegistry(): StepRegistry {
 
       await openDeviceSubmenu(ctx, deviceType)
       await clickLocator(ctx.page.getByTestId('ui-app-btn-disconnect-driver').first(), ctx.stepTimeoutMs)
-
-      const singleDeviceRoot = ctx.page.getByTestId(DISCONNECT_DRIVER_DIALOG_ROOT_TESTID).first()
-      const guiConfirmRoot = ctx.page.getByTestId(CONFIRM_DIALOG_ROOT_TESTID).first()
-      const singleVisible = await singleDeviceRoot.isVisible().catch(() => false)
-      const guiVisible = await guiConfirmRoot.isVisible().catch(() => false)
-      if (singleVisible) {
-        await clickByTestId(ctx.page, DISCONNECT_DRIVER_DIALOG_BTN_CONFIRM, ctx.stepTimeoutMs)
-      } else if (guiVisible) {
-        await clickByTestId(ctx.page, CONFIRM_DIALOG_BTN_CONFIRM, ctx.stepTimeoutMs)
-      }
+      await disconnectDriverDialogIfOpen(ctx.page, 'confirm', ctx.stepTimeoutMs).catch(() => false)
+      await confirmDialogIfOpen(ctx.page, 'confirm', ctx.stepTimeoutMs).catch(() => false)
 
       const disconnectTimeoutMs = params.timeoutMs ?? Math.max(ctx.stepTimeoutMs, 30_000)
       try {

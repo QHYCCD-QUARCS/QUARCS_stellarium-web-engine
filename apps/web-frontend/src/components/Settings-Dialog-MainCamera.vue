@@ -1,5 +1,5 @@
 <template>
-  <v-dialog max-width='300' v-model="$store.state.showDeviceSettingsDialog_MainCamera" data-testid="ui-settings-dialog-main-camera-root"> <!-- showDeviceSettingsDialog_Mount -->
+  <v-dialog max-width='300' v-model="$store.state.showDeviceSettingsDialog_MainCamera" data-testid="ui-settings-dialog-main-camera-root" :data-state="$store.state.showDeviceSettingsDialog_MainCamera ? 'open' : 'closed'"> <!-- showDeviceSettingsDialog_Mount -->
     <v-card v-if="$store.state.showDeviceSettingsDialog_MainCamera" class="secondary white--text">
       <v-card-title>
         <div class="text-h5">{{ $t('MainCamera Settings') }}</div>

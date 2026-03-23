@@ -16,10 +16,20 @@ const DIALOG_BLOCKER_STEP_IDS: Record<DialogBlockerKind, string> = {
   powerManager: 'menu.closePowerManager',
   deviceAllocation: 'menu.closeDeviceAllocation',
   imageManager: 'menu.closeImageManager',
+  schedulePanel: 'menu.closeSchedulePanel',
   polarAxis: 'menu.closePolarAxis',
   location: 'menu.closeLocationDialog',
   dataCredits: 'menu.closeDataCredits',
   debugLog: 'menu.closeDebugLog',
+  usbFiles: 'menu.closeUsbFiles',
+  planetsVisibility: 'menu.closePlanetsVisibility',
+  raDec: 'menu.closeRaDecDialog',
+  settingsMount: 'menu.closeSettingsDialogMount',
+  settingsGuider: 'menu.closeSettingsDialogGuider',
+  settingsMainCamera: 'menu.closeSettingsDialogMainCamera',
+  settingsFocuser: 'menu.closeSettingsDialogFocuser',
+  settingsCfw: 'menu.closeSettingsDialogCfw',
+  settingsPoleCamera: 'menu.closeSettingsDialogPoleCamera',
   blockingOverlay: 'app.dismissBlockingOverlay',
 }
 
@@ -35,15 +45,6 @@ const CANCEL_STEP_IDS: Partial<Record<BusyStateKey, string>> = {
   polarAxis: 'menu.closePolarAxis',
   deviceAllocation: 'menu.closeDeviceAllocation',
 }
-
-const PROACTIVE_SAFE_BLOCKERS = new Set<DialogBlockerKind>([
-  'generalSettings',
-  'powerManager',
-  'deviceAllocation',
-  'imageManager',
-  'polarAxis',
-  'blockingOverlay',
-])
 
 function dedupeCalls(calls: FlowStepCall[]): FlowStepCall[] {
   const result: FlowStepCall[] = []
@@ -71,6 +72,8 @@ function isDialogBlockerActive(status: PageStatus, kind: DialogBlockerKind): boo
       return status.dialogs.deviceAllocation
     case 'imageManager':
       return status.dialogs.imageManager
+    case 'schedulePanel':
+      return status.dialogs.schedulePanel
     case 'polarAxis':
       return status.dialogs.polarAxis || status.surfaces.polarAxisMinimized || status.overlays.trajectoryFullscreen || status.overlays.trajectoryWindowed
     case 'location':
@@ -79,6 +82,24 @@ function isDialogBlockerActive(status: PageStatus, kind: DialogBlockerKind): boo
       return status.dialogs.dataCredits
     case 'debugLog':
       return status.dialogs.debugLog
+    case 'usbFiles':
+      return status.dialogs.usbFiles
+    case 'planetsVisibility':
+      return status.dialogs.planetsVisibility
+    case 'raDec':
+      return status.dialogs.raDec
+    case 'settingsMount':
+      return status.dialogs.settingsMount
+    case 'settingsGuider':
+      return status.dialogs.settingsGuider
+    case 'settingsMainCamera':
+      return status.dialogs.settingsMainCamera
+    case 'settingsFocuser':
+      return status.dialogs.settingsFocuser
+    case 'settingsCfw':
+      return status.dialogs.settingsCfw
+    case 'settingsPoleCamera':
+      return status.dialogs.settingsPoleCamera
     case 'blockingOverlay':
       return status.overlays.blocking
   }
@@ -133,13 +154,6 @@ export function planRecoverySteps(args: {
       stepId: DIALOG_BLOCKER_STEP_IDS[kind],
     })
     preSteps.push({ id: DIALOG_BLOCKER_STEP_IDS[kind] })
-  }
-
-  for (const kind of requirement?.blockers ?? []) {
-    if (!PROACTIVE_SAFE_BLOCKERS.has(kind)) continue
-    const stepId = DIALOG_BLOCKER_STEP_IDS[kind]
-    if (preSteps.some((item) => item.id === stepId)) continue
-    preSteps.push({ id: stepId })
   }
 
   for (const [busyKey, strategy] of Object.entries(requirement?.busy ?? {}) as Array<[BusyStateKey, BusyStrategy]>) {

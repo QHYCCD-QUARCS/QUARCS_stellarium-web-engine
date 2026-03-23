@@ -5,6 +5,7 @@
  * gotoHome -> [可选 disconnect current device] -> device.connectIfNeeded -> [若提供拍摄参数] device.mainCamera.applyCaptureConfig -> 关闭侧栏 -> 确保拍摄面板 -> [可选] captureOnce × captureCount -> [可选 save]。参数可指定 deviceType、driverText、connectionModeText、doCapture、doSave、waitCaptureTimeoutMs、resetBeforeConnect、doBindAllocation、allocationDeviceMatch、captureCount（拍摄次数，默认 1），以及拍摄配置 captureGain/captureOffset/captureCfaMode/captureTemperature/captureAutoSave/captureSaveFailedParse/captureSaveFolder。
  */
 import type { FlowStepCall } from '../core/flowTypes'
+import { DEFAULT_QHY_DRIVER_TEXT } from '../shared/driverDefaults'
 
 function hasCaptureConfigParams(p: {
   captureGain?: number
@@ -65,7 +66,7 @@ export function buildDeviceConnectCaptureFlow(params: {
     id: 'device.connectIfNeeded',
     params: {
       deviceType,
-      driverText: params.driverText ?? 'QHYCCD',
+      driverText: params.driverText ?? DEFAULT_QHY_DRIVER_TEXT,
       connectionModeText: params.connectionModeText ?? 'SDK',
       allocationDeviceMatch: params.allocationDeviceMatch ?? undefined,
       doBindAllocation: params.doBindAllocation !== false,

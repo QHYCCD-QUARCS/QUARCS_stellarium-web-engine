@@ -7,6 +7,7 @@
       :attach="true"
       content-class="radec-dialog"
       eager
+      :data-state="innerOpen ? 'open' : 'closed'"
      data-testid="ui-ra-dec-dialog-root">
       <v-card>
         <v-card-title class="text-h5">{{ this.$t('Input Target Coordinates') }}</v-card-title>

@@ -17,13 +17,28 @@
  * - GET /status : 读取当前页面状态（通过 page.evaluate 在页面内读取）
  * - GET /status?command=xxx : 读取状态并规划指定命令的执行步骤
  * - POST /run : 执行命令
+ *
+ * 环境变量：
+ * - E2E_AI_CONTROL_SESSION_NO_KILL_STALE=1：不在启动前尝试结束占用会话端口的旧进程（默认会尝试释放端口）。
  */
+import { execFile as execFileCb } from 'node:child_process'
 import * as http from 'node:http'
+import * as net from 'node:net'
 import * as readline from 'node:readline'
+import { promisify } from 'node:util'
 import { chromium } from '@playwright/test'
 
+const execFile = promisify(execFileCb)
+
 const baseURL = process.env.E2E_BASE_URL || 'http://192.168.1.113:8080'
-const SESSION_PORT = Number(process.env.E2E_AI_CONTROL_SESSION_PORT) || 39281
+
+function resolveSessionPort(): number {
+  const raw = process.env.E2E_AI_CONTROL_SESSION_PORT
+  if (raw === undefined || raw === '') return 39281
+  const n = Number(raw)
+  if (!Number.isFinite(n) || n < 0 || n > 65535) return 39281
+  return n
+}
 const SESSION_RUN_TIMEOUT_MS = Number(process.env.E2E_AI_CONTROL_RUN_TIMEOUT_MS) || 60_000
 const SESSION_PAGE_INIT_TIMEOUT_MS = Number(process.env.E2E_AI_CONTROL_PAGE_INIT_TIMEOUT_MS) || 15_000
 const SESSION_MIN_TEST_TIMEOUT_MS = 5 * 60_000
@@ -63,7 +78,115 @@ function sendJson(res: http.ServerResponse, status: number, body: object) {
   res.end(JSON.stringify(body))
 }
 
+/** 检测本机 host:port 是否已有进程在监听（临时 bind 探测）。 */
+function isPortListening(host: string, port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const s = net.createServer()
+    s.once('error', (err: NodeJS.ErrnoException) => {
+      s.removeAllListeners()
+      if (err.code === 'EADDRINUSE') resolve(true)
+      else resolve(false)
+    })
+    s.once('listening', () => {
+      s.close(() => resolve(false))
+    })
+    s.listen(port, host)
+  })
+}
+
+async function getPidsListeningOnPort(port: number): Promise<number[]> {
+  const dedupe = (pids: number[]) =>
+    [...new Set(pids)].filter((n) => Number.isFinite(n) && n > 0 && n !== process.pid)
+
+  const tryLsof = async () => {
+    const variants = [
+      ['-ti', `TCP:${port}`, '-sTCP:LISTEN', '-n'],
+      ['-ti', `TCP:${port}`, '-sTCP:LISTEN'],
+      ['-ti', `:${port}`],
+    ]
+    for (const args of variants) {
+      try {
+        const { stdout } = await execFile('lsof', args, { encoding: 'utf8' })
+        const pids = stdout
+          .trim()
+          .split('\n')
+          .map((s) => parseInt(s, 10))
+          .filter((n) => Number.isFinite(n))
+        if (pids.length) return dedupe(pids)
+      } catch {
+        continue
+      }
+    }
+    return []
+  }
+
+  const tryFuser = async () => {
+    try {
+      const { stdout } = await execFile('fuser', ['-n', 'tcp', String(port)], { encoding: 'utf8' })
+      const m = stdout.match(/\d+/g)
+      if (!m) return []
+      return dedupe(m.map((s) => parseInt(s, 10)))
+    } catch {
+      return []
+    }
+  }
+
+  let pids = await tryLsof()
+  if (pids.length === 0) pids = await tryFuser()
+  return pids
+}
+
+/** 若会话端口已被占用，先结束占用进程再启动（避免 EADDRINUSE）。 */
+async function freeStaleSessionPortIfNeeded(port: number): Promise<void> {
+  const skip =
+    process.env.E2E_AI_CONTROL_SESSION_NO_KILL_STALE === '1' ||
+    process.env.E2E_AI_CONTROL_SESSION_NO_KILL_STALE === 'true' ||
+    process.env.E2E_AI_CONTROL_SESSION_NO_KILL_STALE === 'yes'
+  if (skip) return
+
+  const host = '127.0.0.1'
+  if (!(await isPortListening(host, port))) return
+
+  console.log(`[ai-control] 会话端口 ${port} 已被占用，尝试结束占用进程...`)
+  const pids = await getPidsListeningOnPort(port)
+  if (pids.length === 0) {
+    throw new Error(
+      `[ai-control] 无法解析占用端口 ${port} 的进程（请安装 lsof 或 fuser，或手动结束进程 / 设置 E2E_AI_CONTROL_SESSION_PORT）`,
+    )
+  }
+
+  for (const pid of pids) {
+    try {
+      process.kill(pid, 'SIGTERM')
+      console.log(`[ai-control] 已向 PID ${pid} 发送 SIGTERM`)
+    } catch {
+      /* 可能已退出或无权限 */
+    }
+  }
+  await sleep(500)
+  for (const pid of pids) {
+    try {
+      process.kill(pid, 0)
+      process.kill(pid, 'SIGKILL')
+      console.log(`[ai-control] 已向 PID ${pid} 发送 SIGKILL`)
+    } catch {
+      /* 已退出 */
+    }
+  }
+  await sleep(500)
+
+  if (await isPortListening(host, port)) {
+    throw new Error(
+      `[ai-control] 端口 ${port} 仍被占用，请手动处理或设置 E2E_AI_CONTROL_SESSION_NO_KILL_STALE=1 后改用其他端口`,
+    )
+  }
+  console.log(`[ai-control] 端口 ${port} 已释放`)
+}
+
 async function main() {
+  const sessionPort = resolveSessionPort()
+  await freeStaleSessionPortIfNeeded(sessionPort)
+
   const headed = process.env.E2E_HEADED !== '0' && process.env.E2E_HEADED !== 'false' && process.env.E2E_HEADED !== 'off'
   console.log('Launching browser (headed:', headed, '), baseURL:', baseURL)
 
@@ -261,12 +384,21 @@ async function main() {
       sendJson(res, 200, { ok: false, error: message })
     }
   })
-  server.listen(SESSION_PORT, '127.0.0.1', () => {
-    console.log('Session HTTP server: http://127.0.0.1:' + SESSION_PORT)
-    console.log('  GET /status        - 读取当前页面状态')
-    console.log('  GET /status?command=xxx - 状态 + 命令执行步骤规划')
-    console.log('  POST /run          - 执行命令')
+  await new Promise<void>((resolve, reject) => {
+    const onErr = (err: Error) => {
+      server.removeListener('error', onErr)
+      reject(err)
+    }
+    server.once('error', onErr)
+    server.listen(sessionPort, '127.0.0.1', () => {
+      server.removeListener('error', onErr)
+      resolve()
+    })
   })
+  console.log('Session HTTP server: http://127.0.0.1:' + sessionPort)
+  console.log('  GET /status        - 读取当前页面状态')
+  console.log('  GET /status?command=xxx - 状态 + 命令执行步骤规划')
+  console.log('  POST /run          - 执行命令')
 
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
   const prompt = () => process.stdout.write('> ')

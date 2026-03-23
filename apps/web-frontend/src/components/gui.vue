@@ -316,16 +316,25 @@
       data-testid="ui-confirm-dialog-root"
       :data-state="ConfirmDialog ? 'open' : 'closed'"
       :data-action="ConfirmToDo || ''"
+      :data-variant="ConfirmToDo === 'startAutoFocus' ? 'autofocus-mode' : 'binary'"
       :data-title="ConfirmDialogTitle || ''"
       style="display: contents;"
     >
-      <v-dialog v-model="ConfirmDialog" width="260" persistent>
+      <v-dialog
+        v-model="ConfirmDialog"
+        width="260"
+        persistent
+        content-class="gui-confirm-dialog-content"
+      >
         <v-expand-x-transition>
           <!-- NOTE: gui-root 外层使用了 .click-through(pointer-events: none)；
                这里必须显式加 .get-click(pointer-events: all) 才能让 Confirm Dialog 的按钮可点击（含 E2E）。 -->
           <v-card class="flashing-border get-click" style="backdrop-filter: blur(5px); background-color: rgba(64, 64, 64, 0.5);">
           <v-card-title style="font-size: 20px; display: flex; align-items: center; justify-content: space-between;">
-            <span data-testid="ui-confirm-dialog-title">{{ $t(ConfirmDialogTitle) }}</span>
+            <!-- DeleteSchedulePreset：标题为预设名（非 i18n key）；其它场景仍走 $t -->
+            <span data-testid="ui-confirm-dialog-title">{{
+              ConfirmToDo === 'DeleteSchedulePreset' ? ConfirmDialogTitle : $t(ConfirmDialogTitle)
+            }}</span>
             <v-btn
               v-if="ConfirmToDo === 'startAutoFocus'"
               icon
@@ -338,12 +347,14 @@
             </v-btn>
           </v-card-title>
           <v-card-text style="font-size: 15px; margin-bottom: -20px; line-height: 1.5;">
-            <span v-if="ConfirmToDo === 'startAutoFocus'">
-              <span data-testid="ui-confirm-dialog-text">{{ $t('Please confirm the auto focus mode') }}</span>
-            </span>
-            <span v-else>
-              <span data-testid="ui-confirm-dialog-text">{{ $t(ConfirmDialogText) }}</span>
-            </span>
+            <!-- 单一节点承载正文，避免同一文件内重复字面量 data-testid 触发校验误报 -->
+            <span data-testid="ui-confirm-dialog-text">{{
+              ConfirmToDo === 'startAutoFocus'
+                ? $t('Please confirm the auto focus mode')
+                : ConfirmToDo === 'DeleteSchedulePreset'
+                  ? ConfirmDialogText
+                  : $t(ConfirmDialogText)
+            }}</span>
           </v-card-text>
           <v-card-actions style="margin-top: -20px; padding-top: -20px;">
             <v-spacer></v-spacer>
@@ -1528,10 +1539,10 @@ export default {
     },
 
     ShowConfirmDialog(title, text, ToDo) {
-      this.ConfirmDialog = true;
       this.ConfirmDialogTitle = title;
       this.ConfirmDialogText = text;
       this.ConfirmToDo = ToDo;
+      this.ConfirmDialog = true;
     },
 
     ConfirmDialogCancel() {
@@ -2685,5 +2696,12 @@ export default {
   width: 35px;
   height: 35px;
   margin: 0; /* 清除默认margin */
+}
+</style>
+
+<!-- 确认框挂载在 body，需非 scoped；压过 SchedulePanel(z200) 与内嵌预设遮罩(z300) -->
+<style lang="scss">
+.v-dialog__content.gui-confirm-dialog-content {
+  z-index: 520 !important;
 }
 </style>

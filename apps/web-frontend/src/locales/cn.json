@@ -121,6 +121,8 @@
   "OutPut Power 1": "输出电源 1",
   "OutPut Power 2": "输出电源 2",
   "Restart": "重启",
+  "Restart QUARCS Server": "重启 QUARCS 服务端",
+  "Are you sure you want to restart the QUARCS server via the monitor process? The web page will reload afterwards.": "确定要通过管理进程（QUARCS Process）重启 QUARCS 后端服务吗？确认后网页将重新加载。",
   "Shut Down": "关机",
   "Force Update": "强制更新",
   "Device Connection": "设备连接",

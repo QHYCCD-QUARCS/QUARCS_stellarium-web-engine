@@ -17,6 +17,7 @@
   data-testid="ui-confirm-dialog-root"
   :data-state="ConfirmDialog ? 'open' : 'closed'"
   :data-action="ConfirmToDo || ''"
+  :data-variant="ConfirmToDo === 'startAutoFocus' ? 'autofocus-mode' : 'binary'"
   :data-title="ConfirmDialogTitle || ''"
   style="display: contents;"
 >
@@ -27,6 +28,7 @@
 |------|------|----------|
 | `data-state` | 是否打开 | `open` / `closed` |
 | `data-action` | 当前确认动作类型（业务区分用） | 见下表 |
+| `data-variant` | 当前确认框按钮模型 | `binary` / `autofocus-mode` |
 | `data-title` | 弹窗标题文案 | 来自 `ConfirmDialogTitle` |
 
 **data-action 取值**（来自 `ConfirmToDo`，在 `ShowConfirmDialog(title, text, ToDo)` 时设置）：
@@ -53,6 +55,11 @@
 - 通用：`ui-confirm-dialog-btn-cancel`、`ui-confirm-dialog-btn-confirm`
 - 自动对焦：`ui-confirm-dialog-btn-close`、`ui-confirm-dialog-btn-autofocus-coarse`、`ui-confirm-dialog-btn-autofocus-fine`
 
+**按钮模型约定**：
+
+- `binary`：仅允许 `confirm` / `cancel`
+- `autofocus-mode`：允许 `cancel`(close) / `coarse` / `fine`
+
 **E2E 示例**：
 
 ```ts
@@ -75,11 +82,12 @@ await page.getByTestId('ui-confirm-dialog-btn-confirm').first().click()
 | 电源管理页 | `ui-power-manager-root` | 页面内部状态 | App.vue（非 v-dialog） |
 | 设备分配 | `dap-root` | 组件内部 `data-state` | DeviceAllocationPanel.vue |
 | 图像管理 | `imp-root` | 组件内部 | ImageManagerBrowser.vue |
-| RA/DEC | `ui-ra-dec-dialog-root` | v-model 控制 | RaDecDialog.vue |
-| 设备设置 Mount | `ui-settings-dialog-mount-root` | `$store.state.showDeviceSettingsDialog_Mount` | Settings-Dialog-Mount.vue |
-| 设备设置 Guider/MainCamera/Focuser/CFW/PoleCamera | `ui-settings-dialog-guider-root` 等 | 对应 store 状态 | 各 Settings-Dialog-*.vue |
-| USB 文件 | `ui-usbfiles-dialog-root` | `$store.state.showUSBFilesDialog` | USBFilesDialog.vue |
-| 行星可见性 | `ui-planets-visibility-root` | `$store.state.showPlanetsVisibilityDialog` | planets-visibility.vue |
+| 图像管理（侧栏/文件列表行） | `imp-sidebar-folder-{index}`、`imp-file-row-{folderIndex}-{index}` | 组件内部 | ImageManagerBrowser.vue（与 `ImageFolder.vue` 的 `ui-image-folder-*` 区分，避免 testid 冲突） |
+| RA/DEC | `ui-ra-dec-dialog-root` | `data-state="open" \| "closed"`（由 `innerOpen` 驱动） | RaDecDialog.vue |
+| 设备设置 Mount | `ui-settings-dialog-mount-root` | `data-state="open" \| "closed"`（来自 `$store.state.showDeviceSettingsDialog_Mount`） | Settings-Dialog-Mount.vue |
+| 设备设置 Guider/MainCamera/Focuser/CFW/PoleCamera | `ui-settings-dialog-guider-root` 等 | `data-state="open" \| "closed"`（来自各自 store 状态） | 各 Settings-Dialog-*.vue |
+| USB 文件 | `ui-usbfiles-dialog-root` | `data-state="open" \| "closed"`（来自 `$store.state.showUSBFilesDialog`） | USBFilesDialog.vue |
+| 行星可见性 | `ui-planets-visibility-root` | `data-state="open" \| "closed"`（来自 `$store.state.showPlanetsVisibilityDialog`） | planets-visibility.vue |
 
 ## 4. 单设备断开确认弹窗（App.vue）
 

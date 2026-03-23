@@ -7,10 +7,20 @@ export type DialogBlockerKind =
   | 'powerManager'
   | 'deviceAllocation'
   | 'imageManager'
+  | 'schedulePanel'
   | 'polarAxis'
   | 'location'
   | 'dataCredits'
   | 'debugLog'
+  | 'usbFiles'
+  | 'planetsVisibility'
+  | 'raDec'
+  | 'settingsMount'
+  | 'settingsGuider'
+  | 'settingsMainCamera'
+  | 'settingsFocuser'
+  | 'settingsCfw'
+  | 'settingsPoleCamera'
   | 'blockingOverlay'
 
 export type BusyStateKey = 'capture' | 'guiding' | 'polarAxis' | 'deviceAllocation'
@@ -39,10 +49,20 @@ const DEFAULT_BLOCKERS: DialogBlockerKind[] = [
   'powerManager',
   'deviceAllocation',
   'imageManager',
+  'schedulePanel',
   'polarAxis',
   'location',
   'dataCredits',
   'debugLog',
+  'usbFiles',
+  'planetsVisibility',
+  'raDec',
+  'settingsMount',
+  'settingsGuider',
+  'settingsMainCamera',
+  'settingsFocuser',
+  'settingsCfw',
+  'settingsPoleCamera',
   'blockingOverlay',
 ]
 
@@ -210,6 +230,16 @@ export const COMMAND_REQUIREMENTS: Record<string, CommandRequirement> = {
     targetSurface: 'image-manager-panel',
     needMenuOpen: true,
     blockers: DEFAULT_BLOCKERS.filter((item) => item !== 'imageManager'),
+    busy: {
+      capture: 'reject',
+      guiding: 'cancel',
+      polarAxis: 'cancel',
+      deviceAllocation: 'cancel',
+    },
+  },
+  'task-schedule': {
+    targetSurface: 'schedule-panel',
+    blockers: DEFAULT_BLOCKERS.filter((item) => item !== 'schedulePanel'),
     busy: {
       capture: 'reject',
       guiding: 'cancel',

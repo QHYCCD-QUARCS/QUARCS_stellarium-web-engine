@@ -20,9 +20,10 @@ import type { FlowContext, StepRegistry } from '../core/flowTypes'
 import { CONFIRM_ACTION, CONFIRM_DIALOG_ROOT_TESTID } from '../shared/dialogConstants'
 import { createStepError } from '../shared/errors'
 import { clickByTestId } from '../shared/interaction'
-import { ensureMenuDrawerOpen } from '../shared/navigation'
+import { ensureMenuDrawerClosed, ensureMenuDrawerOpen } from '../shared/navigation'
 import { sleep } from '../shared/interaction'
 import {
+  closeStatefulDialogByEscapeIfOpen,
   confirmDialogIfOpen,
   disconnectAllDialogIfOpen,
   waitForConfirmDialogOpen,
@@ -220,14 +221,9 @@ export function makeMenuStepRegistry(): StepRegistry {
   registry.set('menu.ensureGeneralSettingsClosed', {
     description: '若通用设置对话框已打开则关闭，便于后续 openGeneralSettings 从已知关闭态打开',
     async run(ctx, params) {
-      const root = ctx.page.getByTestId('ui-view-settings-dialog-root').first()
-      const state = await root.getAttribute('data-state').catch(() => null)
-      if (state !== 'open') return
-      for (let i = 0; i < 3; i += 1) {
-        await ctx.page.keyboard.press('Escape')
-        await sleep(300)
-      }
-      await root.waitFor({ state: 'hidden', timeout: 4000 }).catch(() => {})
+      await closeStatefulDialogByEscapeIfOpen(ctx.page, params.timeoutMs ?? ctx.stepTimeoutMs, {
+        rootTestId: 'ui-view-settings-dialog-root',
+      })
       await sleep(200)
     },
   })
@@ -246,12 +242,44 @@ export function makeMenuStepRegistry(): StepRegistry {
 
   registry.set('menu.openPowerManager', {
     async run(ctx, params) {
-      await ensureMenuResultOpen(ctx, params, {
-        menuTestId: 'ui-app-menu-open-power-manager',
-        resultTestId: 'ui-power-manager-root',
-        resultLabel: '电源管理页面',
-        resultState: 'open',
-      })
+      const timeout = resolveTimeout(ctx, params)
+      const root = ctx.page.getByTestId('ui-power-manager-root').first()
+      const submenuDrawer = ctx.page.getByTestId('ui-app-submenu-drawer').first()
+      const firstItem = ctx.page.getByTestId('ui-app-power-page-output-power-1').first()
+
+      const isPowerManagerReady = async () => {
+        const rootVisible = await root.isVisible().catch(() => false)
+        const rootState = await root.getAttribute('data-state').catch(() => null)
+        const submenuState = await submenuDrawer.getAttribute('data-state').catch(() => null)
+        const firstItemVisible = await firstItem.isVisible().catch(() => false)
+        return rootVisible && rootState === 'open' && submenuState === 'open' && firstItemVisible
+      }
+
+      const tryOpenPowerManager = async (mode: 'normal' | 'retry') => {
+        if (mode === 'retry') {
+          await ensureMenuDrawerClosed(ctx.page, timeout).catch(() => {})
+          await sleep(250)
+        }
+        console.log('[ai-control] ui-app-menu-open-power-manager 前置步骤: menu.drawer.open')
+        await ensureMenuDrawerOpen(ctx.page, timeout)
+        await clickByTestId(ctx.page, 'ui-app-menu-open-power-manager', timeout)
+        await sleep(mode === 'retry' ? 700 : 500)
+      }
+
+      await sleep(200)
+      if (!(await isPowerManagerReady())) {
+        await tryOpenPowerManager('normal')
+      }
+
+      if (!(await isPowerManagerReady())) {
+        console.log('[ai-control] ui-app-menu-open-power-manager 首次打开未就绪，执行一次重试')
+        await tryOpenPowerManager('retry')
+      }
+
+      await expect(root, '电源管理页面 应已打开 (data-state)').toHaveAttribute('data-state', 'open', { timeout })
+      await expect(submenuDrawer, '电源管理子抽屉 应已打开').toHaveAttribute('data-state', 'open', { timeout })
+      await expect(firstItem, '电源管理页面首个按钮 应已可见').toBeVisible({ timeout })
+      console.log('[ai-control] ui-app-menu-open-power-manager 后置确认: 电源管理页面 已打开')
     },
   })
 

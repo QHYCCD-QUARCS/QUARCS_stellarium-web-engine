@@ -1,14 +1,15 @@
 {
   "summary": {
-    "totalTestIds": 620,
+    "totalTestIds": 647,
     "totalComponents": 55,
-    "totalIssues": 4,
+    "totalIssues": 5,
     "byType": {
-      "naming": 4
+      "naming": 4,
+      "coverage": 1
     },
     "bySeverity": {
       "warning": 3,
-      "info": 1
+      "info": 2
     }
   },
   "issues": [
@@ -98,6 +99,15 @@
       "line": 76,
       "message": "测试标识 \"ui-components-location-focal-inputs-act-handle-keyboard-input\" 过长 (61 字符)",
       "suggestion": "建议保持在 60 字符以内"
+    },
+    {
+      "type": "coverage",
+      "severity": "info",
+      "message": "1 个组件尚未添加测试标识",
+      "files": [
+        "components/ImageManagerPanel.vue"
+      ],
+      "suggestion": "建议为所有组件添加测试标识以提高测试覆盖率"
     }
   ],
   "namingConventions": {
@@ -133,5 +143,5 @@
       "-content-": "内容区域"
     }
   },
-  "generatedAt": "2026-03-06T06:40:33.167Z"
+  "generatedAt": "2026-03-20T09:29:57.401Z"
 }

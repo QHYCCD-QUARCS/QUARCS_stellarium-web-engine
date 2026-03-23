@@ -1,49 +1,50 @@
 # E2E 测试标识主汇总
 
-**生成时间**: 2026/3/4 16:55:07
+**生成时间**: 2026/3/20 17:29:57
 
 ## 📊 统计摘要
 
-- **总组件数**: 55
-- **已添加标识的组件**: 55 (100%)
-- **总测试标识数**: 628
-- **平均标识数**: 11 个/组件
+- **总组件数**: 56
+- **已添加标识的组件**: 55 (98%)
+- **总测试标识数**: 660
+- **平均标识数**: 12 个/组件
 
 ## 📋 按优先级分类
 
-### 高优先级 (7/7 已完成)
+### 高优先级 (8/8 已完成)
 
 | 组件文件 | 组件名称 | 代码行数 | 标识数量 | 状态 |
 |---------|---------|---------|---------|------|
-| App.vue | showViewSettingsDialog | 11795 | 47 | ✅ 已完成 |
-| components/AutomaticPolarAlignmentCalibration.vue | AutomaticPolarAlignmentCalibration | 5352 | 140 | ✅ 已完成 |
+| App.vue | showViewSettingsDialog | 12387 | 54 | ✅ 已完成 |
+| components/AutomaticPolarAlignmentCalibration.vue | AutomaticPolarAlignmentCalibration | 5374 | 144 | ✅ 已完成 |
 | components/SchedulePanel.vue | SchedulePanel | 3266 | 35 | ✅ 已完成 |
-| components/gui.vue | gui | 2558 | 22 | ✅ 已完成 |
-| components/ImageManagerPanel.vue | ImageManagerPanel | 1905 | 32 | ✅ 已完成 |
+| components/gui.vue | gui | 2708 | 24 | ✅ 已完成 |
 | components/location-mgr.vue | BigDataCloud-API | 1551 | 3 | ✅ 已完成 |
-| components/FocuserPanel.vue | FocuserPanel | 1094 | 15 | ✅ 已完成 |
+| components/ImageManagerBrowser.vue | ImageManagerBrowser | 1454 | 44 | 🔄 进行中(缺8) |
+| components/FocuserPanel.vue | FocuserPanel | 1094 | 16 | ✅ 已完成 |
+| components/MountControlPanel.vue | MountControlPanel | 1024 | 43 | ✅ 已完成 |
 
 ### 中优先级 (15/15 已完成)
 
 | 组件文件 | 组件名称 | 代码行数 | 标识数量 | 状态 |
 |---------|---------|---------|---------|------|
-| components/MountControlPanel.vue | MountControlPanel | 998 | 43 | ✅ 已完成 |
 | components/CapturePanel.vue | CapturePanel | 906 | 41 | ✅ 已完成 |
 | components/Chart-Focus.vue | LineChart | 866 | 3 | ✅ 已完成 |
 | components/NumberKeyboard.vue | NumberKeyboard | 820 | 5 | ✅ 已完成 |
-| components/ImageFolder.vue | ImageFolder | 773 | 4 | ✅ 已完成 |
+| components/ImageFolder.vue | ImageFolder | 774 | 4 | ✅ 已完成 |
 | components/view-settings-dialog.vue | USB1 | 766 | 34 | ✅ 已完成 |
 | components/MeridianFlipNotifier.vue | MeridianFlipNotifier | 676 | 14 | ✅ 已完成 |
-| components/toolbar.vue | toolbar | 596 | 5 | ✅ 已完成 |
+| components/toolbar.vue | toolbar | 638 | 10 | ✅ 已完成 |
 | components/selected-object-info.vue | selected-object-info | 504 | 8 | 🔄 进行中(缺4) |
 | components/UpdateProgressDialog.vue | UpdateProgressDialog | 497 | 5 | ✅ 已完成 |
 | components/indiDebugDialog.vue | indiDebugDialog | 494 | 8 | ✅ 已完成 |
 | components/DeviceAllocationPanel.vue | DeviceAllocationPanel | 470 | 4 | ✅ 已完成 |
+| components/ChartComponent.vue | ChartsPanel | 430 | 6 | ✅ 已完成 |
+| components/Chart-Line.vue | LineChart | 424 | 1 | ✅ 已完成 |
 | components/LocationFocalInputs.vue | LocationFocalInputs | 422 | 7 | ✅ 已完成 |
-| components/ChartComponent.vue | ChartsPanel | 412 | 6 | ✅ 已完成 |
 | components/location-dialog.vue | Unknown | 409 | 6 | ✅ 已完成 |
 
-### 低优先级 (33/33 已完成)
+### 低优先级 (32/33 已完成)
 
 | 组件文件 | 组件名称 | 代码行数 | 标识数量 | 状态 |
 |---------|---------|---------|---------|------|
@@ -53,15 +54,14 @@
 | components/Chart-Histogram.vue | BarChart | 301 | 1 | ✅ 已完成 |
 | components/date-time-picker.vue | date-time-picker | 276 | 8 | ✅ 已完成 |
 | components/HistogramPanel.vue | HistogramPanel | 254 | 13 | ✅ 已完成 |
-| components/RaDecDialog.vue | RaDecDialog | 243 | 7 | ✅ 已完成 |
-| components/Chart-Line.vue | LineChart | 241 | 1 | ✅ 已完成 |
+| components/RaDecDialog.vue | RaDecDialog | 244 | 7 | ✅ 已完成 |
 | components/bottom-bar.vue | bottom-bar | 215 | 11 | ✅ 已完成 |
 | components/USBFilesDialog.vue | USBFilesDialog | 196 | 4 | ✅ 已完成 |
 | components/Chart-Scatter.vue | ScatterChart | 174 | 2 | ✅ 已完成 |
 | components/data-credits-dialog.vue | data-credits-dialog | 170 | 2 | ✅ 已完成 |
 | components/Settings-Dialog-CFW.vue | Settings-Dialog-CFW | 163 | 10 | ✅ 已完成 |
 | components/Chart-FocusImage.vue | ImageChart | 161 | 1 | ✅ 已完成 |
-| components/planets-visibility.vue | planets-visibility | 160 | 1 | ✅ 已完成 |
+| components/planets-visibility.vue | planets-visibility | 160 | 2 | ✅ 已完成 |
 | components/skysource-search.vue | skysource-search | 156 | 3 | ✅ 已完成 |
 | components/DevicePicker.vue | DevicePicker | 150 | 4 | ✅ 已完成 |
 | components/Settings-Dialog-MainCamera.vue | Settings-Dialog-MainCamera | 121 | 10 | ✅ 已完成 |
@@ -79,6 +79,7 @@
 | components/target-search.vue | target-search | 53 | 1 | ✅ 已完成 |
 | components/progress-bars.vue | progress-bars | 52 | 1 | ✅ 已完成 |
 | components/observing-panel-root-toolbar.vue | observing-panel-root-toolbar | 26 | 2 | ✅ 已完成 |
+| components/ImageManagerPanel.vue | ImageManagerPanel | 21 | 0 | ❌ 未开始 |
 | components/PolarAlignmentInfoPanel.vue | PolarAlignmentInfoPanel | 9 | 1 | ✅ 已完成 |
 
 ## 📘 命名规范

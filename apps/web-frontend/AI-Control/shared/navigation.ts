@@ -5,8 +5,12 @@
  * tb-act-toggle-navigation-drawer-overlay（仅主菜单打开时存在），避免误触其他控件。
  */
 import { expect, type Page } from '@playwright/test'
-import { getAppStartPath } from '../../tests/e2e/support/appStartPath'
-import { clickLocator, sleep } from './interaction'
+import { ACTION_SETTLE_MS, clickLocator, sleep } from './interaction'
+
+function getAppStartPath() {
+  const configured = process.env.E2E_APP_START_PATH?.trim()
+  return configured || '/'
+}
 
 /** 打开应用首页并等待 ui-app-root 可见 */
 export async function gotoHome(page: Page, stepTimeoutMs: number) {
@@ -64,6 +68,7 @@ export async function ensureMenuDrawerOpen(page: Page, timeout = 10_000) {
 
   await clickLocator(page.getByTestId('tb-act-toggle-navigation-drawer').first(), timeout)
   await expect(drawer).toHaveAttribute('data-state', 'open', { timeout })
+  await sleep(ACTION_SETTLE_MS)
 }
 
 /** 主菜单打开时浮在遮罩之上的关闭按钮 testid，仅当主菜单打开时存在于 DOM，优先点击以关闭主菜单 */
@@ -82,6 +87,7 @@ export async function ensureMenuDrawerClosed(page: Page, timeout = 10_000) {
   if (overlayVisible) {
     await clickLocator(overlayToggle, timeout)
     await expect(drawer).toHaveAttribute('data-state', 'closed', { timeout })
+    await sleep(ACTION_SETTLE_MS)
     return
   }
 
@@ -90,6 +96,7 @@ export async function ensureMenuDrawerClosed(page: Page, timeout = 10_000) {
 
   await clickLocator(page.getByTestId('tb-act-toggle-navigation-drawer').first(), timeout)
   await expect(drawer).toHaveAttribute('data-state', 'closed', { timeout })
+  await sleep(ACTION_SETTLE_MS)
 }
 
 const CAPTURE_PANEL_TESTID = 'cp-panel'

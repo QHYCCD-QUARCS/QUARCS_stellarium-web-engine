@@ -476,6 +476,18 @@
 
             <v-divider :style="{ marginBottom: '10px' }"></v-divider>
 
+            <v-list-item @click.stop="RestartQuarcsServerViaProcess()" :style="{ height: '36px', marginBottom: '10px' }" data-testid="ui-app-power-page-restart-quarcs-server">
+              <v-list-item-icon style="margin-right: 10px;">
+                <div style="display: flex; justify-content: center; align-items: center;">
+                  <img src="@/assets/images/svg/ui/Reboot.svg" height="30px"
+                    style="min-height: 30px; pointer-events: none;"></img>
+                </div>
+              </v-list-item-icon>
+              <v-list-item-content>
+                <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Restart QUARCS Server') }}</v-list-item-title>
+              </v-list-item-content>
+            </v-list-item>
+
             <v-list-item @click.stop="RestartRaspberryPi()" :style="{ height: '36px', marginBottom: '10px' }" data-testid="ui-app-power-page-restart">
               <v-list-item-icon style="margin-right: 10px;">
                 <div style="display: flex; justify-content: center; align-items: center;">
@@ -1025,7 +1037,7 @@ export default {
 
       QTClientVersion: 'Not connected',
       // VueClientVersion: process.env.VUE_APP_VERSION,
-      VueClientVersion: '20260310', // 手动指定版本号
+      VueClientVersion: '20260323-4', // 手动指定版本号
 
       // 全局总版本号（由 Qt 通过 WebSocket 从环境变量 QUARCS_TOTAL_VERSION 读取并发送）
       TotalVersion: '0.0.0',
@@ -4863,6 +4875,7 @@ export default {
     },
 
     clearDeviceList() {
+      this.clearPendingConnectionModeAfterDisconnect('all');
       this.devices.forEach(device => {
         device.device = device.driverName;
         device.isConnected = false;
@@ -4885,6 +4898,14 @@ export default {
       }
     },
 
+    RestartQuarcsServerViaProcess() {
+      this.drawer_2 = false;
+      this.ShowConfirmDialog(
+        'Restart QUARCS Server',
+        'Are you sure you want to restart the QUARCS server via the monitor process? The web page will reload afterwards.',
+        'restartQtServer'
+      );
+    },
     RestartRaspberryPi() {
       this.drawer_2 = false;
       this.ShowConfirmDialog('Restart', 'Are you sure you want to restart the Raspberry Pi?', 'RestartRaspberryPi');
@@ -9785,6 +9806,8 @@ export default {
         return;
       };
 
+      this.clearPendingConnectionModeAfterDisconnect(devicetype);
+
       for (const device of this.devices) {
         if (device.driverType === devicetype && device.isConnected) {
           device.isConnected = false;
@@ -9838,6 +9861,8 @@ export default {
         this.$bus.$emit('deleteDeviceTypeAllocationList', 'all');
         return;
       };
+
+      this.clearPendingConnectionModeAfterDisconnect(devicetype);
 
       for (const device of this.devices) {
         if (device.driverType === devicetype && device.isConnected) {
@@ -9979,6 +10004,22 @@ export default {
           this.requestSetConnectionMode(deviceType, 'INDI', { silent: true });
         }, 50);
       }
+    },
+
+    // 设备断开或清空列表时：释放 SetConnectionMode 等待状态，避免连接模式下拉框永久 disabled
+    clearPendingConnectionModeAfterDisconnect(deviceType) {
+      if (!deviceType || deviceType === 'all') {
+        this.pendingConnectionModeByDevice = {};
+        this.isSettingConnectionMode = false;
+        return;
+      }
+      delete this.pendingConnectionModeByDevice[deviceType];
+      // 主相机/导星同驱动时，模式切换会成对发起 SetConnectionMode；一侧已断开时另一侧的 pending 也应清除
+      if ((deviceType === 'MainCamera' || deviceType === 'Guider') && this.isMainGuiderSameDriver()) {
+        delete this.pendingConnectionModeByDevice.MainCamera;
+        delete this.pendingConnectionModeByDevice.Guider;
+      }
+      this.isSettingConnectionMode = Object.keys(this.pendingConnectionModeByDevice || {}).length > 0;
     },
 
     requestSetConnectionMode(deviceType, mode, opts = {}) {

@@ -2,10 +2,11 @@
  * AI-Control QHYCCD 预设别名步骤。
  *
  * 将 device 侧的 gotoHome、ensureDeviceSidebar、connectIfNeeded、ensureCapturePanel、captureOnce、save
- * 包装为默认 deviceType=MainCamera、driverText=QHYCCD、connectionModeText=SDK 的 qhy.* 步骤，便于 CLI/Flow 调用。
+ * 包装为默认 deviceType=MainCamera、driverText 为 QHY 默认展示文案（shared/driverDefaults）、connectionModeText=SDK 的 qhy.* 步骤，便于 CLI/Flow 调用。
  */
 import type { FlowContext, StepRegistry } from '../core/flowTypes'
 import { createStepError } from '../shared/errors'
+import { DEFAULT_QHY_DRIVER_TEXT } from '../shared/driverDefaults'
 import { makeCaptureStepRegistry } from './captureSteps'
 import { makeConnectionStepRegistry } from './connectionSteps'
 
@@ -17,7 +18,7 @@ function makeBaseRegistry() {
   return registry
 }
 
-/** 将指定 device step 包装为带默认参数的 step（MainCamera + QHYCCD + SDK），params 可覆盖 */
+/** 将指定 device step 包装为带默认参数的 step（MainCamera + QHY CCD + SDK），params 可覆盖 */
 function wrapDeviceStep(deviceStepId: string, defaults: Record<string, any> = {}) {
   const deviceRegistry = makeBaseRegistry()
   const def = deviceRegistry.get(deviceStepId)
@@ -29,7 +30,7 @@ function wrapDeviceStep(deviceStepId: string, defaults: Record<string, any> = {}
       await def.run(ctx, {
         deviceType: 'MainCamera',
         driverType: 'MainCamera',
-        driverText: 'QHYCCD',
+        driverText: DEFAULT_QHY_DRIVER_TEXT,
         connectionModeText: 'SDK',
         ...defaults,
         ...(params ?? {}),

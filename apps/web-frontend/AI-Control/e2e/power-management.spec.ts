@@ -77,7 +77,7 @@ test('power-management 命令：将 output2 设为开启态', async ({}, testInf
   await expect(page.getByTestId('ui-app-power-page-output-power-2').first()).toContainText('[ON]')
 })
 
-test('power-management 命令：打开重启确认后取消', async ({}, testInfo) => {
+test('power-management 命令：打开树莓派重启确认后取消', async ({}, testInfo) => {
   const page = sharedPage!
   const ctx = createFlowContext(page, testInfo, { minTestTimeoutMs: 2 * 60_000 })
   const registry = makeAiControlRegistry()
@@ -87,6 +87,21 @@ test('power-management 命令：打开重启确认后取消', async ({}, testInf
     registry,
     commandName: 'power-management',
     flowParams: { gotoHome: false, powerManagementInteract: { restart: 'cancel' } },
+  })
+
+  await expect(page.getByTestId('ui-confirm-dialog-root').first()).toHaveAttribute('data-state', 'closed')
+})
+
+test('power-management 命令：打开「重启 QUARCS 服务端」确认后取消', async ({}, testInfo) => {
+  const page = sharedPage!
+  const ctx = createFlowContext(page, testInfo, { minTestTimeoutMs: 2 * 60_000 })
+  const registry = makeAiControlRegistry()
+
+  await runFlowByCommand({
+    ctx,
+    registry,
+    commandName: 'power-management',
+    flowParams: { gotoHome: false, powerManagementInteract: { restartQuarcsServer: 'cancel' } },
   })
 
   await expect(page.getByTestId('ui-confirm-dialog-root').first()).toHaveAttribute('data-state', 'closed')

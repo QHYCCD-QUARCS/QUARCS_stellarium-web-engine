@@ -1,5 +1,6 @@
 import { expect } from '@playwright/test'
 import type { FlowContext, StepRegistry } from '../core/flowTypes'
+import { CONFIRM_ACTION } from '../shared/dialogConstants'
 import { clickByTestId, clickLocator, sleep } from '../shared/interaction'
 import { confirmDialogIfOpen, waitForConfirmDialogOpen } from '../menu/dialogSteps'
 
@@ -8,6 +9,8 @@ export type PowerConfirmMode = boolean | 'confirm' | 'cancel'
 export type PowerManagementInteractParams = {
   output1?: boolean
   output2?: boolean
+  /** 电源页「重启 QUARCS 服务端」：经管理进程重启 Qt 后端（data-action=restartQtServer） */
+  restartQuarcsServer?: PowerConfirmMode
   restart?: PowerConfirmMode
   shutdown?: PowerConfirmMode
   forceUpdate?: PowerConfirmMode
@@ -67,14 +70,8 @@ async function runConfirmableAction(
   await button.scrollIntoViewIfNeeded().catch(() => {})
   await clickLocator(button, ctx.stepTimeoutMs)
   await sleep(250)
-  await waitForConfirmDialogOpen(ctx.page, Math.min(5_000, ctx.stepTimeoutMs), { expectedAction }).catch(() => null)
-  if (resolveConfirmMode(mode) === 'cancel') {
-    await ctx.page.keyboard.press('Escape').catch(() => {})
-    await sleep(250)
-    await confirmDialogIfOpen(ctx.page, 'cancel', ctx.stepTimeoutMs).catch(() => null)
-  } else {
-    await confirmDialogIfOpen(ctx.page, 'confirm', ctx.stepTimeoutMs)
-  }
+  await waitForConfirmDialogOpen(ctx.page, ctx.stepTimeoutMs, { expectedAction })
+  await confirmDialogIfOpen(ctx.page, resolveConfirmMode(mode), ctx.stepTimeoutMs, { expectedAction })
   await sleep(250)
 }
 
@@ -83,6 +80,7 @@ function hasAnyInteraction(params: PowerManagementInteractParams | undefined) {
   return (
     typeof params.output1 === 'boolean' ||
     typeof params.output2 === 'boolean' ||
+    params.restartQuarcsServer != null ||
     params.restart != null ||
     params.shutdown != null ||
     params.forceUpdate != null
@@ -103,6 +101,12 @@ export function makePowerManagementStepRegistry(): StepRegistry {
       if (typeof params.output2 === 'boolean') {
         await setOutputPower(ctx, 2, params.output2)
       }
+      await runConfirmableAction(
+        ctx,
+        'ui-app-power-page-restart-quarcs-server',
+        CONFIRM_ACTION.RESTART_QT_SERVER,
+        params.restartQuarcsServer,
+      )
       await runConfirmableAction(ctx, 'ui-app-power-page-restart', 'RestartRaspberryPi', params.restart)
       await runConfirmableAction(ctx, 'ui-app-power-page-shutdown', 'ShutdownRaspberryPi', params.shutdown)
       await runConfirmableAction(ctx, 'ui-app-power-page-force-update', 'ForceUpdate', params.forceUpdate)

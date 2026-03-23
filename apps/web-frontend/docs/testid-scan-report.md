@@ -1,64 +1,66 @@
 # 测试标识扫描报告
 
-**生成时间**: 2026/3/6 14:40:33
+**生成时间**: 2026/3/20 17:29:57
 
 ## 📊 统计摘要
 
 - **总组件数**: 55
 - **有标识的组件**: 55
-- **总标识数**: 631
+- **总标识数**: 660
 - **重复标识数**: 0
 
 ### 按前缀分类
 
 | 前缀 | 数量 |
 |------|------|
-| `ui-` | 252 |
-| `pa-` | 140 |
+| `ui-` | 259 |
+| `pa-` | 144 |
 | `mcp-` | 43 |
+| `imp-` | 42 |
 | `cp-` | 41 |
-| `imp-` | 34 |
 | `scp-` | 31 |
 | `fp-` | 16 |
 | `gui-` | 16 |
 | `hp-` | 13 |
+| `tb-` | 11 |
 | `bb-` | 11 |
-| `tb-` | 5 |
 | `
                   'ui-` | 4 |
 | `dap-` | 4 |
 | `dp-` | 4 |
 | ``scp-` | 4 |
 | `
+                    'ui-` | 3 |
+| `
                       'ui-` | 3 |
 | ``ui-` | 3 |
 | `e2e-` | 2 |
-| `
-                    'ui-` | 2 |
+| ``imp-` | 2 |
 | ``e2e-` | 1 |
 | `
                         'ui-` | 1 |
 | `
               'ui-` | 1 |
+| `$attrs['data-` | 1 |
 
 ### 标识最多的组件（前10）
 
 | 组件文件 | 标识数量 |
 |---------|----------|
-| components/AutomaticPolarAlignmentCalibration.vue | 140 |
-| App.vue | 47 |
+| components/AutomaticPolarAlignmentCalibration.vue | 144 |
+| App.vue | 54 |
+| components/ImageManagerBrowser.vue | 44 |
 | components/MountControlPanel.vue | 43 |
 | components/CapturePanel.vue | 41 |
 | components/SchedulePanel.vue | 35 |
-| components/ImageManagerPanel.vue | 34 |
 | components/view-settings-dialog.vue | 34 |
-| components/gui.vue | 22 |
+| components/gui.vue | 24 |
 | components/FocuserPanel.vue | 16 |
 | components/MeridianFlipNotifier.vue | 14 |
 
 ## 📝 详细列表
 
-### components/AutomaticPolarAlignmentCalibration.vue (140 个标识)
+### components/AutomaticPolarAlignmentCalibration.vue (144 个标识)
 
 | 标识 | 元素 | 行号 | 状态属性 |
 |------|------|------|----------|
@@ -69,141 +71,145 @@
 | `pa-minimized-icon` | v | 23 | - |
 | `pa-minimized-title` | span | 24 | - |
 | `pa-minimized-controls` | div | 27 | - |
-| `pa-btn-expand-from-minimized` | unknown | 32 | - |
-| `pa-icon-expand-from-minimized` | v | 34 | - |
-| `pa-minimized-status` | div | 39 | - |
-| `pa-connection-indicator-minimized` | unknown | 43 | - |
-| `pa-connection-text-minimized` | span | 46 | - |
-| `pa-widget` | unknown | 62 | - |
-| `pa-header` | div | 66 | - |
-| `pa-header-drag-handle` | unknown | 71 | - |
-| `pa-header-left` | div | 73 | - |
-| `pa-header-icon` | v | 74 | - |
-| `pa-header-title` | span | 75 | - |
-| `pa-connection-indicator` | div | 76 | - |
-| `pa-connection-dot` | unknown | 80 | - |
-| `pa-header-controls` | div | 87 | - |
-| `pa-btn-toggle-collapse` | unknown | 92 | - |
-| `pa-icon-toggle-collapse` | v | 94 | - |
-| `pa-btn-toggle-trajectory` | unknown | 103 | - |
-| `pa-icon-toggle-trajectory` | v | 106 | - |
-| `pa-btn-minimize` | unknown | 115 | - |
-| `pa-icon-minimize` | v | 117 | - |
-| `pa-content-collapsed` | unknown | 127 | - |
-| `pa-collapsed-info` | div | 129 | - |
-| `pa-collapsed-progress` | div | 130 | - |
-| `pa-collapsed-progress-circle` | unknown | 134 | - |
-| `pa-collapsed-progress-text` | span | 137 | - |
-| `pa-collapsed-status` | div | 143 | - |
-| `pa-collapsed-azimuth` | div | 144 | - |
-| `pa-collapsed-azimuth-label` | span | 145 | - |
-| `pa-collapsed-azimuth-value` | unknown | 149 | - |
-| `pa-collapsed-altitude` | div | 156 | - |
-| `pa-collapsed-altitude-label` | span | 157 | - |
-| `pa-collapsed-altitude-value` | unknown | 161 | - |
-| `pa-content-expanded` | unknown | 176 | - |
-| `pa-sections` | div | 178 | - |
-| `pa-calibration-progress` | div | 180 | - |
-| `pa-progress-header` | div | 181 | - |
-| `pa-progress-title` | div | 182 | - |
-| `pa-calibration-loop-info` | unknown | 186 | - |
-| `pa-progress-bar` | div | 193 | - |
-| `pa-progress-fill` | unknown | 197 | - |
-| `pa-progress-nodes` | div | 201 | - |
-| `pa-step-initialization` | div | 203 | - |
-| `pa-step-initialization-circle` | div | 204 | - |
-| `pa-step-initialization-label` | div | 208 | - |
-| `pa-step-calibration-1` | div | 212 | - |
-| `pa-step-calibration-1-circle` | div | 213 | - |
-| `pa-step-calibration-1-label` | div | 217 | - |
-| `pa-step-calibration-2` | div | 221 | - |
-| `pa-step-calibration-2-circle` | div | 222 | - |
-| `pa-step-calibration-2-label` | div | 226 | - |
-| `pa-step-calibration-3` | div | 230 | - |
-| `pa-step-calibration-3-circle` | div | 231 | - |
-| `pa-step-calibration-3-label` | div | 235 | - |
-| `pa-step-guidance-calibration` | unknown | 242 | - |
-| `pa-step-guidance-calibration-circle` | div | 245 | - |
-| `pa-step-guidance-calibration-label` | div | 250 | - |
-| `pa-step-verification` | unknown | 257 | - |
-| `pa-step-verification-circle` | div | 260 | - |
-| `pa-step-verification-label` | div | 264 | - |
-| `pa-log-section` | div | 271 | - |
-| `pa-log-display` | div | 272 | - |
-| `pa-latest-log` | unknown | 277 | - |
-| `pa-latest-log-timestamp` | div | 280 | - |
-| `pa-latest-log-message` | div | 283 | - |
-| `pa-log-empty` | div | 288 | - |
-| `pa-position-section` | div | 295 | - |
-| `pa-position-grid` | div | 296 | - |
-| `pa-pos-current-ra` | div | 297 | - |
-| `pa-pos-current-ra-label` | div | 298 | - |
-| `pa-pos-current-ra-value` | div | 299 | - |
-| `pa-pos-current-dec` | div | 302 | - |
-| `pa-pos-current-dec-label` | div | 303 | - |
-| `pa-pos-current-dec-value` | div | 304 | - |
-| `pa-pos-target-ra` | div | 307 | - |
-| `pa-pos-target-ra-label` | div | 308 | - |
-| `pa-pos-target-ra-value` | div | 309 | - |
-| `pa-pos-target-dec` | div | 312 | - |
-| `pa-pos-target-dec-label` | div | 313 | - |
-| `pa-pos-target-dec-value` | div | 314 | - |
-| `pa-adjustment-section` | div | 320 | - |
-| `pa-adjustment-instructions` | div | 321 | - |
-| `pa-adjust-azimuth` | unknown | 325 | - |
-| `pa-adjust-azimuth-icon` | div | 328 | - |
-| `pa-adjust-azimuth-details` | div | 332 | - |
-| `pa-adjust-azimuth-header` | div | 333 | - |
-| `pa-adjust-azimuth-type` | span | 334 | - |
-| `pa-adjust-azimuth-value` | span | 335 | - |
-| `pa-adjust-azimuth-action` | div | 340 | - |
-| `pa-adjust-altitude` | unknown | 349 | - |
-| `pa-adjust-altitude-icon` | div | 352 | - |
-| `pa-adjust-altitude-details` | div | 356 | - |
-| `pa-adjust-altitude-header` | div | 357 | - |
-| `pa-adjust-altitude-type` | span | 358 | - |
-| `pa-adjust-altitude-value` | span | 359 | - |
-| `pa-adjust-altitude-action` | div | 364 | - |
-| `pa-control-section` | div | 373 | - |
-| `pa-action-buttons` | div | 374 | - |
-| `pa-btn-auto-calibration` | unknown | 379 | - |
-| `pa-btn-auto-calibration-text` | span | 384 | - |
-| `pa-btn-test-simulation` | unknown | 395 | - |
-| `pa-btn-test-simulation-text` | span | 398 | - |
-| `pa-guidance-indicator` | div | 407 | - |
-| `pa-guidance-circle` | unknown | 416 | - |
-| `pa-guidance-svg` | svg | 420 | - |
-| `pa-guidance-bg` | circle | 421 | - |
-| `pa-guidance-bar` | unknown | 428 | - |
-| `pa-guidance-content` | div | 432 | - |
-| `pa-guidance-step-icon` | v | 433 | - |
-| `pa-guidance-step-description` | div | 434 | - |
-| `pa-guidance-star-count` | unknown | 440 | - |
-| `pa-trajectory-overlay-fullscreen` | unknown | 456 | - |
-| `pa-trajectory-canvas-fullscreen` | canvas | 458 | - |
-| `pa-btn-trajectory-close` | unknown | 464 | - |
-| `pa-trajectory-hint` | div | 469 | - |
-| `pa-trajectory-panel` | div | 471 | - |
-| `pa-trajectory-panel-current` | div | 472 | - |
-| `pa-trajectory-panel-current-label` | span | 473 | - |
-| `pa-trajectory-panel-current-value` | span | 474 | - |
-| `pa-trajectory-panel-target` | div | 479 | - |
-| `pa-trajectory-panel-target-label` | span | 480 | - |
-| `pa-trajectory-panel-target-value` | span | 481 | - |
-| `pa-trajectory-panel-actions` | div | 486 | - |
-| `pa-btn-clear-old-trajectory` | button | 487 | - |
-| `pa-btn-switch-to-windowed` | button | 490 | - |
-| `pa-trajectory-overlay-windowed` | unknown | 504 | - |
-| `pa-trajectory-window-header` | div | 506 | - |
-| `pa-trajectory-window-title` | span | 507 | - |
-| `pa-trajectory-window-actions` | div | 509 | - |
-| `pa-btn-switch-to-fullscreen` | button | 510 | - |
-| `pa-btn-clear-old-trajectory-windowed` | button | 513 | - |
-| `pa-btn-trajectory-close-windowed` | unknown | 520 | - |
-| `pa-trajectory-window-content` | div | 527 | - |
-| `pa-trajectory-canvas-windowed` | canvas | 528 | - |
+| `pa-btn-close-minimized` | unknown | 32 | - |
+| `pa-icon-close-minimized` | v | 34 | - |
+| `pa-btn-expand-from-minimized` | unknown | 40 | - |
+| `pa-icon-expand-from-minimized` | v | 42 | - |
+| `pa-minimized-status` | div | 47 | - |
+| `pa-connection-indicator-minimized` | unknown | 51 | - |
+| `pa-connection-text-minimized` | span | 54 | - |
+| `pa-widget` | unknown | 70 | - |
+| `pa-header` | div | 74 | - |
+| `pa-header-drag-handle` | unknown | 79 | - |
+| `pa-header-left` | div | 81 | - |
+| `pa-header-icon` | v | 82 | - |
+| `pa-header-title` | span | 83 | - |
+| `pa-connection-indicator` | div | 84 | - |
+| `pa-connection-dot` | unknown | 88 | - |
+| `pa-header-controls` | div | 95 | - |
+| `pa-btn-close` | unknown | 100 | - |
+| `pa-icon-close` | v | 102 | - |
+| `pa-btn-toggle-collapse` | unknown | 108 | - |
+| `pa-icon-toggle-collapse` | v | 110 | - |
+| `pa-btn-toggle-trajectory` | unknown | 119 | - |
+| `pa-icon-toggle-trajectory` | v | 122 | - |
+| `pa-btn-minimize` | unknown | 131 | - |
+| `pa-icon-minimize` | v | 133 | - |
+| `pa-content-collapsed` | unknown | 143 | - |
+| `pa-collapsed-info` | div | 145 | - |
+| `pa-collapsed-progress` | div | 146 | - |
+| `pa-collapsed-progress-circle` | unknown | 150 | - |
+| `pa-collapsed-progress-text` | span | 153 | - |
+| `pa-collapsed-status` | div | 159 | - |
+| `pa-collapsed-azimuth` | div | 160 | - |
+| `pa-collapsed-azimuth-label` | span | 161 | - |
+| `pa-collapsed-azimuth-value` | unknown | 165 | - |
+| `pa-collapsed-altitude` | div | 172 | - |
+| `pa-collapsed-altitude-label` | span | 173 | - |
+| `pa-collapsed-altitude-value` | unknown | 177 | - |
+| `pa-content-expanded` | unknown | 192 | - |
+| `pa-sections` | div | 194 | - |
+| `pa-calibration-progress` | div | 196 | - |
+| `pa-progress-header` | div | 197 | - |
+| `pa-progress-title` | div | 198 | - |
+| `pa-calibration-loop-info` | unknown | 202 | - |
+| `pa-progress-bar` | div | 209 | - |
+| `pa-progress-fill` | unknown | 213 | - |
+| `pa-progress-nodes` | div | 217 | - |
+| `pa-step-initialization` | div | 219 | - |
+| `pa-step-initialization-circle` | div | 220 | - |
+| `pa-step-initialization-label` | div | 224 | - |
+| `pa-step-calibration-1` | div | 228 | - |
+| `pa-step-calibration-1-circle` | div | 229 | - |
+| `pa-step-calibration-1-label` | div | 233 | - |
+| `pa-step-calibration-2` | div | 237 | - |
+| `pa-step-calibration-2-circle` | div | 238 | - |
+| `pa-step-calibration-2-label` | div | 242 | - |
+| `pa-step-calibration-3` | div | 246 | - |
+| `pa-step-calibration-3-circle` | div | 247 | - |
+| `pa-step-calibration-3-label` | div | 251 | - |
+| `pa-step-guidance-calibration` | unknown | 258 | - |
+| `pa-step-guidance-calibration-circle` | div | 261 | - |
+| `pa-step-guidance-calibration-label` | div | 266 | - |
+| `pa-step-verification` | unknown | 273 | - |
+| `pa-step-verification-circle` | div | 276 | - |
+| `pa-step-verification-label` | div | 280 | - |
+| `pa-log-section` | div | 287 | - |
+| `pa-log-display` | div | 288 | - |
+| `pa-latest-log` | unknown | 293 | - |
+| `pa-latest-log-timestamp` | div | 296 | - |
+| `pa-latest-log-message` | div | 299 | - |
+| `pa-log-empty` | div | 304 | - |
+| `pa-position-section` | div | 311 | - |
+| `pa-position-grid` | div | 312 | - |
+| `pa-pos-current-ra` | div | 313 | - |
+| `pa-pos-current-ra-label` | div | 314 | - |
+| `pa-pos-current-ra-value` | div | 315 | - |
+| `pa-pos-current-dec` | div | 318 | - |
+| `pa-pos-current-dec-label` | div | 319 | - |
+| `pa-pos-current-dec-value` | div | 320 | - |
+| `pa-pos-target-ra` | div | 323 | - |
+| `pa-pos-target-ra-label` | div | 324 | - |
+| `pa-pos-target-ra-value` | div | 325 | - |
+| `pa-pos-target-dec` | div | 328 | - |
+| `pa-pos-target-dec-label` | div | 329 | - |
+| `pa-pos-target-dec-value` | div | 330 | - |
+| `pa-adjustment-section` | div | 336 | - |
+| `pa-adjustment-instructions` | div | 337 | - |
+| `pa-adjust-azimuth` | unknown | 341 | - |
+| `pa-adjust-azimuth-icon` | div | 344 | - |
+| `pa-adjust-azimuth-details` | div | 348 | - |
+| `pa-adjust-azimuth-header` | div | 349 | - |
+| `pa-adjust-azimuth-type` | span | 350 | - |
+| `pa-adjust-azimuth-value` | span | 351 | - |
+| `pa-adjust-azimuth-action` | div | 356 | - |
+| `pa-adjust-altitude` | unknown | 365 | - |
+| `pa-adjust-altitude-icon` | div | 368 | - |
+| `pa-adjust-altitude-details` | div | 372 | - |
+| `pa-adjust-altitude-header` | div | 373 | - |
+| `pa-adjust-altitude-type` | span | 374 | - |
+| `pa-adjust-altitude-value` | span | 375 | - |
+| `pa-adjust-altitude-action` | div | 380 | - |
+| `pa-control-section` | div | 389 | - |
+| `pa-action-buttons` | div | 390 | - |
+| `pa-btn-auto-calibration` | unknown | 395 | - |
+| `pa-btn-auto-calibration-text` | span | 400 | - |
+| `pa-btn-test-simulation` | unknown | 411 | - |
+| `pa-btn-test-simulation-text` | span | 414 | - |
+| `pa-guidance-indicator` | div | 423 | - |
+| `pa-guidance-circle` | unknown | 432 | - |
+| `pa-guidance-svg` | svg | 436 | - |
+| `pa-guidance-bg` | circle | 437 | - |
+| `pa-guidance-bar` | unknown | 444 | - |
+| `pa-guidance-content` | div | 448 | - |
+| `pa-guidance-step-icon` | v | 449 | - |
+| `pa-guidance-step-description` | div | 450 | - |
+| `pa-guidance-star-count` | unknown | 456 | - |
+| `pa-trajectory-overlay-fullscreen` | unknown | 472 | - |
+| `pa-trajectory-canvas-fullscreen` | canvas | 474 | - |
+| `pa-btn-trajectory-close` | unknown | 480 | - |
+| `pa-trajectory-hint` | div | 485 | - |
+| `pa-trajectory-panel` | div | 487 | - |
+| `pa-trajectory-panel-current` | div | 488 | - |
+| `pa-trajectory-panel-current-label` | span | 489 | - |
+| `pa-trajectory-panel-current-value` | span | 490 | - |
+| `pa-trajectory-panel-target` | div | 495 | - |
+| `pa-trajectory-panel-target-label` | span | 496 | - |
+| `pa-trajectory-panel-target-value` | span | 497 | - |
+| `pa-trajectory-panel-actions` | div | 502 | - |
+| `pa-btn-clear-old-trajectory` | button | 503 | - |
+| `pa-btn-switch-to-windowed` | button | 506 | - |
+| `pa-trajectory-overlay-windowed` | unknown | 520 | - |
+| `pa-trajectory-window-header` | div | 522 | - |
+| `pa-trajectory-window-title` | span | 523 | - |
+| `pa-trajectory-window-actions` | div | 525 | - |
+| `pa-btn-switch-to-fullscreen` | button | 526 | - |
+| `pa-btn-clear-old-trajectory-windowed` | button | 529 | - |
+| `pa-btn-trajectory-close-windowed` | unknown | 536 | - |
+| `pa-trajectory-window-content` | div | 543 | - |
+| `pa-trajectory-canvas-windowed` | canvas | 544 | - |
 
-### App.vue (47 个标识)
+### App.vue (54 个标识)
 
 | 标识 | 元素 | 行号 | 状态属性 |
 |------|------|------|----------|
@@ -255,13 +261,21 @@
                   + index
                 ` | unknown | 224 | - |
 | `
+                    'ui-config-'
+                    + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')
+                    + '-'
+                    + String(item.label || 'Field').replace(/[^A-Za-z0-9]+/g, '')
+                    + '-slider-label-'
+                    + index
+                  ` | unknown | 237 | - |
+| `
                       'ui-config-'
                       + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')
                       + '-'
                       + String(item.label || 'Field').replace(/[^A-Za-z0-9]+/g, '')
                       + '-slider-dec-'
                       + index
-                    ` | unknown | 245 | - |
+                    ` | unknown | 255 | - |
 | `
                       'ui-config-'
                       + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')
@@ -269,7 +283,7 @@
                       + String(item.label || 'Field').replace(/[^A-Za-z0-9]+/g, '')
                       + '-slider-'
                       + index
-                    ` | unknown | 269 | - |
+                    ` | unknown | 279 | - |
 | `
                       'ui-config-'
                       + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')
@@ -277,7 +291,7 @@
                       + String(item.label || 'Field').replace(/[^A-Za-z0-9]+/g, '')
                       + '-slider-inc-'
                       + index
-                    ` | unknown | 285 | - |
+                    ` | unknown | 295 | - |
 | `
                   'ui-config-'
                   + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')
@@ -285,7 +299,7 @@
                   + String(item.label || 'Field').replace(/[^A-Za-z0-9]+/g, '')
                   + '-select-'
                   + index
-                ` | unknown | 310 | - |
+                ` | unknown | 320 | - |
 | `
                   'ui-config-'
                   + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')
@@ -293,7 +307,7 @@
                   + String(item.label || 'Field').replace(/[^A-Za-z0-9]+/g, '')
                   + '-switch-'
                   + index
-                ` | unknown | 328 | - |
+                ` | unknown | 338 | - |
 | `
                     'ui-config-'
                     + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')
@@ -301,28 +315,83 @@
                     + String(item.label || item.buttonText || 'Button').replace(/[^A-Za-z0-9]+/g, '')
                     + '-button-'
                     + index
-                  ` | unknown | 359 | - |
-| `ui-app-btn-disconnect-driver` | unknown | 395 | - |
-| `ui-power-manager-root` | unknown | 408 | - |
-| `ui-app-power-page-output-power-1` | unknown | 420 | - |
-| `ui-app-power-page-output-power-2` | unknown | 440 | - |
-| `ui-app-power-page-restart` | v | 461 | - |
-| `ui-app-power-page-shutdown` | v | 473 | - |
-| `ui-app-power-page-force-update` | v | 485 | - |
-| `ui-app-menu-drawer` | unknown | 513 | - |
-| `ui-app-menu-quit` | v | 547 | - |
-| `ui-app-menu-general-settings` | v | 561 | - |
-| `ui-app-menu-open-power-manager` | v | 575 | - |
-| ``ui-app-menu-device-${device && device.driverType ? device.driverType : UNKNOWN_DRIVER_TYPE}`` | unknown | 596 | - |
-| `ui-app-menu-connect-all` | unknown | 630 | - |
-| `ui-app-menu-disconnect-all` | v | 649 | - |
-| `ui-app-menu-device-allocation` | v | 663 | - |
-| `ui-app-menu-calibrate-polar-axis` | v | 677 | - |
-| `ui-app-menu-open-image-manager` | v | 691 | - |
-| `ui-app-menu-open-debug-log` | v | 705 | - |
-| `ui-app-menu-location` | v | 721 | - |
-| `ui-app-menu-refresh-page` | unknown | 740 | - |
-| `ui-app-menu-data-credits` | v | 756 | - |
+                  ` | unknown | 369 | - |
+| `ui-app-btn-disconnect-driver` | unknown | 405 | - |
+| `ui-power-manager-root` | unknown | 418 | - |
+| `ui-power-manager-btn-close` | unknown | 424 | - |
+| `ui-app-power-page-output-power-1` | unknown | 438 | - |
+| `ui-app-power-page-output-power-2` | unknown | 458 | - |
+| `ui-app-power-page-restart-quarcs-server` | v | 479 | - |
+| `ui-app-power-page-restart` | v | 491 | - |
+| `ui-app-power-page-shutdown` | v | 503 | - |
+| `ui-app-power-page-force-update` | v | 515 | - |
+| `ui-app-menu-drawer` | unknown | 543 | - |
+| `ui-app-menu-quit` | v | 577 | - |
+| `ui-app-menu-general-settings` | v | 591 | - |
+| `ui-app-menu-open-power-manager` | v | 605 | - |
+| ``ui-app-menu-device-${device && device.driverType ? device.driverType : UNKNOWN_DRIVER_TYPE}`` | unknown | 626 | - |
+| `ui-app-menu-connect-all` | unknown | 660 | - |
+| `ui-app-menu-disconnect-all` | v | 679 | - |
+| `ui-app-menu-device-allocation` | v | 693 | - |
+| `ui-app-menu-calibrate-polar-axis` | v | 707 | - |
+| `ui-app-menu-open-image-manager` | v | 721 | - |
+| `ui-app-menu-open-debug-log` | v | 735 | - |
+| `ui-app-menu-location` | v | 751 | - |
+| `ui-app-menu-refresh-page` | unknown | 770 | - |
+| `ui-app-menu-data-credits` | v | 786 | - |
+| `tb-act-toggle-navigation-drawer-overlay` | unknown | 847 | - |
+| `ui-app-disconnect-driver-dialog-root` | unknown | 857 | - |
+| `ui-app-disconnect-driver-dialog-btn-cancel` | v | 863 | - |
+| `ui-app-disconnect-driver-dialog-btn-confirm` | v | 864 | - |
+
+### components/ImageManagerBrowser.vue (44 个标识)
+
+| 标识 | 元素 | 行号 | 状态属性 |
+|------|------|------|----------|
+| `imp-root` | unknown | 7 | - |
+| `imp-btn-move-file-to-usb` | button | 12 | - |
+| `imp-btn-delete-btn-click` | button | 15 | - |
+| `imp-btn-download-selected` | button | 18 | - |
+| `imp-act-image-file-switch` | span | 19 | - |
+| `imp-btn-image-file-switch` | button | 20 | - |
+| `imp-btn-panel-close` | button | 23 | - |
+| `imp-txt-no-folders` | div | 38 | - |
+| ``imp-sidebar-folder-${index}`` | unknown | 45 | - |
+| `imp-txt-current-folder` | div | 67 | - |
+| `imp-btn-refresh-current-folder` | button | 71 | - |
+| ``imp-file-row-${currentFolderDisplayIndex}-${index}`` | unknown | 87 | - |
+| `imp-act-close-usbselect-dialog` | div | 111 | - |
+| `imp-act-usb-select-dialog` | div | 112 | - |
+| `imp-btn-close-usbselect-dialog` | button | 115 | - |
+| `imp-act-select-usb` | div | 118 | - |
+| `imp-act-close-usb-confirm-dialog` | div | 131 | - |
+| `imp-usb-confirm-dialog` | div | 132 | - |
+| `imp-btn-close-usb-confirm-dialog` | button | 135 | - |
+| `imp-btn-cancel-usb-confirm` | button | 142 | - |
+| `imp-btn-confirm-usb-transfer` | button | 143 | - |
+| `imp-act-close-delete-confirm-dialog` | div | 151 | - |
+| `imp-delete-confirm-dialog` | div | 152 | - |
+| `imp-btn-close-delete-confirm-dialog` | button | 155 | - |
+| `imp-btn-cancel-delete-confirm` | button | 161 | - |
+| `imp-btn-confirm-delete` | button | 162 | - |
+| `imp-act-close-download-confirm-dialog` | div | 170 | - |
+| `imp-act-usb-select-dialog-2` | div | 171 | - |
+| `imp-btn-close-download-confirm-dialog` | button | 174 | - |
+| `imp-select-download-concurrency` | select | 180 | - |
+| `imp-btn-close-download-confirm-dialog-2` | button | 188 | - |
+| `imp-btn-confirm-start-download` | button | 189 | - |
+| `imp-act-close-download-location-reminder-dialog` | div | 197 | - |
+| `imp-act-download-location-reminder-dialog` | div | 198 | - |
+| `imp-btn-close-download-location-reminder-dialog` | button | 201 | - |
+| `imp-btn-cancel-download-location-reminder-dialog` | button | 206 | - |
+| `imp-btn-continue-download-location-reminder-dialog` | button | 207 | - |
+| `imp-btn-toggle-download-panel` | button | 220 | - |
+| `imp-btn-cancel-all-downloads` | button | 221 | - |
+| `imp-select-download-concurrency-2` | select | 223 | - |
+| `imp-btn-pause-download` | button | 236 | - |
+| `imp-btn-resume-download` | button | 237 | - |
+| `imp-btn-cancel-download` | button | 238 | - |
+| `imp-btn-auto` | button | 251 | - |
 
 ### components/MountControlPanel.vue (43 个标识)
 
@@ -458,43 +527,6 @@
 | `scp-preset-btn-delete` | unknown | 622 | - |
 | `scp-preset-btn-ok` | unknown | 630 | - |
 
-### components/ImageManagerPanel.vue (34 个标识)
-
-| 标识 | 元素 | 行号 | 状态属性 |
-|------|------|------|----------|
-| `imp-root` | unknown | 6 | - |
-| `imp-btn-move-file-to-usb` | button | 10 | - |
-| `imp-btn-delete-folders` | button | 19 | - |
-| `imp-btn-delete-btn-click` | button | 23 | - |
-| `imp-btn-download-selected` | button | 34 | - |
-| `imp-act-image-file-switch` | span | 38 | - |
-| `imp-btn-image-file-switch` | button | 40 | - |
-| `imp-btn-panel-close` | button | 68 | - |
-| `imp-txt-no-folders` | span | 85 | - |
-| `imp-act-overlay` | div | 90 | - |
-| `imp-act-close-usbselect-dialog` | div | 95 | - |
-| `imp-act-usb-select-dialog` | div | 96 | - |
-| `imp-btn-close-usbselect-dialog` | button | 99 | - |
-| `imp-act-select-usb` | unknown | 109 | - |
-| `imp-act-close-download-confirm-dialog` | div | 123 | - |
-| `imp-act-usb-select-dialog-2` | div | 124 | - |
-| `imp-btn-close-download-confirm-dialog` | button | 127 | - |
-| `imp-select-download-concurrency` | select | 138 | - |
-| `imp-btn-close-download-confirm-dialog-2` | button | 148 | - |
-| `imp-btn-confirm-start-download` | button | 149 | - |
-| `imp-act-close-download-location-reminder-dialog` | div | 158 | - |
-| `imp-act-download-location-reminder-dialog` | div | 159 | - |
-| `imp-btn-close-download-location-reminder-dialog` | button | 162 | - |
-| `imp-btn-cancel-download-location-reminder-dialog` | button | 175 | - |
-| `imp-btn-continue-download-location-reminder-dialog` | button | 176 | - |
-| `imp-btn-toggle-download-panel` | button | 191 | - |
-| `imp-btn-cancel-all-downloads` | button | 194 | - |
-| `imp-select-download-concurrency-2` | select | 196 | - |
-| `imp-btn-pause-download` | unknown | 213 | - |
-| `imp-btn-resume-download` | unknown | 221 | - |
-| `imp-btn-cancel-download` | unknown | 229 | - |
-| `imp-btn-auto` | unknown | 249 | - |
-
 ### components/view-settings-dialog.vue (34 个标识)
 
 | 标识 | 元素 | 行号 | 状态属性 |
@@ -534,32 +566,34 @@
 | `ui-view-settings-dialog-btn-on-confirm-clear-box` | unknown | 261 | - |
 | `ui-view-settings-dialog-btn-blue-text` | v | 269 | - |
 
-### components/gui.vue (22 个标识)
+### components/gui.vue (24 个标识)
 
 | 标识 | 元素 | 行号 | 状态属性 |
 |------|------|------|----------|
 | `gui-root` | unknown | 11 | - |
-| `gui-btn-toggle-image-manager-panel` | button | 43 | - |
-| `gui-btn-recalibrate-polar-axis` | button | 49 | - |
-| `gui-btn-single-solve-image` | unknown | 59 | - |
-| `gui-btn-loop-solve-image` | unknown | 77 | - |
-| `gui-btn-toggle-mount-panel` | unknown | 91 | - |
-| `gui-btn-switch-main-page` | unknown | 126 | - |
-| `gui-btn-toggle-charts-panel` | unknown | 155 | - |
-| `gui-btn-quit-polar-axis-mode` | unknown | 174 | - |
-| `gui-btn-hide-capture-ui` | unknown | 191 | - |
-| `gui-btn-show-capture-ui` | unknown | 203 | - |
-| `gui-btn-get-original-image` | unknown | 215 | - |
-| `gui-btn-scale-plus` | unknown | 234 | - |
-| `gui-btn-scale-minus` | unknown | 246 | - |
-| `ui-confirm-dialog-root` | unknown | 306 | - |
-| `ui-confirm-dialog-btn-close` | unknown | 323 | - |
-| `ui-confirm-dialog-btn-autofocus-coarse` | unknown | 344 | - |
-| `ui-confirm-dialog-btn-autofocus-fine` | unknown | 351 | - |
-| `ui-confirm-dialog-btn-cancel` | unknown | 362 | - |
-| `ui-confirm-dialog-btn-confirm` | unknown | 369 | - |
-| `gui-dslr-btn-toggle-tips` | unknown | 413 | - |
-| `gui-dslr-btn-confirm` | unknown | 421 | - |
+| `gui-btn-toggle-image-manager-panel` | button | 52 | - |
+| `gui-btn-recalibrate-polar-axis` | button | 58 | - |
+| `gui-btn-single-solve-image` | unknown | 68 | - |
+| `gui-btn-loop-solve-image` | unknown | 86 | - |
+| `gui-btn-toggle-mount-panel` | unknown | 100 | - |
+| `gui-btn-switch-main-page` | unknown | 135 | - |
+| `gui-btn-toggle-charts-panel` | unknown | 165 | - |
+| `gui-btn-quit-polar-axis-mode` | unknown | 184 | - |
+| `gui-btn-hide-capture-ui` | unknown | 201 | - |
+| `gui-btn-show-capture-ui` | unknown | 213 | - |
+| `gui-btn-get-original-image` | unknown | 225 | - |
+| `gui-btn-scale-plus` | unknown | 244 | - |
+| `gui-btn-scale-minus` | unknown | 256 | - |
+| `ui-confirm-dialog-root` | unknown | 316 | - |
+| `ui-confirm-dialog-title` | span | 335 | - |
+| `ui-confirm-dialog-btn-close` | unknown | 344 | - |
+| `ui-confirm-dialog-text` | span | 351 | - |
+| `ui-confirm-dialog-btn-autofocus-coarse` | unknown | 367 | - |
+| `ui-confirm-dialog-btn-autofocus-fine` | unknown | 374 | - |
+| `ui-confirm-dialog-btn-cancel` | unknown | 385 | - |
+| `ui-confirm-dialog-btn-confirm` | unknown | 392 | - |
+| `gui-dslr-btn-toggle-tips` | unknown | 436 | - |
+| `gui-dslr-btn-confirm` | unknown | 444 | - |
 
 ### components/FocuserPanel.vue (16 个标识)
 
@@ -623,7 +657,7 @@
 
 | 标识 | 元素 | 行号 | 状态属性 |
 |------|------|------|----------|
-| `ui-settings-dialog-guider-root` | v | 2 | - |
+| `ui-settings-dialog-guider-root` | v | 2 | $store.state.showDeviceSettingsDialog_Guider ? 'open' : 'closed' |
 | `ui-settings-dialog-guider-btn-switch-page` | v | 7 | - |
 | `ui-settings-dialog-guider-select-selected-driver` | v | 13 | - |
 | `ui-settings-dialog-guider-btn-confirm-driver` | v | 15 | - |
@@ -655,7 +689,7 @@
 
 | 标识 | 元素 | 行号 | 状态属性 |
 |------|------|------|----------|
-| `ui-settings-dialog-cfw-root` | v | 2 | - |
+| `ui-settings-dialog-cfw-root` | v | 2 | $store.state.showDeviceSettingsDialog_CFW ? 'open' : 'closed' |
 | `ui-settings-dialog-cfw-btn-switch-page` | v | 7 | - |
 | `ui-settings-dialog-cfw-select-selected-driver` | v | 13 | - |
 | `ui-settings-dialog-cfw-btn-confirm-driver` | v | 15 | - |
@@ -670,7 +704,7 @@
 
 | 标识 | 元素 | 行号 | 状态属性 |
 |------|------|------|----------|
-| `ui-settings-dialog-focuser-root` | v | 2 | - |
+| `ui-settings-dialog-focuser-root` | v | 2 | $store.state.showDeviceSettingsDialog_Focuser ? 'open' : 'closed' |
 | `ui-settings-dialog-focuser-btn-switch-page` | v | 7 | - |
 | `ui-settings-dialog-focuser-select-selected-driver` | v | 13 | - |
 | `ui-settings-dialog-focuser-btn-confirm-driver` | v | 15 | - |
@@ -685,7 +719,7 @@
 
 | 标识 | 元素 | 行号 | 状态属性 |
 |------|------|------|----------|
-| `ui-settings-dialog-main-camera-root` | v | 2 | - |
+| `ui-settings-dialog-main-camera-root` | v | 2 | $store.state.showDeviceSettingsDialog_MainCamera ? 'open' : 'closed' |
 | `ui-settings-dialog-main-camera-btn-switch-page` | v | 7 | - |
 | `ui-settings-dialog-main-camera-select-selected-driver` | v | 13 | - |
 | `ui-settings-dialog-main-camera-btn-confirm-driver` | v | 15 | - |
@@ -700,7 +734,7 @@
 
 | 标识 | 元素 | 行号 | 状态属性 |
 |------|------|------|----------|
-| `ui-settings-dialog-mount-root` | v | 2 | - |
+| `ui-settings-dialog-mount-root` | v | 2 | $store.state.showDeviceSettingsDialog_Mount ? 'open' : 'closed' |
 | `ui-settings-dialog-mount-btn-switch-page` | v | 7 | - |
 | `ui-settings-dialog-mount-select-selected-driver` | v | 13 | - |
 | `ui-settings-dialog-mount-btn-confirm-driver` | v | 15 | - |
@@ -710,6 +744,21 @@
 | `ui-settings-dialog-mount-input-value` | v | 25 | - |
 | `ui-settings-dialog-mount-btn-confirm-configuration` | v | 26 | - |
 | `ui-settings-dialog-mount-btn-close-dialog` | v | 32 | - |
+
+### components/toolbar.vue (10 个标识)
+
+| 标识 | 元素 | 行号 | 状态属性 |
+|------|------|------|----------|
+| `tb-root` | div | 10 | - |
+| `tb-act-toggle-navigation-drawer` | v | 12 | - |
+| `tb-btn-transparent` | v | 40 | - |
+| `tb-btn-timer-pick-btn` | button | 43 | - |
+| `tb-status-card` | unknown | 76 | - |
+| `tb-status-maincamera` | unknown | 83 | - |
+| `tb-status-mount` | unknown | 112 | - |
+| `tb-status-guider` | unknown | 140 | - |
+| `tb-status-focuser` | unknown | 173 | - |
+| `tb-btn-toggle-schedule-panel` | button | 201 | - |
 
 ### components/date-time-picker.vue (8 个标识)
 
@@ -766,19 +815,19 @@
 
 | 标识 | 元素 | 行号 | 状态属性 |
 |------|------|------|----------|
-| `ui-ra-dec-dialog-root` | unknown | 10 | - |
-| `ui-ra-dec-dialog-input-ra-str` | unknown | 32 | - |
-| `ui-ra-dec-dialog-btn-auto` | v | 40 | - |
-| `ui-ra-dec-dialog-btn-auto-2` | v | 41 | - |
-| `ui-ra-dec-dialog-input-dec-str` | unknown | 59 | - |
-| `ui-ra-dec-dialog-btn-on-cancel` | v | 69 | - |
-| `ui-ra-dec-dialog-btn-on-ok` | v | 70 | - |
+| `ui-ra-dec-dialog-root` | unknown | 11 | - |
+| `ui-ra-dec-dialog-input-ra-str` | unknown | 33 | - |
+| `ui-ra-dec-dialog-btn-auto` | v | 41 | - |
+| `ui-ra-dec-dialog-btn-auto-2` | v | 42 | - |
+| `ui-ra-dec-dialog-input-dec-str` | unknown | 60 | - |
+| `ui-ra-dec-dialog-btn-on-cancel` | v | 70 | - |
+| `ui-ra-dec-dialog-btn-on-ok` | v | 71 | - |
 
 ### components/Settings-Dialog-PoleCamera.vue (7 个标识)
 
 | 标识 | 元素 | 行号 | 状态属性 |
 |------|------|------|----------|
-| `ui-settings-dialog-pole-camera-root` | v | 2 | - |
+| `ui-settings-dialog-pole-camera-root` | v | 2 | $store.state.showDeviceSettingsDialog_PoleCamera ? 'open' : 'closed' |
 | `ui-settings-dialog-pole-camera-select-selected-driver` | v | 10 | - |
 | `ui-settings-dialog-pole-camera-btn-confirm-driver` | v | 12 | - |
 | `ui-settings-dialog-pole-camera-btn-connect-indi-server` | v | 13 | - |
@@ -790,12 +839,12 @@
 
 | 标识 | 元素 | 行号 | 状态属性 |
 |------|------|------|----------|
-| `ui-chart-component-root` | div | 3 | - |
-| `ui-chart-component-btn-loop-exp-switch` | unknown | 14 | - |
-| `ui-chart-component-btn-start-press` | unknown | 25 | - |
-| `ui-chart-component-btn-exp-time-switch` | button | 31 | - |
-| `ui-chart-component-btn-data-clear` | button | 49 | - |
-| `ui-chart-component-btn-range-switch` | button | 55 | - |
+| `ui-chart-component-root` | unknown | 6 | - |
+| `ui-chart-component-btn-loop-exp-switch` | unknown | 22 | - |
+| `ui-chart-component-btn-start-press` | unknown | 34 | - |
+| `ui-chart-component-btn-exp-time-switch` | unknown | 47 | - |
+| `ui-chart-component-btn-data-clear` | button | 67 | - |
+| `ui-chart-component-btn-range-switch` | button | 73 | - |
 
 ### components/location-dialog.vue (6 个标识)
 
@@ -838,16 +887,6 @@
 | `ui-update-progress-dialog-btn-close-dialog` | button | 43 | - |
 | `ui-update-progress-dialog-btn-retry-update` | button | 44 | - |
 
-### components/toolbar.vue (5 个标识)
-
-| 标识 | 元素 | 行号 | 状态属性 |
-|------|------|------|----------|
-| `tb-root` | div | 10 | - |
-| `tb-act-toggle-navigation-drawer` | v | 12 | - |
-| `tb-btn-transparent` | v | 40 | - |
-| `tb-btn-timer-pick-btn` | button | 43 | - |
-| `tb-btn-toggle-schedule-panel` | button | 179 | - |
-
 ### components/DeviceAllocationPanel.vue (4 个标识)
 
 | 标识 | 元素 | 行号 | 状态属性 |
@@ -879,7 +918,7 @@
 
 | 标识 | 元素 | 行号 | 状态属性 |
 |------|------|------|----------|
-| `ui-usbfiles-dialog-root` | v | 2 | - |
+| `ui-usbfiles-dialog-root` | v | 2 | $store.state.showUSBFilesDialog ? 'open' : 'closed' |
 | `ui-usbfiles-dialog-btn-navigate-up` | v | 18 | - |
 | `ui-components-usbfiles-dialog-act-handle-item-click` | unknown | 31 | - |
 | `ui-usbfiles-dialog-btn-blue-text` | v | 52 | - |
@@ -934,7 +973,7 @@
 
 | 标识 | 元素 | 行号 | 状态属性 |
 |------|------|------|----------|
-| `ui-circular-button-root` | div | 2 | - |
+| `$attrs['data-testid'] || 'ui-circular-button-root'` | div | 2 | - |
 | `ui-components-circular-button-act-handle-mouse-down` | unknown | 11 | - |
 
 ### components/Red-Box.vue (2 个标识)
@@ -964,6 +1003,13 @@
 |------|------|------|----------|
 | `ui-observing-panel-root` | div | 11 | - |
 | `ui-observing-panel-btn-tab-bt` | v | 13 | - |
+
+### components/planets-visibility.vue (2 个标识)
+
+| 标识 | 元素 | 行号 | 状态属性 |
+|------|------|------|----------|
+| `ui-planets-visibility-root` | v | 10 | $store.state.showPlanetsVisibilityDialog ? 'open' : 'closed' |
+| `ui-planets-visibility-btn-close` | v | 40 | - |
 
 ### components/Chart-FocusImage.vue (1 个标识)
 
@@ -1013,12 +1059,6 @@
 |------|------|------|----------|
 | `ui-gui-loader-root` | div | 11 | - |
 
-### components/planets-visibility.vue (1 个标识)
-
-| 标识 | 元素 | 行号 | 状态属性 |
-|------|------|------|----------|
-| `ui-planets-visibility-root` | v | 10 | - |
-
 ### components/progress-bars.vue (1 个标识)
 
 | 标识 | 元素 | 行号 | 状态属性 |
@@ -1030,12 +1070,4 @@
 | 标识 | 元素 | 行号 | 状态属性 |
 |------|------|------|----------|
 | `ui-target-search-root` | div | 10 | - |
-
----
-
-## E2E 用例与 testid 对应（电源管理）
-
-- **唯一性**：静态 testid 在单页内每个 id 仅出现一次（或按设计多实例用 `.first()` 取首）。动态 testid（如 `e2e-device-${driverType}-conn`、`ui-app-menu-device-${driverType}`）依赖运行时数据，同一时刻不同实例 id 不同，视为“逻辑唯一”。
-- **电源管理**：`ui-power-manager-root`、`ui-app-power-page-output-power-1/2`、`ui-app-power-page-restart`、`ui-app-power-page-shutdown`、`ui-app-power-page-force-update`、`ui-app-menu-open-power-manager` 以及确认弹窗 `ui-confirm-dialog-root`、`ui-confirm-dialog-btn-cancel`、`ui-confirm-dialog-btn-confirm` 和 `tb-act-toggle-navigation-drawer`、`ui-app-menu-drawer` 在 Power 功能范围内全局唯一，可直接作为 E2E 定位标准。
-- 针对具体 spec 的引用清单与触发方式校验见 **testid-validation-report.md** 中「按 E2E 用例的 testid 校验」。
 

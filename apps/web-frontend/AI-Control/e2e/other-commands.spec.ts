@@ -1,6 +1,6 @@
 /**
- * AI-Control：极轴校准、图像管理命令。
- * 执行后验证对应页面/面板打开（pa-widget、imp-root）；图像管理支持 imageManagerInteract 组合。
+ * AI-Control：极轴校准、图像管理、任务计划表命令。
+ * 执行后验证对应页面/面板打开（pa-widget、imp-root、scp-root）；图像管理支持 imageManagerInteract，任务计划表支持 scheduleInteract。
  *
  * 本 spec 使用串行模式 + 共用同一 page。
  */
@@ -87,6 +87,40 @@ test('polar-axis-calibration 命令：关闭轨迹界面后退出极轴校准', 
   })
   await expect(page.getByTestId('pa-widget').first()).not.toBeVisible({ timeout: ctx.stepTimeoutMs }).catch(() => {})
   await expect(page.getByTestId('pa-minimized').first()).not.toBeVisible({ timeout: ctx.stepTimeoutMs }).catch(() => {})
+})
+
+test('task-schedule 命令：打开任务计划表面板', async ({ }, testInfo) => {
+  const page = sharedPage!
+  const ctx = createFlowContext(page, testInfo, { minTestTimeoutMs: 2 * 60_000 })
+  const registry = makeAiControlRegistry()
+
+  await runFlowByCommand({
+    ctx,
+    registry,
+    commandName: 'task-schedule',
+    flowParams: { gotoHome: true },
+  })
+
+  await expect(page.getByTestId('scp-root').first()).toBeVisible({ timeout: ctx.stepTimeoutMs })
+  await expect(page.getByTestId('scp-root').first()).toHaveAttribute('data-state', 'open')
+})
+
+test('task-schedule 命令：折叠工具栏、增行后关闭面板', async ({ }, testInfo) => {
+  const page = sharedPage!
+  const ctx = createFlowContext(page, testInfo, { minTestTimeoutMs: 2 * 60_000 })
+  const registry = makeAiControlRegistry()
+
+  await runFlowByCommand({
+    ctx,
+    registry,
+    commandName: 'task-schedule',
+    flowParams: {
+      gotoHome: false,
+      scheduleInteract: { toggleLeftToolbar: true, addRow: true, closePanel: true },
+    },
+  })
+
+  await expect(page.getByTestId('scp-root').first()).toHaveAttribute('data-state', 'closed', { timeout: ctx.stepTimeoutMs })
 })
 
 test('image-file-manager 命令：打开图像管理面板', async ({ }, testInfo) => {

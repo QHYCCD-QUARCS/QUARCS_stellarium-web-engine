@@ -15,6 +15,14 @@ export const CONFIRM_DIALOG_BTN_CANCEL = 'ui-confirm-dialog-btn-cancel'
 export const CONFIRM_DIALOG_BTN_CLOSE = 'ui-confirm-dialog-btn-close'
 export const CONFIRM_DIALOG_BTN_AUTOFOCUS_COARSE = 'ui-confirm-dialog-btn-autofocus-coarse'
 export const CONFIRM_DIALOG_BTN_AUTOFOCUS_FINE = 'ui-confirm-dialog-btn-autofocus-fine'
+export const CONFIRM_DIALOG_VARIANT_BINARY = 'binary'
+export const CONFIRM_DIALOG_VARIANT_AUTOFOCUS_MODE = 'autofocus-mode'
+export type ConfirmDialogVariant =
+  | typeof CONFIRM_DIALOG_VARIANT_BINARY
+  | typeof CONFIRM_DIALOG_VARIANT_AUTOFOCUS_MODE
+export type ConfirmDialogBinaryAction = 'confirm' | 'cancel'
+export type ConfirmDialogAutoFocusAction = 'coarse' | 'fine' | 'cancel'
+export type ConfirmDialogActionMode = ConfirmDialogBinaryAction | ConfirmDialogAutoFocusAction
 
 /** 单设备断开确认弹窗（App.vue showDisconnectDialog），与“断开全部”的 gui 确认弹窗区分 */
 export const DISCONNECT_DRIVER_DIALOG_ROOT_TESTID = 'ui-app-disconnect-driver-dialog-root'
@@ -69,6 +77,30 @@ export const CONFIRM_ACTION = {
 } as const
 
 export type ConfirmActionType = (typeof CONFIRM_ACTION)[keyof typeof CONFIRM_ACTION]
+
+export const CONFIRM_ACTION_VARIANTS: Record<ConfirmActionType, ConfirmDialogVariant> = {
+  [CONFIRM_ACTION.DISCONNECT_ALL_DEVICE]: CONFIRM_DIALOG_VARIANT_BINARY,
+  [CONFIRM_ACTION.REFRESH]: CONFIRM_DIALOG_VARIANT_BINARY,
+  [CONFIRM_ACTION.RESTART_RASPBERRY_PI]: CONFIRM_DIALOG_VARIANT_BINARY,
+  [CONFIRM_ACTION.SHUTDOWN_RASPBERRY_PI]: CONFIRM_DIALOG_VARIANT_BINARY,
+  [CONFIRM_ACTION.RESTART_QT_SERVER]: CONFIRM_DIALOG_VARIANT_BINARY,
+  [CONFIRM_ACTION.RESTART_PHD2]: CONFIRM_DIALOG_VARIANT_BINARY,
+  [CONFIRM_ACTION.SWITCH_OUTPUT_POWER]: CONFIRM_DIALOG_VARIANT_BINARY,
+  [CONFIRM_ACTION.FORCE_UPDATE]: CONFIRM_DIALOG_VARIANT_BINARY,
+  [CONFIRM_ACTION.RECALIBRATE]: CONFIRM_DIALOG_VARIANT_BINARY,
+  [CONFIRM_ACTION.END_CAPTURE_AND_SOLVE]: CONFIRM_DIALOG_VARIANT_BINARY,
+  [CONFIRM_ACTION.START_CALIBRATION]: CONFIRM_DIALOG_VARIANT_BINARY,
+  [CONFIRM_ACTION.START_AUTO_FOCUS]: CONFIRM_DIALOG_VARIANT_AUTOFOCUS_MODE,
+  [CONFIRM_ACTION.DELETE_SCHEDULE_PRESET]: CONFIRM_DIALOG_VARIANT_BINARY,
+  [CONFIRM_ACTION.UPDATE_CURRENT_CLIENT_PREFIX]: CONFIRM_DIALOG_VARIANT_BINARY,
+}
+
+export function getConfirmDialogVariant(action?: string | null): ConfirmDialogVariant {
+  if (action && action in CONFIRM_ACTION_VARIANTS) {
+    return CONFIRM_ACTION_VARIANTS[action as ConfirmActionType]
+  }
+  return CONFIRM_DIALOG_VARIANT_BINARY
+}
 
 /** 其他弹窗根节点 testid（与 dialog-identification.md 第 3 节对应） */
 export const DIALOG_ROOT_TESTIDS = {

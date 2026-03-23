@@ -121,6 +121,8 @@
   "OutPut Power 1": "Output Power 1",
   "OutPut Power 2": "Output Power 2",
   "Restart": "Restart",
+  "Restart QUARCS Server": "Restart QUARCS Server",
+  "Are you sure you want to restart the QUARCS server via the monitor process? The web page will reload afterwards.": "Are you sure you want to restart the QUARCS server via the monitor process? The web page will reload afterwards.",
   "Shut Down": "Shut Down",
   "Force Update": "Force Update",
   "Device Connection": "Device Connection",

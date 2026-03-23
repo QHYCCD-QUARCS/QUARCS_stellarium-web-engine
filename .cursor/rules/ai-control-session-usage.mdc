@@ -8,7 +8,8 @@ alwaysApply: false
 
 - 把 `apps/web-frontend/AI-Control/README.md` 与 `apps/web-frontend/docs/web-page-structure.md` 视为 AI-Control 的事实来源；处理 AI 控制、E2E 控制、会话命令时，优先依据文档执行，无需先查源码，只有文档缺失或互相矛盾时才回看代码。
 - 优先使用会话模式，在同一已打开页面上执行命令；不要默认每次新开浏览器。
-- 标准流程固定为：确认会话已启动 `npm run e2e:ai-control:session` -> 先读 `GET /status` 或 `GET /status?command=xxx&flowParams=...` -> 检查 `blockers`、`preSteps`、`coreStepIds`、`suggestions` -> 再 `POST /run` 执行命令。
+- 启动会话：`E2E_BASE_URL=http://<前端IP>:8080 npm run e2e:ai-control:session`（在 `apps/web-frontend` 下）。`scripts/ai-control-session.ts` 会在启动浏览器**之前**检测默认/配置的会话端口（`E2E_AI_CONTROL_SESSION_PORT`，默认 `39281`）是否被占用；若占用则尝试用 `lsof`/`fuser` 解析 PID 并结束后再监听。无需手动 `pkill`，除非自动释放失败或用户设置了 `E2E_AI_CONTROL_SESSION_NO_KILL_STALE=1`（关闭自动结束占用进程）。
+- 标准流程固定为：确认会话已启动（终端出现 `Session HTTP server` 与 `> `）-> 先读 `GET /status` 或 `GET /status?command=xxx&flowParams=...` -> 检查 `blockers`、`preSteps`、`coreStepIds`、`suggestions` -> 再 `POST /run` 执行命令。
 - 默认端口是 `39281`；会话未启动时，应明确提示先启动，而不是假设工具可自动补齐。
 - 默认不要刷新页面；仅在用户明确要求回首页或命令确实需要时才传 `gotoHome: true`。
 - 默认不要断开全部设备；仅在用户明确要求或流程确有必要时才传 `resetBeforeConnect: true`。

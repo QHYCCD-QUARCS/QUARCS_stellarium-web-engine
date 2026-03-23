@@ -9,10 +9,12 @@ import type { FlowContext, StepRegistry } from '../core/flowTypes'
 import {
   clickByTestId,
   deviceProbeTestId,
+  normalizeDriverLabelForCompare,
   selectVSelectItemText,
   sleep,
   waitForTestIdState,
 } from '../shared/interaction'
+import { DEFAULT_QHY_DRIVER_TEXT } from '../shared/driverDefaults'
 import { createStepError } from '../shared/errors'
 import { ensureMenuDrawerClosed, gotoHome } from '../shared/navigation'
 import { openDeviceSubmenu } from '../menu/drawerSteps'
@@ -23,13 +25,6 @@ type ConnectTarget = {
   driverText: string
   connectionModeText: string
   allocationDeviceMatch?: string
-}
-
-/** 规范化用于比较的文案（大写、去空白） */
-function normalizeCompareText(value: unknown) {
-  return String(value ?? '')
-    .toUpperCase()
-    .replace(/\s+/g, '')
 }
 
 function resolveDeviceType(params: Record<string, any>) {
@@ -81,7 +76,7 @@ function resolveConnectTargets(params: Record<string, any>): ConnectTarget[] {
   for (let i = 0; i < total; i += 1) {
     targets.push({
       deviceType: valueByIndexOrFirst(deviceTypes, i, fallbackDeviceType),
-      driverText: valueByIndexOrFirst(driverTexts, i, String(params.driverText ?? 'QHYCCD')),
+      driverText: valueByIndexOrFirst(driverTexts, i, String(params.driverText ?? DEFAULT_QHY_DRIVER_TEXT)),
       connectionModeText: valueByIndexOrFirst(connectionModes, i, String(params.connectionModeText ?? '')),
       allocationDeviceMatch: valueByIndexOrFirst(allocationMatches, i, '').trim() || undefined,
     })
@@ -95,8 +90,8 @@ async function selectDriverIfVisible(ctx: FlowContext, driverText: string) {
   const wrapper = panel.locator('.v-input').filter({ has: ctx.page.getByTestId('ui-app-select-confirm-driver') }).first()
   if (!(await wrapper.isVisible().catch(() => false))) return
 
-  const wanted = normalizeCompareText(driverText)
-  const current = normalizeCompareText(await wrapper.textContent().catch(() => ''))
+  const wanted = normalizeDriverLabelForCompare(driverText)
+  const current = normalizeDriverLabelForCompare(await wrapper.textContent().catch(() => ''))
   if (wanted && current.includes(wanted)) return
   await selectVSelectItemText(ctx.page, 'ui-app-select-confirm-driver', driverText, ctx.stepTimeoutMs)
 }

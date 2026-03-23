@@ -7,7 +7,7 @@
 // repository.
 
 <template>
-<v-dialog max-width='600' v-model="$store.state.showPlanetsVisibilityDialog" data-testid="ui-planets-visibility-root">
+<v-dialog max-width='600' v-model="$store.state.showPlanetsVisibilityDialog" data-testid="ui-planets-visibility-root" :data-state="$store.state.showPlanetsVisibilityDialog ? 'open' : 'closed'">
   <v-card v-if="$store.state.showPlanetsVisibilityDialog" transparent class="secondary white--text">
     <v-card-title><div class="text-h5">{{ $t('Planets Visibility') }}</div></v-card-title>
     <v-card-text>{{ $t('Night from {0} to {1}', [startDate.format('MMMM Do'), endDate.format('MMMM Do')]) }}</v-card-text>
@@ -37,7 +37,7 @@
       </div>
     </v-card-text>
     <v-card-actions>
-      <v-spacer></v-spacer><v-btn class="blue--text darken-1" text @click.native="$store.state.showPlanetsVisibilityDialog = false">Close</v-btn>
+      <v-spacer></v-spacer><v-btn class="blue--text darken-1" text @click.native="$store.state.showPlanetsVisibilityDialog = false" data-testid="ui-planets-visibility-btn-close">Close</v-btn>
     </v-card-actions>
   </v-card>
 </v-dialog>

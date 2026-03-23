@@ -2,7 +2,7 @@
  * AI-Control 统一入口。
  *
  * 对外导出流程类型、运行器、交互原语、导航、守卫、步骤注册表工厂及高层业务 flow builder，
- * 供 E2E 测试、CLI 或 MCP 调用。不侵入 tests/ 目录，仅提供新的控制层草案。
+ * 供 E2E 测试、CLI 或 MCP 调用。
  */
 export * from './core/flowTypes'
 export * from './core/flowRunner'

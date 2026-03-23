@@ -1,5 +1,5 @@
 <template>
-  <v-dialog max-width='300' v-model="$store.state.showDeviceSettingsDialog_Focuser" data-testid="ui-settings-dialog-focuser-root"> <!-- showDeviceSettingsDialog_Mount -->
+  <v-dialog max-width='300' v-model="$store.state.showDeviceSettingsDialog_Focuser" data-testid="ui-settings-dialog-focuser-root" :data-state="$store.state.showDeviceSettingsDialog_Focuser ? 'open' : 'closed'"> <!-- showDeviceSettingsDialog_Mount -->
     <v-card v-if="$store.state.showDeviceSettingsDialog_Focuser" class="secondary white--text">
       <v-card-title>
         <div class="text-h5">{{ $t('Focuser Settings') }}</div>

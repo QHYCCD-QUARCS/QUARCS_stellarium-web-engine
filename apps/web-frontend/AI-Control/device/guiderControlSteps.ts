@@ -7,11 +7,7 @@
  */
 import { expect, type Locator, type Page } from '@playwright/test'
 import type { FlowContext, StepRegistry } from '../core/flowTypes'
-import {
-  CONFIRM_ACTION,
-  CONFIRM_DIALOG_BTN_CONFIRM,
-  CONFIRM_DIALOG_ROOT_TESTID,
-} from '../shared/dialogConstants'
+import { CONFIRM_ACTION } from '../shared/dialogConstants'
 import { createStepError } from '../shared/errors'
 import {
   clickByTestId,
@@ -23,6 +19,7 @@ import {
 } from '../shared/interaction'
 import { openDeviceSubmenu } from '../menu/drawerSteps'
 import { ensureGuiderUiVisible } from '../shared/navigation'
+import { actConfirmDialogIfOpen } from '../menu/dialogSteps'
 
 const DEVICE_TYPE = 'Guider'
 const GUIDER_LOOP_SWITCH_TESTID = 'ui-chart-component-btn-loop-exp-switch'
@@ -207,13 +204,9 @@ async function triggerGuiderRecalibrate(ctx: FlowContext) {
   await button.dispatchEvent('mousedown')
   await sleep(1200)
   await button.dispatchEvent('mouseup')
-
-  const dialog = ctx.page.getByTestId(CONFIRM_DIALOG_ROOT_TESTID).first()
-  await expect(dialog).toBeVisible({ timeout: Math.min(10_000, ctx.stepTimeoutMs) })
-  await expect(dialog).toHaveAttribute('data-action', CONFIRM_ACTION.RECALIBRATE, {
-    timeout: Math.min(10_000, ctx.stepTimeoutMs),
+  await actConfirmDialogIfOpen(ctx.page, 'confirm', ctx.stepTimeoutMs, {
+    expectedAction: CONFIRM_ACTION.RECALIBRATE,
   })
-  await clickByTestId(ctx.page, CONFIRM_DIALOG_BTN_CONFIRM, ctx.stepTimeoutMs)
 }
 
 export function makeGuiderControlStepRegistry(): StepRegistry {

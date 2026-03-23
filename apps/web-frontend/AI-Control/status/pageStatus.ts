@@ -6,6 +6,11 @@
 import type { Page } from '@playwright/test'
 import type { CliFlowParams } from '../scenario/cliFlows'
 import { planRecoverySteps } from '../recovery/recoveryPlanner'
+import {
+  getConfirmDialogVariant,
+  type ConfirmDialogActionMode,
+  type ConfirmDialogVariant,
+} from '../shared/dialogConstants'
 
 export type MainPageName = 'Stel' | 'MainCamera' | 'GuiderCamera'
 export type DrawerState = 'open' | 'closed'
@@ -27,16 +32,26 @@ export interface PageStatus {
   selectedDevice: string | null
   devices: DeviceRuntimeStatus[]
   dialogs: {
-    confirm: { visible: boolean; action?: string }
+    confirm: { visible: boolean; action?: string; variant?: ConfirmDialogVariant; availableButtons: ConfirmDialogActionMode[] }
     generalSettings: boolean
     powerManager: boolean
     deviceAllocation: boolean
     imageManager: boolean
+    schedulePanel: boolean
     polarAxis: boolean
     location: boolean
     dataCredits: boolean
     debugLog: boolean
     disconnectDriver: boolean
+    usbFiles: boolean
+    planetsVisibility: boolean
+    raDec: boolean
+    settingsMount: boolean
+    settingsGuider: boolean
+    settingsMainCamera: boolean
+    settingsFocuser: boolean
+    settingsCfw: boolean
+    settingsPoleCamera: boolean
   }
   busyStates: {
     capture: 'idle' | 'busy' | 'unknown'
@@ -106,6 +121,7 @@ const PAGE_STATUS_EVALUATE_SCRIPT = `(() => {
   const paRoot = byId('pa-root')
   const paWidget = byId('pa-widget')
   const paMinimized = byId('pa-minimized')
+  const scpRoot = byId('scp-root')
   const dapRoot = byId('dap-root')
   const showUiBtn = byId('gui-btn-show-capture-ui')
   const toolbarMainCamera = byId('tb-status-maincamera')
@@ -150,6 +166,12 @@ const PAGE_STATUS_EVALUATE_SCRIPT = `(() => {
   // gui.vue 的确认弹窗根节点使用 display: contents，不能只靠几何尺寸判断“可见”。
   const confirmVisible = !!confirmRoot && (confirmState === 'open' || visible(confirmRoot))
   const confirmAction = confirmVisible ? attr(confirmRoot, 'data-action') : null
+  const confirmVariant = confirmVisible ? (attr(confirmRoot, 'data-variant') || null) : null
+  const confirmAvailableButtons = !confirmVisible
+    ? []
+    : confirmVariant === 'autofocus-mode'
+      ? ['cancel', 'coarse', 'fine']
+      : ['cancel', 'confirm']
 
   const overlay = document.querySelector('.v-overlay.v-overlay--active')
   const trajectoryFullscreen = byId('pa-trajectory-overlay-fullscreen')
@@ -164,16 +186,31 @@ const PAGE_STATUS_EVALUATE_SCRIPT = `(() => {
     selectedDevice,
     devices,
     dialogs: {
-      confirm: { visible: confirmVisible, action: confirmAction },
+      confirm: {
+        visible: confirmVisible,
+        action: confirmAction,
+        variant: confirmVariant,
+        availableButtons: confirmAvailableButtons,
+      },
       generalSettings: dialogVisible('ui-view-settings-dialog-root'),
       powerManager: dialogVisible('ui-power-manager-root'),
       deviceAllocation: dialogVisible('dap-root'),
       imageManager: dialogVisible('imp-root'),
+      schedulePanel: !!scpRoot && attr(scpRoot, 'data-state') === 'open' && visible(scpRoot),
       polarAxis: dialogVisible('pa-widget'),
       location: dialogVisible('ui-location-dialog-root'),
       dataCredits: dialogVisible('ui-data-credits-dialog-root'),
       debugLog: dialogVisible('ui-indi-debug-dialog-root'),
       disconnectDriver: dialogVisible('ui-app-disconnect-driver-dialog-root'),
+      usbFiles: dialogVisible('ui-usbfiles-dialog-root'),
+      planetsVisibility: dialogVisible('ui-planets-visibility-root'),
+      raDec: dialogVisible('ui-ra-dec-dialog-root'),
+      settingsMount: dialogVisible('ui-settings-dialog-mount-root'),
+      settingsGuider: dialogVisible('ui-settings-dialog-guider-root'),
+      settingsMainCamera: dialogVisible('ui-settings-dialog-main-camera-root'),
+      settingsFocuser: dialogVisible('ui-settings-dialog-focuser-root'),
+      settingsCfw: dialogVisible('ui-settings-dialog-cfw-root'),
+      settingsPoleCamera: dialogVisible('ui-settings-dialog-pole-camera-root'),
     },
     busyStates: {
       capture: cpStatus
@@ -235,16 +272,26 @@ const DEFAULT_STATUS: PageStatus = {
   selectedDevice: null,
   devices: [],
   dialogs: {
-    confirm: { visible: false },
+    confirm: { visible: false, availableButtons: [] },
     generalSettings: false,
     powerManager: false,
     deviceAllocation: false,
     imageManager: false,
+    schedulePanel: false,
     polarAxis: false,
     location: false,
     dataCredits: false,
     debugLog: false,
     disconnectDriver: false,
+    usbFiles: false,
+    planetsVisibility: false,
+    raDec: false,
+    settingsMount: false,
+    settingsGuider: false,
+    settingsMainCamera: false,
+    settingsFocuser: false,
+    settingsCfw: false,
+    settingsPoleCamera: false,
   },
   busyStates: {
     capture: 'unknown',
@@ -294,7 +341,7 @@ function normalizeStatus(raw: unknown): PageStatus {
   const capture = (s.capture as PageStatus['capture']) ?? DEFAULT_STATUS.capture
   const guider = (s.guider as PageStatus['guider']) ?? DEFAULT_STATUS.guider
   const polarAxis = (s.polarAxis as PageStatus['polarAxis']) ?? DEFAULT_STATUS.polarAxis
-  const confirm = dialogs.confirm ?? { visible: false }
+  const confirm = dialogs.confirm ?? { visible: false, availableButtons: [] }
   return {
     root: Boolean(s.root),
     mainPage: (s.mainPage as PageStatus['mainPage']) ?? null,
@@ -304,16 +351,38 @@ function normalizeStatus(raw: unknown): PageStatus {
     selectedDevice: (s.selectedDevice as PageStatus['selectedDevice']) ?? null,
     devices: Array.isArray(s.devices) ? (s.devices as DeviceRuntimeStatus[]) : [],
     dialogs: {
-      confirm: { visible: Boolean(confirm?.visible), action: confirm?.action },
+      confirm: {
+        visible: Boolean(confirm?.visible),
+        action: confirm?.action,
+        variant: (confirm?.variant as ConfirmDialogVariant | undefined)
+          ?? getConfirmDialogVariant(confirm?.action as string | null | undefined),
+        availableButtons: Array.isArray(confirm?.availableButtons)
+          ? (confirm.availableButtons as ConfirmDialogActionMode[])
+          : Boolean(confirm?.visible)
+            ? (getConfirmDialogVariant(confirm?.action as string | null | undefined) === 'autofocus-mode'
+                ? ['cancel', 'coarse', 'fine']
+                : ['cancel', 'confirm'])
+            : [],
+      },
       generalSettings: Boolean(dialogs.generalSettings),
       powerManager: Boolean(dialogs.powerManager),
       deviceAllocation: Boolean(dialogs.deviceAllocation),
       imageManager: Boolean(dialogs.imageManager),
+      schedulePanel: Boolean(dialogs.schedulePanel),
       polarAxis: Boolean(dialogs.polarAxis),
       location: Boolean(dialogs.location),
       dataCredits: Boolean(dialogs.dataCredits),
       debugLog: Boolean(dialogs.debugLog),
       disconnectDriver: Boolean(dialogs.disconnectDriver),
+      usbFiles: Boolean(dialogs.usbFiles),
+      planetsVisibility: Boolean(dialogs.planetsVisibility),
+      raDec: Boolean(dialogs.raDec),
+      settingsMount: Boolean(dialogs.settingsMount),
+      settingsGuider: Boolean(dialogs.settingsGuider),
+      settingsMainCamera: Boolean(dialogs.settingsMainCamera),
+      settingsFocuser: Boolean(dialogs.settingsFocuser),
+      settingsCfw: Boolean(dialogs.settingsCfw),
+      settingsPoleCamera: Boolean(dialogs.settingsPoleCamera),
     },
     busyStates: {
       capture: (busyStates.capture as PageStatus['busyStates']['capture']) ?? 'unknown',

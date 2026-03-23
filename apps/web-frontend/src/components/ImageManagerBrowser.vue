@@ -42,7 +42,7 @@
               :key="folderKey(item)"
               class="folder-item"
               :class="{ active: isCurrentFolder(item), selected: item.isSelected }"
-              :data-testid="`ui-image-folder-root-${index}`"
+              :data-testid="`imp-sidebar-folder-${index}`"
               :data-state="isCurrentFolder(item) ? 'open' : 'closed'"
               @click="selectFolder(item)"
             >
@@ -84,7 +84,7 @@
                   :key="file.id"
                   class="file-row"
                   :class="{ active: isCurrentFile(file), opened: file.isOpen, selected: file.isSelect }"
-                  :data-testid="`ui-image-folder-file-${currentFolderDisplayIndex}-${index}`"
+                  :data-testid="`imp-file-row-${currentFolderDisplayIndex}-${index}`"
                   :data-state="file.isOpen ? 'open' : 'closed'"
                   @click="focusFile(file)"
                 >

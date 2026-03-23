@@ -36,8 +36,10 @@
     { "kind": "exact", "id": "pa-root", "requiresDataState": true, "allowedStates": ["idle", "running"] },
 
     { "kind": "exact", "id": "imp-root", "requiresDataState": true, "allowedStates": ["open", "closed"] },
-    { "kind": "pattern", "patternType": "regex", "pattern": "ui-image-folder-root-" },
-    { "kind": "pattern", "patternType": "regex", "pattern": "ui-image-folder-file-" },
+    { "kind": "pattern", "patternType": "regex", "pattern": "ui-image-folder-root-", "note": "ImageFolder.vue 侧栏/文件行（非图像管理浏览器）" },
+    { "kind": "pattern", "patternType": "regex", "pattern": "ui-image-folder-file-", "note": "ImageFolder.vue 侧栏/文件行（非图像管理浏览器）" },
+    { "kind": "pattern", "patternType": "regex", "pattern": "imp-sidebar-folder-", "note": "ImageManagerBrowser.vue 侧栏文件夹行" },
+    { "kind": "pattern", "patternType": "regex", "pattern": "imp-file-row-", "note": "ImageManagerBrowser.vue 当前文件夹下列表行" },
 
     { "kind": "exact", "id": "ui-indi-debug-dialog-root", "requiresDataState": true, "allowedStates": ["open", "closed"] },
     { "kind": "exact", "id": "ui-location-dialog-root", "requiresDataState": true, "allowedStates": ["open", "closed"] },

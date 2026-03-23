@@ -6,7 +6,7 @@ import { defineConfig } from '@playwright/test'
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { DEFAULTS, envFlag, envNumber, envString } = require('./e2e.config.cjs')
 
-// 录屏/截图/trace 输出子目录：由各脚本设置 E2E_ARTIFACT_SUBDIR（如 run-test001-sequential.20260311_123456），避免不同脚本互相覆盖
+// 录屏/截图/trace 输出子目录：由各脚本设置 E2E_ARTIFACT_SUBDIR，避免不同脚本互相覆盖
 const artifactSubdir = process.env.E2E_ARTIFACT_SUBDIR
 const outputDir = artifactSubdir ? path.join('test-results', artifactSubdir) : 'test-results'
 
@@ -19,13 +19,12 @@ const outputDir = artifactSubdir ? path.join('test-results', artifactSubdir) : '
  * - 脚本可通过 E2E_ARTIFACT_SUBDIR 指定本次运行的录屏/截图目录（如 <脚本名>.<时间戳>），实现按脚本分目录。
  */
 export default defineConfig({
-  testDir: './tests/e2e',
+  testDir: './AI-Control/e2e',
   timeout: 60_000,
   expect: { timeout: 10_000 },
   reporter: 'list',
   outputDir,
   projects: [
-    { name: 'e2e', testDir: './tests/e2e' },
     // ai-control：单 worker + 各 spec 内可串行共用同一 page，避免每条命令重开网页
     { name: 'ai-control', testDir: './AI-Control/e2e', workers: 1 },
   ],

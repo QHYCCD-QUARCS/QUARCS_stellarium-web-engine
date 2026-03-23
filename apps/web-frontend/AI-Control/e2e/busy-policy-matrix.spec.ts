@@ -10,16 +10,26 @@ const BASE_STATUS: PageStatus = {
   selectedDevice: null,
   devices: [],
   dialogs: {
-    confirm: { visible: false },
+    confirm: { visible: false, availableButtons: [] },
     generalSettings: false,
     powerManager: false,
     deviceAllocation: false,
     imageManager: false,
+    schedulePanel: false,
     polarAxis: false,
     location: false,
     dataCredits: false,
     debugLog: false,
     disconnectDriver: false,
+    usbFiles: false,
+    planetsVisibility: false,
+    raDec: false,
+    settingsMount: false,
+    settingsGuider: false,
+    settingsMainCamera: false,
+    settingsFocuser: false,
+    settingsCfw: false,
+    settingsPoleCamera: false,
   },
   busyStates: {
     capture: 'idle',
@@ -145,6 +155,16 @@ test('busy 矩阵：general-settings 对拍摄中保持严格拒绝', () => {
   expect(plan.preSteps.map((item) => item.id)).not.toContain('app.waitForCaptureIdle')
 })
 
+test('busy 矩阵：干净状态下 power-management 不应注入恒定恢复步骤', () => {
+  const plan = planRecoverySteps({
+    commandName: 'power-management',
+    status: makeStatus(),
+  })
+
+  expect(plan.blockers).toHaveLength(0)
+  expect(plan.preSteps).toHaveLength(0)
+})
+
 test('busy 矩阵：deviceAllocation 打开时只保留一次关闭步骤', () => {
   const plan = planRecoverySteps({
     commandName: 'image-file-manager',
@@ -162,6 +182,28 @@ test('busy 矩阵：deviceAllocation 打开时只保留一次关闭步骤', () =
     }),
   )
   expect(plan.preSteps.filter((item) => item.id === 'menu.closeDeviceAllocation')).toHaveLength(1)
+})
+
+test('busy 矩阵：任务计划表打开时非 task-schedule 命令会先关闭面板', () => {
+  const plan = planRecoverySteps({
+    commandName: 'power-management',
+    status: makeStatus({
+      dialogs: { schedulePanel: true },
+    }),
+  })
+
+  expect(plan.preSteps.map((item) => item.id)).toContain('menu.closeSchedulePanel')
+})
+
+test('busy 矩阵：USB 文件对话框打开时会先关闭', () => {
+  const plan = planRecoverySteps({
+    commandName: 'power-management',
+    status: makeStatus({
+      dialogs: { usbFiles: true },
+    }),
+  })
+
+  expect(plan.preSteps.map((item) => item.id)).toContain('menu.closeUsbFiles')
 })
 
 test('busy 矩阵：确认弹窗打开时会先安排 dismissConfirm', () => {
