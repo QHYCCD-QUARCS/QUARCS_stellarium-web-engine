@@ -1072,6 +1072,8 @@ export default {
     GuiderStatus(status) {
       if (status === 'InGuiding') {
         this.CurrentGuiderStatus = 'InGuiding';
+      } else if (status === 'InSelecting') {
+        this.CurrentGuiderStatus = 'InSelecting';
       } else if (status === 'InCalibration') {
         this.CurrentGuiderStatus = 'InCalibration';
       } else if (status === 'InDirectionDetection') {
@@ -2003,6 +2005,7 @@ export default {
       return [
         {
           'box-InGuiding': this.CurrentGuiderStatus === 'InGuiding',
+          'box-InSelecting': this.CurrentGuiderStatus === 'InSelecting',
           'box-InCalibration': this.CurrentGuiderStatus === 'InCalibration',
           'box-InDirectionDetection': this.CurrentGuiderStatus === 'InDirectionDetection',
           'box-StarLostAlert': this.CurrentGuiderStatus === 'StarLostAlert',
@@ -2015,6 +2018,7 @@ export default {
       return [
         {
           'cross-InGuiding': this.CurrentGuiderStatus === 'InGuiding',
+          'cross-InSelecting': this.CurrentGuiderStatus === 'InSelecting',
           'cross-InCalibration': this.CurrentGuiderStatus === 'InCalibration',
           'cross-InDirectionDetection': this.CurrentGuiderStatus === 'InDirectionDetection',
           'cross-StarLostAlert': this.CurrentGuiderStatus === 'StarLostAlert',
@@ -2495,6 +2499,13 @@ export default {
   outline: 1px solid rgba(51, 218, 121, 1);
 }
 
+.box-InSelecting {
+  position: absolute;
+  background-color: transparent;
+  box-sizing: border-box;
+  outline: 1px solid rgba(120, 170, 255, 0.95);
+}
+
 .box-InCalibration {
   position: absolute;
   background-color: transparent;
@@ -2526,6 +2537,11 @@ export default {
 .cross-InGuiding {
   position: absolute;
   background-color: rgba(51, 218, 121, 1);
+}
+
+.cross-InSelecting {
+  position: absolute;
+  background-color: rgba(120, 170, 255, 0.95);
 }
 
 .cross-InCalibration {

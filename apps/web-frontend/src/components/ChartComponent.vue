@@ -29,13 +29,14 @@
       </button>
 
       <button class="btn-Style" :class="GuiderSwitchBtnClass"
-        @mousedown="startPress" @mouseup="endPress"
+        @mousedown="startPress" @mouseup="endPress" @mouseleave="cancelPress"
         @touchstart.stop.prevent="startPress" @touchend.stop.prevent="endPress"
+        @touchcancel.stop.prevent="cancelPress"
         data-testid="ui-chart-component-btn-start-press"
         :data-guiding="isGuiding ? 'true' : 'false'"
         :data-status="CurrentGuiderStatus"
-        :aria-pressed="isGuiding ? 'true' : 'false'"
-      >
+        :aria-pressed="isGuiding ? 'true' : 'false'">
+
         <div style="display: flex; justify-content: center; align-items: center;">
           <img src="@/assets/images/svg/ui/Guider.svg" height="20px" style="min-height: 20px; pointer-events: none;"></img>
         </div>
@@ -130,17 +131,20 @@ export default {
   },
   computed: {
     GuiderSwitchBtnClass() {
-      if(!this.isGuiding) {
-        return 'btn-null';
-      } else {
+      if (this.isGuiding) {
         return [
           {
             'btn-InGuiding': this.CurrentGuiderStatus === 'InGuiding',
+            'btn-InSelecting': this.CurrentGuiderStatus === 'InSelecting',
             'btn-InCalibration': this.CurrentGuiderStatus === 'InCalibration',
             'btn-StarLostAlert': this.CurrentGuiderStatus === 'StarLostAlert',
             'btn-null': this.CurrentGuiderStatus === 'null',
           }
         ];
+      } else if (this.isLoopping && this.GuiderConnect) {
+        return 'btn-Ready';
+      } else {
+        return 'btn-null';
       }
     },
     LoopExpSwitchBtnClass() {
@@ -165,6 +169,9 @@ export default {
       this.$bus.$emit('updateLineChartWidth', newWidth);
     },
     startPress() {
+      if (this.pressTimer) {
+        clearTimeout(this.pressTimer);
+      }
       this.isLongPress = false; // 重置长按标记
       this.pressTimer = setTimeout(() => {
         this.isLongPress = true; // 标记为长按
@@ -177,6 +184,13 @@ export default {
         this.handleClick(); // 如果不是长按，则触发点击事件
       }
       this.pressTimer = null; // 重置定时器
+    },
+    cancelPress() {
+      if (this.pressTimer) {
+        clearTimeout(this.pressTimer);
+      }
+      this.pressTimer = null;
+      this.isLongPress = false;
     },
     handleClick() {
       if (!this.canClick) return; // 如果不可点击，直接返回
@@ -200,6 +214,9 @@ export default {
 
     GuiderSwitch() {
       if(this.isLoopping) {
+        if (!this.isGuiding) {
+          this.DataClear();
+        }
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'GuiderSwitch:'+!this.isGuiding);
       } else {
         this.$bus.$emit('showMsgBox', 'Please open the loop exposure first.', 'error');
@@ -228,9 +245,11 @@ export default {
     GuiderSwitchStatus(value) {
       if(value === 'true' || value === "true") {
         this.isGuiding = true;
-        // 若后端尚未返回细分状态，先以“校准中”显示为黄色
-        if (this.CurrentGuiderStatus !== 'InGuiding') {
-          this.CurrentGuiderStatus = 'InCalibration';
+        // 若后端尚未返回细分状态，先以“选星中”显示，避免把自动选星误显示为校准
+        if (this.CurrentGuiderStatus !== 'InGuiding'
+          && this.CurrentGuiderStatus !== 'InCalibration'
+          && this.CurrentGuiderStatus !== 'InDirectionDetection') {
+          this.CurrentGuiderStatus = 'InSelecting';
         }
         this.$startFeature(['GuiderCamera'], 'GuiderGuiding');
       } else {
@@ -262,6 +281,9 @@ export default {
         this.CurrentGuiderStatus = 'InGuiding';
         // 恢复正常导星，重置丢星弹窗时间
         this.lastStarLostAlertTime = 0;
+      } else if(status === 'InSelecting') {
+        this.CurrentGuiderStatus = 'InSelecting';
+        this.lastStarLostAlertTime = 0;
       } else if(status === 'InCalibration') {
         this.CurrentGuiderStatus = 'InCalibration';
         // 校准状态也视为“未丢星”，重置丢星弹窗时间
@@ -281,7 +303,6 @@ export default {
     
     DataClear() {
       this.$bus.$emit('clearChartData');
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'clearGuiderData');
     },
     RangeSwitch() {
       this.$bus.$emit('ChartRangeSwitch');
@@ -407,12 +428,20 @@ export default {
   border: 1px solid rgba(51, 218, 121, 1);
 }
 
+.btn-InSelecting {
+  border: 1px solid rgba(120, 170, 255, 0.95);
+}
+
 .btn-InCalibration {
   border: 1px solid rgba(255, 165, 0, 1);
 }
 
 .btn-StarLostAlert {
   border: 1px solid rgba(255, 0, 0, 1);
+}
+
+.btn-Ready {
+  border: 1px solid rgba(120, 170, 255, 0.95);
 }
 
 .btn-null {

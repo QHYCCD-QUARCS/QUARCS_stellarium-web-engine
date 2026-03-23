@@ -2133,6 +2133,50 @@ export default {
             return;
           }
           let acceptMessage = false;
+          // ===== Network mode / ZeroTier integration (no ':' split) =====
+          // NOTE: `data.message` contains ':' for JSON, so we must handle it BEFORE the big switch.
+          if (data.message.startsWith('NetStatus|')) {
+            acceptMessage = true;
+            const payload = data.message.substring('NetStatus|'.length);
+            try {
+              const obj = JSON.parse(payload);
+              this.$bus.$emit('NetStatus', obj);
+            } catch (e) {
+              console.error('NetStatus JSON parse failed:', e, payload);
+              this.$bus.$emit('SendConsoleLogMsg', 'NetStatus JSON parse failed', 'warning');
+            }
+          }
+          if (data.message.startsWith('WiFiScan|')) {
+            acceptMessage = true;
+            const payload = data.message.substring('WiFiScan|'.length);
+            try {
+              const arr = JSON.parse(payload);
+              this.$bus.$emit('WiFiScan', arr);
+            } catch (e) {
+              console.error('WiFiScan JSON parse failed:', e, payload);
+              this.$bus.$emit('SendConsoleLogMsg', 'WiFiScan JSON parse failed', 'warning');
+            }
+          }
+          if (data.message.startsWith('WiFiSaveResult|')) {
+            acceptMessage = true;
+            const parts = data.message.split('|');
+            // WiFiSaveResult|<save|scan>|<ok|fail>|<detail?>
+            const action = parts[1] || '';
+            const result = parts[2] || '';
+            const detail = parts.slice(3).join('|');
+            this.$bus.$emit('WiFiSaveResult', { action, result, detail });
+          }
+          if (data.message.startsWith('NetModeResult|')) {
+            acceptMessage = true;
+            const parts = data.message.split('|');
+            // NetModeResult|<ap|wan>|<ok|fail>|<detail?>
+            if (parts.length >= 3) {
+              const mode = parts[1];
+              const result = parts[2];
+              const detail = parts.slice(3).join('|');
+              this.$bus.$emit('NetModeResult', { mode, result, detail });
+            }
+          }
           if (data.message.startsWith('StagingScheduleData:')) {
             console.log('------------------------------');
             acceptMessage = true;
@@ -8046,35 +8090,59 @@ export default {
       return imageData;
     },
 
+    getGuiderCanvasDisplayRect() {
+      const canvas = this.$refs.guiderCanvas;
+      if (!canvas || typeof canvas.getBoundingClientRect !== 'function') {
+        return {
+          left: 0,
+          top: 0,
+          width: Math.max(1, window.innerWidth),
+          height: Math.max(1, window.innerHeight)
+        };
+      }
+      const rect = canvas.getBoundingClientRect();
+      return {
+        left: Number.isFinite(rect.left) ? rect.left : 0,
+        top: Number.isFinite(rect.top) ? rect.top : 0,
+        width: Math.max(1, rect.width || window.innerWidth),
+        height: Math.max(1, rect.height || window.innerHeight)
+      };
+    },
+
+    mapGuiderImagePointToScreen(PHD2ImageSize_X, PHD2ImageSize_Y, pointX, pointY) {
+      const rect = this.getGuiderCanvasDisplayRect();
+      const imageW = Math.max(1, PHD2ImageSize_X);
+      const imageH = Math.max(1, PHD2ImageSize_Y);
+      return {
+        rect,
+        x: rect.left + (pointX * rect.width / imageW),
+        y: rect.top + (pointY * rect.height / imageH)
+      };
+    },
+
     DrawPHD2Box(PHD2ImageSize_X, PHD2ImageSize_Y, Box_X, Box_Y) {
-      const ratioZoomX = PHD2ImageSize_X / window.innerWidth;
-      const ratioZoomY = PHD2ImageSize_Y / window.innerHeight;
+      const mapped = this.mapGuiderImagePointToScreen(PHD2ImageSize_X, PHD2ImageSize_Y, Box_X, Box_Y);
+      const BoxWidth = 20 * mapped.rect.width / Math.max(1, PHD2ImageSize_X);
+      const BoxHeight = 20 * mapped.rect.height / Math.max(1, PHD2ImageSize_Y);
 
-      const BoxWidth = 20 / ratioZoomX;
-      const BoxHeight = 20 / ratioZoomY;
-
-      const BoxStartX = Box_X / ratioZoomX - BoxWidth / 2;
-      const BoxStartY = Box_Y / ratioZoomY - BoxHeight / 2;
+      const BoxStartX = mapped.x - BoxWidth / 2;
+      const BoxStartY = mapped.y - BoxHeight / 2;
 
       this.$bus.$emit('PHD2BoxPosition', BoxStartX, BoxStartY, BoxWidth, BoxHeight);
     },
 
     DrawPHD2Cross(PHD2ImageSize_X, PHD2ImageSize_Y, Cross_X, Cross_Y) {
-      const ratioZoomX = PHD2ImageSize_X / window.innerWidth;
-      const ratioZoomY = PHD2ImageSize_Y / window.innerHeight;
-
-      const CrossStartX = Cross_X / ratioZoomX;
-      const CrossStartY = Cross_Y / ratioZoomY;
-
-      this.$bus.$emit('PHD2CrossPosition', CrossStartX, CrossStartY);
+      const mapped = this.mapGuiderImagePointToScreen(PHD2ImageSize_X, PHD2ImageSize_Y, Cross_X, Cross_Y);
+      this.$bus.$emit('PHD2CrossPosition', mapped.x, mapped.y);
     },
 
     DrawPHD2MultiStars(PHD2ImageSize_X, PHD2ImageSize_Y, Star_X, Star_Y) {
-      const ratioZoomX = PHD2ImageSize_X / window.innerWidth;
-      const ratioZoomY = PHD2ImageSize_Y / window.innerHeight;
+      const mapped = this.mapGuiderImagePointToScreen(PHD2ImageSize_X, PHD2ImageSize_Y, Star_X, Star_Y);
+      const StarWidth = 12 * mapped.rect.width / Math.max(1, PHD2ImageSize_X);
+      const StarHeight = 12 * mapped.rect.height / Math.max(1, PHD2ImageSize_Y);
 
-      const StarStartX = Star_X / ratioZoomX - 12 / 2;
-      const StarStartY = Star_Y / ratioZoomY - 12 / 2;
+      const StarStartX = mapped.x - StarWidth / 2;
+      const StarStartY = mapped.y - StarHeight / 2;
 
       this.$bus.$emit('PHD2MultiStarsPosition', StarStartX, StarStartY);
     },
@@ -9703,13 +9771,12 @@ export default {
     },
 
     handleGuiderCanvasClick(event) {
-      const canvas = this.$refs.guiderCanvas;
-      const rect = canvas.getBoundingClientRect();
+      const rect = this.getGuiderCanvasDisplayRect();
       const x = event.clientX - rect.left; // 点击坐标X
       const y = event.clientY - rect.top;  // 点击坐标Y
       console.log(`Clicked at: (${x}, ${y})`);
-      const CanvasWidth = window.innerWidth;
-      const CanvasHeight = window.innerHeight;
+      const CanvasWidth = Math.max(1, rect.width);
+      const CanvasHeight = Math.max(1, rect.height);
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'GuiderCanvasClick:' + CanvasWidth + ':' + CanvasHeight + ':' + x + ':' + y);
     },
     connectDriver() {

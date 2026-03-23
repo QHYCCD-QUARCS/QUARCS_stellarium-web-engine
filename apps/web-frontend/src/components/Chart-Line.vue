@@ -25,6 +25,8 @@ export default {
       pulseAxisMax: 250,
       xAxis_min: 0,
       xAxis_max: 50, 
+      xWindowSize: 50,
+      chartHistoryPadding: 10,
       yAxis_min: -4,
       yAxis_max: 4,  
       range: 4,
@@ -278,6 +280,21 @@ export default {
       };
       this.myChart.setOption(option);
     },
+    updateAutoScrollWindow(latestX) {
+      if (!Number.isFinite(latestX)) return;
+      const windowSize = Math.max(1, this.xWindowSize);
+      const nextMax = Math.max(windowSize, latestX);
+      this.xAxis_max = nextMax;
+      this.xAxis_min = Math.max(0, nextMax - windowSize);
+    },
+    pruneOldChartData() {
+      const keepAfterX = this.xAxis_min - this.chartHistoryPadding;
+      const shouldKeepPoint = (point) => Array.isArray(point) && point.length > 0 && Number(point[0]) >= keepAfterX;
+      this.chartData1 = this.chartData1.filter(shouldKeepPoint);
+      this.chartData2 = this.chartData2.filter(shouldKeepPoint);
+      this.pulseDataRa = this.pulseDataRa.filter(shouldKeepPoint);
+      this.pulseDataDec = this.pulseDataDec.filter(shouldKeepPoint);
+    },
     addData(newDataPoint1,newDataPoint2) {
       this.chartData1.push(newDataPoint1);
       this.chartData2.push(newDataPoint2);
@@ -288,6 +305,8 @@ export default {
         // 默认补 0（没有脉冲时）
         this.pulseDataRa.push([this.lastX, 0]);
         this.pulseDataDec.push([this.lastX, 0]);
+        this.updateAutoScrollWindow(this.lastX);
+        this.pruneOldChartData();
       }
       
       // 更新当前Ra和Dec值
@@ -369,6 +388,12 @@ export default {
     changeRange(min, max) {
       this.xAxis_min = min;
       this.xAxis_max = max;
+      const windowSize = max - min;
+      if (Number.isFinite(windowSize) && windowSize > 0) {
+        this.xWindowSize = windowSize;
+      }
+      this.pruneOldChartData();
+      this.renderChart(this.xAxis_min, this.xAxis_max, this.yAxis_min, this.yAxis_max);
     },
     clearChartData() {
       this.chartData1 = [];
