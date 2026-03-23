@@ -1,13 +1,14 @@
 <template>
-  <div class="circular-button no-select">
+  <div class="circular-button no-select" :data-testid="$attrs['data-testid'] || 'ui-circular-button-root'">
     <svg
-      @touchstart="handleMouseDown" @touchend="handleMouseUp"
-      @mousedown="handleMouseDown" @mouseup="handleMouseUp"
+      v-bind="$attrs"
+      @touchstart.prevent="handleMouseDown($event)" @touchend.prevent="handleMouseUp($event)"
+      @mousedown="handleMouseDown($event)" @mouseup="handleMouseUp($event)"
       :width="svgSize"
       :height="svgSize"
       :viewBox="'0 0 ' + svgSize + ' ' + svgSize"
       style="cursor: pointer;"
-    >
+     data-testid="ui-components-circular-button-act-handle-mouse-down">
       <!-- 背景圆圈 -->
       <circle
         :cx="svgSize / 2"
@@ -30,6 +31,18 @@
         :stroke-dashoffset="circumference * (1 - longPressProgress)"
         stroke-linecap="round"
         :transform="'rotate(-90 ' + svgSize / 2 + ' ' + svgSize / 2 + ')'"
+      />
+      <!-- 失败动画：红色闪烁圆环 -->
+      <circle
+        v-if="isFailed"
+        :key="failPulseKey"
+        class="failure-ring"
+        :cx="svgSize / 2"
+        :cy="svgSize / 2"
+        :r="radius"
+        fill="none"
+        stroke="rgba(255, 0, 0, 0.9)"
+        :stroke-width="strokeWidth"
       />
       <!-- 进度条 -->
       <circle
@@ -71,6 +84,7 @@
 
 <script>
 export default {
+  inheritAttrs: false,
   data() {
     return {
       progress: 0,
@@ -93,14 +107,34 @@ export default {
       isProcessing: false, // 新增状态变量，表示是否正在处理
 
       isButtonDisabled: false, // 拍摄按钮是否禁用
+
+      // QHYCCD SDK 主相机采集模式：由 App.vue 的配置项驱动
+      captureMode: 'Single', // 'Single' | 'Live' | 'Burst'
+      burstFrames: 20,
+
+      // 曝光失败动画
+      isFailed: false,
+      failPulseKey: 0,
+      failTimer: null,
+
+      // 触屏设备上会在 touch 后合成触发一套 mouse 事件，需做去重避免误判长按
+      isTouching: false,
+      lastTouchTs: 0,
+      touchMouseDedupWindowMs: 800,
     };
   },
   created() {
     this.$bus.$on('ExposureCompleted', this.overProgress);
+    this.$bus.$on('ExposureFailed', this.onExposureFailed);
     this.$bus.$on('SetExpTime',this.SetDuration);
     this.$bus.$on('CameraInExposuring',this.setInProgress);
     this.$bus.$on('MainCameraConnected', this.MainCameraConnected);
     this.$bus.$on('disableCaptureButton', this.disableCaptureButton);
+    this.$bus.$on('SetCaptureMode', (m) => { this.captureMode = String(m || 'Single'); });
+    this.$bus.$on('SetBurstFrames', (n) => {
+      const v = parseInt(n, 10);
+      this.burstFrames = Number.isFinite(v) && !isNaN(v) ? v : 20;
+    });
   },
   mounted() {
     this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getCaptureStatus');
@@ -115,6 +149,7 @@ export default {
       return 2 * Math.PI * this.radius;
     },
     progressText() {
+      if (this.isFailed) return '!';
       return this.isClicked ? `${(this.progress * 100).toFixed(0)}%` : '';
     },
     fontSize() {
@@ -123,7 +158,17 @@ export default {
     },
   },
   methods: {
-    handleMouseDown() {
+    handleMouseDown(event) {
+      // touch/mouse 去重：触摸后短时间内忽略合成的 mouse 事件
+      if (event && event.type === 'touchstart') {
+        this.isTouching = true;
+        this.lastTouchTs = Date.now();
+      } else if (event && event.type === 'mousedown') {
+        if (this.lastTouchTs && (Date.now() - this.lastTouchTs) < this.touchMouseDedupWindowMs) {
+          return;
+        }
+      }
+
       if (this.isButtonDisabled) {
         // 使用全局设备状态给出准确的阻塞原因（如 ROI 循环/极轴校准/解析等）
         this.$canUseDevice('MainCamera', 'Capture');
@@ -142,7 +187,17 @@ export default {
       }
     },
 
-    handleMouseUp() {
+    handleMouseUp(event) {
+      // touch/mouse 去重：触摸后短时间内忽略合成的 mouse 事件
+      if (event && event.type === 'touchend') {
+        this.isTouching = false;
+        this.lastTouchTs = Date.now();
+      } else if (event && event.type === 'mouseup') {
+        if (this.lastTouchTs && (Date.now() - this.lastTouchTs) < this.touchMouseDedupWindowMs) {
+          return;
+        }
+      }
+
       if (this.isButtonDisabled) {
         return; 
       }
@@ -152,10 +207,20 @@ export default {
       this.isLongPress = false;
       this.longPressProgress = 0;
 
+      if (!this.mousePressTimestamp) return;
       const elapsed = Date.now() - this.mousePressTimestamp;
       if (elapsed < this.longPressThreshold) {
         // 处理点击逻辑
         if(this.MainCameraConnect) {
+          // 仅限制：拍摄（主相机未绑定时禁止）
+          if (!this.$store.getters['device/isDeviceBound']('MainCamera')) {
+            this.$bus.$emit(
+              'showMsgBox',
+              this.$t('MainCameraNotBoundAction', { action: this.$t('Feature_Capture') }),
+              'error'
+            );
+            return;
+          }
           const check = this.$canUseDevice('MainCamera', 'Capture');
           if (!check.allowed) return;
           this.animateProgress();
@@ -168,10 +233,24 @@ export default {
     animateProgress() {
       if (this.isClicked) return; // 如果已点击，则退出方法
       console.log('执行点按，触发拍摄');
+      const mode = String(this.captureMode || 'Single');
+      if (mode === 'Live') {
+        // Live 是预览连续取帧：不触发 takeExposure，否则会把后端模式切回 Single
+        this.$bus.$emit('SendConsoleLogMsg', this.$t('LiveModeCaptureHint'), 'info');
+        this.$bus.$emit('showMsgBox', this.$t('LiveModeCaptureHint'), 'info');
+        return;
+      }
+
       this.animationDuration = this.CaptureExpTime;
       this.$startFeature(['MainCamera'], 'Capture')
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'takeExposure:'+this.animationDuration);
-      this.$bus.$emit('SendConsoleLogMsg', 'Take Exposure:'+this.animationDuration, 'info');
+      if (mode === 'Burst') {
+        const frames = Math.max(1, Math.min(1024, parseInt(this.burstFrames, 10) || 20));
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'takeExposureBurst:' + this.animationDuration + ':' + frames);
+        this.$bus.$emit('SendConsoleLogMsg', 'Take Exposure (Burst):' + this.animationDuration + 'ms x' + frames, 'info');
+      } else {
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'takeExposure:' + this.animationDuration);
+        this.$bus.$emit('SendConsoleLogMsg', 'Take Exposure:' + this.animationDuration, 'info');
+      }
       this.isClicked = true;
       const startTime = performance.now();
       const animate = (currentTime) => {
@@ -198,6 +277,27 @@ export default {
       // 延时2秒后重置进度
       setTimeout(() => {
         this.resetProgress();
+      }, 2000);
+    },
+
+    onExposureFailed(/* reason */) {
+      // 停止拍摄动画并切到失败闪烁动画（弹窗由 App.vue 统一处理）
+      if (this.animationRequest) cancelAnimationFrame(this.animationRequest);
+      if (this.longPressAnimationRequest) cancelAnimationFrame(this.longPressAnimationRequest);
+      clearTimeout(this.longPressTimer);
+
+      this.$stopFeature(['MainCamera'], 'Capture');
+      this.progress = 0;
+      this.isClicked = false;
+
+      this.isLongPress = false;
+      this.longPressProgress = 0;
+
+      this.isFailed = true;
+      this.failPulseKey += 1;
+      if (this.failTimer) clearTimeout(this.failTimer);
+      this.failTimer = setTimeout(() => {
+        this.isFailed = false;
       }, 2000);
     },
 
@@ -273,6 +373,16 @@ export default {
   display: flex;
   justify-content: center;
   align-items: center;
+}
+
+.failure-ring {
+  animation: failurePulse 0.6s ease-in-out 0s 3;
+}
+
+@keyframes failurePulse {
+  0% { opacity: 0.2; }
+  50% { opacity: 1; }
+  100% { opacity: 0.2; }
 }
 
 </style>

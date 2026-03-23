@@ -1,315 +1,552 @@
 <template>
-  <div class="polar-alignment-root">
-  <!-- 最小化状态 -->
-  <div v-if="visible && isMinimized" class="polar-alignment-minimized" :class="{ 'dragging': isDraggingState }"
-    :style="{ left: position.x + 'px', top: position.y + 'px' }">
-    <div class="minimized-header">
-      <div class="minimized-drag-area" @mousedown="startDrag" @touchstart="startDrag">
-        <v-icon class="minimized-icon">mdi-compass-rose</v-icon>
-        <span class="minimized-title">{{ $t('Polar Alignment') }}</span>
-      </div>
-      <div class="minimized-controls">
-        <button class="minimized-btn" @click="toggleMinimize" :title="$t('Expand')">
-          <v-icon>mdi-chevron-up</v-icon>
-        </button>
-      </div>
-    </div>
-    <div class="minimized-status">
-      <div class="status-indicator" :class="{ 'online': isConnected }"></div>
-      <span class="status-text">{{ isConnected ? $t('Connected') : $t('Disconnected') }}</span>
-    </div>
-  </div>
+  <div
+    class="polar-alignment-root"
+    data-testid="pa-root"
+    :data-state="isCalibrationRunning ? 'running' : 'idle'"
+  >
+    <!-- 最小化状态 -->
+    <div
+      v-if="visible && isMinimized"
+      class="polar-alignment-minimized"
+      :class="{ 'dragging': isDraggingState }"
+      :style="{ left: position.x + 'px', top: position.y + 'px' }"
+      data-testid="pa-minimized"
+      :data-state="isMinimized ? 'minimized' : 'expanded'"
+    >
+      <div class="minimized-header" data-testid="pa-minimized-header">
+        <div
+          class="minimized-drag-area"
+          @mousedown="startDrag"
+          @touchstart.stop.prevent="startDrag"
+          data-testid="pa-minimized-drag-handle"
+        >
+          <v-icon class="minimized-icon" data-testid="pa-minimized-icon">mdi-compass-rose</v-icon>
+          <span class="minimized-title" data-testid="pa-minimized-title">{{ $t('Polar Alignment') }}</span>
+        </div>
 
-  <!-- 完整界面 -->
-  <div v-else-if="visible" class="polar-alignment-widget"
-    :class="{ 'collapsed': isCollapsed, 'dragging': isDraggingState }"
-    :style="{ left: position.x + 'px', top: position.y + 'px', pointerEvents: (showTrajectoryOverlay && overlayMode === 'fullscreen' ? 'none' : 'auto') }">
-
-    <!-- 拖动手柄 -->
-    <div class="widget-header">
-      <div class="header-drag-area" @mousedown="startDrag" @touchstart="startDrag">
-        <div class="header-left">
-          <v-icon class="header-icon">mdi-compass-rose</v-icon>
-          <span class="header-title">{{ $t('Polar Alignment Calibration') }}</span>
-          <div class="connection-indicator">
-            <div class="status-dot" :class="{ 'online': isConnected }"></div>
-          </div>
+        <div class="minimized-controls" data-testid="pa-minimized-controls">
+          <button
+            class="minimized-btn"
+            @click="closeInterface"
+            :title="$t('Close')"
+            data-testid="pa-btn-close-minimized"
+          >
+            <v-icon data-testid="pa-icon-close-minimized">mdi-close</v-icon>
+          </button>
+          <button
+            class="minimized-btn"
+            @click="toggleMinimize"
+            :title="$t('Expand')"
+            data-testid="pa-btn-expand-from-minimized"
+          >
+            <v-icon data-testid="pa-icon-expand-from-minimized">mdi-chevron-up</v-icon>
+          </button>
         </div>
       </div>
 
-      <div class="header-controls">
-        <button class="header-btn" @click="toggleCollapse" :title="isCollapsed ? $t('Expand') : $t('Collapse')">
-          <v-icon>{{ isCollapsed ? 'mdi-chevron-down' : 'mdi-chevron-up' }}</v-icon>
-        </button>
-        <button class="header-btn" @click="toggleTrajectoryOverlay" :title="showTrajectoryOverlay ? $t('Hide Trajectory Canvas') : $t('Show Trajectory Canvas')">
-          <v-icon>{{ showTrajectoryOverlay ? 'mdi-eye-off' : 'mdi-crosshairs-gps' }}</v-icon>
-        </button>
-        <button class="header-btn" @click="toggleMinimize" :title="$t('Minimize')">
-          <v-icon>mdi-minus</v-icon>
-        </button>
-      </div>
-    </div>
-
-    <!-- 收缩状态内容 -->
-    <div v-if="isCollapsed" class="widget-content collapsed" :class="{ 'dragging': isDraggingState }">
-      <div class="collapsed-info">
-        <div class="collapsed-progress">
-          <div class="progress-circle" :style="{ '--progress': progressPercentage + '%' }">
-            <span class="progress-text">{{ Math.round(progressPercentage) }}%</span>
-          </div>
-        </div>
-        <div class="collapsed-status">
-          <div class="status-item">
-            <span class="status-label">方位角:</span>
-            <span class="status-value" :class="{ 'needs-adjustment': needsAzimuthAdjustment }">
-              {{ formatAdjustmentValue(adjustment.azimuth) }}
-            </span>
-          </div>
-          <div class="status-item">
-            <span class="status-label">高度角:</span>
-            <span class="status-value" :class="{ 'needs-adjustment': needsAltitudeAdjustment }">
-              {{ formatAdjustmentValue(adjustment.altitude) }}
-            </span>
-          </div>
-        </div>
+      <div class="minimized-status" data-testid="pa-minimized-status">
+        <div
+          class="status-indicator"
+          :class="{ 'online': isConnected }"
+          data-testid="pa-connection-indicator-minimized"
+          :data-state="isConnected ? 'connected' : 'disconnected'"
+        ></div>
+        <span class="status-text" data-testid="pa-connection-text-minimized">
+          {{ isConnected ? $t('Connected') : $t('Disconnected') }}
+        </span>
       </div>
     </div>
 
-    <!-- 展开状态内容 -->
-    <div v-else class="widget-content expanded" :class="{ 'dragging': isDraggingState }">
-      <div class="content-sections">
-        <!-- 校准步骤进度条 -->
-        <div class="calibration-progress">
-          <div class="progress-header">
-            <div class="progress-title">{{ $t('Calibration Progress') }}</div>
-            <div v-if="progressPercentage >= 75 && progressPercentage < 95" class="calibration-loop-info">
-              {{ $t('Calibration Round', [calibrationLoopCount]) }}
-            </div>
-          </div>
-          <div class="progress-bar">
-            <div class="progress-fill" :style="{ width: progressPercentage + '%' }"></div>
-            <div class="progress-nodes">
-              <!-- 初始化节点 -->
-              <div class="progress-node" :class="getStepClass(0)">
-                <div class="node-circle">
-                  <v-icon v-if="progressPercentage >= 15">mdi-check</v-icon>
-                  <v-icon v-else>mdi-cog</v-icon>
-                </div>
-                <div class="node-label">{{ $t('Initialization') }}</div>
-              </div>
-
-              <!-- 第一次校准节点 -->
-              <div class="progress-node" :class="getStepClass(1)">
-                <div class="node-circle">
-                  <v-icon v-if="progressPercentage >= 25">mdi-check</v-icon>
-                  <span v-else>1</span>
-                </div>
-                <div class="node-label">{{ $t('First Calibration') }}</div>
-              </div>
-
-              <!-- 第二次校准节点 -->
-              <div class="progress-node" :class="getStepClass(2)">
-                <div class="node-circle">
-                  <v-icon v-if="progressPercentage >= 50">mdi-check</v-icon>
-                  <span v-else>2</span>
-                </div>
-                <div class="node-label">{{ $t('Second Calibration') }}</div>
-              </div>
-
-              <!-- 第三次校准节点 -->
-              <div class="progress-node" :class="getStepClass(3)">
-                <div class="node-circle">
-                  <v-icon v-if="progressPercentage >= 75">mdi-check</v-icon>
-                  <span v-else>3</span>
-                </div>
-                <div class="node-label">{{ $t('Third Calibration') }}</div>
-              </div>
-
-              <!-- 校准调整节点 -->
-              <div class="progress-node calibration-node"
-                :class="{ 'active': progressPercentage >= 75, 'looping': progressPercentage >= 75 && progressPercentage < 95 }">
-                <div class="node-circle">
-                  <v-icon v-if="progressPercentage >= 95">mdi-check</v-icon>
-                  <v-icon v-else-if="progressPercentage >= 75">mdi-refresh</v-icon>
-                  <v-icon v-else>mdi-tune</v-icon>
-                </div>
-                <div class="node-label">{{ $t('Calibration') }}</div>
-              </div>
-
-              <!-- 最终验证节点 -->
-              <div class="progress-node verification-node" :class="{ 'active': progressPercentage >= 95 }">
-                <div class="node-circle">
-                  <v-icon v-if="isPolarAligned">mdi-check</v-icon>
-                  <v-icon v-else>mdi-target</v-icon>
-                </div>
-                <div class="node-label">{{ $t('Verification') }}</div>
-              </div>
+    <!-- 完整界面 -->
+    <div
+      v-else-if="visible"
+      class="polar-alignment-widget"
+      :class="{ 'collapsed': isCollapsed, 'dragging': isDraggingState }"
+      :style="{
+        left: position.x + 'px',
+        top: position.y + 'px',
+        pointerEvents: (showTrajectoryOverlay && overlayMode === 'fullscreen' ? 'none' : 'auto')
+      }"
+      data-testid="pa-widget"
+      :data-state="isCollapsed ? 'collapsed' : 'expanded'"
+    >
+      <!-- 拖动手柄 -->
+      <div class="widget-header" data-testid="pa-header">
+        <div
+          class="header-drag-area"
+          @mousedown="startDrag"
+          @touchstart.stop.prevent="startDrag"
+          data-testid="pa-header-drag-handle"
+        >
+          <div class="header-left" data-testid="pa-header-left">
+            <v-icon class="header-icon" data-testid="pa-header-icon">mdi-compass-rose</v-icon>
+            <span class="header-title" data-testid="pa-header-title">{{ $t('Polar Alignment Calibration') }}</span>
+            <div class="connection-indicator" data-testid="pa-connection-indicator">
+              <div
+                class="status-dot"
+                :class="{ 'online': isConnected }"
+                data-testid="pa-connection-dot"
+                :data-state="isConnected ? 'connected' : 'disconnected'"
+              ></div>
             </div>
           </div>
         </div>
 
-        <!-- 日志显示 -->
-        <div class="log-section">
-          <div class="log-display">
-            <div v-if="displayLogs.length > 0" class="latest-log" :class="displayLogs[0].level">
-              <div class="log-timestamp">{{ formatTime(displayLogs[0].timestamp) }}</div>
-              <div class="log-message">{{ displayLogs[0].message }}</div>
-            </div>
-            <div v-else class="log-empty">
-              {{ $t('No activity logs') }}
-            </div>
-          </div>
+        <div class="header-controls" data-testid="pa-header-controls">
+          <button
+            class="header-btn"
+            @click="closeInterface"
+            :title="$t('Close')"
+            data-testid="pa-btn-close"
+          >
+            <v-icon data-testid="pa-icon-close">mdi-close</v-icon>
+          </button>
+          <button
+            class="header-btn"
+            @click="toggleCollapse"
+            :title="isCollapsed ? $t('Expand') : $t('Collapse')"
+            data-testid="pa-btn-toggle-collapse"
+          >
+            <v-icon data-testid="pa-icon-toggle-collapse">
+              {{ isCollapsed ? 'mdi-chevron-down' : 'mdi-chevron-up' }}
+            </v-icon>
+          </button>
+
+          <button
+            class="header-btn"
+            @click="toggleTrajectoryOverlay"
+            :title="showTrajectoryOverlay ? $t('Hide Trajectory Canvas') : $t('Show Trajectory Canvas')"
+            data-testid="pa-btn-toggle-trajectory"
+            :data-state="showTrajectoryOverlay ? 'shown' : 'hidden'"
+          >
+            <v-icon data-testid="pa-icon-toggle-trajectory">
+              {{ showTrajectoryOverlay ? 'mdi-eye-off' : 'mdi-crosshairs-gps' }}
+            </v-icon>
+          </button>
+
+          <button
+            class="header-btn"
+            @click="toggleMinimize"
+            :title="$t('Minimize')"
+            data-testid="pa-btn-minimize"
+          >
+            <v-icon data-testid="pa-icon-minimize">mdi-minus</v-icon>
+          </button>
         </div>
+      </div>
 
-        <!-- 位置信息 -->
-        <div class="position-section">
-          <div class="position-grid">
-            <div class="position-cell current">
-              <div class="cell-label">{{ $t('current RA') }}</div>
-              <div class="cell-value">{{ currentPosition.ra }}</div>
-            </div>
-            <div class="position-cell current">
-              <div class="cell-label">{{ $t('current DEC') }}</div>
-              <div class="cell-value">{{ currentPosition.dec }}</div>
-            </div>
-            <div class="position-cell target">
-              <div class="cell-label">{{ $t('target RA') }}</div>
-              <div class="cell-value">{{ targetPosition.ra }}</div>
-            </div>
-            <div class="position-cell target">
-              <div class="cell-label">{{ $t('target DEC') }}</div>
-              <div class="cell-value">{{ targetPosition.dec }}</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 调整指导 -->
-        <div class="adjustment-section">
-          <div class="adjustment-instructions">
-            <div class="adjustment-item" :class="{ 'active': needsAzimuthAdjustment }">
-              <div class="adjustment-icon">
-                <v-icon>mdi-compass</v-icon>
-              </div>
-              <div class="adjustment-details">
-                <div class="adjustment-header">
-                  <span class="adjustment-type">{{ $t('Azimuth') }}</span>
-                  <span class="adjustment-value">{{ formatAdjustmentValue(adjustment.azimuth) }}</span>
-                </div>
-                <div class="adjustment-action">
-                  {{ needsAzimuthAdjustment ? getAzimuthAction(adjustment.azimuth) : $t('No adjustment needed') }}
-                </div>
-
-              </div>
-            </div>
-
-            <div class="adjustment-item" :class="{ 'active': needsAltitudeAdjustment }">
-              <div class="adjustment-icon">
-                <v-icon>mdi-compass</v-icon>
-              </div>
-              <div class="adjustment-details">
-                <div class="adjustment-header">
-                  <span class="adjustment-type">{{ $t('Altitude') }}</span>
-                  <span class="adjustment-value">{{ formatAdjustmentValue(adjustment.altitude) }}</span>
-                </div>
-                <div class="adjustment-action">
-                  {{ needsAltitudeAdjustment ? getAltitudeAction(adjustment.altitude) : $t('No adjustment needed') }}
-                </div>
-
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 控制按钮 -->
-        <div class="control-section">
-          <div class="action-buttons">
-            <button class="action-btn primary" @click="startAutoCalibration" :disabled="!canAutoCalibrate">
-              <v-icon v-if="!isCalibrationRunning">mdi-play-circle</v-icon>
-              <v-icon v-else>mdi-stop-circle</v-icon>
-              <span>{{ isCalibrationRunning ? $t('Stop Calibration') : $t('Start Auto Calibration') }}</span>
-            </button>
-            <!-- 临时测试按钮：模拟 Qt 端极轴校准数据 -->
-            <button
-              v-if="showTestButton"
-              class="action-btn"
-              style="margin-left: 8px;"
-              @click="runTestPolarAlignmentSimulation"
+      <!-- 收缩状态内容 -->
+      <div
+        v-if="isCollapsed"
+        class="widget-content collapsed"
+        :class="{ 'dragging': isDraggingState }"
+        data-testid="pa-content-collapsed"
+      >
+        <div class="collapsed-info" data-testid="pa-collapsed-info">
+          <div class="collapsed-progress" data-testid="pa-collapsed-progress">
+            <div
+              class="progress-circle"
+              :style="{ '--progress': progressPercentage + '%' }"
+              data-testid="pa-collapsed-progress-circle"
+              :data-progress="Math.round(progressPercentage)"
             >
-              <v-icon>mdi-beaker</v-icon>
-              <span>Test Polar Alignment</span>
-            </button>
+              <span class="progress-text" data-testid="pa-collapsed-progress-text">
+                {{ Math.round(progressPercentage) }}%
+              </span>
+            </div>
+          </div>
+
+          <div class="collapsed-status" data-testid="pa-collapsed-status">
+            <div class="status-item" data-testid="pa-collapsed-azimuth">
+              <span class="status-label" data-testid="pa-collapsed-azimuth-label">方位角:</span>
+              <span
+                class="status-value"
+                :class="{ 'needs-adjustment': needsAzimuthAdjustment }"
+                data-testid="pa-collapsed-azimuth-value"
+                :data-state="needsAzimuthAdjustment ? 'needs-adjustment' : 'ok'"
+              >
+                {{ formatAdjustmentValue(adjustment.azimuth) }}
+              </span>
+            </div>
+
+            <div class="status-item" data-testid="pa-collapsed-altitude">
+              <span class="status-label" data-testid="pa-collapsed-altitude-label">高度角:</span>
+              <span
+                class="status-value"
+                :class="{ 'needs-adjustment': needsAltitudeAdjustment }"
+                data-testid="pa-collapsed-altitude-value"
+                :data-state="needsAltitudeAdjustment ? 'needs-adjustment' : 'ok'"
+              >
+                {{ formatAdjustmentValue(adjustment.altitude) }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 展开状态内容 -->
+      <div
+        v-else
+        class="widget-content expanded"
+        :class="{ 'dragging': isDraggingState }"
+        data-testid="pa-content-expanded"
+      >
+        <div class="content-sections" data-testid="pa-sections">
+          <!-- 校准步骤进度条 -->
+          <div class="calibration-progress" data-testid="pa-calibration-progress">
+            <div class="progress-header" data-testid="pa-progress-header">
+              <div class="progress-title" data-testid="pa-progress-title">{{ $t('Calibration Progress') }}</div>
+              <div
+                v-if="progressPercentage >= 75 && progressPercentage < 95"
+                class="calibration-loop-info"
+                data-testid="pa-calibration-loop-info"
+                :data-loop="calibrationLoopCount"
+              >
+                {{ $t('Calibration Round', [calibrationLoopCount]) }}
+              </div>
+            </div>
+
+            <div class="progress-bar" data-testid="pa-progress-bar">
+              <div
+                class="progress-fill"
+                :style="{ width: progressPercentage + '%' }"
+                data-testid="pa-progress-fill"
+                :data-progress="Math.round(progressPercentage)"
+              ></div>
+
+              <div class="progress-nodes" data-testid="pa-progress-nodes">
+                <!-- 初始化节点 -->
+                <div class="progress-node" :class="getStepClass(0)" data-testid="pa-step-initialization">
+                  <div class="node-circle" data-testid="pa-step-initialization-circle">
+                    <v-icon v-if="progressPercentage >= 15">mdi-check</v-icon>
+                    <v-icon v-else>mdi-cog</v-icon>
+                  </div>
+                  <div class="node-label" data-testid="pa-step-initialization-label">{{ $t('Initialization') }}</div>
+                </div>
+
+                <!-- 第一次校准节点 -->
+                <div class="progress-node" :class="getStepClass(1)" data-testid="pa-step-calibration-1">
+                  <div class="node-circle" data-testid="pa-step-calibration-1-circle">
+                    <v-icon v-if="progressPercentage >= 25">mdi-check</v-icon>
+                    <span v-else>1</span>
+                  </div>
+                  <div class="node-label" data-testid="pa-step-calibration-1-label">{{ $t('First Calibration') }}</div>
+                </div>
+
+                <!-- 第二次校准节点 -->
+                <div class="progress-node" :class="getStepClass(2)" data-testid="pa-step-calibration-2">
+                  <div class="node-circle" data-testid="pa-step-calibration-2-circle">
+                    <v-icon v-if="progressPercentage >= 50">mdi-check</v-icon>
+                    <span v-else>2</span>
+                  </div>
+                  <div class="node-label" data-testid="pa-step-calibration-2-label">{{ $t('Second Calibration') }}</div>
+                </div>
+
+                <!-- 第三次校准节点 -->
+                <div class="progress-node" :class="getStepClass(3)" data-testid="pa-step-calibration-3">
+                  <div class="node-circle" data-testid="pa-step-calibration-3-circle">
+                    <v-icon v-if="progressPercentage >= 75">mdi-check</v-icon>
+                    <span v-else>3</span>
+                  </div>
+                  <div class="node-label" data-testid="pa-step-calibration-3-label">{{ $t('Third Calibration') }}</div>
+                </div>
+
+                <!-- 校准调整节点 -->
+                <div
+                  class="progress-node calibration-node"
+                  :class="{ 'active': progressPercentage >= 75, 'looping': progressPercentage >= 75 && progressPercentage < 95 }"
+                  data-testid="pa-step-guidance-calibration"
+                  :data-state="progressPercentage >= 95 ? 'done' : (progressPercentage >= 75 ? 'running' : 'pending')"
+                >
+                  <div class="node-circle" data-testid="pa-step-guidance-calibration-circle">
+                    <v-icon v-if="progressPercentage >= 95">mdi-check</v-icon>
+                    <v-icon v-else-if="progressPercentage >= 75">mdi-refresh</v-icon>
+                    <v-icon v-else>mdi-tune</v-icon>
+                  </div>
+                  <div class="node-label" data-testid="pa-step-guidance-calibration-label">{{ $t('Calibration') }}</div>
+                </div>
+
+                <!-- 最终验证节点 -->
+                <div
+                  class="progress-node verification-node"
+                  :class="{ 'active': progressPercentage >= 95 }"
+                  data-testid="pa-step-verification"
+                  :data-state="isPolarAligned ? 'aligned' : 'not-aligned'"
+                >
+                  <div class="node-circle" data-testid="pa-step-verification-circle">
+                    <v-icon v-if="isPolarAligned">mdi-check</v-icon>
+                    <v-icon v-else>mdi-target</v-icon>
+                  </div>
+                  <div class="node-label" data-testid="pa-step-verification-label">{{ $t('Verification') }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 日志显示 -->
+          <div class="log-section" data-testid="pa-log-section">
+            <div class="log-display" data-testid="pa-log-display">
+              <div
+                v-if="displayLogs.length > 0"
+                class="latest-log"
+                :class="displayLogs[0].level"
+                data-testid="pa-latest-log"
+                :data-level="displayLogs[0].level"
+              >
+                <div class="log-timestamp" data-testid="pa-latest-log-timestamp">
+                  {{ formatTime(displayLogs[0].timestamp) }}
+                </div>
+                <div class="log-message" data-testid="pa-latest-log-message">
+                  {{ displayLogs[0].message }}
+                </div>
+              </div>
+
+              <div v-else class="log-empty" data-testid="pa-log-empty">
+                {{ $t('No activity logs') }}
+              </div>
+            </div>
+          </div>
+
+          <!-- 位置信息 -->
+          <div class="position-section" data-testid="pa-position-section">
+            <div class="position-grid" data-testid="pa-position-grid">
+              <div class="position-cell current" data-testid="pa-pos-current-ra">
+                <div class="cell-label" data-testid="pa-pos-current-ra-label">{{ $t('current RA') }}</div>
+                <div class="cell-value" data-testid="pa-pos-current-ra-value">{{ currentPosition.ra }}</div>
+              </div>
+
+              <div class="position-cell current" data-testid="pa-pos-current-dec">
+                <div class="cell-label" data-testid="pa-pos-current-dec-label">{{ $t('current DEC') }}</div>
+                <div class="cell-value" data-testid="pa-pos-current-dec-value">{{ currentPosition.dec }}</div>
+              </div>
+
+              <div class="position-cell target" data-testid="pa-pos-target-ra">
+                <div class="cell-label" data-testid="pa-pos-target-ra-label">{{ $t('target RA') }}</div>
+                <div class="cell-value" data-testid="pa-pos-target-ra-value">{{ targetPosition.ra }}</div>
+              </div>
+
+              <div class="position-cell target" data-testid="pa-pos-target-dec">
+                <div class="cell-label" data-testid="pa-pos-target-dec-label">{{ $t('target DEC') }}</div>
+                <div class="cell-value" data-testid="pa-pos-target-dec-value">{{ targetPosition.dec }}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 调整指导 -->
+          <div class="adjustment-section" data-testid="pa-adjustment-section">
+            <div class="adjustment-instructions" data-testid="pa-adjustment-instructions">
+              <div
+                class="adjustment-item"
+                :class="{ 'active': needsAzimuthAdjustment }"
+                data-testid="pa-adjust-azimuth"
+                :data-state="needsAzimuthAdjustment ? 'active' : 'inactive'"
+              >
+                <div class="adjustment-icon" data-testid="pa-adjust-azimuth-icon">
+                  <v-icon>mdi-compass</v-icon>
+                </div>
+
+                <div class="adjustment-details" data-testid="pa-adjust-azimuth-details">
+                  <div class="adjustment-header" data-testid="pa-adjust-azimuth-header">
+                    <span class="adjustment-type" data-testid="pa-adjust-azimuth-type">{{ $t('Azimuth') }}</span>
+                    <span class="adjustment-value" data-testid="pa-adjust-azimuth-value">
+                      {{ formatAdjustmentValue(adjustment.azimuth) }}
+                    </span>
+                  </div>
+
+                  <div class="adjustment-action" data-testid="pa-adjust-azimuth-action">
+                    {{ needsAzimuthAdjustment ? getAzimuthAction(adjustment.azimuth) : $t('No adjustment needed') }}
+                  </div>
+                </div>
+              </div>
+
+              <div
+                class="adjustment-item"
+                :class="{ 'active': needsAltitudeAdjustment }"
+                data-testid="pa-adjust-altitude"
+                :data-state="needsAltitudeAdjustment ? 'active' : 'inactive'"
+              >
+                <div class="adjustment-icon" data-testid="pa-adjust-altitude-icon">
+                  <v-icon>mdi-compass</v-icon>
+                </div>
+
+                <div class="adjustment-details" data-testid="pa-adjust-altitude-details">
+                  <div class="adjustment-header" data-testid="pa-adjust-altitude-header">
+                    <span class="adjustment-type" data-testid="pa-adjust-altitude-type">{{ $t('Altitude') }}</span>
+                    <span class="adjustment-value" data-testid="pa-adjust-altitude-value">
+                      {{ formatAdjustmentValue(adjustment.altitude) }}
+                    </span>
+                  </div>
+
+                  <div class="adjustment-action" data-testid="pa-adjust-altitude-action">
+                    {{ needsAltitudeAdjustment ? getAltitudeAction(adjustment.altitude) : $t('No adjustment needed') }}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 控制按钮 -->
+          <div class="control-section" data-testid="pa-control-section">
+            <div class="action-buttons" data-testid="pa-action-buttons">
+              <button
+                class="action-btn primary"
+                @click="startAutoCalibration"
+                :disabled="!canAutoCalibrate"
+                data-testid="pa-btn-auto-calibration"
+                :data-state="isCalibrationRunning ? 'running' : 'stopped'"
+              >
+                <v-icon v-if="!isCalibrationRunning">mdi-play-circle</v-icon>
+                <v-icon v-else>mdi-stop-circle</v-icon>
+                <span data-testid="pa-btn-auto-calibration-text">
+                  {{ isCalibrationRunning ? $t('Stop Calibration') : $t('Start Auto Calibration') }}
+                </span>
+              </button>
+
+              <!-- 临时测试按钮：模拟 Qt 端极轴校准数据 -->
+              <button
+                v-if="showTestButton"
+                class="action-btn"
+                style="margin-left: 8px;"
+                @click="runTestPolarAlignmentSimulation"
+                data-testid="pa-btn-test-simulation"
+              >
+                <v-icon>mdi-beaker</v-icon>
+                <span data-testid="pa-btn-test-simulation-text">Test Polar Alignment</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- 指导调整阶段循环进度条（右下角，独立于控制面板） -->
-  <div v-if="visible" class="guidance-progress-indicator">
-    <div class="guidance-progress-circle" 
-         :class="[
-           `status-${guidanceStepStatus}`,
-           { 'animating': guidanceStep !== null && isCalibrationRunning && guidanceStepStatus === 'normal' },
-           { 'success-animation': guidanceStepStatus === 'success' },
-           { 'error-animation': guidanceStepStatus === 'error' }
-         ]">
-      <svg class="progress-svg" viewBox="0 0 100 100">
-        <circle class="progress-bg" cx="50" cy="50" r="45"></circle>
-        <circle class="progress-bar" cx="50" cy="50" r="45" 
-                :style="{ strokeDasharray: '283', strokeDashoffset: getProgressOffset() }"></circle>
-      </svg>
-      <div class="progress-content">
-        <v-icon class="step-icon">{{ getStepIcon(guidanceStep) }}</v-icon>
-        <div class="step-description">{{ getStepDescription(guidanceStep, guidanceStepStatus) }}</div>
-        <div v-if="guidanceStarCount >= 0" class="star-count">{{ guidanceStarCount }} {{ $t('Stars') }}</div>
-      </div>
-    </div>
-  </div>
+    <!-- 指导调整阶段循环进度条（右下角，独立于控制面板） -->
+    <div v-if="visible" class="guidance-progress-indicator" data-testid="pa-guidance-indicator">
+      <div
+        class="guidance-progress-circle"
+        :class="[
+          `status-${guidanceStepStatus}`,
+          { 'animating': guidanceStep !== null && isCalibrationRunning && guidanceStepStatus === 'normal' },
+          { 'success-animation': guidanceStepStatus === 'success' },
+          { 'error-animation': guidanceStepStatus === 'error' }
+        ]"
+        data-testid="pa-guidance-circle"
+        :data-status="guidanceStepStatus"
+        :data-step="guidanceStep"
+      >
+        <svg class="progress-svg" viewBox="0 0 100 100" data-testid="pa-guidance-svg">
+          <circle class="progress-bg" cx="50" cy="50" r="45" data-testid="pa-guidance-bg"></circle>
+          <circle
+            class="progress-bar"
+            cx="50"
+            cy="50"
+            r="45"
+            :style="{ strokeDasharray: '283', strokeDashoffset: getProgressOffset() }"
+            data-testid="pa-guidance-bar"
+          ></circle>
+        </svg>
 
-  <!-- 轨迹画布：全屏模式 -->
-  <div v-if="visible && showTrajectoryOverlay && overlayMode === 'fullscreen'" class="trajectory-overlay"
-       @wheel.prevent="onOverlayWheel" @mousedown.stop @touchstart.stop>
-    <canvas ref="trajectoryCanvas"></canvas>
-    <button class="overlay-close-btn" @click.stop="toggleTrajectoryOverlay" :title="$t('Hide Trajectory Canvas')">
-      <v-icon>mdi-close</v-icon>
-    </button>
-    <div class="overlay-hint">{{ $t('Trajectory.Instruction') }}</div>
-    <div class="overlay-panel">
-      <div class="panel-row">
-        <span class="panel-label">{{ $t('Current') }}:</span>
-        <span class="panel-value">RA {{ currentPosition.ra }} / DEC {{ currentPosition.dec }}</span>
-      </div>
-      <div class="panel-row">
-        <span class="panel-label">{{ $t('Target') }}:</span>
-        <span class="panel-value">RA {{ targetPosition.ra }} / DEC {{ targetPosition.dec }}</span>
-      </div>
-      <div class="panel-actions">
-        <!-- <button class="panel-btn" disabled :title="$t('Disabled')">{{ $t('Clear All Trajectory') }}</button> -->
-        <button class="panel-btn" @click.stop="clearOldTrajectory">{{ $t('Clear Old Trajectory') }}</button>
-        <button class="panel-btn" @click.stop="switchToWindowed">{{ $t('Switch to Windowed Mode') }}</button>
+        <div class="progress-content" data-testid="pa-guidance-content">
+          <v-icon class="step-icon" data-testid="pa-guidance-step-icon">{{ getStepIcon(guidanceStep) }}</v-icon>
+          <div class="step-description" data-testid="pa-guidance-step-description">
+            {{ getStepDescription(guidanceStep, guidanceStepStatus) }}
+          </div>
+          <div
+            v-if="guidanceStarCount >= 0"
+            class="star-count"
+            data-testid="pa-guidance-star-count"
+            :data-stars="guidanceStarCount"
+          >
+            {{ guidanceStarCount }} {{ $t('Stars') }}
+          </div>
+        </div>
       </div>
     </div>
-  </div>
 
-  <!-- 轨迹画布：窗口模式 -->
-  <div v-if="visible && showTrajectoryOverlay && overlayMode === 'windowed'"
-       class="trajectory-window" :style="{ left: windowedRect.x + 'px', top: windowedRect.y + 'px', width: windowedRect.width + 'px', height: windowedRect.height + 'px' }"
-       @mousedown.stop @touchstart.stop>
-    <div class="window-header" @mousedown.stop="startWindowDrag" @touchstart.stop="startWindowDrag">
-      <span class="window-title">{{ $t('Trajectory') }}</span>
-      <div class="window-actions">
-        <button class="panel-btn small" @click.stop="switchToFullscreen">{{ $t('Switch to Fullscreen Mode') }}</button>
-        <button class="panel-btn small" @click.stop="clearOldTrajectory">{{ $t('Clear Old Trajectory') }}</button>
-        <!-- <button class="panel-btn small" disabled :title="$t('Disabled')">{{ $t('Clear All Trajectory') }}</button> -->
-        <button class="panel-btn small" @click.stop="toggleTrajectoryOverlay" :title="$t('Hide Trajectory Canvas')"><v-icon>mdi-close</v-icon></button>
+    <!-- 轨迹画布：全屏模式 -->
+    <div
+      v-if="visible && showTrajectoryOverlay && overlayMode === 'fullscreen'"
+      class="trajectory-overlay"
+      @wheel.prevent="onOverlayWheel"
+      @mousedown.stop
+      @touchstart.stop
+      data-testid="pa-trajectory-overlay-fullscreen"
+    >
+      <canvas ref="trajectoryCanvas" data-testid="pa-trajectory-canvas-fullscreen"></canvas>
+
+      <button
+        class="overlay-close-btn"
+        @click.stop="toggleTrajectoryOverlay"
+        :title="$t('Hide Trajectory Canvas')"
+        data-testid="pa-btn-trajectory-close"
+      >
+        <v-icon>mdi-close</v-icon>
+      </button>
+
+      <div class="overlay-hint" data-testid="pa-trajectory-hint">{{ $t('Trajectory.Instruction') }}</div>
+
+      <div class="overlay-panel" data-testid="pa-trajectory-panel">
+        <div class="panel-row" data-testid="pa-trajectory-panel-current">
+          <span class="panel-label" data-testid="pa-trajectory-panel-current-label">{{ $t('Current') }}:</span>
+          <span class="panel-value" data-testid="pa-trajectory-panel-current-value">
+            RA {{ currentPosition.ra }} / DEC {{ currentPosition.dec }}
+          </span>
+        </div>
+
+        <div class="panel-row" data-testid="pa-trajectory-panel-target">
+          <span class="panel-label" data-testid="pa-trajectory-panel-target-label">{{ $t('Target') }}:</span>
+          <span class="panel-value" data-testid="pa-trajectory-panel-target-value">
+            RA {{ targetPosition.ra }} / DEC {{ targetPosition.dec }}
+          </span>
+        </div>
+
+        <div class="panel-actions" data-testid="pa-trajectory-panel-actions">
+          <button class="panel-btn" @click.stop="clearOldTrajectory" data-testid="pa-btn-clear-old-trajectory">
+            {{ $t('Clear Old Trajectory') }}
+          </button>
+          <button class="panel-btn" @click.stop="switchToWindowed" data-testid="pa-btn-switch-to-windowed">
+            {{ $t('Switch to Windowed Mode') }}
+          </button>
+        </div>
       </div>
     </div>
-    <div class="window-content">
-      <canvas ref="trajectoryCanvas"></canvas>
+
+    <!-- 轨迹画布：窗口模式 -->
+    <div
+      v-if="visible && showTrajectoryOverlay && overlayMode === 'windowed'"
+      class="trajectory-window"
+      :style="{ left: windowedRect.x + 'px', top: windowedRect.y + 'px', width: windowedRect.width + 'px', height: windowedRect.height + 'px' }"
+      @mousedown.stop
+      @touchstart.stop
+      data-testid="pa-trajectory-overlay-windowed"
+    >
+      <div class="window-header" @mousedown.stop="startWindowDrag" @touchstart.stop="startWindowDrag" data-testid="pa-trajectory-window-header">
+        <span class="window-title" data-testid="pa-trajectory-window-title">{{ $t('Trajectory') }}</span>
+
+        <div class="window-actions" data-testid="pa-trajectory-window-actions">
+          <button class="panel-btn small" @click.stop="switchToFullscreen" data-testid="pa-btn-switch-to-fullscreen">
+            {{ $t('Switch to Fullscreen Mode') }}
+          </button>
+          <button class="panel-btn small" @click.stop="clearOldTrajectory" data-testid="pa-btn-clear-old-trajectory-windowed">
+            {{ $t('Clear Old Trajectory') }}
+          </button>
+          <button
+            class="panel-btn small"
+            @click.stop="toggleTrajectoryOverlay"
+            :title="$t('Hide Trajectory Canvas')"
+            data-testid="pa-btn-trajectory-close-windowed"
+          >
+            <v-icon>mdi-close</v-icon>
+          </button>
+        </div>
+      </div>
+
+      <div class="window-content" data-testid="pa-trajectory-window-content">
+        <canvas ref="trajectoryCanvas" data-testid="pa-trajectory-canvas-windowed"></canvas>
+      </div>
     </div>
-  </div>
   </div>
 </template>
+
 
 <script>
 import swh from '@/assets/sw_helpers.js'
@@ -974,6 +1211,12 @@ export default {
         // 更新缓存的尺寸信息
         this.updateCachedDimensions()
         this.addLog(this.isMinimized ? this.$t('Interface Minimized') : this.$t('Interface Expanded'), 'info')
+      },
+
+      closeInterface() {
+        this.showTrajectoryOverlay = false
+        this.disableOverlayEventCapture()
+        this.hideInterface()
       },
 
       toggleCollapse() {
@@ -3512,6 +3755,10 @@ export default {
   position: fixed;
   width: 350px;
   max-width: 90vw;
+  /* 让头部 + 内容以列布局撑开，并允许内容区在低高度下内部滚动 */
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
   background: rgba(35, 35, 45, 0.95);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
@@ -3525,7 +3772,8 @@ export default {
   /* 添加背景隔离，防止操作映射到背景 */
   isolation: isolate;
   /* 移除contain属性，它可能阻止拖动事件 */
-  touch-action: none;
+  /* 允许在移动端对内容区进行滚动手势；拖动手柄自己会用 touch-action: none */
+  touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
   -webkit-touch-callout: none;
   -webkit-user-select: none;
@@ -3689,17 +3937,17 @@ export default {
 
 .widget-content.expanded {
   padding: 16px;
-  max-height: 80vh;
+  /* 在控件列布局中占据剩余空间，并在空间不足时内部滚动 */
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
   /* 优化内容布局，充分利用空间 */
   display: flex;
   flex-direction: column;
   gap: 16px;
-  /* 确保内容充分利用可用空间 */
-  min-height: 0;
-  flex: 1;
-  /* 自适应高度 */
-  height: auto;
 }
 
 /* === 收缩状态样式 === */

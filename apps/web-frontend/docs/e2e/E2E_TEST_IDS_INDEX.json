@@ -1,0 +1,5532 @@
+{
+  "metadata": {
+    "generatedAt": "2026-03-04T08:55:07.254Z",
+    "totalComponents": 55,
+    "componentsWithTestIds": 55,
+    "totalTestIds": 628
+  },
+  "components": {
+    "App.vue": {
+      "name": "showViewSettingsDialog",
+      "lines": 11795,
+      "suggestedPrefix": "ui-",
+      "priority": "高",
+      "testIdCount": 47,
+      "testIds": [
+        "ui-app-root",
+        "e2e-probes",
+        "`e2e-device-${d && d.driverType ? d.driverType : UNKNOWN_DRIVER_TYPE}-conn`",
+        "e2e-tilegpm",
+        "ui-app-submenu-drawer",
+        "ui-app-submenu-device-page",
+        "ui-app-submenu-params-container",
+        "ui-app-device-connection-panel",
+        "ui-app-select-confirm-driver",
+        "\n                    'ui-app-select-confirm-driver-option-'\n                    + String((item && item.value) || item || 'unknown').replace(/[^A-Za-z0-9]+/g, '')\n                  ",
+        "ui-app-select-on-connection-mode-change",
+        "\n                        'ui-app-select-connection-mode-option-'\n                        + String((item && item.value) || item || 'unknown').replace(/[^A-Za-z0-9]+/g, '')\n                      ",
+        "ui-app-select-confirm-driver-2",
+        "ui-app-select-auto",
+        "ui-app-select-auto-2",
+        "ui-app-btn-clear-driver",
+        "ui-app-btn-connect-driver",
+        "\n              'ui-app-config-item-'\n              + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')\n              + '-'\n              + String(item.label || 'Field').replace(/[^A-Za-z0-9]+/g, '')\n              + '-'\n              + index\n            ",
+        "\n                  'ui-config-'\n                  + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')\n                  + '-'\n                  + String(item.label || 'Field').replace(/[^A-Za-z0-9]+/g, '')\n                  + '-text-'\n                  + index\n                ",
+        "\n                  'ui-config-'\n                  + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')\n                  + '-' \n                  + String(item.label || 'Field').replace(/[^A-Za-z0-9]+/g, '')\n                  + '-number-'\n                  + index\n                ",
+        "\n                      'ui-config-'\n                      + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')\n                      + '-'\n                      + String(item.label || 'Field').replace(/[^A-Za-z0-9]+/g, '')\n                      + '-slider-dec-'\n                      + index\n                    ",
+        "\n                      'ui-config-'\n                      + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')\n                      + '-'\n                      + String(item.label || 'Field').replace(/[^A-Za-z0-9]+/g, '')\n                      + '-slider-'\n                      + index\n                    ",
+        "\n                      'ui-config-'\n                      + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')\n                      + '-'\n                      + String(item.label || 'Field').replace(/[^A-Za-z0-9]+/g, '')\n                      + '-slider-inc-'\n                      + index\n                    ",
+        "\n                  'ui-config-'\n                  + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')\n                  + '-'\n                  + String(item.label || 'Field').replace(/[^A-Za-z0-9]+/g, '')\n                  + '-select-'\n                  + index\n                ",
+        "\n                  'ui-config-'\n                  + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')\n                  + '-'\n                  + String(item.label || 'Field').replace(/[^A-Za-z0-9]+/g, '')\n                  + '-switch-'\n                  + index\n                ",
+        "\n                    'ui-config-'\n                    + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')\n                    + '-'\n                    + String(item.label || item.buttonText || 'Button').replace(/[^A-Za-z0-9]+/g, '')\n                    + '-button-'\n                    + index\n                  ",
+        "ui-app-btn-disconnect-driver",
+        "ui-power-manager-root",
+        "ui-app-power-page-output-power-1",
+        "ui-app-power-page-output-power-2",
+        "ui-app-power-page-restart",
+        "ui-app-power-page-shutdown",
+        "ui-app-power-page-force-update",
+        "ui-app-menu-drawer",
+        "ui-app-menu-quit",
+        "ui-app-menu-general-settings",
+        "ui-app-menu-open-power-manager",
+        "`ui-app-menu-device-${device && device.driverType ? device.driverType : UNKNOWN_DRIVER_TYPE}`",
+        "ui-app-menu-connect-all",
+        "ui-app-menu-disconnect-all",
+        "ui-app-menu-device-allocation",
+        "ui-app-menu-calibrate-polar-axis",
+        "ui-app-menu-open-image-manager",
+        "ui-app-menu-open-debug-log",
+        "ui-app-menu-location",
+        "ui-app-menu-refresh-page",
+        "ui-app-menu-data-credits"
+      ]
+    },
+    "components/AutomaticPolarAlignmentCalibration.vue": {
+      "name": "AutomaticPolarAlignmentCalibration",
+      "lines": 5352,
+      "suggestedPrefix": "pa-",
+      "priority": "高",
+      "testIdCount": 140,
+      "testIds": [
+        "pa-root",
+        "pa-minimized",
+        "pa-minimized-header",
+        "pa-minimized-drag-handle",
+        "pa-minimized-icon",
+        "pa-minimized-title",
+        "pa-minimized-controls",
+        "pa-btn-expand-from-minimized",
+        "pa-icon-expand-from-minimized",
+        "pa-minimized-status",
+        "pa-connection-indicator-minimized",
+        "pa-connection-text-minimized",
+        "pa-widget",
+        "pa-header",
+        "pa-header-drag-handle",
+        "pa-header-left",
+        "pa-header-icon",
+        "pa-header-title",
+        "pa-connection-indicator",
+        "pa-connection-dot",
+        "pa-header-controls",
+        "pa-btn-toggle-collapse",
+        "pa-icon-toggle-collapse",
+        "pa-btn-toggle-trajectory",
+        "pa-icon-toggle-trajectory",
+        "pa-btn-minimize",
+        "pa-icon-minimize",
+        "pa-content-collapsed",
+        "pa-collapsed-info",
+        "pa-collapsed-progress",
+        "pa-collapsed-progress-circle",
+        "pa-collapsed-progress-text",
+        "pa-collapsed-status",
+        "pa-collapsed-azimuth",
+        "pa-collapsed-azimuth-label",
+        "pa-collapsed-azimuth-value",
+        "pa-collapsed-altitude",
+        "pa-collapsed-altitude-label",
+        "pa-collapsed-altitude-value",
+        "pa-content-expanded",
+        "pa-sections",
+        "pa-calibration-progress",
+        "pa-progress-header",
+        "pa-progress-title",
+        "pa-calibration-loop-info",
+        "pa-progress-bar",
+        "pa-progress-fill",
+        "pa-progress-nodes",
+        "pa-step-initialization",
+        "pa-step-initialization-circle",
+        "pa-step-initialization-label",
+        "pa-step-calibration-1",
+        "pa-step-calibration-1-circle",
+        "pa-step-calibration-1-label",
+        "pa-step-calibration-2",
+        "pa-step-calibration-2-circle",
+        "pa-step-calibration-2-label",
+        "pa-step-calibration-3",
+        "pa-step-calibration-3-circle",
+        "pa-step-calibration-3-label",
+        "pa-step-guidance-calibration",
+        "pa-step-guidance-calibration-circle",
+        "pa-step-guidance-calibration-label",
+        "pa-step-verification",
+        "pa-step-verification-circle",
+        "pa-step-verification-label",
+        "pa-log-section",
+        "pa-log-display",
+        "pa-latest-log",
+        "pa-latest-log-timestamp",
+        "pa-latest-log-message",
+        "pa-log-empty",
+        "pa-position-section",
+        "pa-position-grid",
+        "pa-pos-current-ra",
+        "pa-pos-current-ra-label",
+        "pa-pos-current-ra-value",
+        "pa-pos-current-dec",
+        "pa-pos-current-dec-label",
+        "pa-pos-current-dec-value",
+        "pa-pos-target-ra",
+        "pa-pos-target-ra-label",
+        "pa-pos-target-ra-value",
+        "pa-pos-target-dec",
+        "pa-pos-target-dec-label",
+        "pa-pos-target-dec-value",
+        "pa-adjustment-section",
+        "pa-adjustment-instructions",
+        "pa-adjust-azimuth",
+        "pa-adjust-azimuth-icon",
+        "pa-adjust-azimuth-details",
+        "pa-adjust-azimuth-header",
+        "pa-adjust-azimuth-type",
+        "pa-adjust-azimuth-value",
+        "pa-adjust-azimuth-action",
+        "pa-adjust-altitude",
+        "pa-adjust-altitude-icon",
+        "pa-adjust-altitude-details",
+        "pa-adjust-altitude-header",
+        "pa-adjust-altitude-type",
+        "pa-adjust-altitude-value",
+        "pa-adjust-altitude-action",
+        "pa-control-section",
+        "pa-action-buttons",
+        "pa-btn-auto-calibration",
+        "pa-btn-auto-calibration-text",
+        "pa-btn-test-simulation",
+        "pa-btn-test-simulation-text",
+        "pa-guidance-indicator",
+        "pa-guidance-circle",
+        "pa-guidance-svg",
+        "pa-guidance-bg",
+        "pa-guidance-bar",
+        "pa-guidance-content",
+        "pa-guidance-step-icon",
+        "pa-guidance-step-description",
+        "pa-guidance-star-count",
+        "pa-trajectory-overlay-fullscreen",
+        "pa-trajectory-canvas-fullscreen",
+        "pa-btn-trajectory-close",
+        "pa-trajectory-hint",
+        "pa-trajectory-panel",
+        "pa-trajectory-panel-current",
+        "pa-trajectory-panel-current-label",
+        "pa-trajectory-panel-current-value",
+        "pa-trajectory-panel-target",
+        "pa-trajectory-panel-target-label",
+        "pa-trajectory-panel-target-value",
+        "pa-trajectory-panel-actions",
+        "pa-btn-clear-old-trajectory",
+        "pa-btn-switch-to-windowed",
+        "pa-trajectory-overlay-windowed",
+        "pa-trajectory-window-header",
+        "pa-trajectory-window-title",
+        "pa-trajectory-window-actions",
+        "pa-btn-switch-to-fullscreen",
+        "pa-btn-clear-old-trajectory-windowed",
+        "pa-btn-trajectory-close-windowed",
+        "pa-trajectory-window-content",
+        "pa-trajectory-canvas-windowed"
+      ]
+    },
+    "components/CFWSelectBtnBar.vue": {
+      "name": "CFWSelectBtnBar",
+      "lines": 68,
+      "suggestedPrefix": "ui-",
+      "priority": "低",
+      "testIdCount": 2,
+      "testIds": [
+        "ui-cfwselect-btn-bar-root",
+        "ui-cfwselect-btn-bar-btn-select-cfw"
+      ]
+    },
+    "components/CapturePanel.vue": {
+      "name": "CapturePanel",
+      "lines": 906,
+      "suggestedPrefix": "cp-",
+      "priority": "中",
+      "testIdCount": 41,
+      "testIds": [
+        "cp-panel",
+        "cp-camera-temperature",
+        "cp-direction-controls",
+        "cp-btn-exptime-minus",
+        "cp-icon-exptime-minus",
+        "cp-btn-exptime-plus",
+        "cp-icon-exptime-plus",
+        "cp-btn-cfw-minus",
+        "cp-icon-cfw-minus",
+        "cp-btn-cfw-plus",
+        "cp-icon-cfw-plus",
+        "cp-exptime-value",
+        "cp-cfw-display",
+        "cp-cfw-moving-dots",
+        "cp-cfw-moving-rotor",
+        "cp-cfw-dot-0",
+        "cp-cfw-dot-1",
+        "cp-cfw-dot-2",
+        "cp-cfw-dot-3",
+        "cp-cfw-dot-4",
+        "cp-cfw-dot-5",
+        "cp-cfw-dot-6",
+        "cp-cfw-dot-7",
+        "cp-cfw-value",
+        "cp-capture",
+        "cp-btn-capture",
+        "cp-secondary-panels",
+        "cp-btn-toggle-focuser",
+        "cp-btn-toggle-focuser-content",
+        "cp-img-focuser",
+        "cp-btn-toggle-histogram",
+        "cp-btn-toggle-histogram-content",
+        "cp-img-histogram",
+        "cp-status",
+        "cp-status-icon",
+        "cp-status-icon-content",
+        "cp-img-status",
+        "cp-save",
+        "cp-btn-save",
+        "cp-btn-save-content",
+        "cp-img-save"
+      ]
+    },
+    "components/Chart-Focus.vue": {
+      "name": "LineChart",
+      "lines": 866,
+      "suggestedPrefix": "ui-",
+      "priority": "中",
+      "testIdCount": 3,
+      "testIds": [
+        "ui-chart-focus-root",
+        "ui-components-chart-focus-act-start-drag",
+        "ui-chart-focus-btn-close-panel"
+      ]
+    },
+    "components/Chart-FocusImage.vue": {
+      "name": "ImageChart",
+      "lines": 161,
+      "suggestedPrefix": "ui-",
+      "priority": "低",
+      "testIdCount": 1,
+      "testIds": [
+        "ui-chart-focus-image-root"
+      ]
+    },
+    "components/Chart-Histogram.vue": {
+      "name": "BarChart",
+      "lines": 301,
+      "suggestedPrefix": "ui-",
+      "priority": "低",
+      "testIdCount": 1,
+      "testIds": [
+        "ui-chart-histogram-root"
+      ]
+    },
+    "components/Chart-Line.vue": {
+      "name": "LineChart",
+      "lines": 241,
+      "suggestedPrefix": "ui-",
+      "priority": "低",
+      "testIdCount": 1,
+      "testIds": [
+        "ui-chart-line-root"
+      ]
+    },
+    "components/Chart-Scatter.vue": {
+      "name": "ScatterChart",
+      "lines": 174,
+      "suggestedPrefix": "ui-",
+      "priority": "低",
+      "testIdCount": 2,
+      "testIds": [
+        "ui-chart-scatter-root",
+        "ui-chart-scatter-btn-clear-chart-data"
+      ]
+    },
+    "components/ChartComponent.vue": {
+      "name": "ChartsPanel",
+      "lines": 412,
+      "suggestedPrefix": "ui-",
+      "priority": "中",
+      "testIdCount": 6,
+      "testIds": [
+        "ui-chart-component-root",
+        "ui-chart-component-btn-loop-exp-switch",
+        "ui-chart-component-btn-start-press",
+        "ui-chart-component-btn-exp-time-switch",
+        "ui-chart-component-btn-data-clear",
+        "ui-chart-component-btn-range-switch"
+      ]
+    },
+    "components/CircularButton.vue": {
+      "name": "CircularButton",
+      "lines": 391,
+      "suggestedPrefix": "ui-",
+      "priority": "低",
+      "testIdCount": 2,
+      "testIds": [
+        "ui-circular-button-root",
+        "ui-components-circular-button-act-handle-mouse-down"
+      ]
+    },
+    "components/DeviceAllocationPanel.vue": {
+      "name": "DeviceAllocationPanel",
+      "lines": 470,
+      "suggestedPrefix": "dap-",
+      "priority": "中",
+      "testIdCount": 4,
+      "testIds": [
+        "dap-root",
+        "dap-act-selected-device-name",
+        "dap-act-selected-device-name-2",
+        "dap-act-close-panel"
+      ]
+    },
+    "components/DevicePicker.vue": {
+      "name": "DevicePicker",
+      "lines": 150,
+      "suggestedPrefix": "dp-",
+      "priority": "低",
+      "testIdCount": 4,
+      "testIds": [
+        "dp-picker",
+        "dp-device-type",
+        "dp-device-name",
+        "dp-btn-toggle-bind"
+      ]
+    },
+    "components/Dial-Knob.vue": {
+      "name": "Dial-Knob",
+      "lines": 386,
+      "suggestedPrefix": "ui-",
+      "priority": "低",
+      "testIdCount": 3,
+      "testIds": [
+        "ui-dial-knob-root",
+        "ui-components-dial-knob-act-start-drag",
+        "ui-components-dial-knob-act-start-second-drag"
+      ]
+    },
+    "components/FocuserPanel.vue": {
+      "name": "FocuserPanel",
+      "lines": 1094,
+      "suggestedPrefix": "fp-",
+      "priority": "高",
+      "testIdCount": 15,
+      "testIds": [
+        "fp-root",
+        "fp-buttons-container",
+        "fp-btn-start-calibration",
+        "fp-btn-toggle-loop-shooting",
+        "fp-btn-speed-change",
+        "fp-btn-speed-change-2",
+        "fp-btn-roichange",
+        "fp-btn-focus-left-move",
+        "fp-btn-focus-move",
+        "fp-btn-auto-focus",
+        "fp-btn-auto-focus-2",
+        "fp-btn-focus-goto",
+        "fp-btn-focus-right-move",
+        "fp-btn-focus-move-2",
+        "fp-state-current"
+      ]
+    },
+    "components/HistogramPanel.vue": {
+      "name": "HistogramPanel",
+      "lines": 254,
+      "suggestedPrefix": "hp-",
+      "priority": "低",
+      "testIdCount": 13,
+      "testIds": [
+        "hp-panel",
+        "hp-chart",
+        "hp-dial-knob",
+        "hp-buttons-container",
+        "hp-btn-white-balance",
+        "hp-img-white-balance",
+        "hp-btn-auto",
+        "hp-icon-auto",
+        "hp-btn-reset",
+        "hp-img-reset",
+        "hp-btn-toggle-range",
+        "hp-range-label-range",
+        "hp-range-label-full"
+      ]
+    },
+    "components/ImageFolder.vue": {
+      "name": "ImageFolder",
+      "lines": 773,
+      "suggestedPrefix": "ui-",
+      "priority": "中",
+      "testIdCount": 4,
+      "testIds": [
+        "`ui-image-folder-root-${folderIndex}`",
+        "`ui-image-folder-file-${folderIndex}-${index}`",
+        "ui-imagefolder-btn-delete-confirm",
+        "ui-imagefolder-btn-delete"
+      ]
+    },
+    "components/ImageManagerPanel.vue": {
+      "name": "ImageManagerPanel",
+      "lines": 1905,
+      "suggestedPrefix": "imp-",
+      "priority": "高",
+      "testIdCount": 30,
+      "testIds": [
+        "imp-root",
+        "imp-btn-move-file-to-usb",
+        "imp-btn-delete-folders",
+        "imp-btn-delete-btn-click",
+        "imp-btn-download-selected",
+        "imp-act-image-file-switch",
+        "imp-btn-image-file-switch",
+        "imp-btn-panel-close",
+        "imp-act-close-usbselect-dialog",
+        "imp-act-usb-select-dialog",
+        "imp-btn-close-usbselect-dialog",
+        "imp-act-select-usb",
+        "imp-act-close-download-confirm-dialog",
+        "imp-act-usb-select-dialog-2",
+        "imp-btn-close-download-confirm-dialog",
+        "imp-select-download-concurrency",
+        "imp-btn-close-download-confirm-dialog-2",
+        "imp-btn-confirm-start-download",
+        "imp-act-close-download-location-reminder-dialog",
+        "imp-act-download-location-reminder-dialog",
+        "imp-btn-close-download-location-reminder-dialog",
+        "imp-btn-cancel-download-location-reminder-dialog",
+        "imp-btn-continue-download-location-reminder-dialog",
+        "imp-btn-toggle-download-panel",
+        "imp-btn-cancel-all-downloads",
+        "imp-select-download-concurrency-2",
+        "imp-btn-pause-download",
+        "imp-btn-resume-download",
+        "imp-btn-cancel-download",
+        "imp-btn-auto"
+      ]
+    },
+    "components/LocationFocalInputs.vue": {
+      "name": "LocationFocalInputs",
+      "lines": 422,
+      "suggestedPrefix": "ui-",
+      "priority": "中",
+      "testIdCount": 7,
+      "testIds": [
+        "ui-location-focal-inputs-root",
+        "ui-components-location-focal-inputs-act-expand-inputs",
+        "ui-location-focal-inputs-input-t",
+        "ui-location-focal-inputs-input-t-2",
+        "ui-location-focal-inputs-input-t-3",
+        "ui-location-focal-inputs-btn-collapse-inputs",
+        "ui-components-location-focal-inputs-act-handle-keyboard-input"
+      ]
+    },
+    "components/MeridianFlipNotifier.vue": {
+      "name": "MeridianFlipNotifier",
+      "lines": 676,
+      "suggestedPrefix": "ui-",
+      "priority": "中",
+      "testIdCount": 14,
+      "testIds": [
+        "ui-meridian-flip-notifier-root",
+        "ui-meridian-flip-notifier-btn-select-mode",
+        "ui-meridian-flip-notifier-btn-select-mode-2",
+        "ui-meridian-flip-notifier-btn-trigger-flip-now",
+        "ui-meridian-flip-notifier-btn-close-banner",
+        "ui-components-meridian-flip-notifier-act-close-center",
+        "ui-meridian-flip-notifier-btn-select-mode-3",
+        "ui-meridian-flip-notifier-btn-select-mode-4",
+        "ui-meridian-flip-notifier-btn-trigger-flip-now-2",
+        "ui-meridian-flip-notifier-btn-close-center",
+        "ui-meridian-flip-notifier-btn-select-mode-5",
+        "ui-meridian-flip-notifier-btn-select-mode-6",
+        "ui-meridian-flip-notifier-btn-trigger-flip-now-3",
+        "ui-meridian-flip-notifier-btn-close-mini"
+      ]
+    },
+    "components/MessageBox.vue": {
+      "name": "MessageBox",
+      "lines": 102,
+      "suggestedPrefix": "ui-",
+      "priority": "低",
+      "testIdCount": 1,
+      "testIds": [
+        "ui-message-box-root"
+      ]
+    },
+    "components/MountControlPanel.vue": {
+      "name": "MountControlPanel",
+      "lines": 998,
+      "suggestedPrefix": "mcp-",
+      "priority": "中",
+      "testIdCount": 43,
+      "testIds": [
+        "mcp-panel",
+        "mcp-display",
+        "mcp-combined-text",
+        "mcp-pier-side-text",
+        "mcp-separator",
+        "mcp-radec-text",
+        "mcp-value-ra",
+        "mcp-value-dec",
+        "mcp-direction-controls",
+        "mcp-btn-ra-plus",
+        "mcp-img-ra-plus",
+        "mcp-btn-ra-minus",
+        "mcp-img-ra-minus",
+        "mcp-btn-dec-plus",
+        "mcp-img-dec-plus",
+        "mcp-btn-dec-minus",
+        "mcp-img-dec-minus",
+        "mcp-stop-container",
+        "mcp-btn-stop",
+        "mcp-icon-stop",
+        "mcp-speed-container",
+        "mcp-btn-speed",
+        "mcp-speed-value",
+        "mcp-img-speed",
+        "mcp-function-buttons",
+        "mcp-btn-park",
+        "mcp-img-park",
+        "mcp-btn-track",
+        "mcp-icon-track",
+        "mcp-btn-home",
+        "mcp-img-home",
+        "mcp-btn-sync",
+        "mcp-img-sync",
+        "mcp-btn-solve",
+        "mcp-img-solve",
+        "mcp-status",
+        "mcp-status-indicator-idle",
+        "mcp-img-status-idle",
+        "mcp-status-indicator-busy",
+        "mcp-img-status-busy",
+        "mcp-close-container",
+        "mcp-btn-close",
+        "mcp-img-close"
+      ]
+    },
+    "components/NumberKeyboard.vue": {
+      "name": "NumberKeyboard",
+      "lines": 820,
+      "suggestedPrefix": "ui-",
+      "priority": "中",
+      "testIdCount": 5,
+      "testIds": [
+        "ui-number-keyboard-root",
+        "ui-components-number-keyboard-act-handle-drag-start",
+        "ui-components-number-keyboard-act-keyboard-header",
+        "ui-number-keyboard-btn-handle-close",
+        "ui-number-keyboard-btn-handle-key-press"
+      ]
+    },
+    "components/PolarAlignmentInfoPanel.vue": {
+      "name": "PolarAlignmentInfoPanel",
+      "lines": 9,
+      "suggestedPrefix": "ui-",
+      "priority": "低",
+      "testIdCount": 1,
+      "testIds": [
+        "ui-polar-alignment-info-panel-root"
+      ]
+    },
+    "components/ProgressBar.vue": {
+      "name": "ProgressBar",
+      "lines": 78,
+      "suggestedPrefix": "ui-",
+      "priority": "低",
+      "testIdCount": 1,
+      "testIds": [
+        "ui-progress-bar-root"
+      ]
+    },
+    "components/RPI-Hotspot.vue": {
+      "name": "HotspotDialog",
+      "lines": 350,
+      "suggestedPrefix": "ui-",
+      "priority": "低",
+      "testIdCount": 5,
+      "testIds": [
+        "ui-rpi-hotspot-root",
+        "ui-rpi-hotspot-input-input-text",
+        "ui-rpi-hotspot-btn-update-hotspot-name",
+        "ui-rpi-hotspot-btn-save-btn-click",
+        "ui-rpi-hotspot-btn-redo-hotspot-name"
+      ]
+    },
+    "components/RaDecDialog.vue": {
+      "name": "RaDecDialog",
+      "lines": 243,
+      "suggestedPrefix": "ui-",
+      "priority": "低",
+      "testIdCount": 7,
+      "testIds": [
+        "ui-ra-dec-dialog-root",
+        "ui-ra-dec-dialog-input-ra-str",
+        "ui-ra-dec-dialog-btn-auto",
+        "ui-ra-dec-dialog-btn-auto-2",
+        "ui-ra-dec-dialog-input-dec-str",
+        "ui-ra-dec-dialog-btn-on-cancel",
+        "ui-ra-dec-dialog-btn-on-ok"
+      ]
+    },
+    "components/Red-Box.vue": {
+      "name": "Red-Box",
+      "lines": 115,
+      "suggestedPrefix": "ui-",
+      "priority": "低",
+      "testIdCount": 2,
+      "testIds": [
+        "ui-red-box-root",
+        "ui-components-red-box-act-start-drag"
+      ]
+    },
+    "components/SchedulePanel.vue": {
+      "name": "SchedulePanel",
+      "lines": 3266,
+      "suggestedPrefix": "scp-",
+      "priority": "高",
+      "testIdCount": 35,
+      "testIds": [
+        "scp-root",
+        "scp-btn-toggle-left-toolbar",
+        "scp-btn-add-row",
+        "scp-btn-delete-selected-row",
+        "scp-btn-toggle-schedule",
+        "scp-btn-open-save-preset-dialog",
+        "scp-btn-open-load-preset-dialog",
+        "scp-btn-close-panel",
+        "scp-act-select-cell",
+        "scp-editor-clock-now",
+        "scp-editor-clock-hour",
+        "scp-editor-clock-minute",
+        "scp-editor-exposure-preset",
+        "`scp-editor-filter-pill-${idx}`",
+        "`scp-editor-type-pill-${idx}`",
+        "`scp-editor-refocus-pill-${idx}`",
+        "scp-editor-reps-value",
+        "scp-editor-target-input",
+        "scp-editor-target-cycle-prefix",
+        "scp-editor-target-search-center",
+        "scp-editor-target-use-selected-object",
+        "scp-editor-target-current-position",
+        "scp-editor-coordinate-ra",
+        "scp-editor-coordinate-dec",
+        "`scp-keypad-key-${k}`",
+        "scp-keypad-unit-toggle",
+        "scp-preset-dialog-root",
+        "scp-preset-btn-close",
+        "scp-preset-list",
+        "scp-preset-item",
+        "scp-preset-empty",
+        "scp-preset-input-name",
+        "scp-preset-btn-save",
+        "scp-preset-btn-delete",
+        "scp-preset-btn-ok"
+      ]
+    },
+    "components/Settings-Dialog-CFW.vue": {
+      "name": "Settings-Dialog-CFW",
+      "lines": 163,
+      "suggestedPrefix": "ui-",
+      "priority": "低",
+      "testIdCount": 10,
+      "testIds": [
+        "ui-settings-dialog-cfw-root",
+        "ui-settings-dialog-cfw-btn-switch-page",
+        "ui-settings-dialog-cfw-select-selected-driver",
+        "ui-settings-dialog-cfw-btn-confirm-driver",
+        "ui-settings-dialog-cfw-btn-connect-indi-server",
+        "ui-settings-dialog-cfw-select-selected-device",
+        "ui-settings-dialog-cfw-btn-confirm-device",
+        "ui-settings-dialog-cfw-input-value",
+        "ui-settings-dialog-cfw-btn-confirm-configuration",
+        "ui-settings-dialog-cfw-btn-close-dialog"
+      ]
+    },
+    "components/Settings-Dialog-Focuser.vue": {
+      "name": "Settings-Dialog-Focuser",
+      "lines": 111,
+      "suggestedPrefix": "ui-",
+      "priority": "低",
+      "testIdCount": 10,
+      "testIds": [
+        "ui-settings-dialog-focuser-root",
+        "ui-settings-dialog-focuser-btn-switch-page",
+        "ui-settings-dialog-focuser-select-selected-driver",
+        "ui-settings-dialog-focuser-btn-confirm-driver",
+        "ui-settings-dialog-focuser-btn-connect-indi-server",
+        "ui-settings-dialog-focuser-select-selected-device",
+        "ui-settings-dialog-focuser-btn-confirm-device",
+        "ui-settings-dialog-focuser-input-value",
+        "ui-settings-dialog-focuser-btn-confirm-configuration",
+        "ui-settings-dialog-focuser-btn-close-dialog"
+      ]
+    },
+    "components/Settings-Dialog-Guider.vue": {
+      "name": "Settings-Dialog-Guider",
+      "lines": 111,
+      "suggestedPrefix": "ui-",
+      "priority": "低",
+      "testIdCount": 11,
+      "testIds": [
+        "ui-settings-dialog-guider-root",
+        "ui-settings-dialog-guider-btn-switch-page",
+        "ui-settings-dialog-guider-select-selected-driver",
+        "ui-settings-dialog-guider-btn-confirm-driver",
+        "ui-settings-dialog-guider-btn-connect-indi-server",
+        "ui-settings-dialog-guider-select-selected-device",
+        "ui-settings-dialog-guider-btn-confirm-device",
+        "ui-settings-dialog-guider-btn-clear-calibration-data",
+        "ui-settings-dialog-guider-input-value",
+        "ui-settings-dialog-guider-btn-confirm-configuration",
+        "ui-settings-dialog-guider-btn-close-dialog"
+      ]
+    },
+    "components/Settings-Dialog-MainCamera.vue": {
+      "name": "Settings-Dialog-MainCamera",
+      "lines": 121,
+      "suggestedPrefix": "ui-",
+      "priority": "低",
+      "testIdCount": 10,
+      "testIds": [
+        "ui-settings-dialog-main-camera-root",
+        "ui-settings-dialog-main-camera-btn-switch-page",
+        "ui-settings-dialog-main-camera-select-selected-driver",
+        "ui-settings-dialog-main-camera-btn-confirm-driver",
+        "ui-settings-dialog-main-camera-btn-connect-indi-server",
+        "ui-settings-dialog-main-camera-select-selected-device",
+        "ui-settings-dialog-main-camera-btn-confirm-device",
+        "ui-settings-dialog-main-camera-input-value",
+        "ui-settings-dialog-main-camera-btn-confirm-configuration",
+        "ui-settings-dialog-main-camera-btn-close-dialog"
+      ]
+    },
+    "components/Settings-Dialog-Mount.vue": {
+      "name": "Settings-Dialog-Mount",
+      "lines": 107,
+      "suggestedPrefix": "ui-",
+      "priority": "低",
+      "testIdCount": 10,
+      "testIds": [
+        "ui-settings-dialog-mount-root",
+        "ui-settings-dialog-mount-btn-switch-page",
+        "ui-settings-dialog-mount-select-selected-driver",
+        "ui-settings-dialog-mount-btn-confirm-driver",
+        "ui-settings-dialog-mount-btn-connect-indi-server",
+        "ui-settings-dialog-mount-select-selected-device",
+        "ui-settings-dialog-mount-btn-confirm-device",
+        "ui-settings-dialog-mount-input-value",
+        "ui-settings-dialog-mount-btn-confirm-configuration",
+        "ui-settings-dialog-mount-btn-close-dialog"
+      ]
+    },
+    "components/Settings-Dialog-PoleCamera.vue": {
+      "name": "Settings-Dialog-PoleCamera",
+      "lines": 67,
+      "suggestedPrefix": "ui-",
+      "priority": "低",
+      "testIdCount": 7,
+      "testIds": [
+        "ui-settings-dialog-pole-camera-root",
+        "ui-settings-dialog-pole-camera-select-selected-driver",
+        "ui-settings-dialog-pole-camera-btn-confirm-driver",
+        "ui-settings-dialog-pole-camera-btn-connect-indi-server",
+        "ui-settings-dialog-pole-camera-select-selected-device",
+        "ui-settings-dialog-pole-camera-btn-confirm-device",
+        "ui-settings-dialog-pole-camera-btn-close-dialog"
+      ]
+    },
+    "components/USBFilesDialog.vue": {
+      "name": "USBFilesDialog",
+      "lines": 196,
+      "suggestedPrefix": "ui-",
+      "priority": "低",
+      "testIdCount": 4,
+      "testIds": [
+        "ui-usbfiles-dialog-root",
+        "ui-usbfiles-dialog-btn-navigate-up",
+        "ui-components-usbfiles-dialog-act-handle-item-click",
+        "ui-usbfiles-dialog-btn-blue-text"
+      ]
+    },
+    "components/UpdateProgressDialog.vue": {
+      "name": "UpdateProgressDialog",
+      "lines": 497,
+      "suggestedPrefix": "ui-",
+      "priority": "中",
+      "testIdCount": 5,
+      "testIds": [
+        "ui-update-progress-dialog-root",
+        "ui-components-update-progress-dialog-act-update-dialog",
+        "ui-update-progress-dialog-btn-toggle-log-expand",
+        "ui-update-progress-dialog-btn-close-dialog",
+        "ui-update-progress-dialog-btn-retry-update"
+      ]
+    },
+    "components/bottom-bar.vue": {
+      "name": "bottom-bar",
+      "lines": 215,
+      "suggestedPrefix": "bb-",
+      "priority": "低",
+      "testIdCount": 11,
+      "testIds": [
+        "bb-btnbar",
+        "bb-spacer-left",
+        "bb-btn-constellations-lines",
+        "bb-btn-constellations-art",
+        "bb-btn-atmosphere",
+        "bb-btn-landscape",
+        "bb-btn-grid-azimuthal",
+        "bb-btn-grid-equatorial-jnow",
+        "bb-btn-grid-equatorial-j2000",
+        "bb-btn-dsos",
+        "bb-spacer-right"
+      ]
+    },
+    "components/bottom-button.vue": {
+      "name": "bottom-button",
+      "lines": 64,
+      "suggestedPrefix": "ui-",
+      "priority": "低",
+      "testIdCount": 1,
+      "testIds": [
+        "ui-bottom-button-root"
+      ]
+    },
+    "components/data-credits-dialog.vue": {
+      "name": "data-credits-dialog",
+      "lines": 170,
+      "suggestedPrefix": "ui-",
+      "priority": "低",
+      "testIdCount": 2,
+      "testIds": [
+        "ui-data-credits-dialog-root",
+        "ui-data-credits-dialog-btn-blue-text"
+      ]
+    },
+    "components/date-time-picker.vue": {
+      "name": "date-time-picker",
+      "lines": 276,
+      "suggestedPrefix": "ui-",
+      "priority": "低",
+      "testIdCount": 8,
+      "testIds": [
+        "ui-date-time-picker-root",
+        "ui-date-time-picker-btn-inc-time",
+        "ui-date-time-picker-btn-inc-time-2",
+        "ui-date-time-picker-btn-inc-time-3",
+        "ui-date-time-picker-btn-dec-time",
+        "ui-date-time-picker-btn-dec-time-2",
+        "ui-date-time-picker-btn-dec-time-3",
+        "ui-date-time-picker-btn-reset-time"
+      ]
+    },
+    "components/gui-loader.vue": {
+      "name": "gui-loader",
+      "lines": 53,
+      "suggestedPrefix": "ui-",
+      "priority": "低",
+      "testIdCount": 1,
+      "testIds": [
+        "ui-gui-loader-root"
+      ]
+    },
+    "components/gui.vue": {
+      "name": "gui",
+      "lines": 2558,
+      "suggestedPrefix": "gui-",
+      "priority": "高",
+      "testIdCount": 22,
+      "testIds": [
+        "gui-root",
+        "gui-btn-toggle-image-manager-panel",
+        "gui-btn-recalibrate-polar-axis",
+        "gui-btn-single-solve-image",
+        "gui-btn-loop-solve-image",
+        "gui-btn-toggle-mount-panel",
+        "gui-btn-switch-main-page",
+        "gui-btn-toggle-charts-panel",
+        "gui-btn-quit-polar-axis-mode",
+        "gui-btn-hide-capture-ui",
+        "gui-btn-show-capture-ui",
+        "gui-btn-get-original-image",
+        "gui-btn-scale-plus",
+        "gui-btn-scale-minus",
+        "ui-confirm-dialog-root",
+        "ui-confirm-dialog-btn-close",
+        "ui-confirm-dialog-btn-autofocus-coarse",
+        "ui-confirm-dialog-btn-autofocus-fine",
+        "ui-confirm-dialog-btn-cancel",
+        "ui-confirm-dialog-btn-confirm",
+        "gui-dslr-btn-toggle-tips",
+        "gui-dslr-btn-confirm"
+      ]
+    },
+    "components/indiDebugDialog.vue": {
+      "name": "indiDebugDialog",
+      "lines": 494,
+      "suggestedPrefix": "ui-",
+      "priority": "中",
+      "testIdCount": 8,
+      "testIds": [
+        "ui-indi-debug-dialog-root",
+        "ui-indi-debug-dialog-btn-scroll-to-bottom",
+        "ui-indi-debug-dialog-btn-clear-messages",
+        "ui-indi-debug-dialog-btn-save-messages",
+        "ui-indi-debug-dialog-btn-toggle-error-debug",
+        "ui-indi-debug-dialog-btn-toggle-server-debug",
+        "ui-indi-debug-dialog-btn-toggle-client-debug",
+        "ui-indi-debug-dialog-btn-close"
+      ]
+    },
+    "components/location-dialog.vue": {
+      "name": "Unknown",
+      "lines": 409,
+      "suggestedPrefix": "ui-",
+      "priority": "中",
+      "testIdCount": 6,
+      "testIds": [
+        "ui-location-dialog-root",
+        "ui-location-dialog-input-latitude",
+        "ui-location-dialog-input-longitude",
+        "ui-location-dialog-btn-save-manual-coordinates",
+        "ui-location-dialog-switch-handle-auto-location-change",
+        "ui-components-location-dialog-act-handle-keyboard-input"
+      ]
+    },
+    "components/location-mgr.vue": {
+      "name": "BigDataCloud-API",
+      "lines": 1551,
+      "suggestedPrefix": "ui-",
+      "priority": "高",
+      "testIdCount": 3,
+      "testIds": [
+        "ui-location-mgr-root",
+        "ui-components-location-mgr-act-select-known-location",
+        "ui-location-mgr-switch-on-map-type-toggle"
+      ]
+    },
+    "components/observing-panel-root-toolbar.vue": {
+      "name": "observing-panel-root-toolbar",
+      "lines": 26,
+      "suggestedPrefix": "ui-",
+      "priority": "低",
+      "testIdCount": 2,
+      "testIds": [
+        "ui-observing-panel-root-toolbar-root",
+        "ui-observing-panel-root-toolbar-btn-auto"
+      ]
+    },
+    "components/observing-panel.vue": {
+      "name": "observing-panel",
+      "lines": 82,
+      "suggestedPrefix": "ui-",
+      "priority": "低",
+      "testIdCount": 2,
+      "testIds": [
+        "ui-observing-panel-root",
+        "ui-observing-panel-btn-tab-bt"
+      ]
+    },
+    "components/planets-visibility.vue": {
+      "name": "planets-visibility",
+      "lines": 160,
+      "suggestedPrefix": "ui-",
+      "priority": "低",
+      "testIdCount": 1,
+      "testIds": [
+        "ui-planets-visibility-root"
+      ]
+    },
+    "components/progress-bars.vue": {
+      "name": "progress-bars",
+      "lines": 52,
+      "suggestedPrefix": "ui-",
+      "priority": "低",
+      "testIdCount": 1,
+      "testIds": [
+        "ui-progress-bars-root"
+      ]
+    },
+    "components/selected-object-info.vue": {
+      "name": "selected-object-info",
+      "lines": 504,
+      "suggestedPrefix": "ui-",
+      "priority": "中",
+      "testIdCount": 8,
+      "testIds": [
+        "ui-selected-object-info-root",
+        "ui-selected-object-info-btn-auto",
+        "ui-selected-object-info-btn-grey-text",
+        "ui-selected-object-info-action-buttons",
+        "ui-selected-object-info-btn-point-to",
+        "ui-selected-object-info-img-point-to",
+        "ui-selected-object-info-btn-goto",
+        "ui-selected-object-info-img-goto"
+      ]
+    },
+    "components/skysource-search.vue": {
+      "name": "skysource-search",
+      "lines": 156,
+      "suggestedPrefix": "ui-",
+      "priority": "低",
+      "testIdCount": 3,
+      "testIds": [
+        "ui-skysource-search-root",
+        "ui-skysource-search-input-search-field",
+        "ui-components-skysource-search-act-source-clicked"
+      ]
+    },
+    "components/target-search.vue": {
+      "name": "target-search",
+      "lines": 53,
+      "suggestedPrefix": "ui-",
+      "priority": "低",
+      "testIdCount": 1,
+      "testIds": [
+        "ui-target-search-root"
+      ]
+    },
+    "components/toolbar.vue": {
+      "name": "toolbar",
+      "lines": 596,
+      "suggestedPrefix": "tb-",
+      "priority": "中",
+      "testIdCount": 5,
+      "testIds": [
+        "tb-root",
+        "tb-act-toggle-navigation-drawer",
+        "tb-btn-transparent",
+        "tb-btn-timer-pick-btn",
+        "tb-btn-toggle-schedule-panel"
+      ]
+    },
+    "components/view-settings-dialog.vue": {
+      "name": "USB1",
+      "lines": 766,
+      "suggestedPrefix": "ui-",
+      "priority": "中",
+      "testIdCount": 34,
+      "testIds": [
+        "ui-view-settings-dialog-root",
+        "ui-view-settings-dialog-tab-display-settings",
+        "ui-view-settings-dialog-tab-version-info",
+        "ui-view-settings-dialog-tab-memory-settings",
+        "ui-view-settings-dialog-checkbox-milky-way-on",
+        "ui-view-settings-dialog-checkbox-milky-way-on-label",
+        "ui-view-settings-dialog-checkbox-dss-on",
+        "ui-view-settings-dialog-checkbox-dss-on-label",
+        "ui-view-settings-dialog-checkbox-meridian-on",
+        "ui-view-settings-dialog-checkbox-meridian-on-label",
+        "ui-view-settings-dialog-checkbox-ecliptic-on",
+        "ui-view-settings-dialog-checkbox-ecliptic-on-label",
+        "ui-view-settings-dialog-checkbox-highfps-on",
+        "ui-view-settings-dialog-checkbox-highfps-on-label",
+        "ui-view-settings-dialog-select-switch-language",
+        "ui-system-version-total",
+        "ui-system-version-qt",
+        "ui-system-version-vue",
+        "ui-system-version-app",
+        "ui-view-settings-dialog-btn-refresh-devices",
+        "ui-view-settings-dialog-btn-open-usbbrowser",
+        "ui-view-settings-dialog-btn-open-usbbrowser-2",
+        "ui-view-settings-dialog-btn-open-clear-box-dialog",
+        "ui-view-settings-dialog-btn-clear-logs",
+        "ui-view-settings-dialog-btn-refresh-storage",
+        "ui-view-settings-dialog-checkbox-cache",
+        "ui-view-settings-dialog-checkbox-cache-label",
+        "ui-view-settings-dialog-checkbox-update-pack",
+        "ui-view-settings-dialog-checkbox-update-pack-label",
+        "ui-view-settings-dialog-checkbox-backup",
+        "ui-view-settings-dialog-checkbox-backup-label",
+        "ui-view-settings-dialog-btn-on-cancel-clear-box",
+        "ui-view-settings-dialog-btn-on-confirm-clear-box",
+        "ui-view-settings-dialog-btn-blue-text"
+      ]
+    }
+  },
+  "testIds": {
+    "ui-app-root": {
+      "component": "App.vue",
+      "line": 10,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "e2e-probes": {
+      "component": "App.vue",
+      "line": 18,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "`e2e-device-${d && d.driverType ? d.driverType : UNKNOWN_DRIVER_TYPE}-conn`": {
+      "component": "App.vue",
+      "line": 25,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "e2e-tilegpm": {
+      "component": "App.vue",
+      "line": 32,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-app-submenu-drawer": {
+      "component": "App.vue",
+      "line": 40,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-app-submenu-device-page": {
+      "component": "App.vue",
+      "line": 44,
+      "elementType": "div",
+      "hasDataState": true,
+      "dataState": "isOpenDevicePage ? 'open' : 'closed'"
+    },
+    "ui-app-submenu-params-container": {
+      "component": "App.vue",
+      "line": 52,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-app-device-connection-panel": {
+      "component": "App.vue",
+      "line": 60,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-app-select-confirm-driver": {
+      "component": "App.vue",
+      "line": 69,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "\n                    'ui-app-select-confirm-driver-option-'\n                    + String((item && item.value) || item || 'unknown').replace(/[^A-Za-z0-9]+/g, '')\n                  ": {
+      "component": "App.vue",
+      "line": 74,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-app-select-on-connection-mode-change": {
+      "component": "App.vue",
+      "line": 98,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "\n                        'ui-app-select-connection-mode-option-'\n                        + String((item && item.value) || item || 'unknown').replace(/[^A-Za-z0-9]+/g, '')\n                      ": {
+      "component": "App.vue",
+      "line": 103,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-app-select-confirm-driver-2": {
+      "component": "App.vue",
+      "line": 120,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-app-select-auto": {
+      "component": "App.vue",
+      "line": 126,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-app-select-auto-2": {
+      "component": "App.vue",
+      "line": 137,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-app-btn-clear-driver": {
+      "component": "App.vue",
+      "line": 149,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-app-btn-connect-driver": {
+      "component": "App.vue",
+      "line": 158,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "\n              'ui-app-config-item-'\n              + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')\n              + '-'\n              + String(item.label || 'Field').replace(/[^A-Za-z0-9]+/g, '')\n              + '-'\n              + index\n            ": {
+      "component": "App.vue",
+      "line": 175,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "\n                  'ui-config-'\n                  + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')\n                  + '-'\n                  + String(item.label || 'Field').replace(/[^A-Za-z0-9]+/g, '')\n                  + '-text-'\n                  + index\n                ": {
+      "component": "App.vue",
+      "line": 199,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "\n                  'ui-config-'\n                  + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')\n                  + '-' \n                  + String(item.label || 'Field').replace(/[^A-Za-z0-9]+/g, '')\n                  + '-number-'\n                  + index\n                ": {
+      "component": "App.vue",
+      "line": 224,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "\n                      'ui-config-'\n                      + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')\n                      + '-'\n                      + String(item.label || 'Field').replace(/[^A-Za-z0-9]+/g, '')\n                      + '-slider-dec-'\n                      + index\n                    ": {
+      "component": "App.vue",
+      "line": 245,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "\n                      'ui-config-'\n                      + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')\n                      + '-'\n                      + String(item.label || 'Field').replace(/[^A-Za-z0-9]+/g, '')\n                      + '-slider-'\n                      + index\n                    ": {
+      "component": "App.vue",
+      "line": 269,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "\n                      'ui-config-'\n                      + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')\n                      + '-'\n                      + String(item.label || 'Field').replace(/[^A-Za-z0-9]+/g, '')\n                      + '-slider-inc-'\n                      + index\n                    ": {
+      "component": "App.vue",
+      "line": 285,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "\n                  'ui-config-'\n                  + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')\n                  + '-'\n                  + String(item.label || 'Field').replace(/[^A-Za-z0-9]+/g, '')\n                  + '-select-'\n                  + index\n                ": {
+      "component": "App.vue",
+      "line": 310,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "\n                  'ui-config-'\n                  + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')\n                  + '-'\n                  + String(item.label || 'Field').replace(/[^A-Za-z0-9]+/g, '')\n                  + '-switch-'\n                  + index\n                ": {
+      "component": "App.vue",
+      "line": 328,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "\n                    'ui-config-'\n                    + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')\n                    + '-'\n                    + String(item.label || item.buttonText || 'Button').replace(/[^A-Za-z0-9]+/g, '')\n                    + '-button-'\n                    + index\n                  ": {
+      "component": "App.vue",
+      "line": 359,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-app-btn-disconnect-driver": {
+      "component": "App.vue",
+      "line": 395,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-power-manager-root": {
+      "component": "App.vue",
+      "line": 408,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-app-power-page-output-power-1": {
+      "component": "App.vue",
+      "line": 420,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-app-power-page-output-power-2": {
+      "component": "App.vue",
+      "line": 440,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-app-power-page-restart": {
+      "component": "App.vue",
+      "line": 461,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-app-power-page-shutdown": {
+      "component": "App.vue",
+      "line": 473,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-app-power-page-force-update": {
+      "component": "App.vue",
+      "line": 485,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-app-menu-drawer": {
+      "component": "App.vue",
+      "line": 513,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-app-menu-quit": {
+      "component": "App.vue",
+      "line": 547,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-app-menu-general-settings": {
+      "component": "App.vue",
+      "line": 561,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-app-menu-open-power-manager": {
+      "component": "App.vue",
+      "line": 575,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "`ui-app-menu-device-${device && device.driverType ? device.driverType : UNKNOWN_DRIVER_TYPE}`": {
+      "component": "App.vue",
+      "line": 596,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-app-menu-connect-all": {
+      "component": "App.vue",
+      "line": 630,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-app-menu-disconnect-all": {
+      "component": "App.vue",
+      "line": 649,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-app-menu-device-allocation": {
+      "component": "App.vue",
+      "line": 663,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-app-menu-calibrate-polar-axis": {
+      "component": "App.vue",
+      "line": 677,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-app-menu-open-image-manager": {
+      "component": "App.vue",
+      "line": 691,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-app-menu-open-debug-log": {
+      "component": "App.vue",
+      "line": 705,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-app-menu-location": {
+      "component": "App.vue",
+      "line": 721,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-app-menu-refresh-page": {
+      "component": "App.vue",
+      "line": 740,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-app-menu-data-credits": {
+      "component": "App.vue",
+      "line": 756,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-root": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 4,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-minimized": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 13,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-minimized-header": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 16,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-minimized-drag-handle": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 21,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-minimized-icon": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 23,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-minimized-title": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 24,
+      "elementType": "span",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-minimized-controls": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 27,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-btn-expand-from-minimized": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 32,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-icon-expand-from-minimized": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 34,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-minimized-status": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 39,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-connection-indicator-minimized": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 43,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-connection-text-minimized": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 46,
+      "elementType": "span",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-widget": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 62,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-header": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 66,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-header-drag-handle": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 71,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-header-left": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 73,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-header-icon": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 74,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-header-title": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 75,
+      "elementType": "span",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-connection-indicator": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 76,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-connection-dot": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 80,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-header-controls": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 87,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-btn-toggle-collapse": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 92,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-icon-toggle-collapse": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 94,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-btn-toggle-trajectory": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 103,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-icon-toggle-trajectory": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 106,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-btn-minimize": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 115,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-icon-minimize": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 117,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-content-collapsed": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 127,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-collapsed-info": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 129,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-collapsed-progress": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 130,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-collapsed-progress-circle": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 134,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-collapsed-progress-text": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 137,
+      "elementType": "span",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-collapsed-status": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 143,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-collapsed-azimuth": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 144,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-collapsed-azimuth-label": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 145,
+      "elementType": "span",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-collapsed-azimuth-value": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 149,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-collapsed-altitude": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 156,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-collapsed-altitude-label": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 157,
+      "elementType": "span",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-collapsed-altitude-value": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 161,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-content-expanded": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 176,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-sections": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 178,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-calibration-progress": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 180,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-progress-header": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 181,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-progress-title": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 182,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-calibration-loop-info": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 186,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-progress-bar": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 193,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-progress-fill": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 197,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-progress-nodes": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 201,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-step-initialization": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 203,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-step-initialization-circle": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 204,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-step-initialization-label": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 208,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-step-calibration-1": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 212,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-step-calibration-1-circle": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 213,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-step-calibration-1-label": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 217,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-step-calibration-2": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 221,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-step-calibration-2-circle": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 222,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-step-calibration-2-label": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 226,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-step-calibration-3": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 230,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-step-calibration-3-circle": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 231,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-step-calibration-3-label": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 235,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-step-guidance-calibration": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 242,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-step-guidance-calibration-circle": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 245,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-step-guidance-calibration-label": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 250,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-step-verification": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 257,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-step-verification-circle": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 260,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-step-verification-label": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 264,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-log-section": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 271,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-log-display": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 272,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-latest-log": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 277,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-latest-log-timestamp": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 280,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-latest-log-message": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 283,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-log-empty": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 288,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-position-section": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 295,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-position-grid": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 296,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-pos-current-ra": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 297,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-pos-current-ra-label": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 298,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-pos-current-ra-value": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 299,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-pos-current-dec": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 302,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-pos-current-dec-label": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 303,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-pos-current-dec-value": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 304,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-pos-target-ra": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 307,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-pos-target-ra-label": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 308,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-pos-target-ra-value": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 309,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-pos-target-dec": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 312,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-pos-target-dec-label": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 313,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-pos-target-dec-value": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 314,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-adjustment-section": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 320,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-adjustment-instructions": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 321,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-adjust-azimuth": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 325,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-adjust-azimuth-icon": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 328,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-adjust-azimuth-details": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 332,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-adjust-azimuth-header": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 333,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-adjust-azimuth-type": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 334,
+      "elementType": "span",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-adjust-azimuth-value": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 335,
+      "elementType": "span",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-adjust-azimuth-action": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 340,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-adjust-altitude": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 349,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-adjust-altitude-icon": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 352,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-adjust-altitude-details": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 356,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-adjust-altitude-header": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 357,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-adjust-altitude-type": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 358,
+      "elementType": "span",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-adjust-altitude-value": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 359,
+      "elementType": "span",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-adjust-altitude-action": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 364,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-control-section": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 373,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-action-buttons": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 374,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-btn-auto-calibration": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 379,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-btn-auto-calibration-text": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 384,
+      "elementType": "span",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-btn-test-simulation": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 395,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-btn-test-simulation-text": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 398,
+      "elementType": "span",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-guidance-indicator": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 407,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-guidance-circle": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 416,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-guidance-svg": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 420,
+      "elementType": "svg",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-guidance-bg": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 421,
+      "elementType": "circle",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-guidance-bar": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 428,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-guidance-content": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 432,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-guidance-step-icon": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 433,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-guidance-step-description": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 434,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-guidance-star-count": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 440,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-trajectory-overlay-fullscreen": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 456,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-trajectory-canvas-fullscreen": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 458,
+      "elementType": "canvas",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-btn-trajectory-close": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 464,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-trajectory-hint": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 469,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-trajectory-panel": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 471,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-trajectory-panel-current": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 472,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-trajectory-panel-current-label": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 473,
+      "elementType": "span",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-trajectory-panel-current-value": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 474,
+      "elementType": "span",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-trajectory-panel-target": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 479,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-trajectory-panel-target-label": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 480,
+      "elementType": "span",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-trajectory-panel-target-value": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 481,
+      "elementType": "span",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-trajectory-panel-actions": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 486,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-btn-clear-old-trajectory": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 487,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-btn-switch-to-windowed": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 490,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-trajectory-overlay-windowed": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 504,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-trajectory-window-header": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 506,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-trajectory-window-title": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 507,
+      "elementType": "span",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-trajectory-window-actions": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 509,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-btn-switch-to-fullscreen": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 510,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-btn-clear-old-trajectory-windowed": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 513,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-btn-trajectory-close-windowed": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 520,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-trajectory-window-content": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 527,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "pa-trajectory-canvas-windowed": {
+      "component": "components/AutomaticPolarAlignmentCalibration.vue",
+      "line": 528,
+      "elementType": "canvas",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-cfwselect-btn-bar-root": {
+      "component": "components/CFWSelectBtnBar.vue",
+      "line": 2,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-cfwselect-btn-bar-btn-select-cfw": {
+      "component": "components/CFWSelectBtnBar.vue",
+      "line": 6,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "cp-panel": {
+      "component": "components/CapturePanel.vue",
+      "line": 6,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "cp-camera-temperature": {
+      "component": "components/CapturePanel.vue",
+      "line": 10,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "cp-direction-controls": {
+      "component": "components/CapturePanel.vue",
+      "line": 15,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "cp-btn-exptime-minus": {
+      "component": "components/CapturePanel.vue",
+      "line": 19,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "cp-icon-exptime-minus": {
+      "component": "components/CapturePanel.vue",
+      "line": 21,
+      "elementType": "span",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "cp-btn-exptime-plus": {
+      "component": "components/CapturePanel.vue",
+      "line": 29,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "cp-icon-exptime-plus": {
+      "component": "components/CapturePanel.vue",
+      "line": 31,
+      "elementType": "span",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "cp-btn-cfw-minus": {
+      "component": "components/CapturePanel.vue",
+      "line": 40,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "cp-icon-cfw-minus": {
+      "component": "components/CapturePanel.vue",
+      "line": 43,
+      "elementType": "span",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "cp-btn-cfw-plus": {
+      "component": "components/CapturePanel.vue",
+      "line": 52,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "cp-icon-cfw-plus": {
+      "component": "components/CapturePanel.vue",
+      "line": 55,
+      "elementType": "span",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "cp-exptime-value": {
+      "component": "components/CapturePanel.vue",
+      "line": 63,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "cp-cfw-display": {
+      "component": "components/CapturePanel.vue",
+      "line": 72,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "cp-cfw-moving-dots": {
+      "component": "components/CapturePanel.vue",
+      "line": 76,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "cp-cfw-moving-rotor": {
+      "component": "components/CapturePanel.vue",
+      "line": 77,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "cp-cfw-dot-0": {
+      "component": "components/CapturePanel.vue",
+      "line": 78,
+      "elementType": "span",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "cp-cfw-dot-1": {
+      "component": "components/CapturePanel.vue",
+      "line": 79,
+      "elementType": "span",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "cp-cfw-dot-2": {
+      "component": "components/CapturePanel.vue",
+      "line": 80,
+      "elementType": "span",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "cp-cfw-dot-3": {
+      "component": "components/CapturePanel.vue",
+      "line": 81,
+      "elementType": "span",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "cp-cfw-dot-4": {
+      "component": "components/CapturePanel.vue",
+      "line": 82,
+      "elementType": "span",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "cp-cfw-dot-5": {
+      "component": "components/CapturePanel.vue",
+      "line": 83,
+      "elementType": "span",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "cp-cfw-dot-6": {
+      "component": "components/CapturePanel.vue",
+      "line": 84,
+      "elementType": "span",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "cp-cfw-dot-7": {
+      "component": "components/CapturePanel.vue",
+      "line": 85,
+      "elementType": "span",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "cp-cfw-value": {
+      "component": "components/CapturePanel.vue",
+      "line": 92,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "cp-capture": {
+      "component": "components/CapturePanel.vue",
+      "line": 100,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "cp-btn-capture": {
+      "component": "components/CapturePanel.vue",
+      "line": 101,
+      "elementType": "CircularProgressButton",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "cp-secondary-panels": {
+      "component": "components/CapturePanel.vue",
+      "line": 104,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "cp-btn-toggle-focuser": {
+      "component": "components/CapturePanel.vue",
+      "line": 108,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "cp-btn-toggle-focuser-content": {
+      "component": "components/CapturePanel.vue",
+      "line": 110,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "cp-img-focuser": {
+      "component": "components/CapturePanel.vue",
+      "line": 115,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "cp-btn-toggle-histogram": {
+      "component": "components/CapturePanel.vue",
+      "line": 123,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "cp-btn-toggle-histogram-content": {
+      "component": "components/CapturePanel.vue",
+      "line": 125,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "cp-img-histogram": {
+      "component": "components/CapturePanel.vue",
+      "line": 130,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "cp-status": {
+      "component": "components/CapturePanel.vue",
+      "line": 137,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "cp-status-icon": {
+      "component": "components/CapturePanel.vue",
+      "line": 140,
+      "elementType": "span",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "cp-status-icon-content": {
+      "component": "components/CapturePanel.vue",
+      "line": 141,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "cp-img-status": {
+      "component": "components/CapturePanel.vue",
+      "line": 146,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "cp-save": {
+      "component": "components/CapturePanel.vue",
+      "line": 152,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "cp-btn-save": {
+      "component": "components/CapturePanel.vue",
+      "line": 153,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "cp-btn-save-content": {
+      "component": "components/CapturePanel.vue",
+      "line": 154,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "cp-img-save": {
+      "component": "components/CapturePanel.vue",
+      "line": 159,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-chart-focus-root": {
+      "component": "components/Chart-Focus.vue",
+      "line": 2,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-components-chart-focus-act-start-drag": {
+      "component": "components/Chart-Focus.vue",
+      "line": 13,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-chart-focus-btn-close-panel": {
+      "component": "components/Chart-Focus.vue",
+      "line": 24,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-chart-focus-image-root": {
+      "component": "components/Chart-FocusImage.vue",
+      "line": 2,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-chart-histogram-root": {
+      "component": "components/Chart-Histogram.vue",
+      "line": 2,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-chart-line-root": {
+      "component": "components/Chart-Line.vue",
+      "line": 2,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-chart-scatter-root": {
+      "component": "components/Chart-Scatter.vue",
+      "line": 2,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-chart-scatter-btn-clear-chart-data": {
+      "component": "components/Chart-Scatter.vue",
+      "line": 4,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-chart-component-root": {
+      "component": "components/ChartComponent.vue",
+      "line": 3,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-chart-component-btn-loop-exp-switch": {
+      "component": "components/ChartComponent.vue",
+      "line": 14,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-chart-component-btn-start-press": {
+      "component": "components/ChartComponent.vue",
+      "line": 25,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-chart-component-btn-exp-time-switch": {
+      "component": "components/ChartComponent.vue",
+      "line": 31,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-chart-component-btn-data-clear": {
+      "component": "components/ChartComponent.vue",
+      "line": 49,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-chart-component-btn-range-switch": {
+      "component": "components/ChartComponent.vue",
+      "line": 55,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-circular-button-root": {
+      "component": "components/CircularButton.vue",
+      "line": 2,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-components-circular-button-act-handle-mouse-down": {
+      "component": "components/CircularButton.vue",
+      "line": 11,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "dap-root": {
+      "component": "components/DeviceAllocationPanel.vue",
+      "line": 8,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "dap-act-selected-device-name": {
+      "component": "components/DeviceAllocationPanel.vue",
+      "line": 12,
+      "elementType": "li",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "dap-act-selected-device-name-2": {
+      "component": "components/DeviceAllocationPanel.vue",
+      "line": 28,
+      "elementType": "li",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "dap-act-close-panel": {
+      "component": "components/DeviceAllocationPanel.vue",
+      "line": 35,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "dp-picker": {
+      "component": "components/DevicePicker.vue",
+      "line": 5,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "dp-device-type": {
+      "component": "components/DevicePicker.vue",
+      "line": 9,
+      "elementType": "span",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "dp-device-name": {
+      "component": "components/DevicePicker.vue",
+      "line": 11,
+      "elementType": "span",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "dp-btn-toggle-bind": {
+      "component": "components/DevicePicker.vue",
+      "line": 20,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-dial-knob-root": {
+      "component": "components/Dial-Knob.vue",
+      "line": 2,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-components-dial-knob-act-start-drag": {
+      "component": "components/Dial-Knob.vue",
+      "line": 3,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-components-dial-knob-act-start-second-drag": {
+      "component": "components/Dial-Knob.vue",
+      "line": 4,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "fp-root": {
+      "component": "components/FocuserPanel.vue",
+      "line": 4,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "fp-buttons-container": {
+      "component": "components/FocuserPanel.vue",
+      "line": 8,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "fp-btn-start-calibration": {
+      "component": "components/FocuserPanel.vue",
+      "line": 10,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "fp-btn-toggle-loop-shooting": {
+      "component": "components/FocuserPanel.vue",
+      "line": 22,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "fp-btn-speed-change": {
+      "component": "components/FocuserPanel.vue",
+      "line": 30,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "fp-btn-speed-change-2": {
+      "component": "components/FocuserPanel.vue",
+      "line": 31,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "fp-btn-roichange": {
+      "component": "components/FocuserPanel.vue",
+      "line": 52,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "fp-btn-focus-left-move": {
+      "component": "components/FocuserPanel.vue",
+      "line": 73,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "fp-btn-focus-move": {
+      "component": "components/FocuserPanel.vue",
+      "line": 79,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "fp-btn-auto-focus": {
+      "component": "components/FocuserPanel.vue",
+      "line": 86,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "fp-btn-auto-focus-2": {
+      "component": "components/FocuserPanel.vue",
+      "line": 87,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "fp-btn-focus-goto": {
+      "component": "components/FocuserPanel.vue",
+      "line": 102,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "fp-btn-focus-right-move": {
+      "component": "components/FocuserPanel.vue",
+      "line": 108,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "fp-btn-focus-move-2": {
+      "component": "components/FocuserPanel.vue",
+      "line": 116,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "fp-state-current": {
+      "component": "components/FocuserPanel.vue",
+      "line": 134,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "hp-panel": {
+      "component": "components/HistogramPanel.vue",
+      "line": 13,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "hp-chart": {
+      "component": "components/HistogramPanel.vue",
+      "line": 15,
+      "elementType": "HistogramChart",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "hp-dial-knob": {
+      "component": "components/HistogramPanel.vue",
+      "line": 16,
+      "elementType": "DialKnob",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "hp-buttons-container": {
+      "component": "components/HistogramPanel.vue",
+      "line": 17,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "hp-btn-white-balance": {
+      "component": "components/HistogramPanel.vue",
+      "line": 18,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "hp-img-white-balance": {
+      "component": "components/HistogramPanel.vue",
+      "line": 20,
+      "elementType": "img",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "hp-btn-auto": {
+      "component": "components/HistogramPanel.vue",
+      "line": 24,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "hp-icon-auto": {
+      "component": "components/HistogramPanel.vue",
+      "line": 24,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "hp-btn-reset": {
+      "component": "components/HistogramPanel.vue",
+      "line": 26,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "hp-img-reset": {
+      "component": "components/HistogramPanel.vue",
+      "line": 28,
+      "elementType": "img",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "hp-btn-toggle-range": {
+      "component": "components/HistogramPanel.vue",
+      "line": 34,
+      "elementType": "unknown",
+      "hasDataState": true,
+      "dataState": "showEffectiveRange ? 'range' : 'full'"
+    },
+    "hp-range-label-range": {
+      "component": "components/HistogramPanel.vue",
+      "line": 35,
+      "elementType": "span",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "hp-range-label-full": {
+      "component": "components/HistogramPanel.vue",
+      "line": 36,
+      "elementType": "span",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "`ui-image-folder-root-${folderIndex}`": {
+      "component": "components/ImageFolder.vue",
+      "line": 7,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "`ui-image-folder-file-${folderIndex}-${index}`": {
+      "component": "components/ImageFolder.vue",
+      "line": 31,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-imagefolder-btn-delete-confirm": {
+      "component": "components/ImageFolder.vue",
+      "line": 45,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-imagefolder-btn-delete": {
+      "component": "components/ImageFolder.vue",
+      "line": 55,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "imp-root": {
+      "component": "components/ImageManagerPanel.vue",
+      "line": 6,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "imp-btn-move-file-to-usb": {
+      "component": "components/ImageManagerPanel.vue",
+      "line": 10,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "imp-btn-delete-folders": {
+      "component": "components/ImageManagerPanel.vue",
+      "line": 19,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "imp-btn-delete-btn-click": {
+      "component": "components/ImageManagerPanel.vue",
+      "line": 23,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "imp-btn-download-selected": {
+      "component": "components/ImageManagerPanel.vue",
+      "line": 34,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "imp-act-image-file-switch": {
+      "component": "components/ImageManagerPanel.vue",
+      "line": 38,
+      "elementType": "span",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "imp-btn-image-file-switch": {
+      "component": "components/ImageManagerPanel.vue",
+      "line": 40,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "imp-btn-panel-close": {
+      "component": "components/ImageManagerPanel.vue",
+      "line": 68,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "imp-act-close-usbselect-dialog": {
+      "component": "components/ImageManagerPanel.vue",
+      "line": 95,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "imp-act-usb-select-dialog": {
+      "component": "components/ImageManagerPanel.vue",
+      "line": 96,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "imp-btn-close-usbselect-dialog": {
+      "component": "components/ImageManagerPanel.vue",
+      "line": 99,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "imp-act-select-usb": {
+      "component": "components/ImageManagerPanel.vue",
+      "line": 109,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "imp-act-close-download-confirm-dialog": {
+      "component": "components/ImageManagerPanel.vue",
+      "line": 123,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "imp-act-usb-select-dialog-2": {
+      "component": "components/ImageManagerPanel.vue",
+      "line": 124,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "imp-btn-close-download-confirm-dialog": {
+      "component": "components/ImageManagerPanel.vue",
+      "line": 127,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "imp-select-download-concurrency": {
+      "component": "components/ImageManagerPanel.vue",
+      "line": 138,
+      "elementType": "select",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "imp-btn-close-download-confirm-dialog-2": {
+      "component": "components/ImageManagerPanel.vue",
+      "line": 148,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "imp-btn-confirm-start-download": {
+      "component": "components/ImageManagerPanel.vue",
+      "line": 149,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "imp-act-close-download-location-reminder-dialog": {
+      "component": "components/ImageManagerPanel.vue",
+      "line": 158,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "imp-act-download-location-reminder-dialog": {
+      "component": "components/ImageManagerPanel.vue",
+      "line": 159,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "imp-btn-close-download-location-reminder-dialog": {
+      "component": "components/ImageManagerPanel.vue",
+      "line": 162,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "imp-btn-cancel-download-location-reminder-dialog": {
+      "component": "components/ImageManagerPanel.vue",
+      "line": 175,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "imp-btn-continue-download-location-reminder-dialog": {
+      "component": "components/ImageManagerPanel.vue",
+      "line": 176,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "imp-btn-toggle-download-panel": {
+      "component": "components/ImageManagerPanel.vue",
+      "line": 191,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "imp-btn-cancel-all-downloads": {
+      "component": "components/ImageManagerPanel.vue",
+      "line": 194,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "imp-select-download-concurrency-2": {
+      "component": "components/ImageManagerPanel.vue",
+      "line": 196,
+      "elementType": "select",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "imp-btn-pause-download": {
+      "component": "components/ImageManagerPanel.vue",
+      "line": 213,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "imp-btn-resume-download": {
+      "component": "components/ImageManagerPanel.vue",
+      "line": 221,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "imp-btn-cancel-download": {
+      "component": "components/ImageManagerPanel.vue",
+      "line": 229,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "imp-btn-auto": {
+      "component": "components/ImageManagerPanel.vue",
+      "line": 249,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-location-focal-inputs-root": {
+      "component": "components/LocationFocalInputs.vue",
+      "line": 2,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-components-location-focal-inputs-act-expand-inputs": {
+      "component": "components/LocationFocalInputs.vue",
+      "line": 4,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-location-focal-inputs-input-t": {
+      "component": "components/LocationFocalInputs.vue",
+      "line": 29,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-location-focal-inputs-input-t-2": {
+      "component": "components/LocationFocalInputs.vue",
+      "line": 44,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-location-focal-inputs-input-t-3": {
+      "component": "components/LocationFocalInputs.vue",
+      "line": 59,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-location-focal-inputs-btn-collapse-inputs": {
+      "component": "components/LocationFocalInputs.vue",
+      "line": 60,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-components-location-focal-inputs-act-handle-keyboard-input": {
+      "component": "components/LocationFocalInputs.vue",
+      "line": 76,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-meridian-flip-notifier-root": {
+      "component": "components/MeridianFlipNotifier.vue",
+      "line": 2,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-meridian-flip-notifier-btn-select-mode": {
+      "component": "components/MeridianFlipNotifier.vue",
+      "line": 9,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-meridian-flip-notifier-btn-select-mode-2": {
+      "component": "components/MeridianFlipNotifier.vue",
+      "line": 10,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-meridian-flip-notifier-btn-trigger-flip-now": {
+      "component": "components/MeridianFlipNotifier.vue",
+      "line": 11,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-meridian-flip-notifier-btn-close-banner": {
+      "component": "components/MeridianFlipNotifier.vue",
+      "line": 13,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-components-meridian-flip-notifier-act-close-center": {
+      "component": "components/MeridianFlipNotifier.vue",
+      "line": 21,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-meridian-flip-notifier-btn-select-mode-3": {
+      "component": "components/MeridianFlipNotifier.vue",
+      "line": 26,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-meridian-flip-notifier-btn-select-mode-4": {
+      "component": "components/MeridianFlipNotifier.vue",
+      "line": 27,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-meridian-flip-notifier-btn-trigger-flip-now-2": {
+      "component": "components/MeridianFlipNotifier.vue",
+      "line": 28,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-meridian-flip-notifier-btn-close-center": {
+      "component": "components/MeridianFlipNotifier.vue",
+      "line": 29,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-meridian-flip-notifier-btn-select-mode-5": {
+      "component": "components/MeridianFlipNotifier.vue",
+      "line": 51,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-meridian-flip-notifier-btn-select-mode-6": {
+      "component": "components/MeridianFlipNotifier.vue",
+      "line": 53,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-meridian-flip-notifier-btn-trigger-flip-now-3": {
+      "component": "components/MeridianFlipNotifier.vue",
+      "line": 54,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-meridian-flip-notifier-btn-close-mini": {
+      "component": "components/MeridianFlipNotifier.vue",
+      "line": 55,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-message-box-root": {
+      "component": "components/MessageBox.vue",
+      "line": 4,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "mcp-panel": {
+      "component": "components/MountControlPanel.vue",
+      "line": 5,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "mcp-display": {
+      "component": "components/MountControlPanel.vue",
+      "line": 6,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "mcp-combined-text": {
+      "component": "components/MountControlPanel.vue",
+      "line": 8,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "mcp-pier-side-text": {
+      "component": "components/MountControlPanel.vue",
+      "line": 9,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "mcp-separator": {
+      "component": "components/MountControlPanel.vue",
+      "line": 10,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "mcp-radec-text": {
+      "component": "components/MountControlPanel.vue",
+      "line": 11,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "mcp-value-ra": {
+      "component": "components/MountControlPanel.vue",
+      "line": 12,
+      "elementType": "span",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "mcp-value-dec": {
+      "component": "components/MountControlPanel.vue",
+      "line": 13,
+      "elementType": "span",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "mcp-direction-controls": {
+      "component": "components/MountControlPanel.vue",
+      "line": 18,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "mcp-btn-ra-plus": {
+      "component": "components/MountControlPanel.vue",
+      "line": 20,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "mcp-img-ra-plus": {
+      "component": "components/MountControlPanel.vue",
+      "line": 23,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "mcp-btn-ra-minus": {
+      "component": "components/MountControlPanel.vue",
+      "line": 27,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "mcp-img-ra-minus": {
+      "component": "components/MountControlPanel.vue",
+      "line": 30,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "mcp-btn-dec-plus": {
+      "component": "components/MountControlPanel.vue",
+      "line": 34,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "mcp-img-dec-plus": {
+      "component": "components/MountControlPanel.vue",
+      "line": 37,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "mcp-btn-dec-minus": {
+      "component": "components/MountControlPanel.vue",
+      "line": 41,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "mcp-img-dec-minus": {
+      "component": "components/MountControlPanel.vue",
+      "line": 44,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "mcp-stop-container": {
+      "component": "components/MountControlPanel.vue",
+      "line": 49,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "mcp-btn-stop": {
+      "component": "components/MountControlPanel.vue",
+      "line": 50,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "mcp-icon-stop": {
+      "component": "components/MountControlPanel.vue",
+      "line": 50,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "mcp-speed-container": {
+      "component": "components/MountControlPanel.vue",
+      "line": 53,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "mcp-btn-speed": {
+      "component": "components/MountControlPanel.vue",
+      "line": 54,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "mcp-speed-value": {
+      "component": "components/MountControlPanel.vue",
+      "line": 55,
+      "elementType": "span",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "mcp-img-speed": {
+      "component": "components/MountControlPanel.vue",
+      "line": 59,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "mcp-function-buttons": {
+      "component": "components/MountControlPanel.vue",
+      "line": 64,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "mcp-btn-park": {
+      "component": "components/MountControlPanel.vue",
+      "line": 66,
+      "elementType": "unknown",
+      "hasDataState": true,
+      "dataState": "ParkSwitch ? 'on' : 'off'"
+    },
+    "mcp-img-park": {
+      "component": "components/MountControlPanel.vue",
+      "line": 69,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "mcp-btn-track": {
+      "component": "components/MountControlPanel.vue",
+      "line": 73,
+      "elementType": "v",
+      "hasDataState": true,
+      "dataState": "TrackSwitch ? 'on' : 'off'"
+    },
+    "mcp-icon-track": {
+      "component": "components/MountControlPanel.vue",
+      "line": 73,
+      "elementType": "v",
+      "hasDataState": true,
+      "dataState": "TrackSwitch ? 'on' : 'off'"
+    },
+    "mcp-btn-home": {
+      "component": "components/MountControlPanel.vue",
+      "line": 75,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "mcp-img-home": {
+      "component": "components/MountControlPanel.vue",
+      "line": 78,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "mcp-btn-sync": {
+      "component": "components/MountControlPanel.vue",
+      "line": 82,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "mcp-img-sync": {
+      "component": "components/MountControlPanel.vue",
+      "line": 85,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "mcp-btn-solve": {
+      "component": "components/MountControlPanel.vue",
+      "line": 90,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "mcp-img-solve": {
+      "component": "components/MountControlPanel.vue",
+      "line": 93,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "mcp-status": {
+      "component": "components/MountControlPanel.vue",
+      "line": 98,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "mcp-status-indicator-idle": {
+      "component": "components/MountControlPanel.vue",
+      "line": 99,
+      "elementType": "span",
+      "hasDataState": true,
+      "dataState": "idle"
+    },
+    "mcp-img-status-idle": {
+      "component": "components/MountControlPanel.vue",
+      "line": 102,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "mcp-status-indicator-busy": {
+      "component": "components/MountControlPanel.vue",
+      "line": 105,
+      "elementType": "span",
+      "hasDataState": true,
+      "dataState": "busy"
+    },
+    "mcp-img-status-busy": {
+      "component": "components/MountControlPanel.vue",
+      "line": 108,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "mcp-close-container": {
+      "component": "components/MountControlPanel.vue",
+      "line": 113,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "mcp-btn-close": {
+      "component": "components/MountControlPanel.vue",
+      "line": 114,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "mcp-img-close": {
+      "component": "components/MountControlPanel.vue",
+      "line": 117,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-number-keyboard-root": {
+      "component": "components/NumberKeyboard.vue",
+      "line": 3,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-components-number-keyboard-act-handle-drag-start": {
+      "component": "components/NumberKeyboard.vue",
+      "line": 10,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-components-number-keyboard-act-keyboard-header": {
+      "component": "components/NumberKeyboard.vue",
+      "line": 11,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-number-keyboard-btn-handle-close": {
+      "component": "components/NumberKeyboard.vue",
+      "line": 18,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-number-keyboard-btn-handle-key-press": {
+      "component": "components/NumberKeyboard.vue",
+      "line": 35,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-polar-alignment-info-panel-root": {
+      "component": "components/PolarAlignmentInfoPanel.vue",
+      "line": 2,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-progress-bar-root": {
+      "component": "components/ProgressBar.vue",
+      "line": 5,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-rpi-hotspot-root": {
+      "component": "components/RPI-Hotspot.vue",
+      "line": 3,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-rpi-hotspot-input-input-text": {
+      "component": "components/RPI-Hotspot.vue",
+      "line": 4,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-rpi-hotspot-btn-update-hotspot-name": {
+      "component": "components/RPI-Hotspot.vue",
+      "line": 8,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-rpi-hotspot-btn-save-btn-click": {
+      "component": "components/RPI-Hotspot.vue",
+      "line": 12,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-rpi-hotspot-btn-redo-hotspot-name": {
+      "component": "components/RPI-Hotspot.vue",
+      "line": 23,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-ra-dec-dialog-root": {
+      "component": "components/RaDecDialog.vue",
+      "line": 10,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-ra-dec-dialog-input-ra-str": {
+      "component": "components/RaDecDialog.vue",
+      "line": 32,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-ra-dec-dialog-btn-auto": {
+      "component": "components/RaDecDialog.vue",
+      "line": 40,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-ra-dec-dialog-btn-auto-2": {
+      "component": "components/RaDecDialog.vue",
+      "line": 41,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-ra-dec-dialog-input-dec-str": {
+      "component": "components/RaDecDialog.vue",
+      "line": 59,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-ra-dec-dialog-btn-on-cancel": {
+      "component": "components/RaDecDialog.vue",
+      "line": 69,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-ra-dec-dialog-btn-on-ok": {
+      "component": "components/RaDecDialog.vue",
+      "line": 70,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-red-box-root": {
+      "component": "components/Red-Box.vue",
+      "line": 2,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-components-red-box-act-start-drag": {
+      "component": "components/Red-Box.vue",
+      "line": 3,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "scp-root": {
+      "component": "components/SchedulePanel.vue",
+      "line": 5,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "scp-btn-toggle-left-toolbar": {
+      "component": "components/SchedulePanel.vue",
+      "line": 15,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "scp-btn-add-row": {
+      "component": "components/SchedulePanel.vue",
+      "line": 22,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "scp-btn-delete-selected-row": {
+      "component": "components/SchedulePanel.vue",
+      "line": 31,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "scp-btn-toggle-schedule": {
+      "component": "components/SchedulePanel.vue",
+      "line": 39,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "scp-btn-open-save-preset-dialog": {
+      "component": "components/SchedulePanel.vue",
+      "line": 50,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "scp-btn-open-load-preset-dialog": {
+      "component": "components/SchedulePanel.vue",
+      "line": 55,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "scp-btn-close-panel": {
+      "component": "components/SchedulePanel.vue",
+      "line": 67,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "scp-act-select-cell": {
+      "component": "components/SchedulePanel.vue",
+      "line": 114,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "scp-editor-clock-now": {
+      "component": "components/SchedulePanel.vue",
+      "line": 268,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "scp-editor-clock-hour": {
+      "component": "components/SchedulePanel.vue",
+      "line": 289,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "scp-editor-clock-minute": {
+      "component": "components/SchedulePanel.vue",
+      "line": 313,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "scp-editor-exposure-preset": {
+      "component": "components/SchedulePanel.vue",
+      "line": 339,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "`scp-editor-filter-pill-${idx}`": {
+      "component": "components/SchedulePanel.vue",
+      "line": 375,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "`scp-editor-type-pill-${idx}`": {
+      "component": "components/SchedulePanel.vue",
+      "line": 396,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "`scp-editor-refocus-pill-${idx}`": {
+      "component": "components/SchedulePanel.vue",
+      "line": 417,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "scp-editor-reps-value": {
+      "component": "components/SchedulePanel.vue",
+      "line": 428,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "scp-editor-target-input": {
+      "component": "components/SchedulePanel.vue",
+      "line": 441,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "scp-editor-target-cycle-prefix": {
+      "component": "components/SchedulePanel.vue",
+      "line": 445,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "scp-editor-target-search-center": {
+      "component": "components/SchedulePanel.vue",
+      "line": 448,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "scp-editor-target-use-selected-object": {
+      "component": "components/SchedulePanel.vue",
+      "line": 452,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "scp-editor-target-current-position": {
+      "component": "components/SchedulePanel.vue",
+      "line": 460,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "scp-editor-coordinate-ra": {
+      "component": "components/SchedulePanel.vue",
+      "line": 477,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "scp-editor-coordinate-dec": {
+      "component": "components/SchedulePanel.vue",
+      "line": 487,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "`scp-keypad-key-${k}`": {
+      "component": "components/SchedulePanel.vue",
+      "line": 534,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "scp-keypad-unit-toggle": {
+      "component": "components/SchedulePanel.vue",
+      "line": 544,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "scp-preset-dialog-root": {
+      "component": "components/SchedulePanel.vue",
+      "line": 561,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "scp-preset-btn-close": {
+      "component": "components/SchedulePanel.vue",
+      "line": 573,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "scp-preset-list": {
+      "component": "components/SchedulePanel.vue",
+      "line": 580,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "scp-preset-item": {
+      "component": "components/SchedulePanel.vue",
+      "line": 587,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "scp-preset-empty": {
+      "component": "components/SchedulePanel.vue",
+      "line": 592,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "scp-preset-input-name": {
+      "component": "components/SchedulePanel.vue",
+      "line": 602,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "scp-preset-btn-save": {
+      "component": "components/SchedulePanel.vue",
+      "line": 612,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "scp-preset-btn-delete": {
+      "component": "components/SchedulePanel.vue",
+      "line": 622,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "scp-preset-btn-ok": {
+      "component": "components/SchedulePanel.vue",
+      "line": 630,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-cfw-root": {
+      "component": "components/Settings-Dialog-CFW.vue",
+      "line": 2,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-cfw-btn-switch-page": {
+      "component": "components/Settings-Dialog-CFW.vue",
+      "line": 7,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-cfw-select-selected-driver": {
+      "component": "components/Settings-Dialog-CFW.vue",
+      "line": 13,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-cfw-btn-confirm-driver": {
+      "component": "components/Settings-Dialog-CFW.vue",
+      "line": 15,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-cfw-btn-connect-indi-server": {
+      "component": "components/Settings-Dialog-CFW.vue",
+      "line": 16,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-cfw-select-selected-device": {
+      "component": "components/Settings-Dialog-CFW.vue",
+      "line": 17,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-cfw-btn-confirm-device": {
+      "component": "components/Settings-Dialog-CFW.vue",
+      "line": 19,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-cfw-input-value": {
+      "component": "components/Settings-Dialog-CFW.vue",
+      "line": 25,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-cfw-btn-confirm-configuration": {
+      "component": "components/Settings-Dialog-CFW.vue",
+      "line": 26,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-cfw-btn-close-dialog": {
+      "component": "components/Settings-Dialog-CFW.vue",
+      "line": 32,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-focuser-root": {
+      "component": "components/Settings-Dialog-Focuser.vue",
+      "line": 2,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-focuser-btn-switch-page": {
+      "component": "components/Settings-Dialog-Focuser.vue",
+      "line": 7,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-focuser-select-selected-driver": {
+      "component": "components/Settings-Dialog-Focuser.vue",
+      "line": 13,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-focuser-btn-confirm-driver": {
+      "component": "components/Settings-Dialog-Focuser.vue",
+      "line": 15,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-focuser-btn-connect-indi-server": {
+      "component": "components/Settings-Dialog-Focuser.vue",
+      "line": 16,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-focuser-select-selected-device": {
+      "component": "components/Settings-Dialog-Focuser.vue",
+      "line": 17,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-focuser-btn-confirm-device": {
+      "component": "components/Settings-Dialog-Focuser.vue",
+      "line": 19,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-focuser-input-value": {
+      "component": "components/Settings-Dialog-Focuser.vue",
+      "line": 25,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-focuser-btn-confirm-configuration": {
+      "component": "components/Settings-Dialog-Focuser.vue",
+      "line": 26,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-focuser-btn-close-dialog": {
+      "component": "components/Settings-Dialog-Focuser.vue",
+      "line": 32,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-guider-root": {
+      "component": "components/Settings-Dialog-Guider.vue",
+      "line": 2,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-guider-btn-switch-page": {
+      "component": "components/Settings-Dialog-Guider.vue",
+      "line": 7,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-guider-select-selected-driver": {
+      "component": "components/Settings-Dialog-Guider.vue",
+      "line": 13,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-guider-btn-confirm-driver": {
+      "component": "components/Settings-Dialog-Guider.vue",
+      "line": 15,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-guider-btn-connect-indi-server": {
+      "component": "components/Settings-Dialog-Guider.vue",
+      "line": 16,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-guider-select-selected-device": {
+      "component": "components/Settings-Dialog-Guider.vue",
+      "line": 17,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-guider-btn-confirm-device": {
+      "component": "components/Settings-Dialog-Guider.vue",
+      "line": 19,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-guider-btn-clear-calibration-data": {
+      "component": "components/Settings-Dialog-Guider.vue",
+      "line": 24,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-guider-input-value": {
+      "component": "components/Settings-Dialog-Guider.vue",
+      "line": 26,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-guider-btn-confirm-configuration": {
+      "component": "components/Settings-Dialog-Guider.vue",
+      "line": 27,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-guider-btn-close-dialog": {
+      "component": "components/Settings-Dialog-Guider.vue",
+      "line": 33,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-main-camera-root": {
+      "component": "components/Settings-Dialog-MainCamera.vue",
+      "line": 2,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-main-camera-btn-switch-page": {
+      "component": "components/Settings-Dialog-MainCamera.vue",
+      "line": 7,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-main-camera-select-selected-driver": {
+      "component": "components/Settings-Dialog-MainCamera.vue",
+      "line": 13,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-main-camera-btn-confirm-driver": {
+      "component": "components/Settings-Dialog-MainCamera.vue",
+      "line": 15,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-main-camera-btn-connect-indi-server": {
+      "component": "components/Settings-Dialog-MainCamera.vue",
+      "line": 16,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-main-camera-select-selected-device": {
+      "component": "components/Settings-Dialog-MainCamera.vue",
+      "line": 17,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-main-camera-btn-confirm-device": {
+      "component": "components/Settings-Dialog-MainCamera.vue",
+      "line": 19,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-main-camera-input-value": {
+      "component": "components/Settings-Dialog-MainCamera.vue",
+      "line": 25,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-main-camera-btn-confirm-configuration": {
+      "component": "components/Settings-Dialog-MainCamera.vue",
+      "line": 26,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-main-camera-btn-close-dialog": {
+      "component": "components/Settings-Dialog-MainCamera.vue",
+      "line": 32,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-mount-root": {
+      "component": "components/Settings-Dialog-Mount.vue",
+      "line": 2,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-mount-btn-switch-page": {
+      "component": "components/Settings-Dialog-Mount.vue",
+      "line": 7,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-mount-select-selected-driver": {
+      "component": "components/Settings-Dialog-Mount.vue",
+      "line": 13,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-mount-btn-confirm-driver": {
+      "component": "components/Settings-Dialog-Mount.vue",
+      "line": 15,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-mount-btn-connect-indi-server": {
+      "component": "components/Settings-Dialog-Mount.vue",
+      "line": 16,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-mount-select-selected-device": {
+      "component": "components/Settings-Dialog-Mount.vue",
+      "line": 17,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-mount-btn-confirm-device": {
+      "component": "components/Settings-Dialog-Mount.vue",
+      "line": 19,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-mount-input-value": {
+      "component": "components/Settings-Dialog-Mount.vue",
+      "line": 25,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-mount-btn-confirm-configuration": {
+      "component": "components/Settings-Dialog-Mount.vue",
+      "line": 26,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-mount-btn-close-dialog": {
+      "component": "components/Settings-Dialog-Mount.vue",
+      "line": 32,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-pole-camera-root": {
+      "component": "components/Settings-Dialog-PoleCamera.vue",
+      "line": 2,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-pole-camera-select-selected-driver": {
+      "component": "components/Settings-Dialog-PoleCamera.vue",
+      "line": 10,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-pole-camera-btn-confirm-driver": {
+      "component": "components/Settings-Dialog-PoleCamera.vue",
+      "line": 12,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-pole-camera-btn-connect-indi-server": {
+      "component": "components/Settings-Dialog-PoleCamera.vue",
+      "line": 13,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-pole-camera-select-selected-device": {
+      "component": "components/Settings-Dialog-PoleCamera.vue",
+      "line": 14,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-pole-camera-btn-confirm-device": {
+      "component": "components/Settings-Dialog-PoleCamera.vue",
+      "line": 16,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-settings-dialog-pole-camera-btn-close-dialog": {
+      "component": "components/Settings-Dialog-PoleCamera.vue",
+      "line": 25,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-usbfiles-dialog-root": {
+      "component": "components/USBFilesDialog.vue",
+      "line": 2,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-usbfiles-dialog-btn-navigate-up": {
+      "component": "components/USBFilesDialog.vue",
+      "line": 18,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-components-usbfiles-dialog-act-handle-item-click": {
+      "component": "components/USBFilesDialog.vue",
+      "line": 31,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-usbfiles-dialog-btn-blue-text": {
+      "component": "components/USBFilesDialog.vue",
+      "line": 52,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-update-progress-dialog-root": {
+      "component": "components/UpdateProgressDialog.vue",
+      "line": 2,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-components-update-progress-dialog-act-update-dialog": {
+      "component": "components/UpdateProgressDialog.vue",
+      "line": 3,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-update-progress-dialog-btn-toggle-log-expand": {
+      "component": "components/UpdateProgressDialog.vue",
+      "line": 25,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-update-progress-dialog-btn-close-dialog": {
+      "component": "components/UpdateProgressDialog.vue",
+      "line": 43,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-update-progress-dialog-btn-retry-update": {
+      "component": "components/UpdateProgressDialog.vue",
+      "line": 44,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "bb-btnbar": {
+      "component": "components/bottom-bar.vue",
+      "line": 13,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "bb-spacer-left": {
+      "component": "components/bottom-bar.vue",
+      "line": 16,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "bb-btn-constellations-lines": {
+      "component": "components/bottom-bar.vue",
+      "line": 19,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "bb-btn-constellations-art": {
+      "component": "components/bottom-bar.vue",
+      "line": 31,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "bb-btn-atmosphere": {
+      "component": "components/bottom-bar.vue",
+      "line": 43,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "bb-btn-landscape": {
+      "component": "components/bottom-bar.vue",
+      "line": 55,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "bb-btn-grid-azimuthal": {
+      "component": "components/bottom-bar.vue",
+      "line": 67,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "bb-btn-grid-equatorial-jnow": {
+      "component": "components/bottom-bar.vue",
+      "line": 79,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "bb-btn-grid-equatorial-j2000": {
+      "component": "components/bottom-bar.vue",
+      "line": 91,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "bb-btn-dsos": {
+      "component": "components/bottom-bar.vue",
+      "line": 103,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "bb-spacer-right": {
+      "component": "components/bottom-bar.vue",
+      "line": 115,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-bottom-button-root": {
+      "component": "components/bottom-button.vue",
+      "line": 10,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-data-credits-dialog-root": {
+      "component": "components/data-credits-dialog.vue",
+      "line": 14,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-data-credits-dialog-btn-blue-text": {
+      "component": "components/data-credits-dialog.vue",
+      "line": 152,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-date-time-picker-root": {
+      "component": "components/date-time-picker.vue",
+      "line": 10,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-date-time-picker-btn-inc-time": {
+      "component": "components/date-time-picker.vue",
+      "line": 14,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-date-time-picker-btn-inc-time-2": {
+      "component": "components/date-time-picker.vue",
+      "line": 15,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-date-time-picker-btn-inc-time-3": {
+      "component": "components/date-time-picker.vue",
+      "line": 16,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-date-time-picker-btn-dec-time": {
+      "component": "components/date-time-picker.vue",
+      "line": 18,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-date-time-picker-btn-dec-time-2": {
+      "component": "components/date-time-picker.vue",
+      "line": 19,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-date-time-picker-btn-dec-time-3": {
+      "component": "components/date-time-picker.vue",
+      "line": 20,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-date-time-picker-btn-reset-time": {
+      "component": "components/date-time-picker.vue",
+      "line": 26,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-gui-loader-root": {
+      "component": "components/gui-loader.vue",
+      "line": 11,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "gui-root": {
+      "component": "components/gui.vue",
+      "line": 11,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "gui-btn-toggle-image-manager-panel": {
+      "component": "components/gui.vue",
+      "line": 43,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "gui-btn-recalibrate-polar-axis": {
+      "component": "components/gui.vue",
+      "line": 49,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "gui-btn-single-solve-image": {
+      "component": "components/gui.vue",
+      "line": 59,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "gui-btn-loop-solve-image": {
+      "component": "components/gui.vue",
+      "line": 77,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "gui-btn-toggle-mount-panel": {
+      "component": "components/gui.vue",
+      "line": 91,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "gui-btn-switch-main-page": {
+      "component": "components/gui.vue",
+      "line": 126,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "gui-btn-toggle-charts-panel": {
+      "component": "components/gui.vue",
+      "line": 155,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "gui-btn-quit-polar-axis-mode": {
+      "component": "components/gui.vue",
+      "line": 174,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "gui-btn-hide-capture-ui": {
+      "component": "components/gui.vue",
+      "line": 191,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "gui-btn-show-capture-ui": {
+      "component": "components/gui.vue",
+      "line": 203,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "gui-btn-get-original-image": {
+      "component": "components/gui.vue",
+      "line": 215,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "gui-btn-scale-plus": {
+      "component": "components/gui.vue",
+      "line": 234,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "gui-btn-scale-minus": {
+      "component": "components/gui.vue",
+      "line": 246,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-confirm-dialog-root": {
+      "component": "components/gui.vue",
+      "line": 306,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-confirm-dialog-btn-close": {
+      "component": "components/gui.vue",
+      "line": 323,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-confirm-dialog-btn-autofocus-coarse": {
+      "component": "components/gui.vue",
+      "line": 344,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-confirm-dialog-btn-autofocus-fine": {
+      "component": "components/gui.vue",
+      "line": 351,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-confirm-dialog-btn-cancel": {
+      "component": "components/gui.vue",
+      "line": 362,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-confirm-dialog-btn-confirm": {
+      "component": "components/gui.vue",
+      "line": 369,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "gui-dslr-btn-toggle-tips": {
+      "component": "components/gui.vue",
+      "line": 413,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "gui-dslr-btn-confirm": {
+      "component": "components/gui.vue",
+      "line": 421,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-indi-debug-dialog-root": {
+      "component": "components/indiDebugDialog.vue",
+      "line": 6,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-indi-debug-dialog-btn-scroll-to-bottom": {
+      "component": "components/indiDebugDialog.vue",
+      "line": 15,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-indi-debug-dialog-btn-clear-messages": {
+      "component": "components/indiDebugDialog.vue",
+      "line": 19,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-indi-debug-dialog-btn-save-messages": {
+      "component": "components/indiDebugDialog.vue",
+      "line": 25,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-indi-debug-dialog-btn-toggle-error-debug": {
+      "component": "components/indiDebugDialog.vue",
+      "line": 31,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-indi-debug-dialog-btn-toggle-server-debug": {
+      "component": "components/indiDebugDialog.vue",
+      "line": 44,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-indi-debug-dialog-btn-toggle-client-debug": {
+      "component": "components/indiDebugDialog.vue",
+      "line": 57,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-indi-debug-dialog-btn-close": {
+      "component": "components/indiDebugDialog.vue",
+      "line": 70,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-location-dialog-root": {
+      "component": "components/location-dialog.vue",
+      "line": 13,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-location-dialog-input-latitude": {
+      "component": "components/location-dialog.vue",
+      "line": 30,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-location-dialog-input-longitude": {
+      "component": "components/location-dialog.vue",
+      "line": 44,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-location-dialog-btn-save-manual-coordinates": {
+      "component": "components/location-dialog.vue",
+      "line": 48,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-location-dialog-switch-handle-auto-location-change": {
+      "component": "components/location-dialog.vue",
+      "line": 52,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-components-location-dialog-act-handle-keyboard-input": {
+      "component": "components/location-dialog.vue",
+      "line": 66,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-location-mgr-root": {
+      "component": "components/location-mgr.vue",
+      "line": 51,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-components-location-mgr-act-select-known-location": {
+      "component": "components/location-mgr.vue",
+      "line": 56,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-location-mgr-switch-on-map-type-toggle": {
+      "component": "components/location-mgr.vue",
+      "line": 105,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-observing-panel-root-toolbar-root": {
+      "component": "components/observing-panel-root-toolbar.vue",
+      "line": 11,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-observing-panel-root-toolbar-btn-auto": {
+      "component": "components/observing-panel-root-toolbar.vue",
+      "line": 12,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-observing-panel-root": {
+      "component": "components/observing-panel.vue",
+      "line": 11,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-observing-panel-btn-tab-bt": {
+      "component": "components/observing-panel.vue",
+      "line": 13,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-planets-visibility-root": {
+      "component": "components/planets-visibility.vue",
+      "line": 10,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-progress-bars-root": {
+      "component": "components/progress-bars.vue",
+      "line": 10,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-selected-object-info-root": {
+      "component": "components/selected-object-info.vue",
+      "line": 12,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-selected-object-info-btn-auto": {
+      "component": "components/selected-object-info.vue",
+      "line": 13,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-selected-object-info-btn-grey-text": {
+      "component": "components/selected-object-info.vue",
+      "line": 32,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-selected-object-info-action-buttons": {
+      "component": "components/selected-object-info.vue",
+      "line": 75,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-selected-object-info-btn-point-to": {
+      "component": "components/selected-object-info.vue",
+      "line": 82,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-selected-object-info-img-point-to": {
+      "component": "components/selected-object-info.vue",
+      "line": 88,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-selected-object-info-btn-goto": {
+      "component": "components/selected-object-info.vue",
+      "line": 102,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-selected-object-info-img-goto": {
+      "component": "components/selected-object-info.vue",
+      "line": 108,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-skysource-search-root": {
+      "component": "components/skysource-search.vue",
+      "line": 10,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-skysource-search-input-search-field": {
+      "component": "components/skysource-search.vue",
+      "line": 11,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-components-skysource-search-act-source-clicked": {
+      "component": "components/skysource-search.vue",
+      "line": 13,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-target-search-root": {
+      "component": "components/target-search.vue",
+      "line": 10,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "tb-root": {
+      "component": "components/toolbar.vue",
+      "line": 10,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "tb-act-toggle-navigation-drawer": {
+      "component": "components/toolbar.vue",
+      "line": 12,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "tb-btn-transparent": {
+      "component": "components/toolbar.vue",
+      "line": 40,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "tb-btn-timer-pick-btn": {
+      "component": "components/toolbar.vue",
+      "line": 43,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "tb-btn-toggle-schedule-panel": {
+      "component": "components/toolbar.vue",
+      "line": 179,
+      "elementType": "button",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-view-settings-dialog-root": {
+      "component": "components/view-settings-dialog.vue",
+      "line": 13,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-view-settings-dialog-tab-display-settings": {
+      "component": "components/view-settings-dialog.vue",
+      "line": 20,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-view-settings-dialog-tab-version-info": {
+      "component": "components/view-settings-dialog.vue",
+      "line": 21,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-view-settings-dialog-tab-memory-settings": {
+      "component": "components/view-settings-dialog.vue",
+      "line": 22,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-view-settings-dialog-checkbox-milky-way-on": {
+      "component": "components/view-settings-dialog.vue",
+      "line": 32,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-view-settings-dialog-checkbox-milky-way-on-label": {
+      "component": "components/view-settings-dialog.vue",
+      "line": 34,
+      "elementType": "span",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-view-settings-dialog-checkbox-dss-on": {
+      "component": "components/view-settings-dialog.vue",
+      "line": 37,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-view-settings-dialog-checkbox-dss-on-label": {
+      "component": "components/view-settings-dialog.vue",
+      "line": 39,
+      "elementType": "span",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-view-settings-dialog-checkbox-meridian-on": {
+      "component": "components/view-settings-dialog.vue",
+      "line": 44,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-view-settings-dialog-checkbox-meridian-on-label": {
+      "component": "components/view-settings-dialog.vue",
+      "line": 46,
+      "elementType": "span",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-view-settings-dialog-checkbox-ecliptic-on": {
+      "component": "components/view-settings-dialog.vue",
+      "line": 49,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-view-settings-dialog-checkbox-ecliptic-on-label": {
+      "component": "components/view-settings-dialog.vue",
+      "line": 51,
+      "elementType": "span",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-view-settings-dialog-checkbox-highfps-on": {
+      "component": "components/view-settings-dialog.vue",
+      "line": 64,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-view-settings-dialog-checkbox-highfps-on-label": {
+      "component": "components/view-settings-dialog.vue",
+      "line": 66,
+      "elementType": "span",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-view-settings-dialog-select-switch-language": {
+      "component": "components/view-settings-dialog.vue",
+      "line": 73,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-system-version-total": {
+      "component": "components/view-settings-dialog.vue",
+      "line": 90,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-system-version-qt": {
+      "component": "components/view-settings-dialog.vue",
+      "line": 94,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-system-version-vue": {
+      "component": "components/view-settings-dialog.vue",
+      "line": 98,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-system-version-app": {
+      "component": "components/view-settings-dialog.vue",
+      "line": 102,
+      "elementType": "div",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-view-settings-dialog-btn-refresh-devices": {
+      "component": "components/view-settings-dialog.vue",
+      "line": 137,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-view-settings-dialog-btn-open-usbbrowser": {
+      "component": "components/view-settings-dialog.vue",
+      "line": 163,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-view-settings-dialog-btn-open-usbbrowser-2": {
+      "component": "components/view-settings-dialog.vue",
+      "line": 177,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-view-settings-dialog-btn-open-clear-box-dialog": {
+      "component": "components/view-settings-dialog.vue",
+      "line": 192,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-view-settings-dialog-btn-clear-logs": {
+      "component": "components/view-settings-dialog.vue",
+      "line": 193,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-view-settings-dialog-btn-refresh-storage": {
+      "component": "components/view-settings-dialog.vue",
+      "line": 198,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-view-settings-dialog-checkbox-cache": {
+      "component": "components/view-settings-dialog.vue",
+      "line": 222,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-view-settings-dialog-checkbox-cache-label": {
+      "component": "components/view-settings-dialog.vue",
+      "line": 224,
+      "elementType": "span",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-view-settings-dialog-checkbox-update-pack": {
+      "component": "components/view-settings-dialog.vue",
+      "line": 233,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-view-settings-dialog-checkbox-update-pack-label": {
+      "component": "components/view-settings-dialog.vue",
+      "line": 235,
+      "elementType": "span",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-view-settings-dialog-checkbox-backup": {
+      "component": "components/view-settings-dialog.vue",
+      "line": 244,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-view-settings-dialog-checkbox-backup-label": {
+      "component": "components/view-settings-dialog.vue",
+      "line": 246,
+      "elementType": "span",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-view-settings-dialog-btn-on-cancel-clear-box": {
+      "component": "components/view-settings-dialog.vue",
+      "line": 254,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-view-settings-dialog-btn-on-confirm-clear-box": {
+      "component": "components/view-settings-dialog.vue",
+      "line": 261,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "ui-view-settings-dialog-btn-blue-text": {
+      "component": "components/view-settings-dialog.vue",
+      "line": 269,
+      "elementType": "v",
+      "hasDataState": false,
+      "dataState": null
+    }
+  },
+  "prefixes": {
+    "pa-": "极轴校准 (AutomaticPolarAlignmentCalibration)",
+    "cp-": "拍摄面板 (CapturePanel)",
+    "mcp-": "赤道仪控制 (MountControlPanel)",
+    "fp-": "调焦面板 (FocuserPanel)",
+    "imp-": "图像管理 (ImageManagerPanel)",
+    "scp-": "计划面板 (SchedulePanel)",
+    "hp-": "直方图面板 (HistogramPanel)",
+    "dap-": "设备分配 (DeviceAllocationPanel)",
+    "dp-": "设备选择器 (DevicePicker)",
+    "sd-": "设置对话框 (Settings-Dialog)",
+    "chart-": "图表组件",
+    "tb-": "工具栏 (toolbar)",
+    "gui-": "主界面 (gui)",
+    "ui-": "通用组件",
+    "bb-": "底部栏 (bottom-bar)"
+  }
+}

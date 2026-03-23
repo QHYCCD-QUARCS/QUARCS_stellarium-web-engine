@@ -1,5 +1,5 @@
 <template>
-  <v-dialog max-width='300' v-model="$store.state.showDeviceSettingsDialog_PoleCamera"> <!-- showDeviceSettingsDialog_Mount -->
+  <v-dialog max-width='300' v-model="$store.state.showDeviceSettingsDialog_PoleCamera" data-testid="ui-settings-dialog-pole-camera-root"> <!-- showDeviceSettingsDialog_Mount -->
     <v-card v-if="$store.state.showDeviceSettingsDialog_PoleCamera" class="secondary white--text">
       <v-card-title>
         <div class="text-h5">{{ $t('PoleCamera Settings') }}</div>
@@ -7,13 +7,13 @@
       <v-card-text>
         <!-- 设备连接的菜单内容 -->
         <div v-if="activeMenu === 'connection'">
-          <v-select label="选择驱动" :items="drivers" item-text="label" item-value="value" v-model="selectedDriver"></v-select>
+          <v-select label="选择驱动" :items="drivers" item-text="label" item-value="value" v-model="selectedDriver" data-testid="ui-settings-dialog-pole-camera-select-selected-driver"></v-select>
           <v-spacer></v-spacer>
-          <v-btn @click="confirmDriver">确定</v-btn>
-          <v-btn @click="connectIndiServer">连接indiServer</v-btn>
-          <v-select label="选择设备" :items="devices" v-model="selectedDevice"></v-select>
+          <v-btn @click="confirmDriver" data-testid="ui-settings-dialog-pole-camera-btn-confirm-driver">确定</v-btn>
+          <v-btn @click="connectIndiServer" data-testid="ui-settings-dialog-pole-camera-btn-connect-indi-server">连接indiServer</v-btn>
+          <v-select label="选择设备" :items="devices" v-model="selectedDevice" data-testid="ui-settings-dialog-pole-camera-select-selected-device"></v-select>
           <v-spacer></v-spacer>
-          <v-btn @click="confirmDevice">确定</v-btn>
+          <v-btn @click="confirmDevice" data-testid="ui-settings-dialog-pole-camera-btn-confirm-device">确定</v-btn>
         </div>
         <!-- 设备配置的菜单内容 -->
         <div v-if="activeMenu === 'configuration'">
@@ -22,7 +22,7 @@
       </v-card-text>
       <v-card-actions>
         <v-spacer></v-spacer>
-        <v-btn class="blue--text darken-1" text @click.native="closeDialog">Close</v-btn>
+        <v-btn class="blue--text darken-1" text @click.native="closeDialog" data-testid="ui-settings-dialog-pole-camera-btn-close-dialog">Close</v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>

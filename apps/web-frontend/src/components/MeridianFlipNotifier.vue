@@ -1,16 +1,16 @@
 <template>
-  <div v-if="isMountConnected">
+  <div v-if="isMountConnected" data-testid="ui-meridian-flip-notifier-root">
     <!-- 顶部横幅提示：小于5分钟时一次性提示，可关闭，10秒自动关闭 -->
     <transition name="mf-slide-down">
       <div v-if="bannerVisible" class="mf-banner" :style="{ zIndex: String(zIndexBaseComputed) }" role="alert" aria-live="polite">
         <div class="mf-banner__content">
           <div class="mf-banner__text">{{ $t('MeridianFlipNotifier.banner.text', { time: mmss }) }}</div>
           <div class="mf-banner__actions">
-            <button class="mf-btn" :class="btnClass('auto')" @click="selectMode('auto')">{{ $t('MeridianFlipNotifier.actions.autoAtTime') }}</button>
-            <button class="mf-btn" :class="btnClass('manual')" @click="selectMode('manual')">{{ $t('MeridianFlipNotifier.actions.manual') }}</button>
-            <button v-if="isManualSelected" class="mf-btn mf-btn--immediate" :disabled="!isNegative" @click="triggerFlipNow">{{ $t('MeridianFlipNotifier.actions.flipNow') }}</button>
+            <button class="mf-btn" :class="btnClass('auto')" @click="selectMode('auto')" data-testid="ui-meridian-flip-notifier-btn-select-mode">{{ $t('MeridianFlipNotifier.actions.autoAtTime') }}</button>
+            <button class="mf-btn" :class="btnClass('manual')" @click="selectMode('manual')" data-testid="ui-meridian-flip-notifier-btn-select-mode-2">{{ $t('MeridianFlipNotifier.actions.manual') }}</button>
+            <button v-if="isManualSelected" class="mf-btn mf-btn--immediate" :disabled="!isNegative" @click="triggerFlipNow" data-testid="ui-meridian-flip-notifier-btn-trigger-flip-now">{{ $t('MeridianFlipNotifier.actions.flipNow') }}</button>
           </div>
-          <button class="mf-banner__close" :aria-label="$t('Common.close')" @click="closeBanner">×</button>
+          <button class="mf-banner__close" :aria-label="$t('Common.close')" @click="closeBanner" data-testid="ui-meridian-flip-notifier-btn-close-banner">×</button>
         </div>
       </div>
     </transition>
@@ -18,15 +18,15 @@
     <!-- 居中弹窗：小于1分钟且未选择时再次提示，关闭后显示左上角挂件 -->
     <transition name="mf-fade">
       <div v-if="centerVisible" class="mf-modal" :style="{ zIndex: String(zIndexBaseComputed + 1) }">
-        <div class="mf-modal__backdrop" @click="closeCenter"></div>
+        <div class="mf-modal__backdrop" @click="closeCenter" data-testid="ui-components-meridian-flip-notifier-act-close-center"></div>
         <div class="mf-modal__dialog" role="dialog" aria-modal="true" :aria-label="$t('MeridianFlipNotifier.modal.title')">
           <div class="mf-modal__title">{{ $t('MeridianFlipNotifier.modal.title') }}</div>
           <div class="mf-modal__body">{{ $t('MeridianFlipNotifier.modal.body', { time: mmss }) }}</div>
           <div class="mf-modal__actions">
-            <button class="mf-btn" :class="btnClass('auto')" @click="selectMode('auto')">{{ $t('MeridianFlipNotifier.actions.autoAtTime') }}</button>
-            <button class="mf-btn" :class="btnClass('manual')" @click="selectMode('manual')">{{ $t('MeridianFlipNotifier.actions.manual') }}</button>
-            <button v-if="isManualSelected" class="mf-btn mf-btn--immediate" :disabled="!isNegative" @click="triggerFlipNow">{{ $t('MeridianFlipNotifier.actions.flipNow') }}</button>
-            <button class="mf-btn mf-btn--ghost" @click="closeCenter">{{ $t('Common.close') }}</button>
+            <button class="mf-btn" :class="btnClass('auto')" @click="selectMode('auto')" data-testid="ui-meridian-flip-notifier-btn-select-mode-3">{{ $t('MeridianFlipNotifier.actions.autoAtTime') }}</button>
+            <button class="mf-btn" :class="btnClass('manual')" @click="selectMode('manual')" data-testid="ui-meridian-flip-notifier-btn-select-mode-4">{{ $t('MeridianFlipNotifier.actions.manual') }}</button>
+            <button v-if="isManualSelected" class="mf-btn mf-btn--immediate" :disabled="!isNegative" @click="triggerFlipNow" data-testid="ui-meridian-flip-notifier-btn-trigger-flip-now-2">{{ $t('MeridianFlipNotifier.actions.flipNow') }}</button>
+            <button class="mf-btn mf-btn--ghost" @click="closeCenter" data-testid="ui-meridian-flip-notifier-btn-close-center">{{ $t('Common.close') }}</button>
           </div>
         </div>
       </div>
@@ -48,11 +48,11 @@
             <span class="mf-mini__time">{{ mmss }}</span>
           </div>
           <div class="mf-mini__line mf-mini__line--controls">
-            <button class="mf-link" :class="{ 'mf-link--active': autoIsActive }" @click="selectMode('auto')">{{ $t('MeridianFlipNotifier.mini.auto') }}</button>
+            <button class="mf-link" :class="{ 'mf-link--active': autoIsActive }" @click="selectMode('auto')" data-testid="ui-meridian-flip-notifier-btn-select-mode-5">{{ $t('MeridianFlipNotifier.mini.auto') }}</button>
             <span class="mf-sep">/</span>
-            <button class="mf-link" :class="{ 'mf-link--active': manualIsActive }" @click="selectMode('manual')">{{ $t('MeridianFlipNotifier.mini.manual') }}</button>
-            <button v-if="isManualSelected" class="mf-btn mf-btn--immediate" :disabled="!isNegative" @click="triggerFlipNow">{{ $t('MeridianFlipNotifier.actions.flipNow') }}</button>
-            <button class="mf-mini__close" :aria-label="$t('Common.close')" @click="closeMini">×</button>
+            <button class="mf-link" :class="{ 'mf-link--active': manualIsActive }" @click="selectMode('manual')" data-testid="ui-meridian-flip-notifier-btn-select-mode-6">{{ $t('MeridianFlipNotifier.mini.manual') }}</button>
+            <button v-if="isManualSelected" class="mf-btn mf-btn--immediate" :disabled="!isNegative" @click="triggerFlipNow" data-testid="ui-meridian-flip-notifier-btn-trigger-flip-now-3">{{ $t('MeridianFlipNotifier.actions.flipNow') }}</button>
+            <button class="mf-mini__close" :aria-label="$t('Common.close')" @click="closeMini" data-testid="ui-meridian-flip-notifier-btn-close-mini">×</button>
           </div>
         </template>
 

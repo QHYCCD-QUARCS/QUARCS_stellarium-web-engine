@@ -2,7 +2,9 @@
   <div
     class="schedule-panel"
     :style="{ left: '0px', right: '0px', top: '0px', bottom: '0px', zIndex: 200 }"
-  >
+    data-testid="scp-root"
+    :data-state="isOpen ? 'open' : 'closed'"
+    :data-run="scheduleRunState === 'running' ? 'running' : (scheduleRunState === 'paused' ? 'paused' : 'idle')">
     <div class="schedule-main">
       <!-- 左侧：竖直操作栏，适合双手操作 -->
       <div class="left-toolbar" :class="{ collapsed: isLeftToolbarCollapsed }">
@@ -10,14 +12,14 @@
           class="btn icon-only collapse-btn"
           @click="toggleLeftToolbar"
           :title="isLeftToolbarCollapsed ? $t('Expand') : $t('Collapse')"
-        >
+         data-testid="scp-btn-toggle-left-toolbar">
           <v-icon small>
             {{ isLeftToolbarCollapsed ? 'mdi-chevron-right' : 'mdi-chevron-left' }}
           </v-icon>
         </button>
 
         <div class="left-toolbar-buttons" v-show="!isLeftToolbarCollapsed">
-          <button class="btn large" @click="addRow" :disabled="isScheduleRunning">
+          <button class="btn large" @click="addRow" :disabled="isScheduleRunning" data-testid="scp-btn-add-row">
             <v-icon small>mdi-plus</v-icon>
             <span class="btn-text">{{ $t('Add') }}</span>
           </button>
@@ -26,12 +28,17 @@
             class="btn large"
             :disabled="!selectedRow || isScheduleRunning"
             @click="deleteSelectedRow"
-          >
+           data-testid="scp-btn-delete-selected-row">
             <v-icon small>mdi-delete</v-icon>
             <span class="btn-text">{{ $t('Delete') }}</span>
           </button>
 
-          <button class="btn large primary" @click="toggleSchedule">
+          <button
+            class="btn large primary"
+            @click="toggleSchedule"
+            data-testid="scp-btn-toggle-schedule"
+            :data-state="scheduleRunState === 'running' ? 'running' : (scheduleRunState === 'paused' ? 'paused' : 'idle')"
+          >
             <v-icon small>
               {{ isScheduleRunning ? 'mdi-pause' : 'mdi-play' }}
             </v-icon>
@@ -40,12 +47,12 @@
             </span>
           </button>
 
-          <button class="btn" @click="openSavePresetDialog" :disabled="isScheduleRunning">
+          <button class="btn" @click="openSavePresetDialog" :disabled="isScheduleRunning" data-testid="scp-btn-open-save-preset-dialog">
             <v-icon small>mdi-content-save</v-icon>
             <span class="btn-text">{{ $t('Save') }}</span>
           </button>
 
-          <button class="btn" @click="openLoadPresetDialog" :disabled="isScheduleRunning">
+          <button class="btn" @click="openLoadPresetDialog" :disabled="isScheduleRunning" data-testid="scp-btn-open-load-preset-dialog">
             <v-icon small>mdi-folder-open</v-icon>
             <span class="btn-text">{{ $t('Load') }}</span>
           </button>
@@ -57,7 +64,7 @@
           :class="[isLeftToolbarCollapsed ? 'icon-only' : 'large']"
           @click="closePanel"
           :title="$t('Close')"
-        >
+         data-testid="scp-btn-close-panel">
           <v-icon small>mdi-close</v-icon>
           <span class="btn-text" v-if="!isLeftToolbarCollapsed">{{ $t('Close') }}</span>
         </button>
@@ -104,7 +111,11 @@
                         { 'status-col': field.type === 'status' }
                       ]"
                       @click="selectCell(row, colIndex + 1, field)"
-                    >
+                      data-testid="scp-act-select-cell"
+                      :data-index="colIndex"
+                      :data-row="row"
+                      :data-col="colIndex + 1"
+                      :data-field="field.key">
                       <!-- 状态栏：进度条 + 状态文字 -->
                       <template v-if="field.type === 'status'">
                         <div class="status-cell">
@@ -250,7 +261,12 @@
                     <label class="editor-label">{{ $t('Clock') }}</label>
                     <div class="editor-row">
                       <label class="checkbox-label">
-                        <input type="checkbox" v-model="editorClockIsNow" @change="applyClockEditor" />
+                        <input
+                          type="checkbox"
+                          v-model="editorClockIsNow"
+                          @change="applyClockEditor"
+                          data-testid="scp-editor-clock-now"
+                        />
                         <span>{{ $t('Now') }}</span>
                       </label>
                     </div>
@@ -270,6 +286,7 @@
                             inputmode="none"
                             @focus.prevent="$event.target.blur()"
                             @click.prevent.stop="activateClockKeypad('hour')"
+                            data-testid="scp-editor-clock-hour"
                           />
                           <span class="time-unit-label">{{ $t('Hour') }}</span>
                         </div>
@@ -293,6 +310,7 @@
                             inputmode="none"
                             @focus.prevent="$event.target.blur()"
                             @click.prevent.stop="activateClockKeypad('minute')"
+                            data-testid="scp-editor-clock-minute"
                           />
                           <span class="time-unit-label">{{ $t('Minute') }}</span>
                         </div>
@@ -315,7 +333,11 @@
                   <div v-else-if="selectedField.type === 'exposure'" class="editor-section">
                     <label class="editor-label">{{ $t('Exposure') }}</label>
                     <div class="editor-row">
-                      <select v-model="editorExposurePreset" @change="onExposurePresetChange">
+                      <select
+                        v-model="editorExposurePreset"
+                        @change="onExposurePresetChange"
+                        data-testid="scp-editor-exposure-preset"
+                      >
                         <option
                           v-for="p in exposurePresets"
                           :key="p"
@@ -344,12 +366,14 @@
                     <label class="editor-label">{{ $t('Filter No.') }}</label>
                     <div class="editor-row editor-options" v-if="filterOptions && filterOptions.length">
                       <button
-                        v-for="opt in filterOptions"
+                        v-for="(opt, idx) in filterOptions"
                         :key="'filter-pill-' + opt"
                         type="button"
                         class="option-pill"
                         :class="{ active: editorSelectValue === opt }"
                         @click="setSelectValue(opt)"
+                        :data-testid="`scp-editor-filter-pill-${idx}`"
+                        :data-value="opt"
                       >
                         {{ opt }}
                       </button>
@@ -363,12 +387,14 @@
                     <label class="editor-label">{{ $t('Type') }}</label>
                     <div class="editor-row editor-options">
                       <button
-                        v-for="opt in frameTypeOptions"
+                        v-for="(opt, idx) in frameTypeOptions"
                         :key="'type-pill-' + opt"
                         type="button"
                         class="option-pill"
                         :class="{ active: editorSelectValue === opt }"
                         @click="setSelectValue(opt)"
+                        :data-testid="`scp-editor-type-pill-${idx}`"
+                        :data-value="opt"
                       >
                         {{ opt }}
                       </button>
@@ -382,12 +408,14 @@
                     <label class="editor-label">{{ $t('Refocus') }}</label>
                     <div class="editor-row editor-options">
                       <button
-                        v-for="opt in refocusOptions"
+                        v-for="(opt, idx) in refocusOptions"
                         :key="'refocus-pill-' + opt"
                         type="button"
                         class="option-pill"
                         :class="{ active: editorSelectValue === opt }"
                         @click="setSelectValue(opt)"
+                        :data-testid="`scp-editor-refocus-pill-${idx}`"
+                        :data-value="opt"
                       >
                         {{ opt }}
                       </button>
@@ -397,7 +425,7 @@
                   <!-- 整数输入：Reps -->
                   <div v-else-if="selectedField.type === 'integer'" class="editor-section">
                     <label class="editor-label">{{ $t('Reps') }}</label>
-                    <div class="editor-row readonly">
+                    <div class="editor-row readonly" data-testid="scp-editor-reps-value">
                       {{ editorIntegerValue }}
                     </div>
                   </div>
@@ -410,24 +438,58 @@
                         v-model="editorTargetName"
                         @change="applyTargetEditor"
                         :placeholder="$t('e.g. M42, NGC7000...')"
+                        data-testid="scp-editor-target-input"
                       />
                     </div>
                     <div class="editor-row target-actions">
-          <button class="btn small" @click="cycleTargetPrefix">
+          <button class="btn small" @click="cycleTargetPrefix" data-testid="scp-editor-target-cycle-prefix">
             {{ targetPrefixLabel }}
           </button>
-                      <button class="btn small" @click="searchTargetInSky">
+                      <button class="btn small" @click="searchTargetInSky" data-testid="scp-editor-target-search-center">
                         <v-icon x-small>mdi-magnify</v-icon>
                         <span class="btn-text">{{ $t('Search & Center') }}</span>
                       </button>
-                      <button class="btn small" @click="useCurrentSkySelection">
+                      <button class="btn small" @click="useCurrentSkySelection" data-testid="scp-editor-target-use-selected-object">
                         <v-icon x-small>mdi-crosshairs-gps</v-icon>
                         <span class="btn-text">{{ $t('Use Selected Object') }}</span>
+                      </button>
+                      <button 
+                        class="btn small" 
+                        @click="useCurrentPosition"
+                        :title="$t('Capture current view center position (snapshot at click time)')"
+                        data-testid="scp-editor-target-current-position"
+                      >
+                        <v-icon x-small>mdi-crosshairs</v-icon>
+                        <span class="btn-text">{{ $t('Current Position') }}</span>
                       </button>
                     </div>
                   </div>
 
-                  <!-- 文本（只读）：Ra/Dec 等 -->
+                  <!-- coordinate：赤经赤纬输入 -->
+                  <div v-else-if="selectedField.type === 'coordinate'" class="editor-section">
+                    <label class="editor-label">{{ $t('Right Ascension (RA)') }}</label>
+                    <div class="editor-row">
+                      <input
+                        type="text"
+                        v-model="editorRaValue"
+                        @change="applyCoordinateEditor"
+                        placeholder="12h 34m 56s"
+                        data-testid="scp-editor-coordinate-ra"
+                      />
+                    </div>
+                    <label class="editor-label">{{ $t('Declination (Dec)') }}</label>
+                    <div class="editor-row">
+                      <input
+                        type="text"
+                        v-model="editorDecValue"
+                        @change="applyCoordinateEditor"
+                        placeholder="+45° 30' 00&quot;"
+                        data-testid="scp-editor-coordinate-dec"
+                      />
+                    </div>
+                  </div>
+
+                  <!-- 文本（只读）：其它只读字段 -->
                   <div v-else-if="selectedField.type === 'text'" class="editor-section">
                     <label class="editor-label">{{ selectedField.label }}</label>
                     <div class="editor-row readonly">
@@ -469,6 +531,7 @@
                       :key="'unified-' + k"
                       class="keypad-key"
                       @click="onKeypadPress(keypadMode, k)"
+                      :data-testid="`scp-keypad-key-${k}`"
                     >
                       {{ k === 'Del' ? '⌫' : k }}
                     </button>
@@ -478,6 +541,7 @@
                       key="unified-unit"
                       class="keypad-key"
                       @click="toggleExposureUnit"
+                      data-testid="scp-keypad-unit-toggle"
                     >
                       {{ editorExposureUnit === 's' ? 'ms' : 's' }}
                     </button>
@@ -494,29 +558,38 @@
     <div
       v-if="showSchedulePresetDialog"
       class="schedule-preset-dialog"
+      data-testid="scp-preset-dialog-root"
+      data-state="open"
+      :data-mode="schedulePresetMode"
     >
       <div class="schedule-preset-card">
         <div class="schedule-preset-header">
           <span>
             {{ schedulePresetMode === 'save' ? $t('Save Schedule') : $t('Load Schedule') }}
           </span>
-          <button class="btn small" @click="cancelSchedulePresetDialog">
+          <button
+            class="btn small"
+            @click="cancelSchedulePresetDialog"
+            data-testid="scp-preset-btn-close"
+          >
             <v-icon x-small>mdi-close</v-icon>
           </button>
         </div>
 
         <div class="schedule-preset-body">
-          <div class="preset-list">
+          <div class="preset-list" data-testid="scp-preset-list">
             <div
               v-for="name in schedulePresets"
               :key="name"
               class="preset-item"
               :class="{ active: name === scheduleSelectedPreset }"
               @click="selectSchedulePreset(name)"
+              data-testid="scp-preset-item"
+              :data-name="name"
             >
               {{ name }}
             </div>
-            <div v-if="!schedulePresets.length" class="preset-empty">
+            <div v-if="!schedulePresets.length" class="preset-empty" data-testid="scp-preset-empty">
               {{ $t('No saved schedules') }}
             </div>
           </div>
@@ -526,6 +599,7 @@
               type="text"
               v-model="schedulePresetName"
               :placeholder="$t('Schedule name')"
+              data-testid="scp-preset-input-name"
             />
           </div>
         </div>
@@ -535,6 +609,7 @@
             <button
               class="btn primary small"
               @click="confirmSaveSchedulePreset"
+              data-testid="scp-preset-btn-save"
             >
               {{ $t('Save') }}
             </button>
@@ -544,6 +619,7 @@
               class="btn small"
               :disabled="!scheduleSelectedPreset"
               @click="deleteSchedulePreset"
+              data-testid="scp-preset-btn-delete"
             >
               {{ $t('Delete') }}
             </button>
@@ -551,6 +627,7 @@
               class="btn primary small"
               :disabled="!scheduleSelectedPreset"
               @click="cancelSchedulePresetDialog"
+              data-testid="scp-preset-btn-ok"
             >
               {{ $t('OK') }}
             </button>
@@ -564,6 +641,10 @@
 <script>
 export default {
   name: 'SchedulePanel',
+  props: {
+    /** 由父级 gui.vue 传入，用于对外暴露 open/closed 状态契约（避免仅依赖 v-show 可见性） */
+    isOpen: { type: Boolean, default: false },
+  },
   data() {
     return {
       // 面板布局
@@ -576,6 +657,8 @@ export default {
 
       // 计划运行状态
       isScheduleRunning: false,
+      // 对外状态契约：running/paused/idle（paused 用于表达“按下暂停/停止后可恢复”的状态）
+      scheduleRunState: 'idle',
 
       // 表格数据（沿用原 ScheduleTable 的数据结构）
       numberOfRows: 8,
@@ -592,7 +675,7 @@ export default {
       // 字段定义（第一行：命名 + 类型）
       fieldDefinitions: [
         { index: 1, key: 'target', label: this.$t('Target'), type: 'target', typeLabel: 'target' },
-        { index: 2, key: 'raDec', label: this.$t('Ra/Dec'), type: 'text', typeLabel: 'text' },
+        { index: 2, key: 'raDec', label: this.$t('Ra/Dec') + ' (J2000)', type: 'coordinate', typeLabel: 'coordinate' },
         { index: 3, key: 'shootTime', label: this.$t('Shoot Time'), type: 'clock', typeLabel: 'clock' },
         { index: 4, key: 'expTime', label: this.$t('Exp Time'), type: 'exposure', typeLabel: 'exposure' },
         { index: 5, key: 'filter', label: this.$t('Filter No.'), type: 'select-filter', typeLabel: 'dropdown' },
@@ -633,6 +716,9 @@ export default {
       integerEditingStarted: false,
 
       editorTargetName: '',
+
+      editorRaValue: '',
+      editorDecValue: '',
 
       genericEditorValue: '',
 
@@ -684,8 +770,12 @@ export default {
       // 简单日志
       logs: [],
 
-      // 是否处于“从星图选择目标”模式（由 Use Selected Object 按钮触发）
+      // 是否处于"从星图选择目标"模式（由 Use Selected Object 按钮触发）
       isWaitingSkySelection: false,
+      // 是否需要切换到星图界面（区分手动选择对象和自动查询坐标）
+      needSwitchToSkyMap: false,
+      // 是否处于"使用当前位置"模式（由 Current Position 按钮触发）
+      isWaitingCurrentPosition: false,
 
       // 任务计划表预设管理
       showSchedulePresetDialog: false,
@@ -1090,16 +1180,24 @@ export default {
 
     toggleSchedule() {
       // 统一管理本次任务计划需要占用的设备
-      const scheduleDevices = ['MainCamera', 'Mount', 'Focuser', 'CFW', 'GuiderCamera'];
+      const scheduleDevices = ['MainCamera', 'Mount', 'Focuser', 'CFW',];
 
       if (this.isScheduleRunning) {
         // 停止
         this.isScheduleRunning = false;
+        this.scheduleRunState = 'paused';
         this.$stopFeature(scheduleDevices, 'ScheduleCapture');
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'StopSchedule');
         this.addLog(this.$t('Schedule stopped'));
       } else {
         // 开始
+        // 仅限制：任务计划表（主相机未绑定时禁止启动）
+        if (!this.$store.getters['device/isDeviceBound']('MainCamera')) {
+          const msg = this.$t('MainCameraNotBoundAction', { action: this.$t('Feature_Schedule') });
+          this.$bus.$emit('showMsgBox', msg, 'error');
+          this.addLog(msg);
+          return;
+        }
         // ---------- 设备连接状态检查 ----------
         // 使用 App.vue 通过事件总线回传的设备列表
         const allDevices = Array.isArray(this.connectedDevices) ? this.connectedDevices : [];
@@ -1159,6 +1257,7 @@ export default {
         this.sendTableData(true);
 
         this.isScheduleRunning = true;
+        this.scheduleRunState = 'running';
         // 将任务计划表占用登记到所有相关设备，方便全局互斥管理
         this.$startFeature(scheduleDevices, 'ScheduleCapture');
         this.addLog(this.$t('Schedule started'));
@@ -1175,6 +1274,7 @@ export default {
     },
     onScheduleComplete() {
       this.isScheduleRunning = false;
+      this.scheduleRunState = 'idle';
       const scheduleDevices = ['MainCamera', 'Mount', 'Focuser', 'CFW', 'GuiderCamera'];
       this.$stopFeature(scheduleDevices, 'ScheduleCapture');
       this.addLog(this.$t('Schedule completed'));
@@ -1191,6 +1291,12 @@ export default {
       if (column === 10) {
         // 状态列
         return this.statusLabel(row);
+      }
+      // Ra/Dec列：将弧度值转换为标准格式显示
+      if (column === 2) {
+        const key = `${row}-2`;
+        const raw = this.cellValues[key] || '';
+        return this.formatRaDecForDisplay(raw);
       }
       // 滤镜列：若无滤镜轮显示 NULL；若有，则显示当前值对应的滤镜名称
       if (column === 5) {
@@ -1487,6 +1593,8 @@ export default {
     },
     onScheduleRunning(running) {
       this.isScheduleRunning = !!running;
+      // 约定：外部回传 running=false 时视为暂停（可恢复），而非完成；完成由 onScheduleComplete 置为 idle。
+      this.scheduleRunState = this.isScheduleRunning ? 'running' : (this.scheduleRunState === 'idle' ? 'idle' : 'paused');
       this.addLog((running ? this.$t('Schedule started') : this.$t('Schedule stopped')));
     },
     rowProgressPercent(row) {
@@ -1627,6 +1735,28 @@ export default {
         this.integerEditingStarted = false;
       } else if (field.type === 'target') {
         this.editorTargetName = value || '';
+      } else if (field.type === 'coordinate') {
+        // 解析 Ra/Dec 字符串，格式可能是弧度值或标准格式
+        const raMatch = value.match(/ra:([^,]+)/i);
+        const decMatch = value.match(/dec:([^,]+)/i);
+        let raStr = raMatch ? raMatch[1].trim() : '';
+        let decStr = decMatch ? decMatch[1].trim() : '';
+        
+        // 如果是弧度值（纯数字），转换为标准格式以便编辑
+        if (raStr && decStr) {
+          const raNum = parseFloat(raStr);
+          const decNum = parseFloat(decStr);
+          
+          // 检查是否为有效的弧度值
+          if (!isNaN(raNum) && !isNaN(decNum) && !/[hms°'"′″]/.test(raStr)) {
+            // 是弧度值，转换为标准格式
+            raStr = this.radToRAString(raNum);
+            decStr = this.radToDecString(decNum);
+          }
+        }
+        
+        this.editorRaValue = raStr;
+        this.editorDecValue = decStr;
       } else if (field.type === 'text' || field.type === 'status') {
         // 只读，无需编辑
       } else {
@@ -1642,6 +1772,8 @@ export default {
         this.keypadMode = this.isExposureCustom ? 'exposureCustom' : null;
       } else if (field.type === 'target') {
         this.keypadMode = 'target';
+      } else if (field.type === 'coordinate') {
+        this.keypadMode = null;
       } else {
         this.keypadMode = null;
       }
@@ -1699,9 +1831,169 @@ export default {
     applyTargetEditor() {
       if (this.isScheduleRunning) return;
       if (!this.currentCellKey) return;
-      this.$set(this.cellValues, this.currentCellKey, this.editorTargetName || '');
+      const targetName = this.editorTargetName || '';
+      this.$set(this.cellValues, this.currentCellKey, targetName);
+      
+      // 联动：如果输入了有效的目标名称，尝试自动查询坐标
+      if (targetName.trim() && targetName.trim() !== 'null') {
+        this.tryAutoFillCoordinates(targetName.trim());
+      }
+      
       this.sendTableData(false);
       this.addLog(this.$t('Target updated') + `: ${this.editorTargetName}`);
+    },
+    
+    tryAutoFillCoordinates(targetName) {
+      // 通过事件总线触发目标搜索（但不切换界面，静默查询）
+      // 这里发出一个静默搜索事件，由 skysource-search 组件处理
+      if (!this.selectedRow) return;
+      
+      // 标记正在等待坐标返回（但不切换界面）
+      this.isWaitingSkySelection = true;
+      this.needSwitchToSkyMap = false; // 明确不需要切换界面
+      
+      // 发出搜索请求
+      this.$bus.$emit('SearchName', targetName);
+      
+      // 设置超时，如果3秒内没有返回坐标，则取消等待状态
+      setTimeout(() => {
+        if (this.isWaitingSkySelection && !this.needSwitchToSkyMap) {
+          this.isWaitingSkySelection = false;
+          this.addLog(this.$t('Auto coordinate lookup timed out'));
+        }
+      }, 3000);
+    },
+    
+    formatCoordinatesAsName(ra, dec) {
+      // 将坐标格式化为可读的目标名称
+      // 例如：ra: "12h 34m 56s", dec: "+45° 30' 00"" => "J2000 12h34m+45d30m"
+      try {
+        // 简化提取数字部分
+        const raMatch = String(ra).match(/(\d+)h?\s*(\d+)?m?/i);
+        const decMatch = String(dec).match(/([+-]?\d+)[°d]?\s*(\d+)?/i);
+        
+        if (raMatch) {
+          const raH = raMatch[1] || '00';
+          const raM = raMatch[2] || '00';
+          const decD = decMatch ? (decMatch[1] || '+00') : '+00';
+          const decM = decMatch && decMatch[2] ? decMatch[2] : '00';
+          
+          return `J2000 ${raH}h${raM}m${decD}d${decM}m`;
+        }
+        
+        // 如果无法解析，返回简单的坐标描述
+        return `Target RA/Dec`;
+      } catch (error) {
+        return `Target RA/Dec`;
+      }
+    },
+    
+    formatRaDecForDisplay(raDecString) {
+      // 将 Ra/Dec 字符串格式化为标准显示格式
+      // 输入可能是：
+      // 1. "Ra:3.14159,Dec:0.78539" (弧度值)
+      // 2. "ra:12h34m56s,dec:+45d30m" (已经是标准格式)
+      // 3. 空字符串
+      if (!raDecString || !raDecString.trim()) return '';
+      
+      try {
+        const str = raDecString.trim();
+        
+        // 解析 Ra 和 Dec 值
+        const raMatch = str.match(/ra:([^,]+)/i);
+        const decMatch = str.match(/dec:([^,]+)/i);
+        
+        if (!raMatch || !decMatch) return str;
+        
+        const raStr = raMatch[1].trim();
+        const decStr = decMatch[1].trim();
+        
+        // 检查是否已经是标准格式（包含h、m、s或°符号）
+        if (/[hms°'"′″]/.test(raStr) || /[hms°'"′″]/.test(decStr)) {
+          // 已经是标准格式，只需要美化显示
+          return `${raStr} / ${decStr}`;
+        }
+        
+        // 尝试解析为弧度值（纯数字或小数）
+        const raRad = parseFloat(raStr);
+        const decRad = parseFloat(decStr);
+        
+        if (isNaN(raRad) || isNaN(decRad)) {
+          // 无法解析，返回原始值
+          return `${raStr} / ${decStr}`;
+        }
+        
+        // 转换弧度为标准格式
+        const raFormatted = this.radToRAString(raRad);
+        const decFormatted = this.radToDecString(decRad);
+        
+        return `${raFormatted} / ${decFormatted}`;
+      } catch (error) {
+        console.error('Error formatting Ra/Dec:', error);
+        return raDecString;
+      }
+    },
+    
+    radToRAString(radians) {
+      // 将弧度转换为赤经字符串格式：HHh MMm SS.SSs
+      // 赤经范围：0 到 2π 弧度 = 0 到 24小时
+      let hours = (radians * 12 / Math.PI); // 弧度转小时
+      
+      // 确保在 0-24 范围内
+      while (hours < 0) hours += 24;
+      while (hours >= 24) hours -= 24;
+      
+      const h = Math.floor(hours);
+      const minutesFrac = (hours - h) * 60;
+      const m = Math.floor(minutesFrac);
+      const s = (minutesFrac - m) * 60;
+      
+      return `${String(h).padStart(2, '0')}h ${String(m).padStart(2, '0')}m ${s.toFixed(2)}s`;
+    },
+    
+    radToDecString(radians) {
+      // 将弧度转换为赤纬字符串格式：±DD° MM' SS.SS"
+      // 赤纬范围：-π/2 到 π/2 弧度 = -90° 到 +90°
+      let degrees = radians * 180 / Math.PI;
+      
+      // 限制在 -90 到 +90 范围内
+      if (degrees > 90) degrees = 90;
+      if (degrees < -90) degrees = -90;
+      
+      const sign = degrees >= 0 ? '+' : '-';
+      const absDeg = Math.abs(degrees);
+      const d = Math.floor(absDeg);
+      const arcminutesFrac = (absDeg - d) * 60;
+      const m = Math.floor(arcminutesFrac);
+      const s = (arcminutesFrac - m) * 60;
+      
+      return `${sign}${String(d).padStart(2, '0')}° ${String(m).padStart(2, '0')}' ${s.toFixed(2)}"`;
+    },
+    applyCoordinateEditor() {
+      if (this.isScheduleRunning) return;
+      if (!this.currentCellKey) return;
+      if (!this.selectedRow) return;
+      
+      // 组合 Ra/Dec 为标准格式
+      const ra = (this.editorRaValue || '').trim();
+      const dec = (this.editorDecValue || '').trim();
+      
+      if (ra && dec) {
+        const coordString = `ra:${ra},dec:${dec}`;
+        this.$set(this.cellValues, this.currentCellKey, coordString);
+        
+        // 如果目标列为空或为默认值，自动设置为标准格式的坐标描述
+        const targetKey = `${this.selectedRow}-1`;
+        const currentTarget = (this.cellValues[targetKey] || '').trim();
+        if (!currentTarget || currentTarget === 'null' || currentTarget.toLowerCase() === 'null') {
+          // 格式化为标准命名：例如 "RA 12h34m Dec +45d30m"
+          const targetName = this.formatCoordinatesAsName(ra, dec);
+          this.$set(this.cellValues, targetKey, targetName);
+        }
+        
+        this.sendTableData(false);
+        this.addLog(this.$t('Updated Ra/Dec') + `: ${coordString}`);
+      }
     },
     applyGenericEditor() {
       if (this.isScheduleRunning) return;
@@ -1887,13 +2179,95 @@ export default {
         this.initEditorFromCell(targetField);
       }
 
-      // 标记等待来自星图的 TargetRaDec 事件
+      // 标记等待来自星图的 TargetRaDec 事件，并标记需要切换界面
       this.isWaitingSkySelection = true;
+      this.needSwitchToSkyMap = true;
 
       // 通过事件总线让上层 gui 切换到星图并隐藏其他 UI / 任务表
       this.$bus.$emit('ScheduleTargetPickStart');
 
       this.addLog(this.$t('Use Selected Object') + ': ' + this.$t('Switch to sky map to pick target'));
+    },
+    useCurrentPosition() {
+      // 使用当前画面中心位置作为目标坐标
+      if (!this.selectedRow) {
+        this.addLog(this.$t('Please select a row first'));
+        return;
+      }
+
+      // 设置目标名称为标准命名"Current View"
+      const targetKey = `${this.selectedRow}-1`;
+      this.$set(this.cellValues, targetKey, 'Current View');
+
+      // 标记正在等待当前位置坐标
+      this.isWaitingCurrentPosition = true;
+
+      // 尝试直接从 stellarium 获取当前视图中心坐标（一次性快照）
+      try {
+        if (this.$stel && this.$stel.core && this.$stel.core.observer) {
+          const obs = this.$stel.core.observer;
+          
+          // 获取当前时刻的观察方向（方位角和高度角）
+          // 注意：如果视图在移动或跟踪，每次调用会得到不同的值
+          // 这里获取的是"点击瞬间"的快照值
+          const az = obs.yaw;    // 方位角（弧度）
+          const alt = obs.pitch; // 高度角（弧度）
+          
+          console.log('[SchedulePanel] Capturing current view position:', {
+            az: az * 180 / Math.PI,
+            alt: alt * 180 / Math.PI,
+            timestamp: new Date().toISOString()
+          });
+          
+          // 将方位角和高度角转换为方向向量
+          const cosAlt = Math.cos(alt);
+          const viewDir = [
+            Math.sin(az) * cosAlt,
+            Math.cos(az) * cosAlt,
+            Math.sin(alt)
+          ];
+          
+          // 从OBSERVED坐标系转换到ICRF（J2000）坐标系
+          // ICRF/J2000是固定历元坐标系，一旦获取就固定不变，适合长期存储和望远镜指向
+          const posICRF = this.$stel.convertFrame(obs, 'OBSERVED', 'ICRF', viewDir);
+          const radecICRF = this.$stel.c2s(posICRF);
+          const raICRF = this.$stel.anp(radecICRF[0]);
+          const decICRF = this.$stel.anpm(radecICRF[1]);
+          
+          // 使用更高精度存储（保留9位小数，避免精度损失）
+          const raValue = raICRF;
+          const decValue = decICRF;
+          const raDecString = 'Ra:' + raValue + ',' + 'Dec:' + decValue;
+          
+          const raDecKey = `${this.selectedRow}-2`;
+          // 立即写入，确保坐标固定（不会随视图移动而变化）
+          this.$set(this.cellValues, raDecKey, raDecString);
+          
+          console.log('[SchedulePanel] Stored J2000 coordinates:', {
+            ra: raICRF,
+            dec: decICRF,
+            raDeg: raICRF * 180 / Math.PI,
+            decDeg: decICRF * 180 / Math.PI,
+            formatted: raDecString
+          });
+          
+          this.isWaitingCurrentPosition = false;
+          this.sendTableData(false);
+          
+          // 格式化显示
+          const raFormatted = this.radToRAString(raICRF);
+          const decFormatted = this.radToDecString(decICRF);
+          this.addLog(this.$t('Updated Ra/Dec') + ` (J2000, fixed): ${raFormatted} / ${decFormatted}`);
+          this.addLog(`Note: This is a snapshot at click time. Coordinate will not change unless manually edited.`);
+        } else {
+          this.addLog('Error: Stellarium not available');
+          this.isWaitingCurrentPosition = false;
+        }
+      } catch (error) {
+        console.error('[SchedulePanel] Failed to get current view center:', error);
+        this.addLog('Error: ' + this.$t('Failed to get current position'));
+        this.isWaitingCurrentPosition = false;
+      }
     },
     insertObjName(name) {
       // 只有在通过“Use Selected Object”进入选星模式时，才接收星图回传的目标名称
@@ -1912,18 +2286,30 @@ export default {
       this.addLog(this.$t('Target updated') + `: ${name}`);
     },
     insertObjRaDec(raDec) {
-      // 只有在通过“Use Selected Object”进入选星模式时，才接收星图回传的坐标
-      if (!this.isWaitingSkySelection) return;
+      // 接收星图回传的J2000坐标（用于"Use Selected Object"、自动查询或"Current Position"）
+      // J2000（ICRF）是固定历元坐标系，不随时间变化，适合长期存储和望远镜指向
+      if (!this.isWaitingSkySelection && !this.isWaitingCurrentPosition) return;
       if (!this.selectedRow) return;
       const key = `${this.selectedRow}-2`;
       this.$set(this.cellValues, key, ' ' + raDec);
       this.sendTableData(false);
-      this.addLog(this.$t('Updated Ra/Dec') + `: ${raDec}`);
-      // 如果是通过“Use Selected Object”进入的选星模式，在第一次拿到坐标后结束该模式，
-      // 并让上层 gui 恢复原始画布与任务计划表。
+      this.addLog(this.$t('Updated Ra/Dec') + ` (J2000): ${raDec}`);
+      
+      // 如果是通过"Use Selected Object"进入的选星模式且需要切换界面，
+      // 在第一次拿到坐标后结束该模式，并让上层 gui 恢复原始画布与任务计划表。
       if (this.isWaitingSkySelection) {
+        if (this.needSwitchToSkyMap) {
+          // 手动选择对象：需要恢复界面
+          this.$bus.$emit('ScheduleTargetPickFinished');
+          this.needSwitchToSkyMap = false;
+        }
+        // 无论哪种情况都要清除等待状态
         this.isWaitingSkySelection = false;
-        this.$bus.$emit('ScheduleTargetPickFinished');
+      }
+      
+      // 如果是"使用当前位置"模式，直接结束
+      if (this.isWaitingCurrentPosition) {
+        this.isWaitingCurrentPosition = false;
       }
     },
 

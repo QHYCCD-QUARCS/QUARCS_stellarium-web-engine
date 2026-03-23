@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div data-testid="ui-chart-focus-image-root">
     <div ref="imagechart" style="width: 80px; height: 80px;" class="imagechart-panel"></div>
   </div>
 </template>

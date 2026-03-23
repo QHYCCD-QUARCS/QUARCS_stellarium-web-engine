@@ -1,0 +1,754 @@
+组件,测试标识,功能描述,元素类型,行号,父级区域,状态属性
+showViewSettingsDialog,ui-app-root,元素：root,v,10,-,-
+showViewSettingsDialog,e2e-probes,元素：probes,unknown,18,-,-
+showViewSettingsDialog,`e2e-device-${d && d.driverType ? d.driverType : UNKNOWN_DRIVER_TYPE}-conn`,元素：${d && d.driverType ? d.driverType : UNKNOWN_DRIVER_TYPE}-conn`,unknown,25,-,-
+showViewSettingsDialog,e2e-tilegpm,元素：tilegpm,unknown,32,-,-
+showViewSettingsDialog,ui-app-submenu-drawer,元素：submenu-drawer,unknown,40,-,-
+showViewSettingsDialog,ui-app-submenu-device-page,元素：submenu-device-page,div,44,-,isOpenDevicePage ? 'open' : 'closed'
+showViewSettingsDialog,ui-app-submenu-params-container,元素：submenu-params-container,unknown,52,-,-
+showViewSettingsDialog,ui-app-device-connection-panel,元素：device-connection-panel,unknown,60,-,-
+showViewSettingsDialog,ui-app-select-confirm-driver,元素：select-confirm-driver,unknown,69,-,-
+showViewSettingsDialog,
+                    'ui-app-select-confirm-driver-option-'
+                    + String((item && item.value) || item || 'unknown').replace(/[^A-Za-z0-9]+/g, '')
+                  ,元素：select-confirm-driver-option-'
+                    + String((item && item.value) || item || 'unknown').replace(/[^A-Za-z0-9]+/g, '')
+                  ,unknown,74,-,-
+showViewSettingsDialog,ui-app-select-on-connection-mode-change,元素：select-on-connection-mode-change,unknown,98,-,-
+showViewSettingsDialog,
+                        'ui-app-select-connection-mode-option-'
+                        + String((item && item.value) || item || 'unknown').replace(/[^A-Za-z0-9]+/g, '')
+                      ,元素：select-connection-mode-option-'
+                        + String((item && item.value) || item || 'unknown').replace(/[^A-Za-z0-9]+/g, '')
+                      ,unknown,103,-,-
+showViewSettingsDialog,ui-app-select-confirm-driver-2,元素：select-confirm-driver-2,unknown,120,-,-
+showViewSettingsDialog,ui-app-select-auto,元素：select-auto,unknown,126,-,-
+showViewSettingsDialog,ui-app-select-auto-2,元素：select-auto-2,unknown,137,-,-
+showViewSettingsDialog,ui-app-btn-clear-driver,元素：btn-clear-driver,button,149,-,-
+showViewSettingsDialog,ui-app-btn-connect-driver,元素：btn-connect-driver,unknown,158,-,-
+showViewSettingsDialog,
+              'ui-app-config-item-'
+              + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')
+              + '-'
+              + String(item.label || 'Field').replace(/[^A-Za-z0-9]+/g, '')
+              + '-'
+              + index
+            ,元素：config-item-'
+              + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')
+              + '-'
+              + String(item.label || 'Field').replace(/[^A-Za-z0-9]+/g, '')
+              + '-'
+              + index
+            ,unknown,175,-,-
+showViewSettingsDialog,
+                  'ui-config-'
+                  + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')
+                  + '-'
+                  + String(item.label || 'Field').replace(/[^A-Za-z0-9]+/g, '')
+                  + '-text-'
+                  + index
+                ,元素：'
+                  + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')
+                  + '-'
+                  + String(item.label || 'Field').replace(/[^A-Za-z0-9]+/g, '')
+                  + '-text-'
+                  + index
+                ,unknown,199,-,-
+showViewSettingsDialog,
+                  'ui-config-'
+                  + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')
+                  + '-' 
+                  + String(item.label || 'Field').replace(/[^A-Za-z0-9]+/g, '')
+                  + '-number-'
+                  + index
+                ,元素：'
+                  + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')
+                  + '-' 
+                  + String(item.label || 'Field').replace(/[^A-Za-z0-9]+/g, '')
+                  + '-number-'
+                  + index
+                ,unknown,224,-,-
+showViewSettingsDialog,
+                      'ui-config-'
+                      + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')
+                      + '-'
+                      + String(item.label || 'Field').replace(/[^A-Za-z0-9]+/g, '')
+                      + '-slider-dec-'
+                      + index
+                    ,元素：'
+                      + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')
+                      + '-'
+                      + String(item.label || 'Field').replace(/[^A-Za-z0-9]+/g, '')
+                      + '-slider-dec-'
+                      + index
+                    ,unknown,245,-,-
+showViewSettingsDialog,
+                      'ui-config-'
+                      + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')
+                      + '-'
+                      + String(item.label || 'Field').replace(/[^A-Za-z0-9]+/g, '')
+                      + '-slider-'
+                      + index
+                    ,元素：'
+                      + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')
+                      + '-'
+                      + String(item.label || 'Field').replace(/[^A-Za-z0-9]+/g, '')
+                      + '-slider-'
+                      + index
+                    ,unknown,269,-,-
+showViewSettingsDialog,
+                      'ui-config-'
+                      + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')
+                      + '-'
+                      + String(item.label || 'Field').replace(/[^A-Za-z0-9]+/g, '')
+                      + '-slider-inc-'
+                      + index
+                    ,元素：'
+                      + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')
+                      + '-'
+                      + String(item.label || 'Field').replace(/[^A-Za-z0-9]+/g, '')
+                      + '-slider-inc-'
+                      + index
+                    ,unknown,285,-,-
+showViewSettingsDialog,
+                  'ui-config-'
+                  + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')
+                  + '-'
+                  + String(item.label || 'Field').replace(/[^A-Za-z0-9]+/g, '')
+                  + '-select-'
+                  + index
+                ,元素：'
+                  + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')
+                  + '-'
+                  + String(item.label || 'Field').replace(/[^A-Za-z0-9]+/g, '')
+                  + '-select-'
+                  + index
+                ,unknown,310,-,-
+showViewSettingsDialog,
+                  'ui-config-'
+                  + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')
+                  + '-'
+                  + String(item.label || 'Field').replace(/[^A-Za-z0-9]+/g, '')
+                  + '-switch-'
+                  + index
+                ,元素：'
+                  + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')
+                  + '-'
+                  + String(item.label || 'Field').replace(/[^A-Za-z0-9]+/g, '')
+                  + '-switch-'
+                  + index
+                ,unknown,328,-,-
+showViewSettingsDialog,
+                    'ui-config-'
+                    + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')
+                    + '-'
+                    + String(item.label || item.buttonText || 'Button').replace(/[^A-Za-z0-9]+/g, '')
+                    + '-button-'
+                    + index
+                  ,元素：'
+                    + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')
+                    + '-'
+                    + String(item.label || item.buttonText || 'Button').replace(/[^A-Za-z0-9]+/g, '')
+                    + '-button-'
+                    + index
+                  ,unknown,359,-,-
+showViewSettingsDialog,ui-app-btn-disconnect-driver,元素：btn-disconnect-driver,unknown,395,-,-
+showViewSettingsDialog,ui-power-manager-root,元素：manager-root,unknown,408,-,-
+showViewSettingsDialog,ui-app-power-page-output-power-1,元素：power-page-output-power-1,unknown,420,-,-
+showViewSettingsDialog,ui-app-power-page-output-power-2,元素：power-page-output-power-2,unknown,440,-,-
+showViewSettingsDialog,ui-app-power-page-restart,元素：power-page-restart,v,461,-,-
+showViewSettingsDialog,ui-app-power-page-shutdown,元素：power-page-shutdown,v,473,-,-
+showViewSettingsDialog,ui-app-power-page-force-update,元素：power-page-force-update,v,485,-,-
+showViewSettingsDialog,ui-app-menu-drawer,元素：menu-drawer,unknown,513,-,-
+showViewSettingsDialog,ui-app-menu-quit,元素：menu-quit,v,547,-,-
+showViewSettingsDialog,ui-app-menu-general-settings,元素：menu-general-settings,v,561,-,-
+showViewSettingsDialog,ui-app-menu-open-power-manager,元素：menu-open-power-manager,v,575,-,-
+showViewSettingsDialog,`ui-app-menu-device-${device && device.driverType ? device.driverType : UNKNOWN_DRIVER_TYPE}`,元素：menu-device-${device && device.driverType ? device.driverType : UNKNOWN_DRIVER_TYPE}`,unknown,596,-,-
+showViewSettingsDialog,ui-app-menu-connect-all,元素：menu-connect-all,unknown,630,-,-
+showViewSettingsDialog,ui-app-menu-disconnect-all,元素：menu-disconnect-all,v,649,-,-
+showViewSettingsDialog,ui-app-menu-device-allocation,元素：menu-device-allocation,v,663,-,-
+showViewSettingsDialog,ui-app-menu-calibrate-polar-axis,元素：menu-calibrate-polar-axis,v,677,-,-
+showViewSettingsDialog,ui-app-menu-open-image-manager,元素：menu-open-image-manager,v,691,-,-
+showViewSettingsDialog,ui-app-menu-open-debug-log,元素：menu-open-debug-log,v,705,-,-
+showViewSettingsDialog,ui-app-menu-location,元素：menu-location,v,721,-,-
+showViewSettingsDialog,ui-app-menu-refresh-page,元素：menu-refresh-page,unknown,740,-,-
+showViewSettingsDialog,ui-app-menu-data-credits,元素：menu-data-credits,v,756,-,-
+AutomaticPolarAlignmentCalibration,pa-root,根容器：root,unknown,4,-,-
+AutomaticPolarAlignmentCalibration,pa-minimized,元素：minimized,unknown,13,-,-
+AutomaticPolarAlignmentCalibration,pa-minimized-header,元素：header,div,16,-,-
+AutomaticPolarAlignmentCalibration,pa-minimized-drag-handle,元素：drag-handle,unknown,21,-,-
+AutomaticPolarAlignmentCalibration,pa-minimized-icon,元素：icon,v,23,-,-
+AutomaticPolarAlignmentCalibration,pa-minimized-title,元素：title,span,24,-,-
+AutomaticPolarAlignmentCalibration,pa-minimized-controls,元素：controls,div,27,-,-
+AutomaticPolarAlignmentCalibration,pa-btn-expand-from-minimized,按钮：expand-from-minimized,unknown,32,-,-
+AutomaticPolarAlignmentCalibration,pa-icon-expand-from-minimized,图标：expand-from-minimized,v,34,-,-
+AutomaticPolarAlignmentCalibration,pa-minimized-status,元素：status,div,39,-,-
+AutomaticPolarAlignmentCalibration,pa-connection-indicator-minimized,元素：indicator-minimized,unknown,43,-,-
+AutomaticPolarAlignmentCalibration,pa-connection-text-minimized,元素：text-minimized,span,46,-,-
+AutomaticPolarAlignmentCalibration,pa-widget,元素：widget,unknown,62,-,-
+AutomaticPolarAlignmentCalibration,pa-header,元素：header,div,66,-,-
+AutomaticPolarAlignmentCalibration,pa-header-drag-handle,元素：drag-handle,unknown,71,-,-
+AutomaticPolarAlignmentCalibration,pa-header-left,元素：left,div,73,-,-
+AutomaticPolarAlignmentCalibration,pa-header-icon,元素：icon,v,74,-,-
+AutomaticPolarAlignmentCalibration,pa-header-title,元素：title,span,75,-,-
+AutomaticPolarAlignmentCalibration,pa-connection-indicator,元素：indicator,div,76,-,-
+AutomaticPolarAlignmentCalibration,pa-connection-dot,元素：dot,unknown,80,-,-
+AutomaticPolarAlignmentCalibration,pa-header-controls,元素：controls,div,87,-,-
+AutomaticPolarAlignmentCalibration,pa-btn-toggle-collapse,按钮：toggle-collapse,unknown,92,-,-
+AutomaticPolarAlignmentCalibration,pa-icon-toggle-collapse,图标：toggle-collapse,v,94,-,-
+AutomaticPolarAlignmentCalibration,pa-btn-toggle-trajectory,按钮：toggle-trajectory,unknown,103,-,-
+AutomaticPolarAlignmentCalibration,pa-icon-toggle-trajectory,图标：toggle-trajectory,v,106,-,-
+AutomaticPolarAlignmentCalibration,pa-btn-minimize,按钮：minimize,unknown,115,-,-
+AutomaticPolarAlignmentCalibration,pa-icon-minimize,图标：minimize,v,117,-,-
+AutomaticPolarAlignmentCalibration,pa-content-collapsed,元素：collapsed,unknown,127,-,-
+AutomaticPolarAlignmentCalibration,pa-collapsed-info,元素：info,div,129,-,-
+AutomaticPolarAlignmentCalibration,pa-collapsed-progress,元素：progress,div,130,-,-
+AutomaticPolarAlignmentCalibration,pa-collapsed-progress-circle,元素：progress-circle,unknown,134,-,-
+AutomaticPolarAlignmentCalibration,pa-collapsed-progress-text,元素：progress-text,span,137,-,-
+AutomaticPolarAlignmentCalibration,pa-collapsed-status,元素：status,div,143,-,-
+AutomaticPolarAlignmentCalibration,pa-collapsed-azimuth,元素：azimuth,div,144,-,-
+AutomaticPolarAlignmentCalibration,pa-collapsed-azimuth-label,元素：azimuth-label,span,145,-,-
+AutomaticPolarAlignmentCalibration,pa-collapsed-azimuth-value,元素：azimuth-value,unknown,149,-,-
+AutomaticPolarAlignmentCalibration,pa-collapsed-altitude,元素：altitude,div,156,-,-
+AutomaticPolarAlignmentCalibration,pa-collapsed-altitude-label,元素：altitude-label,span,157,-,-
+AutomaticPolarAlignmentCalibration,pa-collapsed-altitude-value,元素：altitude-value,unknown,161,-,-
+AutomaticPolarAlignmentCalibration,pa-content-expanded,元素：expanded,unknown,176,-,-
+AutomaticPolarAlignmentCalibration,pa-sections,元素：sections,div,178,-,-
+AutomaticPolarAlignmentCalibration,pa-calibration-progress,元素：progress,div,180,-,-
+AutomaticPolarAlignmentCalibration,pa-progress-header,元素：header,div,181,-,-
+AutomaticPolarAlignmentCalibration,pa-progress-title,元素：title,div,182,-,-
+AutomaticPolarAlignmentCalibration,pa-calibration-loop-info,元素：loop-info,unknown,186,-,-
+AutomaticPolarAlignmentCalibration,pa-progress-bar,元素：bar,div,193,-,-
+AutomaticPolarAlignmentCalibration,pa-progress-fill,元素：fill,unknown,197,-,-
+AutomaticPolarAlignmentCalibration,pa-progress-nodes,元素：nodes,div,201,-,-
+AutomaticPolarAlignmentCalibration,pa-step-initialization,元素：initialization,div,203,-,-
+AutomaticPolarAlignmentCalibration,pa-step-initialization-circle,元素：initialization-circle,div,204,-,-
+AutomaticPolarAlignmentCalibration,pa-step-initialization-label,元素：initialization-label,div,208,-,-
+AutomaticPolarAlignmentCalibration,pa-step-calibration-1,元素：calibration-1,div,212,-,-
+AutomaticPolarAlignmentCalibration,pa-step-calibration-1-circle,元素：calibration-1-circle,div,213,-,-
+AutomaticPolarAlignmentCalibration,pa-step-calibration-1-label,元素：calibration-1-label,div,217,-,-
+AutomaticPolarAlignmentCalibration,pa-step-calibration-2,元素：calibration-2,div,221,-,-
+AutomaticPolarAlignmentCalibration,pa-step-calibration-2-circle,元素：calibration-2-circle,div,222,-,-
+AutomaticPolarAlignmentCalibration,pa-step-calibration-2-label,元素：calibration-2-label,div,226,-,-
+AutomaticPolarAlignmentCalibration,pa-step-calibration-3,元素：calibration-3,div,230,-,-
+AutomaticPolarAlignmentCalibration,pa-step-calibration-3-circle,元素：calibration-3-circle,div,231,-,-
+AutomaticPolarAlignmentCalibration,pa-step-calibration-3-label,元素：calibration-3-label,div,235,-,-
+AutomaticPolarAlignmentCalibration,pa-step-guidance-calibration,元素：guidance-calibration,unknown,242,-,-
+AutomaticPolarAlignmentCalibration,pa-step-guidance-calibration-circle,元素：guidance-calibration-circle,div,245,-,-
+AutomaticPolarAlignmentCalibration,pa-step-guidance-calibration-label,元素：guidance-calibration-label,div,250,-,-
+AutomaticPolarAlignmentCalibration,pa-step-verification,元素：verification,unknown,257,-,-
+AutomaticPolarAlignmentCalibration,pa-step-verification-circle,元素：verification-circle,div,260,-,-
+AutomaticPolarAlignmentCalibration,pa-step-verification-label,元素：verification-label,div,264,-,-
+AutomaticPolarAlignmentCalibration,pa-log-section,元素：section,div,271,-,-
+AutomaticPolarAlignmentCalibration,pa-log-display,元素：display,div,272,-,-
+AutomaticPolarAlignmentCalibration,pa-latest-log,元素：log,unknown,277,-,-
+AutomaticPolarAlignmentCalibration,pa-latest-log-timestamp,元素：log-timestamp,div,280,-,-
+AutomaticPolarAlignmentCalibration,pa-latest-log-message,元素：log-message,div,283,-,-
+AutomaticPolarAlignmentCalibration,pa-log-empty,元素：empty,div,288,-,-
+AutomaticPolarAlignmentCalibration,pa-position-section,元素：section,div,295,-,-
+AutomaticPolarAlignmentCalibration,pa-position-grid,元素：grid,div,296,-,-
+AutomaticPolarAlignmentCalibration,pa-pos-current-ra,元素：current-ra,div,297,-,-
+AutomaticPolarAlignmentCalibration,pa-pos-current-ra-label,元素：current-ra-label,div,298,-,-
+AutomaticPolarAlignmentCalibration,pa-pos-current-ra-value,元素：current-ra-value,div,299,-,-
+AutomaticPolarAlignmentCalibration,pa-pos-current-dec,元素：current-dec,div,302,-,-
+AutomaticPolarAlignmentCalibration,pa-pos-current-dec-label,元素：current-dec-label,div,303,-,-
+AutomaticPolarAlignmentCalibration,pa-pos-current-dec-value,元素：current-dec-value,div,304,-,-
+AutomaticPolarAlignmentCalibration,pa-pos-target-ra,元素：target-ra,div,307,-,-
+AutomaticPolarAlignmentCalibration,pa-pos-target-ra-label,元素：target-ra-label,div,308,-,-
+AutomaticPolarAlignmentCalibration,pa-pos-target-ra-value,元素：target-ra-value,div,309,-,-
+AutomaticPolarAlignmentCalibration,pa-pos-target-dec,元素：target-dec,div,312,-,-
+AutomaticPolarAlignmentCalibration,pa-pos-target-dec-label,元素：target-dec-label,div,313,-,-
+AutomaticPolarAlignmentCalibration,pa-pos-target-dec-value,元素：target-dec-value,div,314,-,-
+AutomaticPolarAlignmentCalibration,pa-adjustment-section,元素：section,div,320,-,-
+AutomaticPolarAlignmentCalibration,pa-adjustment-instructions,元素：instructions,div,321,-,-
+AutomaticPolarAlignmentCalibration,pa-adjust-azimuth,元素：azimuth,unknown,325,-,-
+AutomaticPolarAlignmentCalibration,pa-adjust-azimuth-icon,元素：azimuth-icon,div,328,-,-
+AutomaticPolarAlignmentCalibration,pa-adjust-azimuth-details,元素：azimuth-details,div,332,-,-
+AutomaticPolarAlignmentCalibration,pa-adjust-azimuth-header,元素：azimuth-header,div,333,-,-
+AutomaticPolarAlignmentCalibration,pa-adjust-azimuth-type,元素：azimuth-type,span,334,-,-
+AutomaticPolarAlignmentCalibration,pa-adjust-azimuth-value,元素：azimuth-value,span,335,-,-
+AutomaticPolarAlignmentCalibration,pa-adjust-azimuth-action,元素：azimuth-action,div,340,-,-
+AutomaticPolarAlignmentCalibration,pa-adjust-altitude,元素：altitude,unknown,349,-,-
+AutomaticPolarAlignmentCalibration,pa-adjust-altitude-icon,元素：altitude-icon,div,352,-,-
+AutomaticPolarAlignmentCalibration,pa-adjust-altitude-details,元素：altitude-details,div,356,-,-
+AutomaticPolarAlignmentCalibration,pa-adjust-altitude-header,元素：altitude-header,div,357,-,-
+AutomaticPolarAlignmentCalibration,pa-adjust-altitude-type,元素：altitude-type,span,358,-,-
+AutomaticPolarAlignmentCalibration,pa-adjust-altitude-value,元素：altitude-value,span,359,-,-
+AutomaticPolarAlignmentCalibration,pa-adjust-altitude-action,元素：altitude-action,div,364,-,-
+AutomaticPolarAlignmentCalibration,pa-control-section,元素：section,div,373,-,-
+AutomaticPolarAlignmentCalibration,pa-action-buttons,元素：buttons,div,374,-,-
+AutomaticPolarAlignmentCalibration,pa-btn-auto-calibration,按钮：auto-calibration,unknown,379,-,-
+AutomaticPolarAlignmentCalibration,pa-btn-auto-calibration-text,按钮：auto-calibration-text,span,384,-,-
+AutomaticPolarAlignmentCalibration,pa-btn-test-simulation,按钮：test-simulation,unknown,395,-,-
+AutomaticPolarAlignmentCalibration,pa-btn-test-simulation-text,按钮：test-simulation-text,span,398,-,-
+AutomaticPolarAlignmentCalibration,pa-guidance-indicator,元素：indicator,div,407,-,-
+AutomaticPolarAlignmentCalibration,pa-guidance-circle,元素：circle,unknown,416,-,-
+AutomaticPolarAlignmentCalibration,pa-guidance-svg,元素：svg,svg,420,-,-
+AutomaticPolarAlignmentCalibration,pa-guidance-bg,元素：bg,circle,421,-,-
+AutomaticPolarAlignmentCalibration,pa-guidance-bar,元素：bar,unknown,428,-,-
+AutomaticPolarAlignmentCalibration,pa-guidance-content,元素：content,div,432,-,-
+AutomaticPolarAlignmentCalibration,pa-guidance-step-icon,元素：step-icon,v,433,-,-
+AutomaticPolarAlignmentCalibration,pa-guidance-step-description,元素：step-description,div,434,-,-
+AutomaticPolarAlignmentCalibration,pa-guidance-star-count,元素：star-count,unknown,440,-,-
+AutomaticPolarAlignmentCalibration,pa-trajectory-overlay-fullscreen,元素：overlay-fullscreen,unknown,456,-,-
+AutomaticPolarAlignmentCalibration,pa-trajectory-canvas-fullscreen,元素：canvas-fullscreen,canvas,458,-,-
+AutomaticPolarAlignmentCalibration,pa-btn-trajectory-close,按钮：trajectory-close,unknown,464,-,-
+AutomaticPolarAlignmentCalibration,pa-trajectory-hint,元素：hint,div,469,-,-
+AutomaticPolarAlignmentCalibration,pa-trajectory-panel,元素：panel,div,471,-,-
+AutomaticPolarAlignmentCalibration,pa-trajectory-panel-current,元素：panel-current,div,472,-,-
+AutomaticPolarAlignmentCalibration,pa-trajectory-panel-current-label,元素：panel-current-label,span,473,-,-
+AutomaticPolarAlignmentCalibration,pa-trajectory-panel-current-value,元素：panel-current-value,span,474,-,-
+AutomaticPolarAlignmentCalibration,pa-trajectory-panel-target,元素：panel-target,div,479,-,-
+AutomaticPolarAlignmentCalibration,pa-trajectory-panel-target-label,元素：panel-target-label,span,480,-,-
+AutomaticPolarAlignmentCalibration,pa-trajectory-panel-target-value,元素：panel-target-value,span,481,-,-
+AutomaticPolarAlignmentCalibration,pa-trajectory-panel-actions,元素：panel-actions,div,486,-,-
+AutomaticPolarAlignmentCalibration,pa-btn-clear-old-trajectory,按钮：clear-old-trajectory,button,487,-,-
+AutomaticPolarAlignmentCalibration,pa-btn-switch-to-windowed,按钮：switch-to-windowed,button,490,-,-
+AutomaticPolarAlignmentCalibration,pa-trajectory-overlay-windowed,元素：overlay-windowed,unknown,504,-,-
+AutomaticPolarAlignmentCalibration,pa-trajectory-window-header,元素：window-header,div,506,-,-
+AutomaticPolarAlignmentCalibration,pa-trajectory-window-title,元素：window-title,span,507,-,-
+AutomaticPolarAlignmentCalibration,pa-trajectory-window-actions,元素：window-actions,div,509,-,-
+AutomaticPolarAlignmentCalibration,pa-btn-switch-to-fullscreen,按钮：switch-to-fullscreen,button,510,-,-
+AutomaticPolarAlignmentCalibration,pa-btn-clear-old-trajectory-windowed,按钮：clear-old-trajectory-windowed,button,513,-,-
+AutomaticPolarAlignmentCalibration,pa-btn-trajectory-close-windowed,按钮：trajectory-close-windowed,unknown,520,-,-
+AutomaticPolarAlignmentCalibration,pa-trajectory-window-content,元素：window-content,div,527,-,-
+AutomaticPolarAlignmentCalibration,pa-trajectory-canvas-windowed,元素：canvas-windowed,canvas,528,-,-
+CFWSelectBtnBar,ui-cfwselect-btn-bar-root,元素：btn-bar-root,div,2,-,-
+CFWSelectBtnBar,ui-cfwselect-btn-bar-btn-select-cfw,元素：btn-bar-btn-select-cfw,unknown,6,-,-
+CapturePanel,cp-panel,面板：panel,unknown,6,-,-
+CapturePanel,cp-camera-temperature,元素：temperature,unknown,10,-,-
+CapturePanel,cp-direction-controls,元素：controls,div,15,-,-
+CapturePanel,cp-btn-exptime-minus,按钮：exptime-minus,unknown,19,-,-
+CapturePanel,cp-icon-exptime-minus,图标：exptime-minus,span,21,-,-
+CapturePanel,cp-btn-exptime-plus,按钮：exptime-plus,unknown,29,-,-
+CapturePanel,cp-icon-exptime-plus,图标：exptime-plus,span,31,-,-
+CapturePanel,cp-btn-cfw-minus,按钮：cfw-minus,unknown,40,-,-
+CapturePanel,cp-icon-cfw-minus,图标：cfw-minus,span,43,-,-
+CapturePanel,cp-btn-cfw-plus,按钮：cfw-plus,unknown,52,-,-
+CapturePanel,cp-icon-cfw-plus,图标：cfw-plus,span,55,-,-
+CapturePanel,cp-exptime-value,元素：value,unknown,63,-,-
+CapturePanel,cp-cfw-display,元素：display,unknown,72,-,-
+CapturePanel,cp-cfw-moving-dots,元素：moving-dots,div,76,-,-
+CapturePanel,cp-cfw-moving-rotor,元素：moving-rotor,div,77,-,-
+CapturePanel,cp-cfw-dot-0,元素：dot-0,span,78,-,-
+CapturePanel,cp-cfw-dot-1,元素：dot-1,span,79,-,-
+CapturePanel,cp-cfw-dot-2,元素：dot-2,span,80,-,-
+CapturePanel,cp-cfw-dot-3,元素：dot-3,span,81,-,-
+CapturePanel,cp-cfw-dot-4,元素：dot-4,span,82,-,-
+CapturePanel,cp-cfw-dot-5,元素：dot-5,span,83,-,-
+CapturePanel,cp-cfw-dot-6,元素：dot-6,span,84,-,-
+CapturePanel,cp-cfw-dot-7,元素：dot-7,span,85,-,-
+CapturePanel,cp-cfw-value,元素：value,unknown,92,-,-
+CapturePanel,cp-capture,元素：capture,div,100,-,-
+CapturePanel,cp-btn-capture,按钮：capture,CircularProgressButton,101,-,-
+CapturePanel,cp-secondary-panels,元素：panels,div,104,-,-
+CapturePanel,cp-btn-toggle-focuser,按钮：toggle-focuser,unknown,108,-,-
+CapturePanel,cp-btn-toggle-focuser-content,按钮：toggle-focuser-content,div,110,-,-
+CapturePanel,cp-img-focuser,图片：focuser,unknown,115,-,-
+CapturePanel,cp-btn-toggle-histogram,按钮：toggle-histogram,unknown,123,-,-
+CapturePanel,cp-btn-toggle-histogram-content,按钮：toggle-histogram-content,div,125,-,-
+CapturePanel,cp-img-histogram,图片：histogram,unknown,130,-,-
+CapturePanel,cp-status,元素：status,unknown,137,-,-
+CapturePanel,cp-status-icon,元素：icon,span,140,-,-
+CapturePanel,cp-status-icon-content,元素：icon-content,div,141,-,-
+CapturePanel,cp-img-status,图片：status,unknown,146,-,-
+CapturePanel,cp-save,元素：save,div,152,-,-
+CapturePanel,cp-btn-save,按钮：save,button,153,-,-
+CapturePanel,cp-btn-save-content,按钮：save-content,div,154,-,-
+CapturePanel,cp-img-save,图片：save,unknown,159,-,-
+LineChart,ui-chart-focus-root,元素：focus-root,div,2,-,-
+LineChart,ui-components-chart-focus-act-start-drag,元素：chart-focus-act-start-drag,unknown,13,-,-
+LineChart,ui-chart-focus-btn-close-panel,元素：focus-btn-close-panel,v,24,-,-
+ImageChart,ui-chart-focus-image-root,元素：focus-image-root,div,2,-,-
+BarChart,ui-chart-histogram-root,元素：histogram-root,div,2,-,-
+LineChart,ui-chart-line-root,元素：line-root,div,2,-,-
+ScatterChart,ui-chart-scatter-root,元素：scatter-root,div,2,-,-
+ScatterChart,ui-chart-scatter-btn-clear-chart-data,元素：scatter-btn-clear-chart-data,button,4,-,-
+ChartsPanel,ui-chart-component-root,元素：component-root,div,3,-,-
+ChartsPanel,ui-chart-component-btn-loop-exp-switch,元素：component-btn-loop-exp-switch,unknown,14,-,-
+ChartsPanel,ui-chart-component-btn-start-press,元素：component-btn-start-press,unknown,25,-,-
+ChartsPanel,ui-chart-component-btn-exp-time-switch,元素：component-btn-exp-time-switch,button,31,-,-
+ChartsPanel,ui-chart-component-btn-data-clear,元素：component-btn-data-clear,button,49,-,-
+ChartsPanel,ui-chart-component-btn-range-switch,元素：component-btn-range-switch,button,55,-,-
+CircularButton,ui-circular-button-root,元素：button-root,div,2,-,-
+CircularButton,ui-components-circular-button-act-handle-mouse-down,元素：circular-button-act-handle-mouse-down,unknown,11,-,-
+DeviceAllocationPanel,dap-root,根容器：root,unknown,8,-,-
+DeviceAllocationPanel,dap-act-selected-device-name,元素：selected-device-name,li,12,-,-
+DeviceAllocationPanel,dap-act-selected-device-name-2,元素：selected-device-name-2,li,28,-,-
+DeviceAllocationPanel,dap-act-close-panel,元素：close-panel,unknown,35,-,-
+DevicePicker,dp-picker,元素：picker,unknown,5,-,-
+DevicePicker,dp-device-type,元素：type,span,9,-,-
+DevicePicker,dp-device-name,元素：name,span,11,-,-
+DevicePicker,dp-btn-toggle-bind,按钮：toggle-bind,unknown,20,-,-
+Dial-Knob,ui-dial-knob-root,元素：knob-root,div,2,-,-
+Dial-Knob,ui-components-dial-knob-act-start-drag,元素：dial-knob-act-start-drag,div,3,-,-
+Dial-Knob,ui-components-dial-knob-act-start-second-drag,元素：dial-knob-act-start-second-drag,div,4,-,-
+FocuserPanel,fp-root,根容器：root,unknown,4,-,-
+FocuserPanel,fp-buttons-container,元素：container,div,8,-,-
+FocuserPanel,fp-btn-start-calibration,按钮：start-calibration,button,10,-,-
+FocuserPanel,fp-btn-toggle-loop-shooting,按钮：toggle-loop-shooting,button,22,-,-
+FocuserPanel,fp-btn-speed-change,按钮：speed-change,button,30,-,-
+FocuserPanel,fp-btn-speed-change-2,按钮：speed-change-2,button,31,-,-
+FocuserPanel,fp-btn-roichange,按钮：roichange,button,52,-,-
+FocuserPanel,fp-btn-focus-left-move,按钮：focus-left-move,button,73,-,-
+FocuserPanel,fp-btn-focus-move,按钮：focus-move,unknown,79,-,-
+FocuserPanel,fp-btn-auto-focus,按钮：auto-focus,button,86,-,-
+FocuserPanel,fp-btn-auto-focus-2,按钮：auto-focus-2,button,87,-,-
+FocuserPanel,fp-btn-focus-goto,按钮：focus-goto,button,102,-,-
+FocuserPanel,fp-btn-focus-right-move,按钮：focus-right-move,button,108,-,-
+FocuserPanel,fp-btn-focus-move-2,按钮：focus-move-2,unknown,116,-,-
+FocuserPanel,fp-state-current,元素：current,div,134,-,-
+HistogramPanel,hp-panel,面板：panel,unknown,13,-,-
+HistogramPanel,hp-chart,元素：chart,HistogramChart,15,-,-
+HistogramPanel,hp-dial-knob,元素：knob,DialKnob,16,-,-
+HistogramPanel,hp-buttons-container,元素：container,div,17,-,-
+HistogramPanel,hp-btn-white-balance,按钮：white-balance,button,18,-,-
+HistogramPanel,hp-img-white-balance,图片：white-balance,img,20,-,-
+HistogramPanel,hp-btn-auto,按钮：auto,button,24,-,-
+HistogramPanel,hp-icon-auto,图标：auto,button,24,-,-
+HistogramPanel,hp-btn-reset,按钮：reset,button,26,-,-
+HistogramPanel,hp-img-reset,图片：reset,img,28,-,-
+HistogramPanel,hp-btn-toggle-range,按钮：toggle-range,unknown,34,-,showEffectiveRange ? 'range' : 'full'
+HistogramPanel,hp-range-label-range,元素：label-range,span,35,-,-
+HistogramPanel,hp-range-label-full,元素：label-full,span,36,-,-
+ImageFolder,`ui-image-folder-root-${folderIndex}`,元素：folder-root-${folderIndex}`,unknown,7,-,-
+ImageFolder,`ui-image-folder-file-${folderIndex}-${index}`,元素：folder-file-${folderIndex}-${index}`,unknown,31,-,-
+ImageFolder,ui-imagefolder-btn-delete-confirm,元素：btn-delete-confirm,unknown,45,-,-
+ImageFolder,ui-imagefolder-btn-delete,元素：btn-delete,unknown,55,-,-
+ImageManagerPanel,imp-root,根容器：root,unknown,6,-,-
+ImageManagerPanel,imp-btn-move-file-to-usb,按钮：move-file-to-usb,button,10,-,-
+ImageManagerPanel,imp-btn-delete-folders,按钮：delete-folders,button,19,-,-
+ImageManagerPanel,imp-btn-delete-btn-click,按钮：delete-btn-click,button,23,-,-
+ImageManagerPanel,imp-btn-download-selected,按钮：download-selected,button,34,-,-
+ImageManagerPanel,imp-act-image-file-switch,元素：image-file-switch,span,38,-,-
+ImageManagerPanel,imp-btn-image-file-switch,按钮：image-file-switch,button,40,-,-
+ImageManagerPanel,imp-btn-panel-close,按钮：panel-close,button,68,-,-
+ImageManagerPanel,imp-act-close-usbselect-dialog,元素：close-usbselect-dialog,div,95,-,-
+ImageManagerPanel,imp-act-usb-select-dialog,元素：usb-select-dialog,div,96,-,-
+ImageManagerPanel,imp-btn-close-usbselect-dialog,按钮：close-usbselect-dialog,button,99,-,-
+ImageManagerPanel,imp-act-select-usb,元素：select-usb,unknown,109,-,-
+ImageManagerPanel,imp-act-close-download-confirm-dialog,元素：close-download-confirm-dialog,div,123,-,-
+ImageManagerPanel,imp-act-usb-select-dialog-2,元素：usb-select-dialog-2,div,124,-,-
+ImageManagerPanel,imp-btn-close-download-confirm-dialog,按钮：close-download-confirm-dialog,button,127,-,-
+ImageManagerPanel,imp-select-download-concurrency,选择：download-concurrency,select,138,-,-
+ImageManagerPanel,imp-btn-close-download-confirm-dialog-2,按钮：close-download-confirm-dialog-2,button,148,-,-
+ImageManagerPanel,imp-btn-confirm-start-download,按钮：confirm-start-download,button,149,-,-
+ImageManagerPanel,imp-act-close-download-location-reminder-dialog,元素：close-download-location-reminder-dialog,div,158,-,-
+ImageManagerPanel,imp-act-download-location-reminder-dialog,元素：download-location-reminder-dialog,div,159,-,-
+ImageManagerPanel,imp-btn-close-download-location-reminder-dialog,按钮：close-download-location-reminder-dialog,button,162,-,-
+ImageManagerPanel,imp-btn-cancel-download-location-reminder-dialog,按钮：cancel-download-location-reminder-dialog,button,175,-,-
+ImageManagerPanel,imp-btn-continue-download-location-reminder-dialog,按钮：continue-download-location-reminder-dialog,button,176,-,-
+ImageManagerPanel,imp-btn-toggle-download-panel,按钮：toggle-download-panel,button,191,-,-
+ImageManagerPanel,imp-btn-cancel-all-downloads,按钮：cancel-all-downloads,button,194,-,-
+ImageManagerPanel,imp-select-download-concurrency-2,选择：download-concurrency-2,select,196,-,-
+ImageManagerPanel,imp-btn-pause-download,按钮：pause-download,unknown,213,-,-
+ImageManagerPanel,imp-btn-resume-download,按钮：resume-download,unknown,221,-,-
+ImageManagerPanel,imp-btn-cancel-download,按钮：cancel-download,unknown,229,-,-
+ImageManagerPanel,imp-btn-auto,按钮：auto,unknown,249,-,-
+LocationFocalInputs,ui-location-focal-inputs-root,元素：focal-inputs-root,div,2,-,-
+LocationFocalInputs,ui-components-location-focal-inputs-act-expand-inputs,元素：location-focal-inputs-act-expand-inputs,div,4,-,-
+LocationFocalInputs,ui-location-focal-inputs-input-t,元素：focal-inputs-input-t,unknown,29,-,-
+LocationFocalInputs,ui-location-focal-inputs-input-t-2,元素：focal-inputs-input-t-2,unknown,44,-,-
+LocationFocalInputs,ui-location-focal-inputs-input-t-3,元素：focal-inputs-input-t-3,unknown,59,-,-
+LocationFocalInputs,ui-location-focal-inputs-btn-collapse-inputs,元素：focal-inputs-btn-collapse-inputs,v,60,-,-
+LocationFocalInputs,ui-components-location-focal-inputs-act-handle-keyboard-input,元素：location-focal-inputs-act-handle-keyboard-input,unknown,76,-,-
+MeridianFlipNotifier,ui-meridian-flip-notifier-root,元素：flip-notifier-root,div,2,-,-
+MeridianFlipNotifier,ui-meridian-flip-notifier-btn-select-mode,元素：flip-notifier-btn-select-mode,button,9,-,-
+MeridianFlipNotifier,ui-meridian-flip-notifier-btn-select-mode-2,元素：flip-notifier-btn-select-mode-2,button,10,-,-
+MeridianFlipNotifier,ui-meridian-flip-notifier-btn-trigger-flip-now,元素：flip-notifier-btn-trigger-flip-now,button,11,-,-
+MeridianFlipNotifier,ui-meridian-flip-notifier-btn-close-banner,元素：flip-notifier-btn-close-banner,button,13,-,-
+MeridianFlipNotifier,ui-components-meridian-flip-notifier-act-close-center,元素：meridian-flip-notifier-act-close-center,div,21,-,-
+MeridianFlipNotifier,ui-meridian-flip-notifier-btn-select-mode-3,元素：flip-notifier-btn-select-mode-3,button,26,-,-
+MeridianFlipNotifier,ui-meridian-flip-notifier-btn-select-mode-4,元素：flip-notifier-btn-select-mode-4,button,27,-,-
+MeridianFlipNotifier,ui-meridian-flip-notifier-btn-trigger-flip-now-2,元素：flip-notifier-btn-trigger-flip-now-2,button,28,-,-
+MeridianFlipNotifier,ui-meridian-flip-notifier-btn-close-center,元素：flip-notifier-btn-close-center,button,29,-,-
+MeridianFlipNotifier,ui-meridian-flip-notifier-btn-select-mode-5,元素：flip-notifier-btn-select-mode-5,button,51,-,-
+MeridianFlipNotifier,ui-meridian-flip-notifier-btn-select-mode-6,元素：flip-notifier-btn-select-mode-6,button,53,-,-
+MeridianFlipNotifier,ui-meridian-flip-notifier-btn-trigger-flip-now-3,元素：flip-notifier-btn-trigger-flip-now-3,button,54,-,-
+MeridianFlipNotifier,ui-meridian-flip-notifier-btn-close-mini,元素：flip-notifier-btn-close-mini,button,55,-,-
+MessageBox,ui-message-box-root,元素：box-root,unknown,4,-,-
+MountControlPanel,mcp-panel,面板：panel,unknown,5,-,-
+MountControlPanel,mcp-display,元素：display,div,6,-,-
+MountControlPanel,mcp-combined-text,元素：text,div,8,-,-
+MountControlPanel,mcp-pier-side-text,元素：side-text,div,9,-,-
+MountControlPanel,mcp-separator,元素：separator,div,10,-,-
+MountControlPanel,mcp-radec-text,元素：text,div,11,-,-
+MountControlPanel,mcp-value-ra,数值：ra,span,12,-,-
+MountControlPanel,mcp-value-dec,数值：dec,span,13,-,-
+MountControlPanel,mcp-direction-controls,元素：controls,div,18,-,-
+MountControlPanel,mcp-btn-ra-plus,按钮：ra-plus,unknown,20,-,-
+MountControlPanel,mcp-img-ra-plus,图片：ra-plus,unknown,23,-,-
+MountControlPanel,mcp-btn-ra-minus,按钮：ra-minus,unknown,27,-,-
+MountControlPanel,mcp-img-ra-minus,图片：ra-minus,unknown,30,-,-
+MountControlPanel,mcp-btn-dec-plus,按钮：dec-plus,unknown,34,-,-
+MountControlPanel,mcp-img-dec-plus,图片：dec-plus,unknown,37,-,-
+MountControlPanel,mcp-btn-dec-minus,按钮：dec-minus,unknown,41,-,-
+MountControlPanel,mcp-img-dec-minus,图片：dec-minus,unknown,44,-,-
+MountControlPanel,mcp-stop-container,元素：container,div,49,-,-
+MountControlPanel,mcp-btn-stop,按钮：stop,button,50,-,-
+MountControlPanel,mcp-icon-stop,图标：stop,button,50,-,-
+MountControlPanel,mcp-speed-container,元素：container,div,53,-,-
+MountControlPanel,mcp-btn-speed,按钮：speed,button,54,-,-
+MountControlPanel,mcp-speed-value,元素：value,span,55,-,-
+MountControlPanel,mcp-img-speed,图片：speed,unknown,59,-,-
+MountControlPanel,mcp-function-buttons,元素：buttons,div,64,-,-
+MountControlPanel,mcp-btn-park,按钮：park,unknown,66,-,ParkSwitch ? 'on' : 'off'
+MountControlPanel,mcp-img-park,图片：park,unknown,69,-,-
+MountControlPanel,mcp-btn-track,按钮：track,v,73,-,TrackSwitch ? 'on' : 'off'
+MountControlPanel,mcp-icon-track,图标：track,v,73,-,TrackSwitch ? 'on' : 'off'
+MountControlPanel,mcp-btn-home,按钮：home,unknown,75,-,-
+MountControlPanel,mcp-img-home,图片：home,unknown,78,-,-
+MountControlPanel,mcp-btn-sync,按钮：sync,unknown,82,-,-
+MountControlPanel,mcp-img-sync,图片：sync,unknown,85,-,-
+MountControlPanel,mcp-btn-solve,按钮：solve,unknown,90,-,-
+MountControlPanel,mcp-img-solve,图片：solve,unknown,93,-,-
+MountControlPanel,mcp-status,元素：status,div,98,-,-
+MountControlPanel,mcp-status-indicator-idle,元素：indicator-idle,span,99,-,idle
+MountControlPanel,mcp-img-status-idle,图片：status-idle,unknown,102,-,-
+MountControlPanel,mcp-status-indicator-busy,元素：indicator-busy,span,105,-,busy
+MountControlPanel,mcp-img-status-busy,图片：status-busy,unknown,108,-,-
+MountControlPanel,mcp-close-container,元素：container,div,113,-,-
+MountControlPanel,mcp-btn-close,按钮：close,button,114,-,-
+MountControlPanel,mcp-img-close,图片：close,unknown,117,-,-
+NumberKeyboard,ui-number-keyboard-root,元素：keyboard-root,div,3,-,-
+NumberKeyboard,ui-components-number-keyboard-act-handle-drag-start,元素：number-keyboard-act-handle-drag-start,unknown,10,-,-
+NumberKeyboard,ui-components-number-keyboard-act-keyboard-header,元素：number-keyboard-act-keyboard-header,div,11,-,-
+NumberKeyboard,ui-number-keyboard-btn-handle-close,元素：keyboard-btn-handle-close,v,18,-,-
+NumberKeyboard,ui-number-keyboard-btn-handle-key-press,元素：keyboard-btn-handle-key-press,unknown,35,-,-
+PolarAlignmentInfoPanel,ui-polar-alignment-info-panel-root,元素：alignment-info-panel-root,div,2,-,-
+ProgressBar,ui-progress-bar-root,元素：bar-root,unknown,5,-,-
+HotspotDialog,ui-rpi-hotspot-root,元素：hotspot-root,div,3,-,-
+HotspotDialog,ui-rpi-hotspot-input-input-text,元素：hotspot-input-input-text,v,4,-,-
+HotspotDialog,ui-rpi-hotspot-btn-update-hotspot-name,元素：hotspot-btn-update-hotspot-name,button,8,-,-
+HotspotDialog,ui-rpi-hotspot-btn-save-btn-click,元素：hotspot-btn-save-btn-click,button,12,-,-
+HotspotDialog,ui-rpi-hotspot-btn-redo-hotspot-name,元素：hotspot-btn-redo-hotspot-name,button,23,-,-
+RaDecDialog,ui-ra-dec-dialog-root,元素：dec-dialog-root,unknown,10,-,-
+RaDecDialog,ui-ra-dec-dialog-input-ra-str,元素：dec-dialog-input-ra-str,unknown,32,-,-
+RaDecDialog,ui-ra-dec-dialog-btn-auto,元素：dec-dialog-btn-auto,v,40,-,-
+RaDecDialog,ui-ra-dec-dialog-btn-auto-2,元素：dec-dialog-btn-auto-2,v,41,-,-
+RaDecDialog,ui-ra-dec-dialog-input-dec-str,元素：dec-dialog-input-dec-str,unknown,59,-,-
+RaDecDialog,ui-ra-dec-dialog-btn-on-cancel,元素：dec-dialog-btn-on-cancel,v,69,-,-
+RaDecDialog,ui-ra-dec-dialog-btn-on-ok,元素：dec-dialog-btn-on-ok,v,70,-,-
+Red-Box,ui-red-box-root,元素：box-root,div,2,-,-
+Red-Box,ui-components-red-box-act-start-drag,元素：red-box-act-start-drag,div,3,-,-
+SchedulePanel,scp-root,根容器：root,unknown,5,-,-
+SchedulePanel,scp-btn-toggle-left-toolbar,按钮：toggle-left-toolbar,unknown,15,-,-
+SchedulePanel,scp-btn-add-row,按钮：add-row,button,22,-,-
+SchedulePanel,scp-btn-delete-selected-row,按钮：delete-selected-row,unknown,31,-,-
+SchedulePanel,scp-btn-toggle-schedule,按钮：toggle-schedule,unknown,39,-,-
+SchedulePanel,scp-btn-open-save-preset-dialog,按钮：open-save-preset-dialog,button,50,-,-
+SchedulePanel,scp-btn-open-load-preset-dialog,按钮：open-load-preset-dialog,button,55,-,-
+SchedulePanel,scp-btn-close-panel,按钮：close-panel,unknown,67,-,-
+SchedulePanel,scp-act-select-cell,元素：select-cell,unknown,114,-,-
+SchedulePanel,scp-editor-clock-now,元素：clock-now,unknown,268,-,-
+SchedulePanel,scp-editor-clock-hour,元素：clock-hour,unknown,289,-,-
+SchedulePanel,scp-editor-clock-minute,元素：clock-minute,unknown,313,-,-
+SchedulePanel,scp-editor-exposure-preset,元素：exposure-preset,unknown,339,-,-
+SchedulePanel,`scp-editor-filter-pill-${idx}`,元素：filter-pill-${idx}`,unknown,375,-,-
+SchedulePanel,`scp-editor-type-pill-${idx}`,元素：type-pill-${idx}`,unknown,396,-,-
+SchedulePanel,`scp-editor-refocus-pill-${idx}`,元素：refocus-pill-${idx}`,unknown,417,-,-
+SchedulePanel,scp-editor-reps-value,元素：reps-value,div,428,-,-
+SchedulePanel,scp-editor-target-input,元素：target-input,unknown,441,-,-
+SchedulePanel,scp-editor-target-cycle-prefix,元素：target-cycle-prefix,button,445,-,-
+SchedulePanel,scp-editor-target-search-center,元素：target-search-center,button,448,-,-
+SchedulePanel,scp-editor-target-use-selected-object,元素：target-use-selected-object,button,452,-,-
+SchedulePanel,scp-editor-target-current-position,元素：target-current-position,unknown,460,-,-
+SchedulePanel,scp-editor-coordinate-ra,元素：coordinate-ra,unknown,477,-,-
+SchedulePanel,scp-editor-coordinate-dec,元素：coordinate-dec,unknown,487,-,-
+SchedulePanel,`scp-keypad-key-${k}`,元素：key-${k}`,unknown,534,-,-
+SchedulePanel,scp-keypad-unit-toggle,元素：unit-toggle,unknown,544,-,-
+SchedulePanel,scp-preset-dialog-root,元素：dialog-root,unknown,561,-,-
+SchedulePanel,scp-preset-btn-close,元素：btn-close,unknown,573,-,-
+SchedulePanel,scp-preset-list,元素：list,div,580,-,-
+SchedulePanel,scp-preset-item,元素：item,unknown,587,-,-
+SchedulePanel,scp-preset-empty,元素：empty,div,592,-,-
+SchedulePanel,scp-preset-input-name,元素：input-name,unknown,602,-,-
+SchedulePanel,scp-preset-btn-save,元素：btn-save,unknown,612,-,-
+SchedulePanel,scp-preset-btn-delete,元素：btn-delete,unknown,622,-,-
+SchedulePanel,scp-preset-btn-ok,元素：btn-ok,unknown,630,-,-
+Settings-Dialog-CFW,ui-settings-dialog-cfw-root,元素：dialog-cfw-root,v,2,-,-
+Settings-Dialog-CFW,ui-settings-dialog-cfw-btn-switch-page,元素：dialog-cfw-btn-switch-page,v,7,-,-
+Settings-Dialog-CFW,ui-settings-dialog-cfw-select-selected-driver,元素：dialog-cfw-select-selected-driver,v,13,-,-
+Settings-Dialog-CFW,ui-settings-dialog-cfw-btn-confirm-driver,元素：dialog-cfw-btn-confirm-driver,v,15,-,-
+Settings-Dialog-CFW,ui-settings-dialog-cfw-btn-connect-indi-server,元素：dialog-cfw-btn-connect-indi-server,v,16,-,-
+Settings-Dialog-CFW,ui-settings-dialog-cfw-select-selected-device,元素：dialog-cfw-select-selected-device,v,17,-,-
+Settings-Dialog-CFW,ui-settings-dialog-cfw-btn-confirm-device,元素：dialog-cfw-btn-confirm-device,v,19,-,-
+Settings-Dialog-CFW,ui-settings-dialog-cfw-input-value,元素：dialog-cfw-input-value,v,25,-,-
+Settings-Dialog-CFW,ui-settings-dialog-cfw-btn-confirm-configuration,元素：dialog-cfw-btn-confirm-configuration,v,26,-,-
+Settings-Dialog-CFW,ui-settings-dialog-cfw-btn-close-dialog,元素：dialog-cfw-btn-close-dialog,v,32,-,-
+Settings-Dialog-Focuser,ui-settings-dialog-focuser-root,元素：dialog-focuser-root,v,2,-,-
+Settings-Dialog-Focuser,ui-settings-dialog-focuser-btn-switch-page,元素：dialog-focuser-btn-switch-page,v,7,-,-
+Settings-Dialog-Focuser,ui-settings-dialog-focuser-select-selected-driver,元素：dialog-focuser-select-selected-driver,v,13,-,-
+Settings-Dialog-Focuser,ui-settings-dialog-focuser-btn-confirm-driver,元素：dialog-focuser-btn-confirm-driver,v,15,-,-
+Settings-Dialog-Focuser,ui-settings-dialog-focuser-btn-connect-indi-server,元素：dialog-focuser-btn-connect-indi-server,v,16,-,-
+Settings-Dialog-Focuser,ui-settings-dialog-focuser-select-selected-device,元素：dialog-focuser-select-selected-device,v,17,-,-
+Settings-Dialog-Focuser,ui-settings-dialog-focuser-btn-confirm-device,元素：dialog-focuser-btn-confirm-device,v,19,-,-
+Settings-Dialog-Focuser,ui-settings-dialog-focuser-input-value,元素：dialog-focuser-input-value,v,25,-,-
+Settings-Dialog-Focuser,ui-settings-dialog-focuser-btn-confirm-configuration,元素：dialog-focuser-btn-confirm-configuration,v,26,-,-
+Settings-Dialog-Focuser,ui-settings-dialog-focuser-btn-close-dialog,元素：dialog-focuser-btn-close-dialog,v,32,-,-
+Settings-Dialog-Guider,ui-settings-dialog-guider-root,元素：dialog-guider-root,v,2,-,-
+Settings-Dialog-Guider,ui-settings-dialog-guider-btn-switch-page,元素：dialog-guider-btn-switch-page,v,7,-,-
+Settings-Dialog-Guider,ui-settings-dialog-guider-select-selected-driver,元素：dialog-guider-select-selected-driver,v,13,-,-
+Settings-Dialog-Guider,ui-settings-dialog-guider-btn-confirm-driver,元素：dialog-guider-btn-confirm-driver,v,15,-,-
+Settings-Dialog-Guider,ui-settings-dialog-guider-btn-connect-indi-server,元素：dialog-guider-btn-connect-indi-server,v,16,-,-
+Settings-Dialog-Guider,ui-settings-dialog-guider-select-selected-device,元素：dialog-guider-select-selected-device,v,17,-,-
+Settings-Dialog-Guider,ui-settings-dialog-guider-btn-confirm-device,元素：dialog-guider-btn-confirm-device,v,19,-,-
+Settings-Dialog-Guider,ui-settings-dialog-guider-btn-clear-calibration-data,元素：dialog-guider-btn-clear-calibration-data,v,24,-,-
+Settings-Dialog-Guider,ui-settings-dialog-guider-input-value,元素：dialog-guider-input-value,v,26,-,-
+Settings-Dialog-Guider,ui-settings-dialog-guider-btn-confirm-configuration,元素：dialog-guider-btn-confirm-configuration,v,27,-,-
+Settings-Dialog-Guider,ui-settings-dialog-guider-btn-close-dialog,元素：dialog-guider-btn-close-dialog,v,33,-,-
+Settings-Dialog-MainCamera,ui-settings-dialog-main-camera-root,元素：dialog-main-camera-root,v,2,-,-
+Settings-Dialog-MainCamera,ui-settings-dialog-main-camera-btn-switch-page,元素：dialog-main-camera-btn-switch-page,v,7,-,-
+Settings-Dialog-MainCamera,ui-settings-dialog-main-camera-select-selected-driver,元素：dialog-main-camera-select-selected-driver,v,13,-,-
+Settings-Dialog-MainCamera,ui-settings-dialog-main-camera-btn-confirm-driver,元素：dialog-main-camera-btn-confirm-driver,v,15,-,-
+Settings-Dialog-MainCamera,ui-settings-dialog-main-camera-btn-connect-indi-server,元素：dialog-main-camera-btn-connect-indi-server,v,16,-,-
+Settings-Dialog-MainCamera,ui-settings-dialog-main-camera-select-selected-device,元素：dialog-main-camera-select-selected-device,v,17,-,-
+Settings-Dialog-MainCamera,ui-settings-dialog-main-camera-btn-confirm-device,元素：dialog-main-camera-btn-confirm-device,v,19,-,-
+Settings-Dialog-MainCamera,ui-settings-dialog-main-camera-input-value,元素：dialog-main-camera-input-value,v,25,-,-
+Settings-Dialog-MainCamera,ui-settings-dialog-main-camera-btn-confirm-configuration,元素：dialog-main-camera-btn-confirm-configuration,v,26,-,-
+Settings-Dialog-MainCamera,ui-settings-dialog-main-camera-btn-close-dialog,元素：dialog-main-camera-btn-close-dialog,v,32,-,-
+Settings-Dialog-Mount,ui-settings-dialog-mount-root,元素：dialog-mount-root,v,2,-,-
+Settings-Dialog-Mount,ui-settings-dialog-mount-btn-switch-page,元素：dialog-mount-btn-switch-page,v,7,-,-
+Settings-Dialog-Mount,ui-settings-dialog-mount-select-selected-driver,元素：dialog-mount-select-selected-driver,v,13,-,-
+Settings-Dialog-Mount,ui-settings-dialog-mount-btn-confirm-driver,元素：dialog-mount-btn-confirm-driver,v,15,-,-
+Settings-Dialog-Mount,ui-settings-dialog-mount-btn-connect-indi-server,元素：dialog-mount-btn-connect-indi-server,v,16,-,-
+Settings-Dialog-Mount,ui-settings-dialog-mount-select-selected-device,元素：dialog-mount-select-selected-device,v,17,-,-
+Settings-Dialog-Mount,ui-settings-dialog-mount-btn-confirm-device,元素：dialog-mount-btn-confirm-device,v,19,-,-
+Settings-Dialog-Mount,ui-settings-dialog-mount-input-value,元素：dialog-mount-input-value,v,25,-,-
+Settings-Dialog-Mount,ui-settings-dialog-mount-btn-confirm-configuration,元素：dialog-mount-btn-confirm-configuration,v,26,-,-
+Settings-Dialog-Mount,ui-settings-dialog-mount-btn-close-dialog,元素：dialog-mount-btn-close-dialog,v,32,-,-
+Settings-Dialog-PoleCamera,ui-settings-dialog-pole-camera-root,元素：dialog-pole-camera-root,v,2,-,-
+Settings-Dialog-PoleCamera,ui-settings-dialog-pole-camera-select-selected-driver,元素：dialog-pole-camera-select-selected-driver,v,10,-,-
+Settings-Dialog-PoleCamera,ui-settings-dialog-pole-camera-btn-confirm-driver,元素：dialog-pole-camera-btn-confirm-driver,v,12,-,-
+Settings-Dialog-PoleCamera,ui-settings-dialog-pole-camera-btn-connect-indi-server,元素：dialog-pole-camera-btn-connect-indi-server,v,13,-,-
+Settings-Dialog-PoleCamera,ui-settings-dialog-pole-camera-select-selected-device,元素：dialog-pole-camera-select-selected-device,v,14,-,-
+Settings-Dialog-PoleCamera,ui-settings-dialog-pole-camera-btn-confirm-device,元素：dialog-pole-camera-btn-confirm-device,v,16,-,-
+Settings-Dialog-PoleCamera,ui-settings-dialog-pole-camera-btn-close-dialog,元素：dialog-pole-camera-btn-close-dialog,v,25,-,-
+USBFilesDialog,ui-usbfiles-dialog-root,元素：dialog-root,v,2,-,-
+USBFilesDialog,ui-usbfiles-dialog-btn-navigate-up,元素：dialog-btn-navigate-up,v,18,-,-
+USBFilesDialog,ui-components-usbfiles-dialog-act-handle-item-click,元素：usbfiles-dialog-act-handle-item-click,unknown,31,-,-
+USBFilesDialog,ui-usbfiles-dialog-btn-blue-text,元素：dialog-btn-blue-text,v,52,-,-
+UpdateProgressDialog,ui-update-progress-dialog-root,元素：progress-dialog-root,div,2,-,-
+UpdateProgressDialog,ui-components-update-progress-dialog-act-update-dialog,元素：update-progress-dialog-act-update-dialog,div,3,-,-
+UpdateProgressDialog,ui-update-progress-dialog-btn-toggle-log-expand,元素：progress-dialog-btn-toggle-log-expand,button,25,-,-
+UpdateProgressDialog,ui-update-progress-dialog-btn-close-dialog,元素：progress-dialog-btn-close-dialog,button,43,-,-
+UpdateProgressDialog,ui-update-progress-dialog-btn-retry-update,元素：progress-dialog-btn-retry-update,button,44,-,-
+bottom-bar,bb-btnbar,元素：btnbar,unknown,13,-,-
+bottom-bar,bb-spacer-left,元素：left,v,16,-,-
+bottom-bar,bb-btn-constellations-lines,按钮：constellations-lines,unknown,19,-,-
+bottom-bar,bb-btn-constellations-art,按钮：constellations-art,unknown,31,-,-
+bottom-bar,bb-btn-atmosphere,按钮：atmosphere,unknown,43,-,-
+bottom-bar,bb-btn-landscape,按钮：landscape,unknown,55,-,-
+bottom-bar,bb-btn-grid-azimuthal,按钮：grid-azimuthal,unknown,67,-,-
+bottom-bar,bb-btn-grid-equatorial-jnow,按钮：grid-equatorial-jnow,unknown,79,-,-
+bottom-bar,bb-btn-grid-equatorial-j2000,按钮：grid-equatorial-j2000,unknown,91,-,-
+bottom-bar,bb-btn-dsos,按钮：dsos,unknown,103,-,-
+bottom-bar,bb-spacer-right,元素：right,v,115,-,-
+bottom-button,ui-bottom-button-root,元素：button-root,div,10,-,-
+data-credits-dialog,ui-data-credits-dialog-root,元素：credits-dialog-root,unknown,14,-,-
+data-credits-dialog,ui-data-credits-dialog-btn-blue-text,元素：credits-dialog-btn-blue-text,unknown,152,-,-
+date-time-picker,ui-date-time-picker-root,元素：time-picker-root,v,10,-,-
+date-time-picker,ui-date-time-picker-btn-inc-time,元素：time-picker-btn-inc-time,v,14,-,-
+date-time-picker,ui-date-time-picker-btn-inc-time-2,元素：time-picker-btn-inc-time-2,v,15,-,-
+date-time-picker,ui-date-time-picker-btn-inc-time-3,元素：time-picker-btn-inc-time-3,v,16,-,-
+date-time-picker,ui-date-time-picker-btn-dec-time,元素：time-picker-btn-dec-time,v,18,-,-
+date-time-picker,ui-date-time-picker-btn-dec-time-2,元素：time-picker-btn-dec-time-2,v,19,-,-
+date-time-picker,ui-date-time-picker-btn-dec-time-3,元素：time-picker-btn-dec-time-3,v,20,-,-
+date-time-picker,ui-date-time-picker-btn-reset-time,元素：time-picker-btn-reset-time,v,26,-,-
+gui-loader,ui-gui-loader-root,元素：loader-root,div,11,-,-
+gui,gui-root,根容器：root,unknown,11,-,-
+gui,gui-btn-toggle-image-manager-panel,按钮：toggle-image-manager-panel,button,43,-,-
+gui,gui-btn-recalibrate-polar-axis,按钮：recalibrate-polar-axis,button,49,-,-
+gui,gui-btn-single-solve-image,按钮：single-solve-image,unknown,59,-,-
+gui,gui-btn-loop-solve-image,按钮：loop-solve-image,unknown,77,-,-
+gui,gui-btn-toggle-mount-panel,按钮：toggle-mount-panel,unknown,91,-,-
+gui,gui-btn-switch-main-page,按钮：switch-main-page,unknown,126,-,-
+gui,gui-btn-toggle-charts-panel,按钮：toggle-charts-panel,unknown,155,-,-
+gui,gui-btn-quit-polar-axis-mode,按钮：quit-polar-axis-mode,unknown,174,-,-
+gui,gui-btn-hide-capture-ui,按钮：hide-capture-ui,unknown,191,-,-
+gui,gui-btn-show-capture-ui,按钮：show-capture-ui,unknown,203,-,-
+gui,gui-btn-get-original-image,按钮：get-original-image,unknown,215,-,-
+gui,gui-btn-scale-plus,按钮：scale-plus,unknown,234,-,-
+gui,gui-btn-scale-minus,按钮：scale-minus,unknown,246,-,-
+gui,ui-confirm-dialog-root,元素：dialog-root,unknown,306,-,-
+gui,ui-confirm-dialog-btn-close,元素：dialog-btn-close,unknown,323,-,-
+gui,ui-confirm-dialog-btn-autofocus-coarse,元素：dialog-btn-autofocus-coarse,unknown,344,-,-
+gui,ui-confirm-dialog-btn-autofocus-fine,元素：dialog-btn-autofocus-fine,unknown,351,-,-
+gui,ui-confirm-dialog-btn-cancel,元素：dialog-btn-cancel,unknown,362,-,-
+gui,ui-confirm-dialog-btn-confirm,元素：dialog-btn-confirm,unknown,369,-,-
+gui,gui-dslr-btn-toggle-tips,元素：btn-toggle-tips,unknown,413,-,-
+gui,gui-dslr-btn-confirm,元素：btn-confirm,unknown,421,-,-
+indiDebugDialog,ui-indi-debug-dialog-root,元素：debug-dialog-root,unknown,6,-,-
+indiDebugDialog,ui-indi-debug-dialog-btn-scroll-to-bottom,元素：debug-dialog-btn-scroll-to-bottom,button,15,-,-
+indiDebugDialog,ui-indi-debug-dialog-btn-clear-messages,元素：debug-dialog-btn-clear-messages,button,19,-,-
+indiDebugDialog,ui-indi-debug-dialog-btn-save-messages,元素：debug-dialog-btn-save-messages,button,25,-,-
+indiDebugDialog,ui-indi-debug-dialog-btn-toggle-error-debug,元素：debug-dialog-btn-toggle-error-debug,button,31,-,-
+indiDebugDialog,ui-indi-debug-dialog-btn-toggle-server-debug,元素：debug-dialog-btn-toggle-server-debug,button,44,-,-
+indiDebugDialog,ui-indi-debug-dialog-btn-toggle-client-debug,元素：debug-dialog-btn-toggle-client-debug,button,57,-,-
+indiDebugDialog,ui-indi-debug-dialog-btn-close,元素：debug-dialog-btn-close,button,70,-,-
+Unknown,ui-location-dialog-root,元素：dialog-root,unknown,13,-,-
+Unknown,ui-location-dialog-input-latitude,元素：dialog-input-latitude,unknown,30,-,-
+Unknown,ui-location-dialog-input-longitude,元素：dialog-input-longitude,unknown,44,-,-
+Unknown,ui-location-dialog-btn-save-manual-coordinates,元素：dialog-btn-save-manual-coordinates,v,48,-,-
+Unknown,ui-location-dialog-switch-handle-auto-location-change,元素：dialog-switch-handle-auto-location-change,v,52,-,-
+Unknown,ui-components-location-dialog-act-handle-keyboard-input,元素：location-dialog-act-handle-keyboard-input,unknown,66,-,-
+BigDataCloud-API,ui-location-mgr-root,元素：mgr-root,div,51,-,-
+BigDataCloud-API,ui-components-location-mgr-act-select-known-location,元素：location-mgr-act-select-known-location,v,56,-,-
+BigDataCloud-API,ui-location-mgr-switch-on-map-type-toggle,元素：mgr-switch-on-map-type-toggle,unknown,105,-,-
+observing-panel-root-toolbar,ui-observing-panel-root-toolbar-root,元素：panel-root-toolbar-root,v,11,-,-
+observing-panel-root-toolbar,ui-observing-panel-root-toolbar-btn-auto,元素：panel-root-toolbar-btn-auto,v,12,-,-
+observing-panel,ui-observing-panel-root,元素：panel-root,div,11,-,-
+observing-panel,ui-observing-panel-btn-tab-bt,元素：panel-btn-tab-bt,v,13,-,-
+planets-visibility,ui-planets-visibility-root,元素：visibility-root,v,10,-,-
+progress-bars,ui-progress-bars-root,元素：bars-root,div,10,-,-
+selected-object-info,ui-selected-object-info-root,元素：object-info-root,v,12,-,-
+selected-object-info,ui-selected-object-info-btn-auto,元素：object-info-btn-auto,v,13,-,-
+selected-object-info,ui-selected-object-info-btn-grey-text,元素：object-info-btn-grey-text,unknown,32,-,-
+selected-object-info,ui-selected-object-info-action-buttons,元素：object-info-action-buttons,div,75,-,-
+selected-object-info,ui-selected-object-info-btn-point-to,元素：object-info-btn-point-to,unknown,82,-,-
+selected-object-info,ui-selected-object-info-img-point-to,元素：object-info-img-point-to,unknown,88,-,-
+selected-object-info,ui-selected-object-info-btn-goto,元素：object-info-btn-goto,unknown,102,-,-
+selected-object-info,ui-selected-object-info-img-goto,元素：object-info-img-goto,unknown,108,-,-
+skysource-search,ui-skysource-search-root,元素：search-root,div,10,-,-
+skysource-search,ui-skysource-search-input-search-field,元素：search-input-search-field,v,11,-,-
+skysource-search,ui-components-skysource-search-act-source-clicked,元素：skysource-search-act-source-clicked,v,13,-,-
+target-search,ui-target-search-root,元素：search-root,div,10,-,-
+toolbar,tb-root,根容器：root,div,10,-,-
+toolbar,tb-act-toggle-navigation-drawer,元素：toggle-navigation-drawer,v,12,-,-
+toolbar,tb-btn-transparent,按钮：transparent,v,40,-,-
+toolbar,tb-btn-timer-pick-btn,按钮：timer-pick-btn,button,43,-,-
+toolbar,tb-btn-toggle-schedule-panel,按钮：toggle-schedule-panel,button,179,-,-
+USB1,ui-view-settings-dialog-root,元素：settings-dialog-root,unknown,13,-,-
+USB1,ui-view-settings-dialog-tab-display-settings,元素：settings-dialog-tab-display-settings,v,20,-,-
+USB1,ui-view-settings-dialog-tab-version-info,元素：settings-dialog-tab-version-info,v,21,-,-
+USB1,ui-view-settings-dialog-tab-memory-settings,元素：settings-dialog-tab-memory-settings,v,22,-,-
+USB1,ui-view-settings-dialog-checkbox-milky-way-on,元素：settings-dialog-checkbox-milky-way-on,v,32,-,-
+USB1,ui-view-settings-dialog-checkbox-milky-way-on-label,元素：settings-dialog-checkbox-milky-way-on-label,span,34,-,-
+USB1,ui-view-settings-dialog-checkbox-dss-on,元素：settings-dialog-checkbox-dss-on,v,37,-,-
+USB1,ui-view-settings-dialog-checkbox-dss-on-label,元素：settings-dialog-checkbox-dss-on-label,span,39,-,-
+USB1,ui-view-settings-dialog-checkbox-meridian-on,元素：settings-dialog-checkbox-meridian-on,v,44,-,-
+USB1,ui-view-settings-dialog-checkbox-meridian-on-label,元素：settings-dialog-checkbox-meridian-on-label,span,46,-,-
+USB1,ui-view-settings-dialog-checkbox-ecliptic-on,元素：settings-dialog-checkbox-ecliptic-on,v,49,-,-
+USB1,ui-view-settings-dialog-checkbox-ecliptic-on-label,元素：settings-dialog-checkbox-ecliptic-on-label,span,51,-,-
+USB1,ui-view-settings-dialog-checkbox-highfps-on,元素：settings-dialog-checkbox-highfps-on,v,64,-,-
+USB1,ui-view-settings-dialog-checkbox-highfps-on-label,元素：settings-dialog-checkbox-highfps-on-label,span,66,-,-
+USB1,ui-view-settings-dialog-select-switch-language,元素：settings-dialog-select-switch-language,v,73,-,-
+USB1,ui-system-version-total,元素：version-total,div,90,-,-
+USB1,ui-system-version-qt,元素：version-qt,div,94,-,-
+USB1,ui-system-version-vue,元素：version-vue,div,98,-,-
+USB1,ui-system-version-app,元素：version-app,div,102,-,-
+USB1,ui-view-settings-dialog-btn-refresh-devices,元素：settings-dialog-btn-refresh-devices,v,137,-,-
+USB1,ui-view-settings-dialog-btn-open-usbbrowser,元素：settings-dialog-btn-open-usbbrowser,v,163,-,-
+USB1,ui-view-settings-dialog-btn-open-usbbrowser-2,元素：settings-dialog-btn-open-usbbrowser-2,v,177,-,-
+USB1,ui-view-settings-dialog-btn-open-clear-box-dialog,元素：settings-dialog-btn-open-clear-box-dialog,v,192,-,-
+USB1,ui-view-settings-dialog-btn-clear-logs,元素：settings-dialog-btn-clear-logs,v,193,-,-
+USB1,ui-view-settings-dialog-btn-refresh-storage,元素：settings-dialog-btn-refresh-storage,v,198,-,-
+USB1,ui-view-settings-dialog-checkbox-cache,元素：settings-dialog-checkbox-cache,unknown,222,-,-
+USB1,ui-view-settings-dialog-checkbox-cache-label,元素：settings-dialog-checkbox-cache-label,span,224,-,-
+USB1,ui-view-settings-dialog-checkbox-update-pack,元素：settings-dialog-checkbox-update-pack,unknown,233,-,-
+USB1,ui-view-settings-dialog-checkbox-update-pack-label,元素：settings-dialog-checkbox-update-pack-label,span,235,-,-
+USB1,ui-view-settings-dialog-checkbox-backup,元素：settings-dialog-checkbox-backup,unknown,244,-,-
+USB1,ui-view-settings-dialog-checkbox-backup-label,元素：settings-dialog-checkbox-backup-label,span,246,-,-
+USB1,ui-view-settings-dialog-btn-on-cancel-clear-box,元素：settings-dialog-btn-on-cancel-clear-box,v,254,-,-
+USB1,ui-view-settings-dialog-btn-on-confirm-clear-box,元素：settings-dialog-btn-on-confirm-clear-box,unknown,261,-,-
+USB1,ui-view-settings-dialog-btn-blue-text,元素：settings-dialog-btn-blue-text,v,269,-,-

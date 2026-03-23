@@ -1,35 +1,35 @@
 <template>
-  <v-dialog max-width='300' v-model="$store.state.showDeviceSettingsDialog_CFW"> <!-- showDeviceSettingsDialog_Mount -->
+  <v-dialog max-width='300' v-model="$store.state.showDeviceSettingsDialog_CFW" data-testid="ui-settings-dialog-cfw-root"> <!-- showDeviceSettingsDialog_Mount -->
     <v-card v-if="$store.state.showDeviceSettingsDialog_CFW" class="secondary white--text">
       <v-card-title>
         <div class="text-h5">{{ $t('CFW Settings') }}</div>
         <div class="button-container">
-          <v-btn @click="SwitchPage" class="button-container">切换页面</v-btn>
+          <v-btn @click="SwitchPage" class="button-container" data-testid="ui-settings-dialog-cfw-btn-switch-page">切换页面</v-btn>
         </div>
       </v-card-title>
       <v-card-text>
         <!-- 设备连接的菜单内容 -->
         <div v-if="activeMenu === 'connection'">
-          <v-select label="选择驱动" :items="drivers" item-text="label" item-value="value" v-model="selectedDriver"></v-select>
+          <v-select label="选择驱动" :items="drivers" item-text="label" item-value="value" v-model="selectedDriver" data-testid="ui-settings-dialog-cfw-select-selected-driver"></v-select>
           <v-spacer></v-spacer>
-          <v-btn @click="confirmDriver">确定</v-btn>
-          <!-- <v-btn @click="connectIndiServer">连接indiServer</v-btn> -->
-          <v-select label="选择设备" :items="devices" item-text="label" item-value="value" v-model="selectedDevice"></v-select>
+          <v-btn @click="confirmDriver" data-testid="ui-settings-dialog-cfw-btn-confirm-driver">确定</v-btn>
+          <!-- <v-btn @click="connectIndiServer" data-testid="ui-settings-dialog-cfw-btn-connect-indi-server">连接indiServer</v-btn> -->
+          <v-select label="选择设备" :items="devices" item-text="label" item-value="value" v-model="selectedDevice" data-testid="ui-settings-dialog-cfw-select-selected-device"></v-select>
           <v-spacer></v-spacer>
-          <v-btn @click="confirmDevice">确定</v-btn>
+          <v-btn @click="confirmDevice" data-testid="ui-settings-dialog-cfw-btn-confirm-device">确定</v-btn>
         </div>
         <!-- 设备配置的菜单内容 -->
         <div v-if="activeMenu === 'configuration'">
           <!-- 设备配置的内容，您可以根据需要添加表单元素 -->
           <div v-for="(item, index) in configurationItems" :key="index">
-           <v-text-field v-model="item.value" :label="item.label"></v-text-field>
-           <v-btn @click="confirmConfiguration(item)">确定</v-btn>
+           <v-text-field v-model="item.value" :label="item.label" data-testid="ui-settings-dialog-cfw-input-value"></v-text-field>
+           <v-btn @click="confirmConfiguration(item)" data-testid="ui-settings-dialog-cfw-btn-confirm-configuration">确定</v-btn>
           </div>
         </div>
       </v-card-text>
       <v-card-actions>
         <v-spacer></v-spacer>
-        <v-btn class="blue--text darken-1" text @click.native="closeDialog">Close</v-btn>
+        <v-btn class="blue--text darken-1" text @click.native="closeDialog" data-testid="ui-settings-dialog-cfw-btn-close-dialog">Close</v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>

@@ -8,12 +8,21 @@
 
 <template>
   <div class="click-through"
-    style="position:absolute; z-index: 1; width: 100%; height: 100%; display:flex; align-items: flex-end; pointer-events: none;">
+    style="position:absolute; z-index: 1; width: 100%; height: 100%; display:flex; align-items: flex-end; pointer-events: none;" data-testid="gui-root">
     <div v-show="showRedBox" class="red-box"
       :style="{ top: mouseY + 'px', left: mouseX + 'px', width: RedBoxWidth / BinningNum + 'px', height: RedBoxHeight / BinningNum + 'px' }">
     </div>
     <div v-show="showPHD2BoxAndCross && PHD2BoxView" :class="SwitchPHD2BoxClass"
       :style="{ top: PHD2Box_Y + 'px', left: PHD2Box_X + 'px', width: PHD2Box_Width + 'px', height: PHD2Box_Height + 'px' }">
+    </div>
+    <!-- 导星星点信息（仿 PHD2：在锁星框旁显示当前导星星点坐标/质量） -->
+    <div
+      v-show="showPHD2BoxAndCross && PHD2BoxView && hasGuiderLockStar"
+      class="guider-lock-label"
+      :class="{ 'guider-lock-label-flash': guiderLockFlash }"
+      :style="{ top: (PHD2Box_Y - 18) + 'px', left: (PHD2Box_X + PHD2Box_Width + 6) + 'px' }"
+    >
+      {{ guiderLockLabel }}
     </div>
     <div v-show="showPHD2BoxAndCross && PHD2CrossView" :class="SwitchPHD2CrossClass"
       :style="{ top: 0 + 'px', left: PHD2Cross_X + 'px', width: 1 + 'px', height: PHD2Cross_Height + 'px' }"></div>
@@ -32,25 +41,21 @@
       </transition>
     </div>
     <observing-panel></observing-panel>
-    <template v-for="(item, i) in pluginsGuiComponents">
-      <component :is="item" :key="i"></component>
-    </template>
-    <template v-for="(item, i) in dialogs">
-      <component :is="item" :key="i + pluginsGuiComponents.length"></component>
-    </template>
+    <component v-for="(item, i) in pluginsGuiComponents" :is="item" :key="'plugin-' + i"></component>
+    <component v-for="(item, i) in dialogs" :is="item" :key="'dialog-' + i"></component>
     <selected-object-info
       v-show="isStellariumMode"
       style="position: absolute; top: 48px; left: 0px; width: 350px; max-width: calc(100vw - 12px); margin: 6px; z-index: 100"
       class="get-click"></selected-object-info>
 
     <!-- <transition name="RightBtn">
-    <button v-show="showMountSwitch" @click="toggleImageManagerPanel" class="get-click btn-ImageManagerPanelSwitch">
+    <button v-show="showMountSwitch" @click="toggleImageManagerPanel" class="get-click btn-ImageManagerPanelSwitch" data-testid="gui-btn-toggle-image-manager-panel">
       <v-icon color="rgba(255, 255, 255)"> mdi-folder-image </v-icon>
     </button>
   </transition> -->
 
     <!-- <transition name="RightBtn">
-      <button v-show="isPolarAxisMode" @click="RecalibratePolarAxis" class="get-click btn-Recalibrate">
+      <button v-show="isPolarAxisMode" @click="RecalibratePolarAxis" class="get-click btn-Recalibrate" data-testid="gui-btn-recalibrate-polar-axis">
         <div style="display: flex; justify-content: center; align-items: center;">
           <img src="@/assets/images/svg/ui/Reset.svg" height="20px"
             style="min-height: 20px; pointer-events: none;"></img>
@@ -60,7 +65,7 @@
 
     <!-- <transition name="RightBtn">
       <button v-show="isPolarAxisMode && showSingleSolveBtn" @click="SingleSolveImage" class="get-click btn-SolveImage"
-        style=" background-color: rgba(0, 0, 0, 0.1); ">
+        style=" background-color: rgba(0, 0, 0, 0.1); " data-testid="gui-btn-single-solve-image">
         <template v-if="!loadingImageSolve">
           <div style="display: flex; justify-content: center; align-items: center;">
             <img src="@/assets/images/svg/ui/Solve.svg" height="25px"
@@ -77,7 +82,8 @@
 
     <!-- <transition name="RightBtn">
       <button v-show="isPolarAxisMode && !showSingleSolveBtn" @click="LoopSolveImage" class="get-click btn-SolveImage"
-        :style="{ 'background-color': PlateSolveInProgress ? 'rgba(46, 160, 67, 0.3)' : 'rgba(0, 0, 0, 0.1)' }">
+        :style="{ 'background-color': PlateSolveInProgress ? 'rgba(46, 160, 67, 0.3)' : 'rgba(0, 0, 0, 0.1)' }"
+        data-testid="gui-btn-loop-solve-image">
         <div style="display: flex; justify-content: center; align-items: center;">
           <img src="@/assets/images/svg/ui/LoopSolve.svg" height="25px"
             style="min-height: 25px; pointer-events: none;"></img>
@@ -87,7 +93,12 @@
 
     <div>
       <transition name="RightBtn">
-        <button v-show="showMountSwitch" @click="toggleFloatingBox" class="get-click btn-MountPanelSwitch">
+        <button
+          v-show="showMountSwitch"
+          @click="toggleFloatingBox"
+          class="get-click btn-MountPanelSwitch"
+          data-testid="gui-btn-toggle-mount-panel"
+        >
           <div style="display: flex; justify-content: center; align-items: center;">
             <img src="@/assets/images/svg/ui/mount.svg" height="33px"
               style="min-height: 33px; pointer-events: none;"></img>
@@ -102,14 +113,28 @@
 
     <div>
       <transition name="BottomBar">
-        <bottom-bar v-show="isBottomBarShow" :style="{ width: isPolarAxisMode ? '75%' : '100%' }"
-          style="position:absolute; justify-content: center; bottom: 0; display:flex; margin-bottom: 0px"
+        <bottom-bar
+          v-show="isBottomBarShow"
+          :style="{
+            width: isPolarAxisMode ? '75%' : '100%',
+            position: 'absolute',
+            justifyContent: 'center',
+            bottom: '0',
+            display: isBottomBarShow ? 'flex' : 'none',
+            marginBottom: '0px'
+          }"
           class="get-click"></bottom-bar>
       </transition>
     </div>
 
     <transition name="BottomBtn">
-      <button v-show="isMainSwitchShow" @click="SwitchMainPage" class="get-click btn-MainPageSwitch">
+      <button
+        v-show="isMainSwitchShow"
+        @click="SwitchMainPage"
+        class="get-click btn-MainPageSwitch"
+        data-testid="gui-btn-switch-main-page"
+        :data-current-main-page="CurrentMainPage"
+      >
         <span v-if="CurrentMainPage === 'Stel'">
           <div style="display: flex; justify-content: center; align-items: center;">
             <img src="@/assets/images/svg/ui/sheying.svg" height="33px"
@@ -133,7 +158,12 @@
 
     <ChartComponent v-show="showChartsPanel" class="get-click" />
     <transition name="BottomBtn">
-      <button v-show="isCaptureMode" @click="toggleChartsPanel" class="get-click btn-ChartsSwitch">
+      <button
+        v-show="isCaptureMode"
+        @click="toggleChartsPanel"
+        class="get-click btn-ChartsSwitch"
+        data-testid="gui-btn-toggle-charts-panel"
+      >
         <div style="display: flex; justify-content: center; align-items: center;">
           <img src="@/assets/images/svg/ui/GuidingPanel.svg" height="35px"
             style="min-height: 35px; pointer-events: none;"></img>
@@ -147,7 +177,12 @@
 
     <!-- 使用CSS Grid布局的按钮容器 -->
     <div class="left-button-container">
-      <button v-show="isPolarAxisMode" @click="QuitPolarAxisMode" class="get-click btn-QuitPolarAxis">
+      <button
+        v-show="isPolarAxisMode"
+        @click="QuitPolarAxisMode"
+        class="get-click btn-QuitPolarAxis"
+        data-testid="gui-btn-quit-polar-axis-mode"
+      >
         <div style="display: flex; justify-content: center; align-items: center;">
           <img src="@/assets/images/svg/ui/Back.svg" height="35px" style="min-height: 35px; pointer-events: none;">
         </div>
@@ -159,21 +194,36 @@
         :class="{ 'buttons-grid': scaleButtonsOverlap, 'buttons-vertical': !scaleButtonsOverlap }"
         :style="scaleButtonsOverlap ? { marginTop: scaleButtonsMarginTop + 'px' } : {}"
       >
-        <button v-show="isShowImage && isShowHideUi" @click="hideCaptureUI" class="get-click btn-UISwitch">
+        <button
+          v-show="isShowImage && isShowHideUi"
+          @click="hideCaptureUI"
+          class="get-click btn-UISwitch"
+          data-testid="gui-btn-hide-capture-ui"
+        >
           <div style="display: flex; justify-content: center; align-items: center;">
             <img src="@/assets/images/svg/ui/UI_Hide.svg" height="20px"
               style="min-height: 20px; pointer-events: none;"></img>
           </div>
         </button>
 
-        <button v-show="!isShowImage && isShowHideUi" @click="showCaptureUI" class="get-click btn-ShowUISwitch">
+        <button
+          v-show="!isShowImage && isShowHideUi"
+          @click="showCaptureUI"
+          class="get-click btn-ShowUISwitch"
+          data-testid="gui-btn-show-capture-ui"
+        >
           <div style="display: flex; justify-content: center; align-items: center;">
             <img src="@/assets/images/svg/ui/UI_Show.svg" height="20px" style="min-height: 20px; pointer-events: none;">
           </div>
         </button>
 
-        <button :disabled="loadingOriginalImage" v-show="isCaptureMode" @click="getOriginalImage"
-          class="get-click btn-OriginalImage">
+        <button
+          :disabled="loadingOriginalImage"
+          v-show="isCaptureMode"
+          @click="getOriginalImage"
+          class="get-click btn-OriginalImage"
+          data-testid="gui-btn-get-original-image"
+        >
           <template v-if="!loadingOriginalImage">
             <div style="display: flex; justify-content: center; align-items: center;">
               <img src="@/assets/images/svg/ui/OriginalImage.svg" height="20px"
@@ -187,14 +237,24 @@
           </template>
         </button>
 
-        <button v-show="isShowScaleChange && isShowImage" @click="ScaleChange('+')" class="get-click btn-ScaleAdd">
+        <button
+          v-show="isShowScaleChange && isShowImage"
+          @click="ScaleChange('+')"
+          class="get-click btn-ScaleAdd"
+          data-testid="gui-btn-scale-plus"
+        >
           <div style="display: flex; justify-content: center; align-items: center;">
             <img src="@/assets/images/svg/ui/ScaleAdd.svg" height="20px"
               style="min-height: 20px; pointer-events: none;"></img>
           </div>
         </button>
 
-        <button v-show="isShowScaleChange && isShowImage" @click="ScaleChange('-')" class="get-click btn-ScaleSub">
+        <button
+          v-show="isShowScaleChange && isShowImage"
+          @click="ScaleChange('-')"
+          class="get-click btn-ScaleSub"
+          data-testid="gui-btn-scale-minus"
+        >
           <div style="display: flex; justify-content: center; align-items: center;">
             <img src="@/assets/images/svg/ui/ScaleSub.svg" height="20px"
               style="min-height: 20px; pointer-events: none;"></img>
@@ -234,43 +294,55 @@
     <DateTimePicker v-show="ShowDateTimePicker" v-model="pickerDate" :location="$store.state.currentLocation">
     </DateTimePicker>
 
-    <ImageManagerPanel v-show="ShowImageManagerPanel" />
+    <ImageManagerPanel v-show="ShowImageManagerPanel" :isOpen="ShowImageManagerPanel" />
 
-    <DeviceAllocationPanel v-show="ShowDeviceAllocationPanel" />
+    <DeviceAllocationPanel v-show="ShowDeviceAllocationPanel" :isOpen="ShowDeviceAllocationPanel" />
 
-    <INDIDebugDialog v-show="ShowINDIDebugDialog" />
+    <INDIDebugDialog v-show="ShowINDIDebugDialog" :isOpen="ShowINDIDebugDialog" />
 
     <RPIHotspotDialog v-show="ShowRPIHotspotDialog" />
 
     <!-- 统一后的任务计划表面板 -->
     <SchedulePanel
       v-show="ShowSchedulePanel"
+      :isOpen="ShowSchedulePanel"
       class="get-click"
       style="position: absolute; z-index: 200;"
     />
 
 
-    <v-dialog v-model="ConfirmDialog" width="260" persistent>
-      <v-expand-x-transition>
-        <v-card class="flashing-border" style="backdrop-filter: blur(5px); background-color: rgba(64, 64, 64, 0.5);">
+    <!-- Confirm Dialog: 为 E2E 暴露稳定 root + data-state（open/closed） -->
+    <div
+      data-testid="ui-confirm-dialog-root"
+      :data-state="ConfirmDialog ? 'open' : 'closed'"
+      :data-action="ConfirmToDo || ''"
+      :data-title="ConfirmDialogTitle || ''"
+      style="display: contents;"
+    >
+      <v-dialog v-model="ConfirmDialog" width="260" persistent>
+        <v-expand-x-transition>
+          <!-- NOTE: gui-root 外层使用了 .click-through(pointer-events: none)；
+               这里必须显式加 .get-click(pointer-events: all) 才能让 Confirm Dialog 的按钮可点击（含 E2E）。 -->
+          <v-card class="flashing-border get-click" style="backdrop-filter: blur(5px); background-color: rgba(64, 64, 64, 0.5);">
           <v-card-title style="font-size: 20px; display: flex; align-items: center; justify-content: space-between;">
-            <span>{{ $t(ConfirmDialogTitle) }}</span>
+            <span data-testid="ui-confirm-dialog-title">{{ $t(ConfirmDialogTitle) }}</span>
             <v-btn
               v-if="ConfirmToDo === 'startAutoFocus'"
               icon
               small
               @click.stop="ConfirmDialogCancel()"
               style="margin-left: 8px; background-color: transparent;"
+              data-testid="ui-confirm-dialog-btn-close"
             >
               <v-icon color="rgba(255, 0, 0)">mdi-close</v-icon>
             </v-btn>
           </v-card-title>
           <v-card-text style="font-size: 15px; margin-bottom: -20px; line-height: 1.5;">
             <span v-if="ConfirmToDo === 'startAutoFocus'">
-              {{ $t('Please confirm the auto focus mode') }}
+              <span data-testid="ui-confirm-dialog-text">{{ $t('Please confirm the auto focus mode') }}</span>
             </span>
             <span v-else>
-              {{ $t(ConfirmDialogText) }}
+              <span data-testid="ui-confirm-dialog-text">{{ $t(ConfirmDialogText) }}</span>
             </span>
           </v-card-text>
           <v-card-actions style="margin-top: -20px; padding-top: -20px;">
@@ -281,12 +353,14 @@
               <v-btn
                 @click="ConfirmDialogAutoFocus('coarse')"
                 style="background-color: rgba(255, 255, 255, 0.1); margin-right: 4px;"
+                data-testid="ui-confirm-dialog-btn-autofocus-coarse"
               >
                 {{ $t('Coarse focus') }}
               </v-btn>
               <v-btn
                 @click="ConfirmDialogAutoFocus('fine')"
                 style="background-color: rgba(255, 255, 255, 0.1); margin-left: 4px;"
+                data-testid="ui-confirm-dialog-btn-autofocus-fine"
               >
                 {{ $t('Fine focus') }}
               </v-btn>
@@ -294,19 +368,28 @@
 
             <!-- 其它场景：保留原来的 勾/叉 图标按钮 -->
             <template v-else>
-              <v-btn @click="ConfirmDialogCancel()" style="background-color: rgba(255, 255, 255, 0.1);">
+              <v-btn
+                @click="ConfirmDialogCancel()"
+                style="background-color: rgba(255, 255, 255, 0.1);"
+                data-testid="ui-confirm-dialog-btn-cancel"
+              >
                 <v-icon color="rgba(255, 0, 0)"> mdi-close </v-icon>
               </v-btn>
-              <v-btn @click="ConfirmDialogToDo()" style="background-color: rgba(255, 255, 255, 0.1);">
+              <v-btn
+                @click="ConfirmDialogToDo()"
+                style="background-color: rgba(255, 255, 255, 0.1);"
+                data-testid="ui-confirm-dialog-btn-confirm"
+              >
                 <v-icon color="rgba(51, 218, 121)"> mdi-check </v-icon>
               </v-btn>
             </template>
 
             <v-spacer></v-spacer>
           </v-card-actions>
-        </v-card>
-      </v-expand-x-transition>
-    </v-dialog>
+          </v-card>
+        </v-expand-x-transition>
+      </v-dialog>
+    </div>
 
     <v-dialog v-model="DSLRsSetupDialog" width="250" persistent>
       <v-expand-x-transition>
@@ -336,12 +419,19 @@
           </v-card-text>
 
           <v-card-actions :style="{ 'margin-top': showDSLRsTips ? '-30px' : '-50px' }">
-            <v-btn @click="showDSLRsTips = !showDSLRsTips" style="background-color: rgba(255, 255, 255, 0.1);">
+            <v-btn
+              @click="showDSLRsTips = !showDSLRsTips"
+              style="background-color: rgba(255, 255, 255, 0.1);"
+              data-testid="gui-dslr-btn-toggle-tips"
+            >
               <v-icon color="#2C9DDE"> mdi-help </v-icon>
             </v-btn>
             <v-spacer></v-spacer>
-            <v-btn @click="ConfirmDSLRsSetup(DSLRCameraWidth, DSLRCameraHeight, DSLRCameraPixelPitch)"
-              style="background-color: rgba(255, 255, 255, 0.1);">
+            <v-btn
+              @click="ConfirmDSLRsSetup(DSLRCameraWidth, DSLRCameraHeight, DSLRCameraPixelPitch)"
+              style="background-color: rgba(255, 255, 255, 0.1);"
+              data-testid="gui-dslr-btn-confirm"
+            >
               <v-icon color="rgb(255, 255, 255)"> mdi-check </v-icon>
             </v-btn>
           </v-card-actions>
@@ -477,6 +567,17 @@ export default {
       currentImageWidth: 0,
       currentImageHeight: 0,
 
+      // 瓦片模式下用于显示“合并等级/分辨率”的动态信息（由 App.vue 广播）
+      tileLevelEnabled: false,
+      tileZ: 0,
+      tileMaxZoomLevel: 0,
+      tileLevelScale: 1,
+      tileLevelWidth: 0,
+      tileLevelHeight: 0,
+      tilePreviewWidth: 0,
+      tilePreviewHeight: 0,
+      tilePreviewBinningFactor: 1,
+
       showRedBox: false, // 控制小红框显示与隐藏
       isInitRedBox: true,
       mouseX: 0, // 鼠标的X坐标
@@ -550,6 +651,16 @@ export default {
       PHD2BoxView: true,
       PHD2CrossView: true,
 
+      // 导星锁星信息（用于显示“正在导哪一颗星点”）
+      guiderLockImgW: 0,
+      guiderLockImgH: 0,
+      guiderLockRawX: null,
+      guiderLockRawY: null,
+      guiderLockSNR: null,
+      guiderLockHFD: null,
+      guiderLockFlash: false,
+      guiderLockFlashTimer: null,
+
       loadingImageSolve: false,
 
       currentPolarAxisStep: 1,
@@ -613,8 +724,8 @@ export default {
     this.$bus.$on('MountPanelClose', this.toggleFloatingBox);
     this.$bus.$on('toggleHistogramPanel', this.toggleHistogramPanel);
     this.$bus.$on('toggleFocuserPanel', this.toggleFocuserPanel);
-    this.$bus.$on('ImageManagerPanelClose', this.toggleImageManagerPanel);
-    this.$bus.$on('ImageManagerPanelOpen', this.toggleImageManagerPanel);
+    this.$bus.$on('ImageManagerPanelClose', this.closeImageManagerPanel);
+    this.$bus.$on('ImageManagerPanelOpen', this.openImageManagerPanel);
     this.$bus.$on('toggleDeviceAllocationPanel', this.toggleDeviceAllocationPanel);
     this.$bus.$on('toggleINDIDebugDialog', this.toggleINDIDebugDialog);
     this.$bus.$on('toggleRPIHotspotDialog', this.toggleRPIHotspotDialog);
@@ -639,6 +750,8 @@ export default {
     this.$bus.$on('GuiderStatus', this.GuiderStatus);
     this.$bus.$on('PHD2StarBoxView', this.togglePHD2StarBox);
     this.$bus.$on('PHD2StarCrossView', this.togglePHD2StarCross);
+    this.$bus.$on('GuiderLockStar', this.onGuiderLockStar);
+    this.$bus.$on('GuiderStarSelected', this.onGuiderStarSelected);
     this.$bus.$on("ImageSolveFinished", this.ImageSolveFinished);
     // this.$bus.$on('Focal Length (mm)', this.FocalLengthSet);
     this.$bus.$on('SetFocalLengthNum', this.FocalLengthSet);
@@ -656,6 +769,7 @@ export default {
     this.$bus.$on('getRedBoxState', this.getRedBoxState);
     this.$bus.$on('selectStar', this.selectStar);
     this.$bus.$on('setScale', this.setScale);
+    this.$bus.$on('TileLevelInfo', this.onTileLevelInfo);
     this.$bus.$on('reRunUpdate', this.reRunUpdate);   // 用于在更新失败后重新运行更新
     this.$bus.$on('closeUpdateDialog', this.closeUpdateDialog);
 
@@ -669,6 +783,18 @@ export default {
     
     // this.resizeRedBox(1920, 1080);
     // this.$bus.$emit('syncROI_length');
+  },
+  beforeDestroy() {
+    try {
+      this.$bus.$off('GuiderLockStar', this.onGuiderLockStar);
+      this.$bus.$off('GuiderStarSelected', this.onGuiderStarSelected);
+    } catch (e) {
+      // ignore
+    }
+    if (this.guiderLockFlashTimer) {
+      clearTimeout(this.guiderLockFlashTimer);
+      this.guiderLockFlashTimer = null;
+    }
   },
   methods: {
     toggleFloatingBox() {
@@ -739,6 +865,18 @@ export default {
         this.$bus.$emit('calculateTotalPage');
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'ShowAllImageFolder');
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'USBCheck');
+      }
+    },
+
+    openImageManagerPanel() {
+      if (!this.ShowImageManagerPanel) {
+        this.toggleImageManagerPanel();
+      }
+    },
+
+    closeImageManagerPanel() {
+      if (this.ShowImageManagerPanel) {
+        this.ShowImageManagerPanel = false;
       }
     },
 
@@ -864,6 +1002,30 @@ export default {
       console.log('currentImageBin:', num);
     },
 
+    onTileLevelInfo(info) {
+      if (!info || !info.enabled) {
+        this.tileLevelEnabled = false;
+        this.tileZ = 0;
+        this.tileMaxZoomLevel = 0;
+        this.tileLevelScale = 1;
+        this.tileLevelWidth = 0;
+        this.tileLevelHeight = 0;
+        this.tilePreviewWidth = 0;
+        this.tilePreviewHeight = 0;
+        this.tilePreviewBinningFactor = 1;
+        return;
+      }
+      this.tileLevelEnabled = true;
+      this.tileZ = Number(info.z) || 0;
+      this.tileMaxZoomLevel = Number(info.maxZoomLevel) || 0;
+      this.tileLevelScale = Number(info.levelScale) || 1;
+      this.tileLevelWidth = Number(info.levelWidth) || 0;
+      this.tileLevelHeight = Number(info.levelHeight) || 0;
+      this.tilePreviewWidth = Number(info.previewWidth) || 0;
+      this.tilePreviewHeight = Number(info.previewHeight) || 0;
+      this.tilePreviewBinningFactor = Number(info.previewBinningFactor) || 1;
+    },
+
     FocalLengthSet(num) {
       if (num === '') {
         this.FocalLength = 0;
@@ -899,8 +1061,12 @@ export default {
     GuiderStatus(status) {
       if (status === 'InGuiding') {
         this.CurrentGuiderStatus = 'InGuiding';
+      } else if (status === 'InSelecting') {
+        this.CurrentGuiderStatus = 'InSelecting';
       } else if (status === 'InCalibration') {
         this.CurrentGuiderStatus = 'InCalibration';
+      } else if (status === 'InDirectionDetection') {
+        this.CurrentGuiderStatus = 'InDirectionDetection';
       } else if (status === 'StarLostAlert') {
         this.CurrentGuiderStatus = 'StarLostAlert';
       } else if (status === 'Connected') {
@@ -1248,6 +1414,15 @@ export default {
 
 
     CalibratePolarAxisMode() {
+      // 仅限制：自动极轴校准（主相机未绑定时禁止）
+      if (!this.$store.getters['device/isDeviceBound']('MainCamera')) {
+        this.$bus.$emit(
+          'showMsgBox',
+          this.$t('MainCameraNotBoundAction', { action: this.$t('Feature_AutoPolarAlignment') }),
+          'error'
+        );
+        return;
+      }
       this.lastMainPage = this.CurrentMainPage;
       this.CurrentMainPage = 'Stel';
       this.$bus.$emit('showStelCanvas');
@@ -1374,9 +1549,27 @@ export default {
       this.ConfirmDialog = false;
 
       if (mode === 'coarse') {
+        // 仅限制：自动对焦（主相机未绑定时禁止）
+        if (!this.$store.getters['device/isDeviceBound']('MainCamera')) {
+          this.$bus.$emit(
+            'showMsgBox',
+            this.$t('MainCameraNotBoundAction', { action: this.$t('Feature_AutoFocus') }),
+            'error'
+          );
+          return;
+        }
         // 粗调：完整自动对焦流程
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'AutoFocusConfirm:Coarse');
       } else if (mode === 'fine') {
+        // 仅限制：自动对焦（主相机未绑定时禁止）
+        if (!this.$store.getters['device/isDeviceBound']('MainCamera')) {
+          this.$bus.$emit(
+            'showMsgBox',
+            this.$t('MainCameraNotBoundAction', { action: this.$t('Feature_AutoFocus') }),
+            'error'
+          );
+          return;
+        }
         // 精调：当前位置为中心的最终 super-fine 精调
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'AutoFocusConfirm:Fine');
       } else {
@@ -1403,6 +1596,15 @@ export default {
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'PHD2Recalibrate');
         this.$bus.$emit('SendConsoleLogMsg', 'PHD2 Recalibrate', 'info');
       } else if (this.ConfirmToDo === 'EndCaptureAndSolve') {
+        // 仅限制：解析同步（主相机未绑定时禁止）
+        if (!this.$store.getters['device/isDeviceBound']('MainCamera')) {
+          this.$bus.$emit(
+            'showMsgBox',
+            this.$t('MainCameraNotBoundAction', { action: this.$t('Feature_SolveSync') }),
+            'error'
+          );
+          return;
+        }
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'EndCaptureAndSolve');
         this.$bus.$emit('SendConsoleLogMsg', 'End Capture And Solve', 'info');
         this.loadingImageSolve = false;
@@ -1425,6 +1627,15 @@ export default {
       } else if (this.ConfirmToDo === 'StartCalibration') {
         this.$bus.$emit('StartCalibration');
       } else if (this.ConfirmToDo === 'startAutoFocus') {
+        // 仅限制：自动对焦（主相机未绑定时禁止）
+        if (!this.$store.getters['device/isDeviceBound']('MainCamera')) {
+          this.$bus.$emit(
+            'showMsgBox',
+            this.$t('MainCameraNotBoundAction', { action: this.$t('Feature_AutoFocus') }),
+            'error'
+          );
+          return;
+        }
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'AutoFocusConfirm:Yes');
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'ClearDataPoints');
         this.$bus.$emit('ClearAllData');
@@ -1500,6 +1711,12 @@ export default {
         this.PHD2BoxView = true;
       } else {
         this.PHD2BoxView = false;
+        // 关闭覆盖层时同步清理上一次的星点信息，避免下次启动仍显示旧值
+        this.guiderLockRawX = null;
+        this.guiderLockRawY = null;
+        this.guiderLockSNR = null;
+        this.guiderLockHFD = null;
+        this.guiderLockFlash = false;
       }
     },
     togglePHD2StarCross(Crossview) {
@@ -1507,6 +1724,52 @@ export default {
         this.PHD2CrossView = true;
       } else {
         this.PHD2CrossView = false;
+      }
+    },
+
+    onGuiderLockStar(imgW, imgH, x, y) {
+      const prevX = this.guiderLockRawX;
+      const prevY = this.guiderLockRawY;
+
+      this.guiderLockImgW = imgW;
+      this.guiderLockImgH = imgH;
+      this.guiderLockRawX = x;
+      this.guiderLockRawY = y;
+
+      // 若锁星发生明显跳变，闪一下提示（可直观看到“导星目标换星了”）
+      if (prevX !== null && prevY !== null) {
+        const dx = x - prevX;
+        const dy = y - prevY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist >= 8) {
+          this.guiderLockFlash = true;
+          if (this.guiderLockFlashTimer) clearTimeout(this.guiderLockFlashTimer);
+          this.guiderLockFlashTimer = setTimeout(() => {
+            this.guiderLockFlash = false;
+          }, 800);
+        }
+      }
+    },
+
+    onGuiderStarSelected(message) {
+      // 形如：GuiderStarSelected:x=885.00:y=366.00:snr=806.3:hfd=4.47
+      try {
+        const parts = String(message).split(':');
+        const kv = {};
+        for (let i = 1; i < parts.length; i++) {
+          const seg = parts[i];
+          const eq = seg.indexOf('=');
+          if (eq === -1) continue;
+          const k = seg.slice(0, eq);
+          const v = seg.slice(eq + 1);
+          if (k) kv[k] = v;
+        }
+        if (kv.x !== undefined) this.guiderLockRawX = Math.round(Number(kv.x));
+        if (kv.y !== undefined) this.guiderLockRawY = Math.round(Number(kv.y));
+        if (kv.snr !== undefined) this.guiderLockSNR = Number(kv.snr);
+        if (kv.hfd !== undefined) this.guiderLockHFD = Number(kv.hfd);
+      } catch (e) {
+        // ignore parse errors
       }
     },
 
@@ -1731,7 +1994,9 @@ export default {
       return [
         {
           'box-InGuiding': this.CurrentGuiderStatus === 'InGuiding',
+          'box-InSelecting': this.CurrentGuiderStatus === 'InSelecting',
           'box-InCalibration': this.CurrentGuiderStatus === 'InCalibration',
+          'box-InDirectionDetection': this.CurrentGuiderStatus === 'InDirectionDetection',
           'box-StarLostAlert': this.CurrentGuiderStatus === 'StarLostAlert',
           'box-null': this.CurrentGuiderStatus === 'null',
           'box-Connected': this.CurrentGuiderStatus === 'Connected',
@@ -1742,12 +2007,24 @@ export default {
       return [
         {
           'cross-InGuiding': this.CurrentGuiderStatus === 'InGuiding',
+          'cross-InSelecting': this.CurrentGuiderStatus === 'InSelecting',
           'cross-InCalibration': this.CurrentGuiderStatus === 'InCalibration',
+          'cross-InDirectionDetection': this.CurrentGuiderStatus === 'InDirectionDetection',
           'cross-StarLostAlert': this.CurrentGuiderStatus === 'StarLostAlert',
           'cross-null': this.CurrentGuiderStatus === 'null',
           'cross-Connected': this.CurrentGuiderStatus === 'Connected',
         }
       ];
+    },
+    hasGuiderLockStar() {
+      return Number.isFinite(this.guiderLockRawX) && Number.isFinite(this.guiderLockRawY);
+    },
+    guiderLockLabel() {
+      if (!this.hasGuiderLockStar) return '';
+      const xy = `导星星点: (${this.guiderLockRawX}, ${this.guiderLockRawY})`;
+      const snr = Number.isFinite(this.guiderLockSNR) ? `  SNR=${this.guiderLockSNR.toFixed(1)}` : '';
+      const hfd = Number.isFinite(this.guiderLockHFD) ? `  HFD=${this.guiderLockHFD.toFixed(2)}` : '';
+      return xy + snr + hfd;
     },
     currentPolarAxisStepTips() {
       return this.PolarAxisStepTips[this.currentPolarAxisStep - 1];
@@ -1757,10 +2034,25 @@ export default {
       if (this.currentImageWidth === 0 || this.currentImageHeight === 0) {
         imageInfo = 'N/A';
       } else {
-        if (this.BinningNum === 1) {
-          imageInfo = 'Original image, Size: [' + this.currentImageWidth + 'x' + this.currentImageHeight + ']';
+        // 瓦片模式：不再使用连接时计算的“合并/binning”，而是根据当前缩放映射到瓦片层级显示
+        if (this.tileLevelEnabled) {
+          const z = Number.isFinite(this.tileZ) ? this.tileZ : 0;
+          const maxZ = Number.isFinite(this.tileMaxZoomLevel) ? this.tileMaxZoomLevel : 0;
+          const zText = `${z}/${maxZ}`;
+          const scale = Number.isFinite(this.tileLevelScale) ? this.tileLevelScale : 1;
+          const w = (Number.isFinite(this.tileLevelWidth) && this.tileLevelWidth > 0) ? this.tileLevelWidth : this.currentImageWidth;
+          const h = (Number.isFinite(this.tileLevelHeight) && this.tileLevelHeight > 0) ? this.tileLevelHeight : this.currentImageHeight;
+          if (scale <= 1.0001) {
+            imageInfo = 'Tile level: ' + zText + ', Size: [' + w + 'x' + h + ']';
+          } else {
+            imageInfo = 'Tile level: ' + zText + ', Merge: ' + Math.round(scale) + 'x, Size: [' + w + 'x' + h + ']';
+          }
         } else {
-          imageInfo = 'Binning: ' + this.BinningNum + ', Size: [' + this.currentImageWidth + 'x' + this.currentImageHeight + ']';
+          if (this.BinningNum === 1) {
+            imageInfo = 'Original image, Size: [' + this.currentImageWidth + 'x' + this.currentImageHeight + ']';
+          } else {
+            imageInfo = 'Binning: ' + this.BinningNum + ', Size: [' + this.currentImageWidth + 'x' + this.currentImageHeight + ']';
+          }
         }
       }
 
@@ -2196,11 +2488,25 @@ export default {
   outline: 1px solid rgba(51, 218, 121, 1);
 }
 
+.box-InSelecting {
+  position: absolute;
+  background-color: transparent;
+  box-sizing: border-box;
+  outline: 1px solid rgba(120, 170, 255, 0.95);
+}
+
 .box-InCalibration {
   position: absolute;
   background-color: transparent;
   box-sizing: border-box;
   outline: 1px solid rgba(255, 165, 0, 1);
+}
+
+.box-InDirectionDetection {
+  position: absolute;
+  background-color: transparent;
+  box-sizing: border-box;
+  outline: 1px solid rgba(0, 100, 255, 1);
 }
 
 .box-StarLostAlert {
@@ -2222,9 +2528,19 @@ export default {
   background-color: rgba(51, 218, 121, 1);
 }
 
+.cross-InSelecting {
+  position: absolute;
+  background-color: rgba(120, 170, 255, 0.95);
+}
+
 .cross-InCalibration {
   position: absolute;
   background-color: rgba(255, 165, 0, 1);
+}
+
+.cross-InDirectionDetection {
+  position: absolute;
+  background-color: rgba(0, 100, 255, 1);
 }
 
 .cross-StarLostAlert {
@@ -2247,6 +2563,24 @@ export default {
   background-color: transparent;
   box-sizing: border-box;
   outline: 1px solid rgba(51, 218, 121, 1);
+}
+
+.guider-lock-label {
+  position: absolute;
+  padding: 2px 6px;
+  font-size: 11px;
+  line-height: 14px;
+  color: rgba(255, 255, 255, 0.95);
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 6px;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.guider-lock-label-flash {
+  border-color: rgba(255, 255, 0, 0.9);
+  box-shadow: 0 0 10px rgba(255, 255, 0, 0.35);
 }
 
 .PolarAxisTips {

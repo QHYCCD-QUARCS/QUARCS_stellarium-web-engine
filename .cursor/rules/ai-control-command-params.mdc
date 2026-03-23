@@ -1,0 +1,26 @@
+---
+description: AI-Control 命令参数速查，直接拼 commandName 和 flowParams JSON
+globs: {apps/web-frontend/AI-Control/**,apps/web-frontend/docs/**,apps/web-frontend/scripts/ai-control-*.ts,apps/web-frontend/scripts/mcp-e2e-server.mjs}
+alwaysApply: false
+---
+
+# AI-Control Command Params Cheat Sheet
+
+- 向会话发命令时，统一使用 `POST /run`，请求体格式固定为 `{ "commandName": "...", "flowParams": { ... } }`。
+- 未明确要求时，`flowParams` 默认尽量最小化；只传当前任务真正需要的字段，不补无关默认值。
+- 通用字段：`gotoHome`、`resetBeforeConnect`、`driverText`、`connectionModeText`、`doBindAllocation`、`allocationDeviceMatch`。
+- `general-settings`: `{ "commandName": "general-settings", "flowParams": { "resetBeforeConnect": false, "generalSettingsInteract": { "displayTab": true, "selectLanguage": true, "close": true }, "generalSettingsLanguageItemText": "Simplified Chinese", "generalSettingsLanguageRestoreItemText": "English", "clearBoxConfirmOption": "cache", "clearBoxConfirmOptions": ["cache","update-pack","backup"], "generalSettingsRestoreAfterMs": 1000 } }`
+- `power-management`: `{ "commandName": "power-management", "flowParams": { "powerManagementInteract": { "output1": true, "output2": false, "restart": "cancel", "shutdown": "confirm", "forceUpdate": "confirm" } } }`
+- `switch-to-guider-page`: `{ "commandName": "switch-to-guider-page", "flowParams": { "gotoHome": false } }`
+- `guider-connect-capture`: `{ "commandName": "guider-connect-capture", "flowParams": { "driverText": "QHYCCD", "connectionModeText": "SDK", "doBindAllocation": true, "allocationDeviceMatch": "QHY", "guiderFocalLengthMm": "240", "guiderMultiStar": true, "guiderGain": 10, "guiderOffset": 0, "guiderRaDirection": "AUTO", "guiderDecDirection": "AUTO", "guiderExposure": "1s", "guiderInteract": { "loopExposure": true, "guiding": true, "expTime": "1s", "dataClear": false, "rangeSwitch": false, "recalibrate": false } } }`
+- `maincamera-connect-capture`: `{ "commandName": "maincamera-connect-capture", "flowParams": { "driverText": "QHYCCD", "connectionModeText": "SDK", "doBindAllocation": true, "allocationDeviceMatch": "QHY", "captureCount": 1, "captureExposure": "1s", "waitCaptureTimeoutMs": 60000, "doSave": false, "captureGain": 10, "captureOffset": 0, "captureCfaMode": "RGGB", "captureTemperature": -10, "captureAutoSave": true, "captureSaveFailedParse": false, "captureSaveFolder": "local" } }`
+- `mount-connect-control`: `{ "commandName": "mount-connect-control", "flowParams": { "driverText": "EQMod", "connectionModeText": "INDI", "mountControlInteract": { "solveCurrentPosition": true, "gotoClick": false, "gotoThenSolve": true, "autoFlip": true }, "ensurePark": false, "mcpInteract": { "park": false, "track": true, "home": false, "stop": false, "sync": true, "solve": true, "move": { "direction": "ra-plus", "durationMs": 1000 } } } }`
+- `mount-park`: `{ "commandName": "mount-park", "flowParams": { "driverText": "EQMod", "connectionModeText": "INDI", "mcpInteract": { "park": true, "track": false } } }`
+- `mount-panel`: `{ "commandName": "mount-panel", "flowParams": { "mcpInteract": { "park": false, "track": true, "home": false, "stop": true, "sync": true, "solve": true, "move": { "direction": "ra-plus", "durationMs": 1000 } } } }`
+- `telescopes-focal-length`: `{ "commandName": "telescopes-focal-length", "flowParams": { "focalLengthMm": "510" } }`
+- `focuser-connect-control`: `{ "commandName": "focuser-connect-control", "flowParams": { "driverText": "Focuser", "connectionModeText": "INDI", "doBindAllocation": true, "allocationDeviceMatch": "Focuser", "focuserInteract": { "speed": 3, "roiLength": 300, "move": { "direction": "right", "durationMs": 1000 }, "loopShooting": true, "startCalibration": "cancel", "autoFocusMode": "coarse", "stopAutoFocus": false } } }`
+- `cfw-capture-config`: `{ "commandName": "cfw-capture-config", "flowParams": { "driverText": "QHYCCD", "connectionModeText": "SDK", "doBindAllocation": true, "allocationDeviceMatch": "QHY", "cfwInteract": { "capturePanelPlusCount": 1, "capturePanelMinusCount": 1, "menuNextCount": 0, "menuPrevCount": 0 } } }`
+- `polar-axis-calibration`: `{ "commandName": "polar-axis-calibration", "flowParams": { "polarAxisInteract": { "autoCalibration": true, "testSimulation": false, "toggleCollapse": false, "toggleTrajectory": true, "minimize": false, "expandFromMinimized": false, "clearOldTrajectory": false, "switchToWindowed": false, "switchToFullscreen": false, "closeTrajectory": false } } }`
+- `image-file-manager`: `{ "commandName": "image-file-manager", "flowParams": { "imageManagerInteract": { "moveToUsb": false, "delete": false, "download": false, "imageFileSwitch": true, "refresh": true, "panelClose": true } } }`
+- AI 生成参数时优先遵循这些枚举值：`restart/shutdown/forceUpdate = "confirm" | "cancel"`，`guiderRaDirection = "AUTO" | "WEST" | "EAST"`，`guiderDecDirection = "AUTO" | "NORTH" | "SOUTH"`，`autoFocusMode = "coarse" | "fine" | "cancel"`。
+- AI 回答用户时，优先输出最小可执行 JSON，例如“只打开页面”就只给 `{ "commandName": "image-file-manager" }`，不要把整份模板全部塞给用户。

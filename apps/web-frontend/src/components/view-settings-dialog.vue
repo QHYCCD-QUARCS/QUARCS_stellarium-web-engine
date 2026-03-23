@@ -7,14 +7,19 @@
 // repository.
 
 <template>
-<v-dialog :max-width="dialogWidth" v-model="$store.state.showViewSettingsDialog">
+<v-dialog
+  :max-width="dialogWidth"
+  v-model="$store.state.showViewSettingsDialog"
+  data-testid="ui-view-settings-dialog-root"
+  :data-state="$store.state.showViewSettingsDialog ? 'open' : 'closed'"
+>
 <v-card v-if="$store.state.showViewSettingsDialog" class="qs-settings-card" elevation="0" style="backdrop-filter: blur(5px); background-color: rgba(64, 64, 64, 0.3);">
   <v-card-title class="qs-title"><div>{{ $t('General Settings') }}</div></v-card-title>
   <v-card-text class="qs-card-text">
     <v-tabs v-model="activeTab" class="qs-tabs" background-color="transparent" dark slider-color="rgba(75, 155, 250, 0.9)" color="rgba(255,255,255,0.7)" fixed-tabs center-active>
-      <v-tab class="qs-tab">{{ $t('Display Settings') }}</v-tab>
-      <v-tab class="qs-tab">{{ $t('Version Info') }}</v-tab>
-      <v-tab class="qs-tab">{{ $t('Memory Settings') }}</v-tab>
+      <v-tab class="qs-tab" data-testid="ui-view-settings-dialog-tab-display-settings">{{ $t('Display Settings') }}</v-tab>
+      <v-tab class="qs-tab" data-testid="ui-view-settings-dialog-tab-version-info">{{ $t('Version Info') }}</v-tab>
+      <v-tab class="qs-tab" data-testid="ui-view-settings-dialog-tab-memory-settings">{{ $t('Memory Settings') }}</v-tab>
     </v-tabs>
 
     <v-tabs-items v-model="activeTab" class="qs-tabs-items">
@@ -24,12 +29,28 @@
             <div class="qs-subheader">{{ $t('Sky Layers') }}</div>
             <v-row no-gutters class="qs-grid" align="center">
               <v-col cols="12" sm="6">
-                <v-checkbox dense hide-details :label="$t('Milky Way')" v-model="milkyWayOn"></v-checkbox>
-                <v-checkbox dense hide-details :label="$t('DSS')" v-model="dssOn"></v-checkbox>
+                <v-checkbox dense hide-details v-model="milkyWayOn" data-testid="ui-view-settings-dialog-checkbox-milky-way-on">
+                  <template #label>
+                    <span data-testid="ui-view-settings-dialog-checkbox-milky-way-on-label">{{ $t('Milky Way') }}</span>
+                  </template>
+                </v-checkbox>
+                <v-checkbox dense hide-details v-model="dssOn" data-testid="ui-view-settings-dialog-checkbox-dss-on">
+                  <template #label>
+                    <span data-testid="ui-view-settings-dialog-checkbox-dss-on-label">{{ $t('DSS') }}</span>
+                  </template>
+                </v-checkbox>
               </v-col>
               <v-col cols="12" sm="6">
-                <v-checkbox dense hide-details :label="$t('Meridian Line')" v-model="meridianOn"></v-checkbox>
-                <v-checkbox dense hide-details :label="$t('Ecliptic Line')" v-model="eclipticOn"></v-checkbox>
+                <v-checkbox dense hide-details v-model="meridianOn" data-testid="ui-view-settings-dialog-checkbox-meridian-on">
+                  <template #label>
+                    <span data-testid="ui-view-settings-dialog-checkbox-meridian-on-label">{{ $t('Meridian Line') }}</span>
+                  </template>
+                </v-checkbox>
+                <v-checkbox dense hide-details v-model="eclipticOn" data-testid="ui-view-settings-dialog-checkbox-ecliptic-on">
+                  <template #label>
+                    <span data-testid="ui-view-settings-dialog-checkbox-ecliptic-on-label">{{ $t('Ecliptic Line') }}</span>
+                  </template>
+                </v-checkbox>
               </v-col>
             </v-row>
           </div>
@@ -40,12 +61,16 @@
             <div class="qs-subheader">{{ $t('Performance & Language') }}</div>
             <v-row no-gutters class="qs-grid" align="center">
               <v-col cols="12" sm="6">
-                <v-checkbox dense hide-details :label="$t('High FPS')" v-model="highfpsOn"></v-checkbox>
+                <v-checkbox dense hide-details v-model="highfpsOn" data-testid="ui-view-settings-dialog-checkbox-highfps-on">
+                  <template #label>
+                    <span data-testid="ui-view-settings-dialog-checkbox-highfps-on-label">{{ $t('High FPS') }}</span>
+                  </template>
+                </v-checkbox>
               </v-col>
               <v-col cols="12" sm="6" class="d-flex align-center">
                 <div class="qs-inline-field">
                   <span class="qs-inline-label">{{ $t('Select Language') }}</span>
-                  <v-select dense hide-details v-model="selectedLanguage" :items="languages" class="qs-inline-select" @change="switchLanguage" :menu-props="{ offsetY: true, attach: true, contentClass: 'qs-menu' }"></v-select>
+                  <v-select dense hide-details v-model="selectedLanguage" :items="languages" class="qs-inline-select" @change="switchLanguage" :menu-props="{ offsetY: true, attach: true, contentClass: 'qs-menu' }" data-testid="ui-view-settings-dialog-select-switch-language"></v-select>
                 </div>
               </v-col>
             </v-row>
@@ -62,19 +87,19 @@
               <div class="qs-version-grid">
                 <div class="qs-version-item">
                   <div class="qs-version-label">{{ $t('Total Version') }}</div>
-                  <div class="qs-version-value">{{ systemVersion.total }}</div>
+                  <div class="qs-version-value" data-testid="ui-system-version-total">{{ systemVersion.total }}</div>
                 </div>
                 <div class="qs-version-item">
                   <div class="qs-version-label">{{ $t('Qt Client Version') }}</div>
-                  <div class="qs-version-value">{{ systemVersion.qt }}</div>
+                  <div class="qs-version-value" data-testid="ui-system-version-qt">{{ systemVersion.qt }}</div>
                 </div>
                 <div class="qs-version-item">
                   <div class="qs-version-label">{{ $t('Web Client Version') }}</div>
-                  <div class="qs-version-value">{{ systemVersion.vue }}</div>
+                  <div class="qs-version-value" data-testid="ui-system-version-vue">{{ systemVersion.vue }}</div>
                 </div>
                 <div class="qs-version-item">
                   <div class="qs-version-label">{{ $t('App Version') }}</div>
-                  <div class="qs-version-value">{{ appVersion }}</div>
+                  <div class="qs-version-value" data-testid="ui-system-version-app">{{ appVersion }}</div>
                 </div>
               </div>
             </div>
@@ -109,7 +134,7 @@
                 </tbody>
               </v-simple-table>
               <div class="qs-actions">
-                <v-btn small text @click="refreshDevices">{{ $t('Refresh') }}</v-btn>
+                <v-btn small text @click="refreshDevices" data-testid="ui-view-settings-dialog-btn-refresh-devices">{{ $t('Refresh') }}</v-btn>
               </div>
             </div>
           </div>
@@ -135,7 +160,7 @@
                   <span>{{ usbList[0].spaceFormatted }}</span>
                 </div>
                 <div class="qs-usb-button-container">
-                  <v-btn small text @click="openUSBBrowser(usbList[0].name)">{{ $t('View USB Files') }}</v-btn>
+                  <v-btn small text @click="openUSBBrowser(usbList[0].name)" data-testid="ui-view-settings-dialog-btn-open-usbbrowser">{{ $t('View USB Files') }}</v-btn>
                 </div>
               </div>
               <div v-else class="qs-usb-multiple">
@@ -149,7 +174,7 @@
                       <div class="qs-usb-item-name">{{ usb.name }}</div>
                       <div class="qs-usb-item-space">{{ $t('Free Space') }}: {{ usb.spaceFormatted }}</div>
                     </div>
-                    <v-btn small text @click="openUSBBrowser(usb.name)">{{ $t('View Files') }}</v-btn>
+                    <v-btn small text @click="openUSBBrowser(usb.name)" data-testid="ui-view-settings-dialog-btn-open-usbbrowser-2">{{ $t('View Files') }}</v-btn>
                   </div>
                 </div>
               </div>
@@ -164,13 +189,13 @@
                 <span>{{ boxInfo.spaceFormatted }}</span>
               </div>
               <div class="qs-actions">
-                <v-btn small text @click="openClearBoxDialog">{{ $t('Clear Box Cache') }}</v-btn>
-                <v-btn small color="red" text @click="clearLogs">{{ $t('Clear Logs') }}</v-btn>
+                <v-btn small text @click="openClearBoxDialog" data-testid="ui-view-settings-dialog-btn-open-clear-box-dialog">{{ $t('Clear Box Cache') }}</v-btn>
+                <v-btn small color="red" text @click="clearLogs" data-testid="ui-view-settings-dialog-btn-clear-logs">{{ $t('Clear Logs') }}</v-btn>
               </div>
             </div>
 
             <div class="qs-actions">
-              <v-btn small text @click="refreshStorage">{{ $t('Refresh') }}</v-btn>
+              <v-btn small text @click="refreshStorage" data-testid="ui-view-settings-dialog-btn-refresh-storage">{{ $t('Refresh') }}</v-btn>
             </div>
           </div>
         </div>
@@ -194,37 +219,46 @@
               dense
               hide-details
               v-model="clearOptions.cache"
-              :label="$t('Cache Files (Recommended)')"
-            ></v-checkbox>
+             data-testid="ui-view-settings-dialog-checkbox-cache">
+              <template #label>
+                <span data-testid="ui-view-settings-dialog-checkbox-cache-label">{{ $t('Cache Files (Recommended)') }}</span>
+              </template>
+            </v-checkbox>
           </div>
           <div class="qs-field">
             <v-checkbox
               dense
               hide-details
               v-model="clearOptions.updatePack"
-              :label="$t('Update Packages')"
-            ></v-checkbox>
+             data-testid="ui-view-settings-dialog-checkbox-update-pack">
+              <template #label>
+                <span data-testid="ui-view-settings-dialog-checkbox-update-pack-label">{{ $t('Update Packages') }}</span>
+              </template>
+            </v-checkbox>
           </div>
           <div class="qs-field">
             <v-checkbox
               dense
               hide-details
               v-model="clearOptions.backup"
-              :label="$t('Backup Files')"
-            ></v-checkbox>
+             data-testid="ui-view-settings-dialog-checkbox-backup">
+              <template #label>
+                <span data-testid="ui-view-settings-dialog-checkbox-backup-label">{{ $t('Backup Files') }}</span>
+              </template>
+            </v-checkbox>
           </div>
         </div>
       </v-card-text>
       <v-card-actions>
         <v-spacer></v-spacer>
-        <v-btn small text @click="onCancelClearBox">{{ $t('Cancel') }}</v-btn>
+        <v-btn small text @click="onCancelClearBox" data-testid="ui-view-settings-dialog-btn-on-cancel-clear-box">{{ $t('Cancel') }}</v-btn>
         <v-btn
           small
           color="primary"
           text
           :disabled="!hasAnyClearSelection"
           @click="onConfirmClearBox"
-        >
+         data-testid="ui-view-settings-dialog-btn-on-confirm-clear-box">
           {{ $t('Confirm') }}
         </v-btn>
       </v-card-actions>
@@ -232,7 +266,7 @@
   </v-dialog>
 
   <v-card-actions>
-    <v-spacer></v-spacer><v-btn class="blue--text darken-1" text @click.native="$store.state.showViewSettingsDialog = false">Close</v-btn>
+    <v-spacer></v-spacer><v-btn class="blue--text darken-1" text @click.native="$store.state.showViewSettingsDialog = false" data-testid="ui-view-settings-dialog-btn-blue-text">Close</v-btn>
   </v-card-actions>
 </v-card>
 </v-dialog>

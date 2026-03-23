@@ -7,7 +7,13 @@
 // repository.
 
 <template>
-  <v-dialog scrollable max-width='600' v-model="$store.state.showDataCreditsDialog">
+  <v-dialog
+    scrollable
+    max-width='600'
+    v-model="$store.state.showDataCreditsDialog"
+    data-testid="ui-data-credits-dialog-root"
+    :data-state="$store.state.showDataCreditsDialog ? 'open' : 'closed'"
+  >
     <v-card v-if="$store.state.showDataCreditsDialog">
       <v-card-title>
         <div class="text-h5">Data Credits</div>
@@ -143,7 +149,7 @@
       </v-card-text>
       <v-card-actions>
         <v-spacer></v-spacer><v-btn text class="blue--text darken-1"
-          @click.native="$store.state.showDataCreditsDialog = false">Close</v-btn>
+          @click.native="$store.state.showDataCreditsDialog = false" data-testid="ui-data-credits-dialog-btn-blue-text">Close</v-btn>
       </v-card-actions>
     </v-card>
   </v-dialog>

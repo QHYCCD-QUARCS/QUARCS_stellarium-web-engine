@@ -44,3 +44,4 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+apps/web-frontend/test-results/*

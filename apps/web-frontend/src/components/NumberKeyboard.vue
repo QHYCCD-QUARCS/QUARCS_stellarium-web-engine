@@ -1,21 +1,21 @@
 <template>
   <transition name="keyboard-fade">
-    <div v-if="visible" class="number-keyboard-overlay" @click="handleOverlayClick">
+    <div v-if="visible" class="number-keyboard-overlay" @click="handleOverlayClick" data-testid="ui-number-keyboard-root">
       <div 
         class="number-keyboard" 
         :style="keyboardStyle"
         @click.stop
         @mousedown="handleDragStart"
         @touchstart="handleDragStart"
-      >
-        <div class="keyboard-header" @click.stop>
+       data-testid="ui-components-number-keyboard-act-handle-drag-start">
+        <div class="keyboard-header" @click.stop data-testid="ui-components-number-keyboard-act-keyboard-header">
           <div class="keyboard-header-left">
             <span class="keyboard-title">{{ title }}</span>
             <div class="keyboard-value-display">
               <span class="value-content">{{ displayValue }}</span>
             </div>
           </div>
-          <v-btn icon small @click.stop="handleClose" class="close-btn" @mousedown.stop @touchstart.stop>
+          <v-btn icon small @click.stop="handleClose" class="close-btn" @mousedown.stop @touchstart.stop data-testid="ui-number-keyboard-btn-handle-close">
             <v-icon>mdi-close</v-icon>
           </v-btn>
         </div>
@@ -32,7 +32,7 @@
               @mousedown="handleMouseDown(key, rowIndex, keyIndex)"
               @mouseup="handleMouseUp(rowIndex, keyIndex)"
               @mouseleave="handleMouseUp(rowIndex, keyIndex)"
-            >
+             data-testid="ui-number-keyboard-btn-handle-key-press" :data-index="keyIndex">
               <v-icon v-if="key.icon" size="24">{{ key.icon }}</v-icon>
               <span v-else>{{ key.label }}</span>
             </button>
@@ -288,8 +288,10 @@ export default {
       let newY = clientY - this.dragStartY;
       
       // 限制在屏幕范围内
-      const maxX = window.innerWidth - this.keyboardWidth;
-      const maxY = window.innerHeight - this.keyboardHeight;
+      // 注意：在某些移动端横屏场景（vh 计算偏差/地址栏影响）可能出现键盘尺寸大于视口，
+      // 这里用 Math.max(0, ...) 避免 maxX/maxY 为负导致定位被“夹”到 0。
+      const maxX = Math.max(0, window.innerWidth - this.keyboardWidth);
+      const maxY = Math.max(0, window.innerHeight - this.keyboardHeight);
       
       newX = Math.max(0, Math.min(newX, maxX));
       newY = Math.max(0, Math.min(newY, maxY));
@@ -365,7 +367,8 @@ export default {
   display: flex;
   flex-direction: column;
   position: relative;
-  max-height: 90vh;
+  /* 尽量适配移动端动态视口，避免横屏高度过小导致内容被裁剪 */
+  max-height: min(90vh, calc(100dvh - 16px));
 }
 
 .number-keyboard.dragging {
@@ -436,7 +439,10 @@ export default {
   gap: 8px;
   flex: 1;
   min-height: 0;
-  overflow: hidden;
+  /* 小高度屏幕时允许按键区滚动，而不是直接裁剪 */
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 .keyboard-row {
@@ -713,6 +719,100 @@ export default {
   
   .keyboard-row {
     gap: 3px;
+  }
+}
+
+/* 横屏：优先保证所有按键可见（降低键高/留出滚动空间） */
+@media (orientation: landscape) and (max-height: 480px) {
+  .number-keyboard {
+    max-height: min(92vh, calc(100dvh - 12px)) !important;
+    padding: 6px;
+    border-radius: 16px;
+  }
+
+  .keyboard-header {
+    padding: 6px 10px;
+    margin-bottom: 6px;
+  }
+
+  .keyboard-key {
+    height: 40px;
+    font-size: 16px;
+  }
+
+  .key-confirm {
+    height: 44px;
+    font-size: 14px;
+  }
+
+  .keyboard-body {
+    gap: 6px;
+  }
+
+  .keyboard-row {
+    gap: 6px;
+  }
+}
+
+/* 极限横屏小高度：把 header 挪到侧边，释放垂直空间 */
+@media (orientation: landscape) and (max-height: 360px) {
+  .number-keyboard {
+    display: grid;
+    grid-template-columns: 132px 1fr;
+    column-gap: 8px;
+    align-items: stretch;
+    padding: 6px;
+    border-radius: 14px;
+  }
+
+  .keyboard-header {
+    border-bottom: none;
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    margin-bottom: 0;
+    padding: 6px;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+  }
+
+  .keyboard-header-left {
+    gap: 4px;
+  }
+
+  .keyboard-title {
+    font-size: 12px;
+    line-height: 1.1;
+  }
+
+  .keyboard-value-display {
+    justify-content: flex-start;
+    padding: 2px 6px;
+  }
+
+  .value-content {
+    font-size: 12px;
+  }
+
+  .close-btn {
+    align-self: flex-end;
+  }
+
+  .keyboard-body {
+    gap: 4px;
+  }
+
+  .keyboard-row {
+    gap: 4px;
+  }
+
+  .keyboard-key {
+    height: 34px;
+    font-size: 14px;
+  }
+
+  .key-confirm {
+    height: 36px;
+    font-size: 13px;
   }
 }
 </style>

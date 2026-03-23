@@ -7,7 +7,7 @@
 // repository.
 
 <template>
-  <div class="tsearch">
+  <div class="tsearch" data-testid="ui-target-search-root">
     <skysource-search v-model="obsSkySource" floatingList="true"></skysource-search>
   </div>
 </template>

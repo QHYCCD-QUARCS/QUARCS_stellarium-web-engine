@@ -1,29 +1,34 @@
 <template>
   <transition name="dialog">
-    <div class="indiDebugDialog" :style="{ bottom: bottom + 'px', top: top + 'px'}">
+    <div
+      class="indiDebugDialog"
+      :style="{ bottom: bottom + 'px', top: top + 'px'}"
+      data-testid="ui-indi-debug-dialog-root"
+      :data-state="isOpen ? 'open' : 'closed'"
+    >
       <div class="debug-messages" ref="messageContainer" @scroll="checkIfScrolledToBottom">
         <p v-for="(msg, index) in ShowMessages" :key="index" :style="getMsgStyle(msg.msgtype)">
           {{ msg.msgtext }}
         </p>
       </div>
 
-      <button @click="scrollToBottom" :class="{ 'ToBottom-button-show': !isAtBottom, 'ToBottom-button-hide': isAtBottom }">
+      <button @click="scrollToBottom" :class="{ 'ToBottom-button-show': !isAtBottom, 'ToBottom-button-hide': isAtBottom }" data-testid="ui-indi-debug-dialog-btn-scroll-to-bottom">
         <v-icon style="font-size: 15px;">mdi-chevron-down</v-icon>
       </button>
 
-      <button @click="clearMessages" class="clear-button">
+      <button @click="clearMessages" class="clear-button" data-testid="ui-indi-debug-dialog-btn-clear-messages">
         <div style="display: flex; justify-content: center; align-items: center;">
           <img src="@/assets/images/svg/ui/delete.svg" height="20px" style="min-height: 20px; pointer-events: none;"></img>
         </div>
       </button>
 
-      <!-- <button @click="saveMessages" class="save-button">
+      <!-- <button @click="saveMessages" class="save-button" data-testid="ui-indi-debug-dialog-btn-save-messages">
         <div style="display: flex; justify-content: center; align-items: center;">
           <img src="@/assets/images/svg/ui/Share.svg" height="20px" style="min-height: 20px; pointer-events: none;"></img>
         </div>
       </button> -->
 
-      <button @click="toggleErrorDebug" class="ErrorMsg-button">
+      <button @click="toggleErrorDebug" class="ErrorMsg-button" data-testid="ui-indi-debug-dialog-btn-toggle-error-debug">
         <template v-if="isErrorDebugActive">
           <div style="display: flex; justify-content: center; align-items: center;">
             <img src="@/assets/images/svg/ui/ErrorMsg_ON.svg" height="25px" style="min-height: 25px; pointer-events: none;"></img>
@@ -36,7 +41,7 @@
         </template>
       </button>
 
-      <button @click="toggleServerDebug" class="ServerMsg-button">
+      <button @click="toggleServerDebug" class="ServerMsg-button" data-testid="ui-indi-debug-dialog-btn-toggle-server-debug">
         <template v-if="isServerDebugActive">
           <div style="display: flex; justify-content: center; align-items: center;">
             <img src="@/assets/images/svg/ui/ServerMsg_ON.svg" height="25px" style="min-height: 25px; pointer-events: none;"></img>
@@ -49,7 +54,7 @@
         </template>
       </button>
 
-      <button @click="toggleClientDebug" class="ClientMsg-button">
+      <button @click="toggleClientDebug" class="ClientMsg-button" data-testid="ui-indi-debug-dialog-btn-toggle-client-debug">
         <template v-if="isClientDebugActive">
           <div style="display: flex; justify-content: center; align-items: center;">
             <img src="@/assets/images/svg/ui/ClientMsg_ON.svg" height="25px" style="min-height: 25px; pointer-events: none;"></img>
@@ -62,7 +67,7 @@
         </template>
       </button>
 
-      <button @click="dialogClose" class="btn-close">
+      <button @click="dialogClose" class="btn-close" data-testid="ui-indi-debug-dialog-btn-close">
         <div style="display: flex; justify-content: center; align-items: center;">
           <img src="@/assets/images/svg/ui/OFF.svg" height="12px" style="min-height: 12px; pointer-events: none;"></img>
         </div>
@@ -77,6 +82,10 @@ import Clipboard from 'clipboard';
 
 export default {
   name: 'indiDebugDialog',
+  props: {
+    // 由父组件（gui.vue）传入，用于稳定输出 data-state=open|closed（契约要求）
+    isOpen: { type: Boolean, default: false },
+  },
   data() {
     return {
       bottom: 50,

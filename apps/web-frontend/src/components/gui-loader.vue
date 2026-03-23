@@ -8,7 +8,7 @@
 
 <template>
 
-<div class="secondary" style="position:absolute; width: 100%; height: 100%;">
+<div class="secondary" style="position:absolute; width: 100%; height: 100%;" data-testid="ui-gui-loader-root">
   <v-container style="width: 100%; height: 100%;">
     <v-layout column align-center style="width: 100%; height: 100%;">
       <div style="margin-top: 60px;">

@@ -1,7 +1,7 @@
 <template>
-  <div>
+  <div data-testid="ui-chart-scatter-root">
     <div ref="scatterchart" style="width: 80px; height: 80px;" class="scatterchart-panel"></div>
-    <!-- <button @click="clearChartData" class="clear-btn">Clear</button> -->
+    <!-- <button @click="clearChartData" class="clear-btn" data-testid="ui-chart-scatter-btn-clear-chart-data">Clear</button> -->
   </div>
 </template>
 

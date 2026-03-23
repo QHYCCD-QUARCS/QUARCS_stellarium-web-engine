@@ -48,12 +48,12 @@ this.$refs.locationManager.centerMapAt(51.5074, -0.1278, 12, false)
 
 
 <template>
-  <div>
+  <div data-testid="ui-location-mgr-root">
     <v-row justify="space-around">
       <v-col cols="4" v-if="doShowMyLocation">
         <v-list two-line subheader>
           <v-subheader>{{ $t('My Locations') }}</v-subheader>
-          <v-list-item href="javascript:;" v-for="item in knownLocations" v-bind:key="item.id" @click.native.stop="selectKnownLocation(item)" :style="(item && knownLocationMode && selectedKnownLocation && item.id === selectedKnownLocation.id) ? 'background-color: #455a64' : ''">
+          <v-list-item href="javascript:;" v-for="item in knownLocations" v-bind:key="item.id" @click.native.stop="selectKnownLocation(item)" :style="(item && knownLocationMode && selectedKnownLocation && item.id === selectedKnownLocation.id) ? 'background-color: #455a64' : ''" data-testid="ui-components-location-mgr-act-select-known-location">
             <v-list-item-icon>
               <v-icon>mdi-map-marker</v-icon>
             </v-list-item-icon>
@@ -102,7 +102,7 @@ this.$refs.locationManager.centerMapAt(51.5074, -0.1278, 12, false)
                           color="primary"
                           class="mt-0 pt-0"
                           style="margin-left: 12px;"
-                        >
+                         data-testid="ui-location-mgr-switch-on-map-type-toggle">
                           <template v-slot:label>
                             <span class="text-caption" style="line-height: 1;">{{ $t('locationMgr.onlineMap') }}</span>
                           </template>

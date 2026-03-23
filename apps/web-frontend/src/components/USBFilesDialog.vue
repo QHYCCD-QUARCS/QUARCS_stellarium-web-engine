@@ -1,5 +1,5 @@
 <template>
-  <v-dialog max-width="800" v-model="$store.state.showUSBFilesDialog" scrollable>
+  <v-dialog max-width="800" v-model="$store.state.showUSBFilesDialog" scrollable data-testid="ui-usbfiles-dialog-root">
     <v-card v-if="$store.state.showUSBFilesDialog" class="qs-settings-card" elevation="0" style="backdrop-filter: blur(5px); background-color: rgba(64, 64, 64, 0.3);">
       <v-card-title class="qs-title">
         <div>{{ $t('USB Files') }}</div>
@@ -15,7 +15,7 @@
         <div v-else-if="currentPath" class="qs-usb-browser">
           <div class="qs-path-bar" style="margin-bottom: 12px; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 4px;">
             <div style="display: flex; align-items: center; gap: 8px;">
-              <v-btn small text @click="navigateUp" :disabled="!canNavigateUp">
+              <v-btn small text @click="navigateUp" :disabled="!canNavigateUp" data-testid="ui-usbfiles-dialog-btn-navigate-up">
                 <v-icon small>mdi-arrow-up</v-icon>
               </v-btn>
               <span style="color: rgba(255,255,255,0.8); font-family: monospace; font-size: 14px; word-break: break-all;">{{ currentPath || '/' }}</span>
@@ -28,7 +28,7 @@
               @click="handleItemClick(item)"
               :class="{ 'v-list-item--active': false }"
               style="border-bottom: 1px solid rgba(255,255,255,0.05);"
-            >
+             data-testid="ui-components-usbfiles-dialog-act-handle-item-click" :data-index="index">
               <v-list-item-avatar>
                 <v-icon :color="item.isDirectory ? 'blue' : 'grey'">
                   {{ item.isDirectory ? 'mdi-folder' : 'mdi-file' }}
@@ -49,7 +49,7 @@
       </v-card-text>
       <v-card-actions>
         <v-spacer></v-spacer>
-        <v-btn class="blue--text darken-1" text @click.native="$store.state.showUSBFilesDialog = false">
+        <v-btn class="blue--text darken-1" text @click.native="$store.state.showUSBFilesDialog = false" data-testid="ui-usbfiles-dialog-btn-blue-text">
           {{ $t('Close') }}
         </v-btn>
       </v-card-actions>

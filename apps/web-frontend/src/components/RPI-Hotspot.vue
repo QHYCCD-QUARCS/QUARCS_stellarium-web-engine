@@ -1,15 +1,15 @@
 <template>
   <transition name="dialog">
-    <div class="HotspotDialog" :style="{ top: top + 'px', height: DialogHeight + 'px' }">
-      <v-text-field class="NameEdit" label="Hotspot Name" v-model="InputText" variant="outlined"></v-text-field>
+    <div class="HotspotDialog" :style="{ top: top + 'px', height: DialogHeight + 'px' }" data-testid="ui-rpi-hotspot-root">
+      <v-text-field class="NameEdit" label="Hotspot Name" v-model="InputText" variant="outlined" data-testid="ui-rpi-hotspot-input-input-text"></v-text-field>
 
       <span v-show="isEdited && (defaultShow || SaveBtnSelect)" class="custom-button no-select" :class="{ 'DeleteTips-show': SaveBtnSelect, 'DeleteTips-hide': !SaveBtnSelect }"> Confirm edited? </span>
 
-      <button v-show="isEdited && (defaultShow || SaveBtnSelect)" class="custom-button btn-SureDelete no-select" :class="{ 'btn-SureDelete-show': SaveBtnSelect, 'btn-SureDelete-hide': !SaveBtnSelect }" @click="UpdateHotspotName"> 
+      <button v-show="isEdited && (defaultShow || SaveBtnSelect)" class="custom-button btn-SureDelete no-select" :class="{ 'btn-SureDelete-show': SaveBtnSelect, 'btn-SureDelete-hide': !SaveBtnSelect }" @click="UpdateHotspotName" data-testid="ui-rpi-hotspot-btn-update-hotspot-name"> 
         <v-icon color="rgba(75, 155, 250)"> mdi-check-circle-outline </v-icon>
       </button>
       
-      <button v-show="isEdited" class="custom-button btn-Delete no-select" @click="SaveBtnClick"> 
+      <button v-show="isEdited" class="custom-button btn-Delete no-select" @click="SaveBtnClick" data-testid="ui-rpi-hotspot-btn-save-btn-click"> 
         <span v-if="SaveBtnSelect === false">
           <div style="display: flex; justify-content: center; align-items: center;">
             <img src="@/assets/images/svg/ui/SaveEdit.svg" height="20px" style="min-height: 20px; pointer-events: none;"></img>
@@ -20,7 +20,7 @@
         </span>
       </button>
 
-      <button v-show="isEdited" class="custom-button btn-Redo no-select" @click="RedoHotspotName"> 
+      <button v-show="isEdited" class="custom-button btn-Redo no-select" @click="RedoHotspotName" data-testid="ui-rpi-hotspot-btn-redo-hotspot-name"> 
         <v-icon color="rgba(255, 0, 0)"> mdi-redo </v-icon>
       </button>
 

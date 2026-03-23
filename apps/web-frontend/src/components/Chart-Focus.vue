@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div data-testid="ui-chart-focus-root">
     <div
       ref="linechart"
       :style="{ width: containerMaxWidth + 'px', height: 80 + 'px' }"
@@ -10,7 +10,7 @@
       @touchstart="startDrag"
       @touchmove="dragging"
       @touchend="endDrag"
-    ></div>
+     data-testid="ui-components-chart-focus-act-start-drag"></div>
     
     <!-- 对焦结果状态框（使用全局弹层，附加到 body，避免被图表容器裁剪） -->
     <v-dialog v-model="quadraticResult.show" attach="body" max-width="460" overlay-color="black" overlay-opacity="0.25" persistent>
@@ -21,7 +21,7 @@
               <v-icon small color="#33DA79">mdi-check-circle</v-icon>
               <span class="header-title">{{ $t('Focus.status') }}</span>
             </div>
-            <v-btn icon small class="close-btn" @click="closePanel">
+            <v-btn icon small class="close-btn" @click="closePanel" data-testid="ui-chart-focus-btn-close-panel">
               <v-icon>mdi-close</v-icon>
             </v-btn>
           </v-card-title>

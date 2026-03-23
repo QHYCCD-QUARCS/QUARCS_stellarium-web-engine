@@ -3,9 +3,12 @@
     <div
       :class="{ 'ImageFolder': !folderSelect, 'ImageFolder-select': folderSelect, 'ImageFolder-Deleted': folderSelect && DeleteBtnSelect, 'ImageFolder-Open': folderOpen, 'ImageFolder-Pressing': PressStart }"
       :style="{ top: folderOpen? '10px':PositionTop, left: folderOpen? '50%':PositionLeft }" @mousedown="startPress"
-      @mouseup="endPress" @touchstart="startPress" @touchend="endPress" v-show="isShow" ref="folder" @click.stop>
+      @mouseup="endPress" @touchstart.stop.prevent="startPress" @touchend.stop.prevent="endPress" v-show="isShow" ref="folder" @click.stop
+      :data-testid="`ui-image-folder-root-${folderIndex}`"
+      data-testid-legacy="ui-image-folder-root"
+      :data-state="folderOpen ? 'open' : 'closed'">
 
-      <div v-show="!folderOpen" class="no-select" style="display: flex; justify-content: center; align-items: center;">
+      <div v-if="!folderOpen" class="no-select" style="display: flex; justify-content: center; align-items: center;">
         <img src="@/assets/images/svg/ui/folder.svg" height="80px"
           style="min-height: 80px; pointer-events: none;"></img>
       </div>
@@ -21,20 +24,38 @@
       </span>
 
       <div v-show="folderOpen" class="image-file-list">
-        <div v-for="(file, index) in displayedItems" :key="index" @mousedown="startFilesPress(index, file.imageName)"
-          @mouseup="endFilesPress" @touchstart="startFilesPress(index, file.imageName)" @touchend="endFilesPress"
-          :class="{ 'image-file-item': !file.isSelect, 'image-file-item-select': file.isSelect, 'ImageFolder-Pressing': file.FilesPressStart, 'image-file-item-open': file.isOpen }">
+        <div v-for="(file, index) in displayedItems" :key="file.imageName" 
+          @mousedown="startFilesPress(index, file.imageName)"
+          @mouseup="endFilesPress" @touchstart.stop.prevent="startFilesPress(index, file.imageName)" @touchend.stop.prevent="endFilesPress"
+          :class="{ 'image-file-item': !file.isSelect, 'image-file-item-select': file.isSelect, 'ImageFolder-Pressing': file.FilesPressStart, 'image-file-item-open': file.isOpen }"
+          :data-testid="`ui-image-folder-file-${folderIndex}-${index}`"
+          data-testid-legacy="ui-components-image-folder-act-start-files-press"
+          :data-index="index"
+          :data-state="file && file.isOpen ? 'open' : 'closed'">
           <span class="image-file-name">{{ file.imageName }}</span>
         </div>
       </div>
 
       <span v-show="folderOpen && (defaultShow || DeleteBtnExpand)" class="custom-button no-select" :class="{ 'DeleteTips-show': DeleteBtnExpand, 'DeleteTips-hide': !DeleteBtnExpand }"> Confirm deletion? </span>
 
-      <button v-show="folderOpen && (defaultShow || DeleteBtnExpand)" class="custom-button btn-SureDelete no-select" :class="{ 'btn-SureDelete-show': DeleteBtnExpand, 'btn-SureDelete-hide': !DeleteBtnExpand }" @click="DeleteImageFiles"> 
+      <button
+        v-show="folderOpen && (defaultShow || DeleteBtnExpand)"
+        class="custom-button btn-SureDelete no-select"
+        :class="{ 'btn-SureDelete-show': DeleteBtnExpand, 'btn-SureDelete-hide': !DeleteBtnExpand }"
+        data-testid="ui-imagefolder-btn-delete-confirm"
+        :data-index="folderIndex"
+        aria-label="Confirm deletion"
+        @click="DeleteImageFiles">
         <v-icon color="rgba(255, 0, 0)"> mdi-check-circle-outline </v-icon>
       </button>
 
-      <button v-show="folderOpen" class="custom-button btn-Delete no-select" @click="DeleteBtnClick">
+      <button
+        v-show="folderOpen"
+        class="custom-button btn-Delete no-select"
+        data-testid="ui-imagefolder-btn-delete"
+        :data-index="folderIndex"
+        aria-label="Delete selected files"
+        @click="DeleteBtnClick">
         <span v-if="DeleteBtnExpand === false">
           <div style="display: flex; justify-content: center; align-items: center;">
             <img src="@/assets/images/svg/ui/delete.svg" height="20px" style="min-height: 20px; pointer-events: none;"></img>
@@ -113,11 +134,68 @@ export default {
       defaultShow: false,
     };
   },
+  watch: {
+    // 兜底：如果父层列表刷新/重排且使用了 :key="index"，组件实例可能会被复用到“另一个文件夹”上。
+    // 当该组件代表的文件夹标识（imageDate/imageName）变化时，强制重置为关闭态，避免出现 folder.svg 错位叠层。
+    imageDate() {
+      this.resetFolderStateOnIdentityChange();
+    },
+    imageName() {
+      this.resetFolderStateOnIdentityChange();
+    },
+  },
   created() {
     this.$bus.$on('currentFolderType', this.GetImageFiles);
     this.$bus.$on('ImageFilesName', this.ImageFilesName);
+    this.$bus.$on('RequestCloseImageFolder', this.closeFolder);
   },
   methods: {
+    emitFolderContext(open) {
+      // folderName 在协议里就是 imageDate + imageName 的拼接（与后端一致）
+      const folderName = (this.imageDate || '') + (this.imageName || '');
+      this.$bus.$emit('ImageFolderContext', {
+        open: !!open,
+        folderType: this.CurrentFolderType || '',
+        folderName,
+      });
+      if (!open) {
+        this.$bus.$emit('SelectedImageFilesChanged', {
+          folderType: this.CurrentFolderType || '',
+          folderName,
+          files: [],
+        });
+      }
+    },
+    emitSelectedFiles() {
+      if (!this.folderOpen) return;
+      const folderName = (this.imageDate || '') + (this.imageName || '');
+      const files = (this.ImageFiles || [])
+        .filter(f => f && f.isSelect)
+        .map(f => f.imageName);
+      this.$bus.$emit('SelectedImageFilesChanged', {
+        folderType: this.CurrentFolderType || '',
+        folderName,
+        files,
+      });
+    },
+    resetFolderStateOnIdentityChange() {
+      // 如果之前处于打开态，先按正常流程关闭（会 emit ImageFolderOpen:false）
+      if (this.folderOpen) {
+        this.closeFolder();
+      }
+
+      // 清理与旧文件夹相关的状态，避免残留导致 UI 混淆
+      this.ImageFiles = [];
+      this.CurrentFolderType = '';
+      this.SelectFilesName = '';
+      this.SelectFilesIndex = 0;
+      this.LastImageFilesList = '';
+      this.DeleteBtnExpand = false;
+      this.defaultShow = false;
+      this.PressStart = false;
+      this.isLongPress = false;
+      this.isFilesLongPress = false;
+    },
     startPress() {
       this.isLongPress = false; // 重置长按标记
       if(!this.folderOpen) {
@@ -148,6 +226,7 @@ export default {
       if(!this.folderOpen) {
         this.folderOpen = true;
         this.$bus.$emit('ImageFolderOpen', 'true');
+        this.emitFolderContext(true);
       }
 
       // 恢复点击权限
@@ -207,6 +286,7 @@ export default {
       // 修改：长按选择文件
       console.log('LongPress to Select File:', this.SelectFilesName);
       this.ImageFiles[this.SelectFilesIndex].isSelect = !this.ImageFiles[this.SelectFilesIndex].isSelect;
+      this.emitSelectedFiles();
     },
 
     toggleFolder() {
@@ -228,6 +308,8 @@ export default {
       if(this.folderOpen) {
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'GetImageFiles:' + type + '/' + this.imageDate + this.imageName);
         this.$bus.$emit('SendConsoleLogMsg', 'Get Image Files:' + type + '/' + this.imageDate + this.imageName, 'info');
+        // folderType 可能是打开后才收到的，这里同步一次
+        this.emitFolderContext(true);
       }
     },
 
@@ -243,6 +325,7 @@ export default {
             console.log('File[',i,']',File[i]);
             this.ImageFiles.push({imageName: File[i], isSelect: false, FilesPressStart: false, isOpen: false});
           }
+          this.emitSelectedFiles();
         }
       }
     },
@@ -250,6 +333,7 @@ export default {
     closeFolder() {
       this.folderOpen = false;
       this.$bus.$emit('ImageFolderOpen', 'false');
+      this.emitFolderContext(false);
     },
 
     DeleteBtnClick() {

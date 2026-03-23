@@ -1,9 +1,9 @@
 <template>
-    <div class="cfw-select-btn-bar">
+    <div class="cfw-select-btn-bar" data-testid="ui-cfwselect-btn-bar-root">
       <button v-for="cfw in FilterWheels"
               :key="cfw"
               :class="{ active: selectedCFW === cfw }"
-              @click="selectCFW(cfw)">
+              @click="selectCFW(cfw)" data-testid="ui-cfwselect-btn-bar-btn-select-cfw">
         {{ cfw }}
       </button>
     </div>

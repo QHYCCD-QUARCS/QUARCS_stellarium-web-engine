@@ -7,7 +7,7 @@
 // repository.
 
 <template>
-  <div>
+  <div data-testid="ui-progress-bars-root">
     <div class="tfaders" v-for="bar in progressBars" v-bind:key="bar.id">
       <transition name="fade">
         <div class="tfader" v-if="bar.value != bar.total">

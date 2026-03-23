@@ -1,12 +1,13 @@
 import Vue from 'vue'
 
 const initialDevices = () => ({
-  MainCamera: { connected: false, running: false, features: [] },
-  GuiderCamera: { connected: false, running: false, features: [] },
-  Focuser: { connected: false, running: false, features: [] },
-  Mount: { connected: false, running: false, features: [] },
-  PoleCamera: { connected: false, running: false, features: [] },
-  CFW: { connected: false, running: false, features: [] },
+  // bound: 仅用于“设备已连接但未绑定(Not Bind Device)”的场景（目前只对主相机做强约束）
+  MainCamera: { connected: false, bound: true, running: false, features: [] },
+  GuiderCamera: { connected: false, bound: true, running: false, features: [] },
+  Focuser: { connected: false, bound: true, running: false, features: [] },
+  Mount: { connected: false, bound: true, running: false, features: [] },
+  PoleCamera: { connected: false, bound: true, running: false, features: [] },
+  CFW: { connected: false, bound: true, running: false, features: [] },
 })
 
 // 功能分组：用于跨设备互斥检测
@@ -21,7 +22,7 @@ const FeatureGroups = {
 
 function ensureDevice(state, device) {
   if (!state.devices[device]) {
-    Vue.set(state.devices, device, { connected: false, running: false, features: [] })
+    Vue.set(state.devices, device, { connected: false, bound: true, running: false, features: [] })
   }
 }
 
@@ -32,7 +33,12 @@ export default {
   }),
   getters: {
     getDevice: (state) => (device) => {
-      return state.devices[device] || { connected: false, running: false, features: [] }
+      return state.devices[device] || { connected: false, bound: true, running: false, features: [] }
+    },
+    isDeviceBound: (state, getters) => (device) => {
+      const d = getters.getDevice(device)
+      // 默认视为已绑定，只有显式标记 bound=false 时才视为未绑定
+      return d && typeof d.bound !== 'undefined' ? !!d.bound : true
     },
     getDeviceFeatures: (state, getters) => (device) => {
       return (getters.getDevice(device).features || []).slice()
@@ -76,6 +82,10 @@ export default {
     SET_DEVICE_CONNECTED(state, { device, connected }) {
       ensureDevice(state, device)
       state.devices[device].connected = !!connected
+    },
+    SET_DEVICE_BOUND(state, { device, bound }) {
+      ensureDevice(state, device)
+      state.devices[device].bound = !!bound
     },
     SET_DEVICE_RUNNING(state, { device, running }) {
       ensureDevice(state, device)

@@ -1,6 +1,6 @@
 <template>
-    <div class="update-overlay" v-if="visible" :class="{ 'update-complete': updateComplete }" @click="handleOverlayClick">
-      <div class="update-dialog" @click.stop>
+    <div class="update-overlay" v-if="visible" :class="{ 'update-complete': updateComplete }" @click="handleOverlayClick" data-testid="ui-update-progress-dialog-root">
+      <div class="update-dialog" @click.stop data-testid="ui-components-update-progress-dialog-act-update-dialog">
         <div class="update-header">
           <h2 v-if="!updateComplete && !updateFailed" class="warning-text">{{ $t('update.warning') }}</h2>
           <h2 v-else-if="updateComplete" class="success-text">{{ $t('update.complete') }}</h2>
@@ -22,7 +22,7 @@
         <div class="log-container">
           <div class="log-header">
             <span>{{ $t('update.updateLog') }}</span>
-            <button class="toggle-log" @click="toggleLogExpand">
+            <button class="toggle-log" @click="toggleLogExpand" data-testid="ui-update-progress-dialog-btn-toggle-log-expand">
               {{ logExpanded ? $t('update.collapse') : $t('update.expand') }}
             </button>
           </div>
@@ -40,8 +40,8 @@
         </div>
   
         <div class="dialog-footer" v-if="updateComplete || updateFailed">
-          <button class="close-button" @click="closeDialog">{{ $t('update.close') }}</button>
-          <button class="retry-button" v-if="updateFailed" @click="retryUpdate">{{ $t('update.retry') }}</button>
+          <button class="close-button" @click="closeDialog" data-testid="ui-update-progress-dialog-btn-close-dialog">{{ $t('update.close') }}</button>
+          <button class="retry-button" v-if="updateFailed" @click="retryUpdate" data-testid="ui-update-progress-dialog-btn-retry-update">{{ $t('update.retry') }}</button>
         </div>
       </div>
     </div>

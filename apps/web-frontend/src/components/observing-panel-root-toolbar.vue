@@ -8,8 +8,8 @@
 
 <template>
 
-<v-toolbar dark dense class="obspanel-toolbar">
-  <v-btn icon to="/"><v-icon>mdi-close</v-icon></v-btn>
+<v-toolbar dark dense class="obspanel-toolbar" data-testid="ui-observing-panel-root-toolbar-root">
+  <v-btn icon to="/" data-testid="ui-observing-panel-root-toolbar-btn-auto"><v-icon>mdi-close</v-icon></v-btn>
   <v-spacer></v-spacer>
 </v-toolbar>
 
