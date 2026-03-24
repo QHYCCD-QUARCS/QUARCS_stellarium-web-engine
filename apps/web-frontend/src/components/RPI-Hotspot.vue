@@ -1,28 +1,30 @@
 <template>
   <transition name="dialog">
-    <div class="HotspotDialog" :style="{ top: top + 'px', height: DialogHeight + 'px' }" data-testid="ui-rpi-hotspot-root">
+    <div class="HotspotDialog" :style="{ top: top + 'px' }" data-testid="ui-rpi-hotspot-root">
       <v-text-field class="NameEdit" label="Hotspot Name" v-model="InputText" variant="outlined" data-testid="ui-rpi-hotspot-input-input-text"></v-text-field>
 
-      <span v-show="isEdited && (defaultShow || SaveBtnSelect)" class="custom-button no-select" :class="{ 'DeleteTips-show': SaveBtnSelect, 'DeleteTips-hide': !SaveBtnSelect }"> Confirm edited? </span>
+      <div v-show="isEdited" class="HotspotEditBar">
+        <button class="custom-button round-action-btn no-select" @click="RedoHotspotName" data-testid="ui-rpi-hotspot-btn-redo-hotspot-name">
+          <v-icon color="rgba(255, 120, 120)"> mdi-redo </v-icon>
+        </button>
 
-      <button v-show="isEdited && (defaultShow || SaveBtnSelect)" class="custom-button btn-SureDelete no-select" :class="{ 'btn-SureDelete-show': SaveBtnSelect, 'btn-SureDelete-hide': !SaveBtnSelect }" @click="UpdateHotspotName" data-testid="ui-rpi-hotspot-btn-update-hotspot-name"> 
-        <v-icon color="rgba(75, 155, 250)"> mdi-check-circle-outline </v-icon>
-      </button>
-      
-      <button v-show="isEdited" class="custom-button btn-Delete no-select" @click="SaveBtnClick" data-testid="ui-rpi-hotspot-btn-save-btn-click"> 
-        <span v-if="SaveBtnSelect === false">
-          <div style="display: flex; justify-content: center; align-items: center;">
-            <img src="@/assets/images/svg/ui/SaveEdit.svg" height="20px" style="min-height: 20px; pointer-events: none;"></img>
-          </div> 
-        </span>
-        <span v-if="SaveBtnSelect === true">
-          <v-icon color="rgba(255, 0, 0)"> mdi-close-circle-outline </v-icon>
-        </span>
-      </button>
+        <button class="custom-button round-action-btn no-select" @click="SaveBtnClick" data-testid="ui-rpi-hotspot-btn-save-btn-click">
+          <span v-if="SaveBtnSelect === false">
+            <div class="ActionIconWrap">
+              <img src="@/assets/images/svg/ui/SaveEdit.svg" height="20px" style="min-height: 20px; pointer-events: none;"></img>
+            </div>
+          </span>
+          <span v-else>
+            <v-icon color="rgba(255, 140, 140)"> mdi-close-circle-outline </v-icon>
+          </span>
+        </button>
 
-      <button v-show="isEdited" class="custom-button btn-Redo no-select" @click="RedoHotspotName" data-testid="ui-rpi-hotspot-btn-redo-hotspot-name"> 
-        <v-icon color="rgba(255, 0, 0)"> mdi-redo </v-icon>
-      </button>
+        <button v-show="SaveBtnSelect" class="custom-button round-action-btn confirm-action-btn no-select" @click="UpdateHotspotName" data-testid="ui-rpi-hotspot-btn-update-hotspot-name">
+          <v-icon color="rgba(75, 155, 250)"> mdi-check-circle-outline </v-icon>
+        </button>
+
+        <span v-show="SaveBtnSelect" class="EditConfirmTip no-select">Confirm edited?</span>
+      </div>
 
       <span v-show="isUpdated" class="TipsText"> 
         {{ $t('Please connect to the new hotspot in the mobile phone system settings, it will take about a minute to wait.') }}
@@ -284,12 +286,6 @@ export default {
     isEdited() {
       return this.InputText !== this.CurrentName;
     },
-    DialogHeight() {
-      if (this.isUpdated) {
-        return 560;
-      }
-      return this.isEdited ? 560 : 520;
-    },
     wifiItems() {
       // Show strongest first
       const list = (this.wifiScanResults || []).slice().sort((a, b) => (b.signal || 0) - (a.signal || 0));
@@ -310,13 +306,17 @@ export default {
   backdrop-filter: blur(5px);
   box-sizing: border-box;
   overflow-x: hidden;
-  overflow-y: auto; /* prevent Wi-Fi section from being clipped on smaller viewports */
+  overflow-y: auto;
   left: 50%;
-  width: 30%;
+  width: min(92vw, 560px);
+  max-height: calc(100vh - 70px);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
   transform: translateX(-50%);
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.8);
-  transition: height 0.3s ease;
 }
 
 .dialog-enter-active {
@@ -355,269 +355,162 @@ export default {
 }
 
 .NameEdit {
-  position: absolute;
-  width: 90%;
-  height: 40px;
-  top: 5px;
-  left: 50%;
-  transform: translateX(-50%);
-
+  width: 100%;
 }
 
-.btn-Redo {
-  position:absolute;
-  top: 65px;
-  left: 10px;
+.HotspotEditBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
 
-  width: 30px;
-  height: 30px;
-
+.round-action-btn {
+  width: 38px;
+  height: 38px;
   user-select: none;
   background-color: rgba(0, 0, 0, 0.3);
   backdrop-filter: blur(5px);
   border-radius: 50%;
   box-sizing: border-box;
   border: none;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
 }
 
-.btn-Delete {
-  position:absolute;
-  top: 65px;
-  right: 10px;
-
-  width: 30px;
-  height: 30px;
-
-  user-select: none;
-  background-color: rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(5px);
-  border-radius: 50%;
-  box-sizing: border-box;
-  border: none;
-}
-
-.btn-Delete:active,
-.btn-SureDelete:active {
-  transform: scale(0.95); /* 点击时缩小按钮 */
+.round-action-btn:active,
+.btn-Net:active {
+  transform: scale(0.97);
   background-color: rgba(255, 255, 255, 0.7);
 }
 
-.btn-SureDelete-show {
-  position:absolute;
-  top: 65px;
-  right: 10px;
-
-  width: 30px;
-  height: 30px;
-
-  user-select: none;
-  background-color: rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(5px);
-  border-radius: 50%;
-  box-sizing: border-box;
-  border: none;
-
-  animation: showAnimation 0.3s forwards;
+.confirm-action-btn {
+  background-color: rgba(75, 155, 250, 0.15);
 }
 
-@keyframes showAnimation {
-  from {
-    right: 10px;
-  }
-  to {
-    right: 135px;
-  }
-}
-
-.btn-SureDelete-hide {
-  position:absolute;
-  top: 65px;
-  right: 10px;
-
-  width: 30px;
-  height: 30px;
-
-  user-select: none;
-  background-color: rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(5px);
-  border-radius: 50%;
-  box-sizing: border-box;
-  border: none;
-
-  animation: hideAnimation 0.3s forwards;
-}
-
-@keyframes hideAnimation {
-  from {
-    right: 135px;
-    opacity: 1;
-  }
-  to {
-    right: 10px;
-    opacity: 0;
-  }
-}
-
-.DeleteTips-show {
-  position:absolute;
-  top: 65px;
-  right: 10px;
-
-  width: 30px;
-  height: 30px;
-
-  user-select: none;
-  background-color: rgba(0, 0, 0, 0.1);
-  backdrop-filter: blur(5px);
-  border-radius: calc(30px / 2);
-  box-sizing: border-box;
-  border: none;
-
-  opacity: 0;
-  overflow: hidden;
-
+.ActionIconWrap {
   display: flex;
   justify-content: center;
   align-items: center;
-  text-align: center;
-
-  animation: expandAnimation 0.3s forwards;
 }
 
-@keyframes expandAnimation {
-  from {
-    width: 30px;
-    opacity: 0;
-  }
-  to {
-    width: 155px;
-    opacity: 1;
-  }
-}
-
-.DeleteTips-hide {
-  position:absolute;
-  top: 65px;
-  right: 10px;
-
-  width: 30px;
-  height: 30px;
-
+.EditConfirmTip {
+  flex: 1 1 180px;
+  min-width: 0;
   user-select: none;
-  background-color: rgba(0, 0, 0, 0.1);
-  backdrop-filter: blur(5px);
-  border-radius: calc(30px / 2);
-  box-sizing: border-box;
-  border: none;
-
-  opacity: 1;
-  overflow: hidden;
-
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  text-align: center;
-
-  animation: collapseAnimation 0.3s forwards;
-}
-
-@keyframes collapseAnimation {
-  from {
-    width: 155px;
-    opacity: 1;
-  }
-  to {
-    width: 30px;
-    opacity: 0;
-  }
+  font-size: 12px;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.85);
 }
 
 .TipsText {
-  position: absolute; 
-  width: 100%; 
-  top: 100px; 
-  left: 0; 
-
-  text-align: center; 
-  font-size: 10px; 
-  color: rgba(255, 0, 0, 0.7); 
+  text-align: center;
+  font-size: 12px;
+  color: rgba(255, 120, 120, 0.9);
   user-select: none;
-  line-height: 1;
+  line-height: 1.45;
 }
 
 .NetBox {
-  position: absolute;
-  left: 5%;
-  top: 115px;
-  width: 90%;
+  width: 100%;
   color: rgba(255, 255, 255, 0.9);
-  font-size: 11px;
+  font-size: 12px;
   user-select: none;
 }
 .NetRow {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin: 2px 0;
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  margin: 4px 0;
 }
 .NetLabel {
   opacity: 0.7;
-  width: 70px;
+  word-break: break-word;
 }
 .NetValue {
-  flex: 1;
-  text-align: right;
+  min-width: 0;
+  text-align: left;
   font-family: monospace;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  word-break: break-all;
+  line-height: 1.4;
 }
 .NetBtns {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin-top: 8px;
 }
 .btn-Net {
-  padding: 6px 10px;
-  border-radius: 8px;
+  padding: 8px 12px;
+  min-width: 96px;
+  min-height: 38px;
+  border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.5);
   background-color: rgba(0, 0, 0, 0.25);
   color: rgba(255, 255, 255, 0.9);
-}
-.btn-Net:active {
-  transform: scale(0.98);
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
 }
 .NetHint {
   margin-top: 6px;
-  font-size: 10px;
+  font-size: 11px;
   opacity: 0.75;
+  line-height: 1.45;
 }
 
 .WifiBox {
-  position: absolute;
-  left: 5%;
-  top: 255px;
-  width: 90%;
+  width: 100%;
   color: rgba(255, 255, 255, 0.9);
 }
 .WifiTitle {
-  font-size: 12px;
+  font-size: 14px;
   opacity: 0.85;
   margin-bottom: 6px;
 }
 .WifiRow {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
   margin: 6px 0;
 }
 .WifiHint, .WifiHint2 {
-  font-size: 10px;
+  flex: 1 1 180px;
+  font-size: 11px;
   opacity: 0.7;
+  line-height: 1.45;
 }
 .WifiSelect, .WifiPsk {
   width: 100%;
   margin-top: 6px;
+}
+
+@media (max-width: 600px) {
+  .HotspotDialog {
+    width: 94vw;
+    max-height: calc(100vh - 56px);
+    padding: 14px;
+    gap: 12px;
+  }
+
+  .NetRow {
+    grid-template-columns: 64px minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .NetBtns,
+  .WifiRow {
+    gap: 8px;
+  }
+
+  .btn-Net {
+    min-width: 88px;
+    flex: 1 1 110px;
+  }
 }
 
 </style>
