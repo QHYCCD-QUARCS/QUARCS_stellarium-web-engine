@@ -2037,7 +2037,11 @@ def extract_incoming_non_qt_return() -> list[dict]:
 
 
 def extract_incoming_special_prefixes() -> list[dict]:
-    """在 switch 之前单独处理的消息前缀。"""
+    """在 switch 之前单独处理的消息前缀。
+
+    元组最后一项为「后端发出格式」完整示例；空字符串表示使用默认占位 QT_Return message: <前缀>...
+    （与 App.vue 内联注释一致的可写明确示例，避免读者以为管道后参数未定义。）
+    """
     specials = [
         (
             "NetStatus|",
@@ -2045,6 +2049,7 @@ def extract_incoming_special_prefixes() -> list[dict]:
             "网络状态（WiFi/ZeroTier 等）",
             "① startsWith('NetStatus|')。② payload = message.substring('NetStatus|'.length)。③ JSON.parse(payload)。",
             "JSON：各键表示网络/接口状态；以运行时为准。",
+            "",  # payload 因环境而异，见解析规律
         ),
         (
             "WiFiScan|",
@@ -2052,20 +2057,23 @@ def extract_incoming_special_prefixes() -> list[dict]:
             "扫描到的 WiFi 列表",
             "startsWith('WiFiScan|') 后子串 JSON.parse 为数组。",
             "数组元素：AP 信息（SSID 等）。",
+            'QT_Return message: WiFiScan|[{"ssid":"...","rssi":...},...]',
         ),
         (
             "WiFiSaveResult|",
             "管道分段",
             "保存 WiFi 配置结果",
-            "按 '|' split（非 ':'）：段1=action，段2=result，段3+=detail。",
-            "action/result/detail：保存配置的操作与结果说明。",
+            "parts=data.message.split('|')；parts[0]=WiFiSaveResult；parts[1]=action；parts[2]=result；detail=parts.slice(3).join('|')（与 App.vue 注释一致）。",
+            "action：save 或 scan；result：ok 或 fail；detail：可选说明文本（若含 '|' 由 slice(3).join 还原）。",
+            "QT_Return message: WiFiSaveResult|<save|scan>|<ok|fail>|<detail可选>",
         ),
         (
             "NetModeResult|",
             "管道分段",
             "AP/WAN 模式切换结果",
-            "按 '|' split：mode / result / detail。",
-            "mode：ap|wan 等；result/detail：切换是否成功及说明。",
+            "parts=data.message.split('|')；parts[0]=NetModeResult；parts[1]=mode；parts[2]=result；detail=parts.slice(3).join('|')（与 App.vue 注释一致）。",
+            "mode：ap 或 wan；result：ok 或 fail；detail：可选说明。",
+            "QT_Return message: NetModeResult|<ap|wan>|<ok|fail>|<detail可选>",
         ),
         (
             "StagingScheduleData:",
@@ -2073,6 +2081,7 @@ def extract_incoming_special_prefixes() -> list[dict]:
             "定标计划数据",
             "startsWith('StagingScheduleData:'); 首冒号后可能仍含 ':'，按 App.vue 取子串。",
             "定标/计划表原始文本载荷。",
+            "QT_Return message: StagingScheduleData:<首冒号后的整段文本>",
         ),
         (
             "SendDebugMessage|",
@@ -2080,6 +2089,7 @@ def extract_incoming_special_prefixes() -> list[dict]:
             "调试消息",
             "按 '|' 拆为 type 与 message 段。",
             "type：类别；message：调试文本。",
+            "QT_Return message: SendDebugMessage|<type>|<message>",
         ),
         (
             "DownloadManifest:",
@@ -2087,10 +2097,11 @@ def extract_incoming_special_prefixes() -> list[dict]:
             "下载清单",
             "indexOf(':') 后整段为 JSON（因 JSON 内含 ':'）。",
             "JSON：文件列表、总大小等；失败时见 App.vue 错误对象约定。",
+            'QT_Return message: DownloadManifest:{"files":[...],"totalBytes":...}',
         ),
     ]
     rows = []
-    for prefix, fmt, note, prule, pmean in specials:
+    for prefix, fmt, note, prule, pmean, emit in specials:
         rows.append(
             {
                 "incoming_channel": "QT_Return_special_prefix",
@@ -2100,7 +2111,7 @@ def extract_incoming_special_prefixes() -> list[dict]:
                 "parameter_meaning": pmean,
                 "frontend_purpose_note": note,
                 "backend_purpose_to_confirm": "",
-                "backend_emit_format": f"QT_Return message: {prefix}...",
+                "backend_emit_format": emit or f"QT_Return message: {prefix}...",
             }
         )
     return rows
