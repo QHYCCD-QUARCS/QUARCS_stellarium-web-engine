@@ -12,6 +12,7 @@
     "e2e": "npx playwright test --project=ai-control",
     "mcp:e2e": "node scripts/mcp-e2e-server.mjs",
     "mcp:auto-test-update": "node scripts/mcp-auto-test-update-server.mjs",
+    "e2e:ai-control:target": "bash scripts/ai-control-e2e-target.sh",
     "e2e:ai-control:session": "npx tsx scripts/ai-control-session.ts",
     "e2e:ai-control:task-schedule-matrix": "bash scripts/ai-control-task-schedule-matrix.sh",
     "e2e:ai-control:deep-verify": "bash scripts/ai-control-deep-verify.sh"

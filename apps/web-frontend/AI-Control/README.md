@@ -10,6 +10,53 @@
 
 ---
 
+## 控制流程图
+
+下图概括 **带恢复层的命令执行**（`core/commandExecutor.ts`）与 **`runFlow` 单步执行**（`core/flowRunner.ts`）。与「本地会话」配合时，外层可先 `GET /status` 再 `POST /run`，其内部仍落在此逻辑上。
+
+```mermaid
+flowchart LR
+  E2E[E2E / Playwright] --> RFB["runFlowByCommand(...)\ncliFlows"]
+  CLI[CLI 与脚本] --> RFB
+  MCP[MCP / 会话服务] --> RFB
+  RFB --> RCR["runCommandWithRecovery"]
+
+  EPS["evaluatePageStatus(page)\nstatus/pageStatus"]
+  PRS["planRecoverySteps(...)\nrecovery + commandRequirements"]
+  GFC["getFlowCallsByCommand(...)\n命令名 → 核心 FlowStepCall[]"]
+
+  RCR --> EPS
+  EPS --> PRS
+  EPS --> GFC
+  PRS --> CHK{"recoveryPlan.blockers 中\n存在 resolution=reject ?"}
+  GFC --> CHK
+
+  CHK -->|是| FAIL["抛出：当前页面状态阻塞命令执行"]
+  CHK -->|否| PRE{"preSteps 非空 ?"}
+  PRE -->|是| RF1["runFlow(calls: preSteps)"]
+  PRE -->|否| RF2["runFlow(calls: coreCalls)"]
+  RF1 --> RF2
+
+  subgraph rf["runFlow 内部（对每步循环）"]
+    direction LR
+    IDX["取下一步 FlowStepCall(id, params)"]
+    MERGE["合并 globalParams + call.params"]
+    LOOKUP["registry.get(id) → step.run(ctx, params)"]
+    DELAY["可选 stepDelayMs"]
+    IDX --> MERGE --> LOOKUP --> DELAY
+    DELAY -->|"尚有 calls"| IDX
+  end
+
+  RF1 --> IDX
+  RF2 --> IDX
+```
+
+- **规划**：先读 `PageStatus`，再得到 `recoveryPlan` 与 `coreCalls`；`preSteps` 与 `coreCalls` **均经同一 `runFlow`**，仅 `calls` 数组不同（先前置、后核心）。
+- **阻塞**：若某 blocker 对该命令的策略为 **reject**，则**不执行**任何 `runFlow`，直接失败。
+- **单步**：每步从 `StepRegistry` 取定义，失败时包装为带 `stepId` 的错误信息。
+
+---
+
 ## 目录结构
 
 | 目录 | 说明 |
@@ -357,6 +404,15 @@ busy 策略概览如下：
 - **Qt 发布**：内部在 `QUARCS_QT-SeverProgram/src/BUILD` 执行交叉编译。
 - **上传更新包**：内部固定调用 `/home/quarcs/workspace/QUARCS/upload.py` 上传到目标设备。
 
+**前端「编译」具体包含什么（避免与文档歧义）**
+
+| 步骤 | 默认（`quarcs-publish.sh … --vue`，不加 `--engine-update`） | 说明 |
+| --- | --- | --- |
+| Vue 生产构建 | **会执行** | `kill_run.sh` 内 `vue-cli-service build`，产出 `apps/web-frontend/dist/`。 |
+| 引擎 wasm / `update-engine` | **不执行** | `ENGINE_UPDATE=0`，跳过 `stellarium-web-engine` 的 wasm 更新（耗时较长，且常需 docker 等环境）。若改了引擎侧，需加 **`--engine-update`**。 |
+| 本地预览服务 | **不启动** | `BUILD_ONLY=1` 只出包不上线 8080/9090。 |
+| Qt 服务端 | **不编译** | 仅 `--qt` 或 `--vue --qt` 时才会在 Qt 仓库里交叉编译。 |
+
 常用选项：
 
 - `--engine-update`：前端构建前执行引擎 wasm 更新（默认等价 `ENGINE_UPDATE=0`）。
@@ -405,7 +461,19 @@ busy 策略概览如下：
 | `driverText` | 驱动文案，须与下拉展示一致。 |
 | `connectionModeText` | 连接模式，如 `SDK`、`INDI`。 |
 | `doBindAllocation` | 是否在出现设备分配面板时自动绑定，默认 `true`。 |
-| `allocationDeviceMatch` | 设备分配时优先匹配的设备名称片段。 |
+| `allocationDeviceMatch` | 设备分配时优先匹配的设备名称片段（列表项展示名 **包含** 该片段即选中，**忽略大小写**，空白会规范化后再比较）。 |
+| `devices` | 多设备 **依次连接**（`device.connectIfNeeded` 内与 `connectionSteps` 的 `devices` 一致）。每项：`deviceType`、`driverText?`、`connectionModeText?`、`allocationDeviceMatch?`。用于 `guider-connect-capture`、`maincamera-connect-capture`；若设置则优先于本表中单设备的 `driverText` / `allocationDeviceMatch` / 默认 `deviceType`。`resetBeforeConnect` 为 `true` 时按数组顺序对各 `deviceType` 执行断开再连接。 |
+
+### 设备分配：模糊匹配与导星默认
+
+- **模糊匹配**：`allocationDeviceMatch` 或 `devices[].allocationDeviceMatch` 只需与列表中的设备展示名 **部分一致**（子串），例如 `minicam8`、`462`。
+- **导星默认（5III）**：当绑定 **导星（Guider）**、列表中 **多于一台** 相机、且 **未指定** `allocationDeviceMatch` 时，自动优先选择名称中含 **`5III`** 的项（与 QHY5III 系列一致）；若无则选第一项。
+
+环境变量 `E2E_DEVICES_JSON` 可传入与 `devices` 相同的 JSON 数组，便于 E2E 无改代码注入，例如：
+
+```json
+[{"deviceType":"MainCamera","allocationDeviceMatch":"minicam8"},{"deviceType":"Guider","allocationDeviceMatch":"462"}]
+```
 
 ### `general-settings`
 

@@ -33,8 +33,9 @@ run_cmd "5. image-file-manager" '{"commandName":"image-file-manager","flowParams
 run_cmd "6. mount-connect-control" '{"commandName":"mount-connect-control","flowParams":{"mountControlInteract":{"gotoThenSolve":true}}}'
 run_cmd "7. mount-park" '{"commandName":"mount-park"}'
 run_cmd "8. mount-panel" '{"commandName":"mount-panel","flowParams":{"mcpInteract":{"park":false,"track":true,"sync":true,"move":{"direction":"ra-plus","durationMs":500},"stop":true}}}'
-run_cmd "9. guider-connect-capture" '{"commandName":"guider-connect-capture","flowParams":{"guiderGain":10,"guiderOffset":0,"guiderExposure":"1s","guiderInteract":{"loopExposure":true,"guiding":true}}}'
-run_cmd "10. maincamera-connect-capture" '{"commandName":"maincamera-connect-capture","flowParams":{"captureGain":10,"captureOffset":0,"captureExposure":"1s","captureAutoSave":true,"doSave":true}}'
+# 导星/主相机链路步骤多、真实设备耗时常超过默认会话 60s，显式放宽 runTimeoutMs
+run_cmd "9. guider-connect-capture" '{"commandName":"guider-connect-capture","runTimeoutMs":120000,"flowParams":{"guiderGain":10,"guiderOffset":0,"guiderExposure":"1s","guiderInteract":{"loopExposure":true,"guiding":true}}}'
+run_cmd "10. maincamera-connect-capture" '{"commandName":"maincamera-connect-capture","runTimeoutMs":180000,"flowParams":{"captureGain":10,"captureOffset":0,"captureExposure":"1s","captureAutoSave":true,"doSave":true}}'
 run_cmd "11. focuser-connect-control" '{"commandName":"focuser-connect-control","flowParams":{"focuserInteract":{"speed":3,"roiLength":300,"move":{"direction":"right","durationMs":500}}}}'
 run_cmd "12. cfw-capture-config" '{"commandName":"cfw-capture-config","flowParams":{"cfwInteract":{"capturePanelPlusCount":1,"capturePanelMinusCount":1,"menuNextCount":1,"menuPrevCount":1}}}'
 

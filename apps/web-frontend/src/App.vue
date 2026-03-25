@@ -1037,7 +1037,7 @@ export default {
 
       QTClientVersion: 'Not connected',
       // VueClientVersion: process.env.VUE_APP_VERSION,
-      VueClientVersion: '20260323-4', // 手动指定版本号
+      VueClientVersion: '20260325', // 手动指定版本号
 
       // 全局总版本号（由 Qt 通过 WebSocket 从环境变量 QUARCS_TOTAL_VERSION 读取并发送）
       TotalVersion: '0.0.0',
@@ -9821,6 +9821,8 @@ export default {
       this.isConnecting = false;
       if (this.drawer_2 == true) {
         this.drawer_2 = false
+        // 与二级抽屉一并收起设备页，避免 data-state 仅 page=open、drawer=closed，自动化误判「子菜单已打开」而跳过点击
+        this.isOpenDevicePage = false
       }
 
       this.stopLoading();

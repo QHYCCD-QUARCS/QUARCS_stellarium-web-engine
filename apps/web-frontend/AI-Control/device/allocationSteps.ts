@@ -7,7 +7,16 @@
 import { expect } from '@playwright/test'
 import type { FlowContext, StepRegistry } from '../core/flowTypes'
 import { createStepError } from '../shared/errors'
+import { DEFAULT_GUIDER_ALLOCATION_SUBSTRING } from '../shared/driverDefaults'
 import { clickLocator, sleep } from '../shared/interaction'
+
+/** 分配列表项文案与查询串的模糊匹配：去空白、忽略大小写，列表名包含查询子串即命中 */
+export function allocationNameMatches(listItemText: string, query: string): boolean {
+  const q = query.trim().toLowerCase().replace(/\s+/g, ' ')
+  if (!q) return false
+  const name = listItemText.trim().toLowerCase().replace(/\s+/g, ' ')
+  return name.includes(q)
+}
 
 /** 在 dap-root 内按 deviceType（dp-device-type 文案）找到对应 dp-picker */
 async function resolvePicker(ctx: FlowContext, deviceType: string) {
@@ -27,19 +36,30 @@ async function resolvePicker(ctx: FlowContext, deviceType: string) {
 }
 
 /** 在分配面板中按 deviceNameMatch 匹配并点击设备项（dap-act-selected-device-name-2） */
-async function selectAllocationDevice(ctx: FlowContext, deviceNameMatch?: string) {
+async function selectAllocationDevice(ctx: FlowContext, deviceNameMatch?: string, deviceType?: string) {
   const dap = ctx.page.getByTestId('dap-root').first()
   const deviceItems = dap.getByTestId('dap-act-selected-device-name-2')
   if ((await deviceItems.count()) === 0) return null
 
-  const matchLower = (deviceNameMatch ?? '').trim().toLowerCase()
+  const queryRaw = (deviceNameMatch ?? '').trim()
+  const itemCount = await deviceItems.count()
   let targetDevice = deviceItems.first()
-  if (matchLower) {
-    const itemCount = await deviceItems.count()
+
+  if (queryRaw) {
     for (let i = 0; i < itemCount; i += 1) {
       const item = deviceItems.nth(i)
-      const name = ((await item.textContent().catch(() => '')) ?? '').trim().toLowerCase()
-      if (name.includes(matchLower)) {
+      const name = ((await item.textContent().catch(() => '')) ?? '').trim()
+      if (allocationNameMatches(name, queryRaw)) {
+        targetDevice = item
+        break
+      }
+    }
+  } else if (deviceType === 'Guider' && itemCount > 1) {
+    const sub = DEFAULT_GUIDER_ALLOCATION_SUBSTRING.toLowerCase()
+    for (let i = 0; i < itemCount; i += 1) {
+      const item = deviceItems.nth(i)
+      const name = ((await item.textContent().catch(() => '')) ?? '').trim()
+      if (name.toLowerCase().includes(sub)) {
         targetDevice = item
         break
       }
@@ -83,7 +103,7 @@ export async function bindInAllocationPanelIfVisible(ctx: FlowContext, deviceTyp
     await sleep(400)
   }
 
-  const selected = await selectAllocationDevice(ctx, deviceNameMatch)
+  const selected = await selectAllocationDevice(ctx, deviceNameMatch, deviceType)
   if (!selected) {
     const closeBtn = ctx.page.getByTestId('dap-act-close-panel').first()
     if (await closeBtn.isVisible().catch(() => false)) {
@@ -123,7 +143,11 @@ export function makeAllocationStepRegistry(): StepRegistry {
   /** 在已打开的 picker 中选择设备，params.allocationDeviceMatch 为名称匹配串 */
   registry.set('device.allocation.selectDevice', {
     async run(ctx, params) {
-      await selectAllocationDevice(ctx, params.allocationDeviceMatch != null ? String(params.allocationDeviceMatch) : undefined)
+      await selectAllocationDevice(
+        ctx,
+        params.allocationDeviceMatch != null ? String(params.allocationDeviceMatch) : undefined,
+        params.deviceType != null ? String(params.deviceType) : undefined,
+      )
     },
   })
 

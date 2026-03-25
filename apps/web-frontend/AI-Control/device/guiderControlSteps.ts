@@ -114,7 +114,18 @@ async function setSelectConfig(ctx: FlowContext, label: string, itemText: string
   }
   const testId = await selectLoc.getAttribute('data-testid')
   if (!testId) return
-  await selectLoc.scrollIntoViewIfNeeded().catch(() => {})
+
+  const scrollHost = page.getByTestId('ui-app-submenu-device-page').first()
+  for (let scrollTry = 0; scrollTry < 16; scrollTry += 1) {
+    await selectLoc.scrollIntoViewIfNeeded().catch(() => {})
+    await sleep(200)
+    const vis = await selectLoc.isVisible().catch(() => false)
+    if (vis) break
+    await scrollHost.evaluate((el) => {
+      el.scrollTop = Math.min(el.scrollTop + 160, el.scrollHeight)
+    })
+  }
+
   await sleep(300)
   await selectVSelectItemText(page, testId, String(itemText), timeout)
 }

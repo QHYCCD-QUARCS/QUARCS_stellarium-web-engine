@@ -14,7 +14,7 @@ import {
   SAVE_SUCCESS_SUBSTRINGS,
 } from '../shared/messageConstants'
 import { clickByTestId, clickLocator, deviceProbeTestId, waitForTestIdState, sleep } from '../shared/interaction'
-import { ensureCaptureUiVisible } from '../shared/navigation'
+import { ensureCaptureUiVisible, ensureMenuDrawerClosed } from '../shared/navigation'
 import { openDeviceSubmenu } from '../menu/drawerSteps'
 import { confirmDialogIfOpen, disconnectDriverDialogIfOpen } from '../menu/dialogSteps'
 
@@ -191,6 +191,8 @@ export function makeCaptureStepRegistry(): StepRegistry {
           e,
         )
       }
+
+      await ensureMenuDrawerClosed(ctx.page, ctx.stepTimeoutMs).catch(() => {})
     },
   })
 

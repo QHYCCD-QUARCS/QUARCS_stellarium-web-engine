@@ -125,6 +125,9 @@ export default {
   mounted() {
     this.updatePosition(); // 初始化位置
     window.addEventListener('resize', this.updatePosition);
+    // 图表面板仅在切到导星页后挂载，可能早于本组件订阅总线时已发出的 GuiderConnected(1)，
+    // 导致 GuiderConnect 仍为 false，LoopExpSwitch 只弹错不发指令、data-state 永不变为 on。
+    this.syncGuiderConnectFromStore();
   },
   beforeDestroy() {
     window.removeEventListener('resize', this.updatePosition);
@@ -156,7 +159,24 @@ export default {
         ];
     }
   },
+  watch: {
+    '$store.state.device.devices.GuiderCamera.connected'(connected) {
+      if (typeof connected === 'boolean') {
+        this.GuiderConnect = connected;
+      }
+    },
+  },
   methods: {
+    syncGuiderConnectFromStore() {
+      try {
+        const guider = this.$store.getters['device/getDevice']('GuiderCamera');
+        if (guider && guider.connected) {
+          this.GuiderConnect = true;
+        }
+      } catch (e) {
+        /* 无 store 的测试环境忽略 */
+      }
+    },
     updatePosition() {
       const screenWidth = window.innerWidth;
       const halfWidth = screenWidth / 2 - 250;

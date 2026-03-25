@@ -75,6 +75,14 @@ export const GENERAL_SETTINGS_INTERACT_KEYS = [
 
 export type GeneralSettingsInteractKey = (typeof GENERAL_SETTINGS_INTERACT_KEYS)[number]
 
+/** 多设备依次连接时，每一项对应一次 device.connectIfNeeded 内的 resolveConnectTargets（与 connectionSteps 一致） */
+export type CliDeviceConnectEntry = {
+  deviceType: string
+  driverText?: string
+  connectionModeText?: string
+  allocationDeviceMatch?: string
+}
+
 /** 可选参数：部分命令支持覆盖默认（如焦距、驱动、连接模式等） */
 export type CliFlowParams = {
   /** 是否先刷新页面（执行 device.gotoHome），默认 false（不刷新，在当前页执行） */
@@ -99,6 +107,12 @@ export type CliFlowParams = {
   doBindAllocation?: boolean
   /** 设备分配时要优先匹配的设备文案 */
   allocationDeviceMatch?: string
+  /**
+   * 多设备连接（依次连接），用于 guider-connect-capture / maincamera-connect-capture 等。
+   * 若设置则优先于单设备的 deviceType/driverText/connectionModeText/allocationDeviceMatch。
+   * resetBeforeConnect 为 true 时按数组顺序依次 disconnectIfNeeded。
+   */
+  devices?: CliDeviceConnectEntry[]
   /** 拍摄次数，默认 1；仅在 doCapture !== false 时生效 */
   captureCount?: number
   /** 主相机拍摄配置：增益（滑块数值） */
@@ -205,6 +219,26 @@ function resolveDeviceDisconnectType(params: CliFlowParams): string {
   return matched
 }
 
+function normalizeCliDevices(p: CliFlowParams): CliDeviceConnectEntry[] | undefined {
+  const raw = p.devices
+  if (!Array.isArray(raw) || raw.length === 0) return undefined
+  const out: CliDeviceConnectEntry[] = []
+  for (const d of raw) {
+    if (d == null || typeof d !== 'object') continue
+    const deviceType = String((d as CliDeviceConnectEntry).deviceType ?? '').trim()
+    if (!deviceType) continue
+    const entry = d as CliDeviceConnectEntry
+    out.push({
+      deviceType,
+      driverText: entry.driverText != null ? String(entry.driverText) : undefined,
+      connectionModeText: entry.connectionModeText != null ? String(entry.connectionModeText) : undefined,
+      allocationDeviceMatch:
+        entry.allocationDeviceMatch != null ? String(entry.allocationDeviceMatch).trim() || undefined : undefined,
+    })
+  }
+  return out.length > 0 ? out : undefined
+}
+
 function buildDeviceConnectCalls(args: {
   deviceType: string
   driverText: string
@@ -234,15 +268,42 @@ function buildDeviceConnectCalls(args: {
 }
 
 function buildGuiderControlFlow(p: CliFlowParams, opts: { gotoHome: boolean; resetBeforeConnect: boolean }): FlowStepCall[] {
-  const calls = buildDeviceConnectCalls({
-    deviceType: 'Guider',
-    driverText: p.driverText ?? DEFAULT_QHY_DRIVER_TEXT,
-    connectionModeText: p.connectionModeText ?? 'SDK',
-    gotoHome: opts.gotoHome,
-    resetBeforeConnect: opts.resetBeforeConnect,
-    doBindAllocation: p.doBindAllocation,
-    allocationDeviceMatch: p.allocationDeviceMatch,
-  })
+  const devices = normalizeCliDevices(p)
+  const calls: FlowStepCall[] = []
+  if (opts.gotoHome) calls.push({ id: 'device.gotoHome' })
+
+  if (devices?.length) {
+    if (opts.resetBeforeConnect) {
+      for (const d of devices) {
+        calls.push({ id: 'device.disconnectIfNeeded', params: { deviceType: d.deviceType } })
+      }
+    }
+    calls.push({
+      id: 'device.connectIfNeeded',
+      params: {
+        devices: devices.map((d) => ({
+          deviceType: d.deviceType,
+          driverText: d.driverText ?? DEFAULT_QHY_DRIVER_TEXT,
+          connectionModeText: d.connectionModeText ?? 'SDK',
+          allocationDeviceMatch: d.allocationDeviceMatch,
+        })),
+        doBindAllocation: p.doBindAllocation !== false,
+        keepDrawerOpen: true,
+      },
+    })
+  } else {
+    calls.push(
+      ...buildDeviceConnectCalls({
+        deviceType: 'Guider',
+        driverText: p.driverText ?? DEFAULT_QHY_DRIVER_TEXT,
+        connectionModeText: p.connectionModeText ?? 'SDK',
+        gotoHome: false,
+        resetBeforeConnect: opts.resetBeforeConnect,
+        doBindAllocation: p.doBindAllocation,
+        allocationDeviceMatch: p.allocationDeviceMatch,
+      }),
+    )
+  }
 
   const unsupportedParams: string[] = []
   if (p.doSave === true) unsupportedParams.push('doSave')
@@ -458,6 +519,7 @@ export function getFlowCallsByCommand(
         resetBeforeConnect: reset,
         doBindAllocation: p.doBindAllocation,
         allocationDeviceMatch: p.allocationDeviceMatch,
+        devices: normalizeCliDevices(p),
         gotoHome: doGotoHome,
         captureCount: p.captureCount,
         captureGain: p.captureGain,
@@ -610,7 +672,10 @@ export function getFlowCallsByCommand(
         calls.push({ id: 'ui.click', params: { testId: 'imp-btn-image-file-switch' } })
       }
       if (im?.refresh) {
-        calls.push({ id: 'ui.click', params: { testId: 'imp-btn-refresh-current-folder' } })
+        calls.push({
+          id: 'ui.click',
+          params: { testId: 'imp-btn-refresh-current-folder', skipIfDisabled: true },
+        })
       }
       if (im?.panelClose) {
         calls.push({ id: 'ui.click', params: { testId: 'imp-btn-panel-close' } })

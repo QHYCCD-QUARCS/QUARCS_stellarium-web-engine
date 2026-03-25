@@ -119,6 +119,7 @@ test('清理盒子缓存：只清理更新包文件', async ({ }, testInfo) => {
         meridian: false,
         ecliptic: false,
         highfps: false,
+        selectLanguage: false,
         versionTab: false,
         refreshDevices: false,
         memoryTab: true,

@@ -26,6 +26,7 @@
  * - E2E_WAIT_CAPTURE_TIMEOUT_MS：等待单次拍摄完成的超时（毫秒）。
  * - E2E_DO_BIND_ALLOCATION：连接后是否执行设备分配。
  * - E2E_ALLOCATION_DEVICE_MATCH：设备分配时优先匹配的设备文案。
+ * - E2E_DEVICES_JSON：多设备连接 JSON 数组（与 flowParams.devices 一致），会合并进 flowParams；单行字符串，如 [{"deviceType":"MainCamera","allocationDeviceMatch":"minicam8"},{"deviceType":"Guider","allocationDeviceMatch":"462"}]
  * - E2E_GUIDER_FOCAL_LENGTH_MM / E2E_GUIDER_GAIN / E2E_GUIDER_OFFSET：导星菜单焦距、增益、偏置。
  * - E2E_GUIDER_MULTI_STAR：导星菜单是否开启多星导星（1/0 或 true/false）。
  * - E2E_GUIDER_RA_DIRECTION / E2E_GUIDER_DEC_DIRECTION：导星菜单 RA/DEC 单步导星方向。
@@ -214,6 +215,12 @@ export function resolveFlowParamsFromEnv(defaults: Partial<CliFlowParams> = {}):
   }
   if (env.E2E_ALLOCATION_DEVICE_MATCH?.trim()) {
     merged.allocationDeviceMatch = env.E2E_ALLOCATION_DEVICE_MATCH.trim()
+  }
+  if (env.E2E_DEVICES_JSON?.trim()) {
+    const arr = parseJsonObject<unknown>(env.E2E_DEVICES_JSON)
+    if (Array.isArray(arr) && arr.length > 0) {
+      merged.devices = arr as CliFlowParams['devices']
+    }
   }
 
   if (env.E2E_GUIDER_FOCAL_LENGTH_MM?.trim()) {
