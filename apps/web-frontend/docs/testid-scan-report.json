@@ -1,13 +1,13 @@
 {
   "summary": {
     "totalComponents": 55,
-    "totalTestIds": 660,
+    "totalTestIds": 661,
     "duplicates": 0,
     "componentsWithTestIds": 55,
     "componentsWithoutTestIds": 0,
     "byPrefix": {
       "ui": 259,
-      "e2e": 2,
+      "e2e": 3,
       "`e2e": 1,
       "\n                    'ui": 3,
       "\n                        'ui": 1,
@@ -38,7 +38,7 @@
       },
       {
         "file": "App.vue",
-        "count": 54
+        "count": 55
       },
       {
         "file": "components/ImageManagerBrowser.vue",
@@ -78,7 +78,7 @@
     "App.vue": {
       "file": "App.vue",
       "path": "/home/quarcs/workspace/QUARCS/QUARCS_stellarium-web-engine/apps/web-frontend/src/App.vue",
-      "testIdCount": 54,
+      "testIdCount": 55,
       "testIds": [
         {
           "id": "ui-app-root",
@@ -109,7 +109,7 @@
         },
         {
           "id": "e2e-tilegpm",
-          "line": 32,
+          "line": 33,
           "elementType": "unknown",
           "hasDataState": false,
           "dataState": null,
@@ -117,8 +117,17 @@
           "preview": "data-testid=\"e2e-tilegpm\""
         },
         {
+          "id": "e2e-exposure-completed",
+          "line": 37,
+          "elementType": "unknown",
+          "hasDataState": false,
+          "dataState": null,
+          "dataAttrs": {},
+          "preview": "data-testid=\"e2e-exposure-completed\""
+        },
+        {
           "id": "ui-app-submenu-drawer",
-          "line": 40,
+          "line": 43,
           "elementType": "unknown",
           "hasDataState": false,
           "dataState": null,

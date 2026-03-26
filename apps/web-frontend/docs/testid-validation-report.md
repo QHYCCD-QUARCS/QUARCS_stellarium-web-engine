@@ -4,18 +4,18 @@
 
 ## 📊 验证摘要
 
-- **总标识数**: 647
+- **总标识数**: 648
 - **总组件数**: 55
-- **问题总数**: 5
+- **问题总数**: 6
 
 ### 按严重程度分类
 
-- ⚠️ **warning**: 3
+- ⚠️ **warning**: 4
 - ℹ️ **info**: 2
 
 ### 按问题类型分类
 
-- **命名规范**: 4
+- **命名规范**: 5
 - **覆盖率**: 1
 
 ## 🔴 严重错误 (error)
@@ -28,7 +28,8 @@
 |------|------|------|------|------|------|
 | 命名规范 | `e2e-probes` | App.vue | 行 18 | 测试标识 "e2e-probes" 未使用规范的前缀 | 建议使用以下前缀之一: pa-, cp-, mcp-, fp-, imp-, scp-, hp-, dap-, dp-, sd-, chart-, tb-, gui-, ui-, bb- |
 | 命名规范 | `e2e-device-X-conn` | App.vue | 行 25 | 测试标识 "e2e-device-X-conn" 未使用规范的前缀 | 建议使用以下前缀之一: pa-, cp-, mcp-, fp-, imp-, scp-, hp-, dap-, dp-, sd-, chart-, tb-, gui-, ui-, bb- |
-| 命名规范 | `e2e-tilegpm` | App.vue | 行 32 | 测试标识 "e2e-tilegpm" 未使用规范的前缀 | 建议使用以下前缀之一: pa-, cp-, mcp-, fp-, imp-, scp-, hp-, dap-, dp-, sd-, chart-, tb-, gui-, ui-, bb- |
+| 命名规范 | `e2e-tilegpm` | App.vue | 行 33 | 测试标识 "e2e-tilegpm" 未使用规范的前缀 | 建议使用以下前缀之一: pa-, cp-, mcp-, fp-, imp-, scp-, hp-, dap-, dp-, sd-, chart-, tb-, gui-, ui-, bb- |
+| 命名规范 | `e2e-exposure-completed` | App.vue | 行 37 | 测试标识 "e2e-exposure-completed" 未使用规范的前缀 | 建议使用以下前缀之一: pa-, cp-, mcp-, fp-, imp-, scp-, hp-, dap-, dp-, sd-, chart-, tb-, gui-, ui-, bb- |
 
 ## ℹ️ 信息 (info)
 

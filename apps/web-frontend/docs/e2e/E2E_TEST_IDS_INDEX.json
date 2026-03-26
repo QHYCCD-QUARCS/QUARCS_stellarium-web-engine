@@ -1,22 +1,23 @@
 {
   "metadata": {
-    "generatedAt": "2026-03-20T09:29:57.343Z",
+    "generatedAt": "2026-03-26T00:00:00.000Z",
     "totalComponents": 56,
     "componentsWithTestIds": 55,
-    "totalTestIds": 660
+    "totalTestIds": 661
   },
   "components": {
     "App.vue": {
       "name": "showViewSettingsDialog",
-      "lines": 12387,
+      "lines": 12485,
       "suggestedPrefix": "ui-",
       "priority": "高",
-      "testIdCount": 54,
+      "testIdCount": 55,
       "testIds": [
         "ui-app-root",
         "e2e-probes",
         "`e2e-device-${d && d.driverType ? d.driverType : UNKNOWN_DRIVER_TYPE}-conn`",
         "e2e-tilegpm",
+        "e2e-exposure-completed",
         "ui-app-submenu-drawer",
         "ui-app-submenu-device-page",
         "ui-app-submenu-params-container",
@@ -1194,21 +1195,28 @@
     },
     "e2e-tilegpm": {
       "component": "App.vue",
-      "line": 32,
+      "line": 33,
+      "elementType": "unknown",
+      "hasDataState": false,
+      "dataState": null
+    },
+    "e2e-exposure-completed": {
+      "component": "App.vue",
+      "line": 37,
       "elementType": "unknown",
       "hasDataState": false,
       "dataState": null
     },
     "ui-app-submenu-drawer": {
       "component": "App.vue",
-      "line": 40,
+      "line": 43,
       "elementType": "unknown",
       "hasDataState": false,
       "dataState": null
     },
     "ui-app-submenu-device-page": {
       "component": "App.vue",
-      "line": 44,
+      "line": 49,
       "elementType": "div",
       "hasDataState": true,
       "dataState": "isOpenDevicePage ? 'open' : 'closed'"

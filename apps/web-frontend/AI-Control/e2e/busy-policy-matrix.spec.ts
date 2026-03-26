@@ -50,6 +50,8 @@ const BASE_STATUS: PageStatus = {
     panelVisible: false,
     state: null,
     cfwState: null,
+    e2eExposureCompletedSeq: null,
+    e2eTileGpmSeq: null,
   },
   guider: {
     panelVisible: false,

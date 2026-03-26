@@ -72,6 +72,10 @@ export interface PageStatus {
     panelVisible: boolean
     state: string | null
     cfwState: string | null
+    /** Qt ExposureCompleted 探针 `e2e-exposure-completed[data-seq]`，与 AI-Control README 一致 */
+    e2eExposureCompletedSeq: string | null
+    /** TileGPM 探针 `e2e-tilegpm[data-seq]` */
+    e2eTileGpmSeq: string | null
   }
   guider: {
     panelVisible: boolean
@@ -124,6 +128,8 @@ const PAGE_STATUS_EVALUATE_SCRIPT = `(() => {
   const scpRoot = byId('scp-root')
   const dapRoot = byId('dap-root')
   const showUiBtn = byId('gui-btn-show-capture-ui')
+  const e2eTilegpm = byId('e2e-tilegpm')
+  const e2eExposureCompleted = byId('e2e-exposure-completed')
   const toolbarMainCamera = byId('tb-status-maincamera')
   const toolbarMount = byId('tb-status-mount')
   const toolbarGuider = byId('tb-status-guider')
@@ -243,6 +249,8 @@ const PAGE_STATUS_EVALUATE_SCRIPT = `(() => {
       panelVisible: cpPanel ? visible(cpPanel) : false,
       state: cpStatus ? attr(cpStatus, 'data-state') : null,
       cfwState: cpCfwDisplay ? attr(cpCfwDisplay, 'data-state') : null,
+      e2eExposureCompletedSeq: e2eExposureCompleted ? attr(e2eExposureCompleted, 'data-seq') : null,
+      e2eTileGpmSeq: e2eTilegpm ? attr(e2eTilegpm, 'data-seq') : null,
     },
     guider: {
       panelVisible: chartRoot ? visible(chartRoot) : false,
@@ -312,6 +320,8 @@ const DEFAULT_STATUS: PageStatus = {
     panelVisible: false,
     state: null,
     cfwState: null,
+    e2eExposureCompletedSeq: null,
+    e2eTileGpmSeq: null,
   },
   guider: {
     panelVisible: false,
@@ -403,6 +413,8 @@ function normalizeStatus(raw: unknown): PageStatus {
       panelVisible: Boolean(capture.panelVisible),
       state: capture.state ?? null,
       cfwState: capture.cfwState ?? null,
+      e2eExposureCompletedSeq: capture.e2eExposureCompletedSeq ?? null,
+      e2eTileGpmSeq: capture.e2eTileGpmSeq ?? null,
     },
     guider: {
       panelVisible: Boolean(guider.panelVisible),

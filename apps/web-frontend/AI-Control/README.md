@@ -92,6 +92,35 @@ flowchart LR
 - 所有命令默认不刷新页面；若需要先回首页再执行，显式传 `gotoHome: true` 或设置 `E2E_GOTO_HOME=1`。
 - 会话 HTTP 只发到本机 `127.0.0.1`；不要从另一台机器通过局域网 IP 访问本地会话端口。
 
+### 指定设备 IP（局域网前端）
+
+控制树莓派 / 盒子等设备上的 QUARCS 前端时，用环境变量 **`E2E_BASE_URL`** 指定浏览器要打开的页面根地址（与 Playwright `baseURL` 一致）。常见形式为 **`http://<设备IP>:8080`**，端口以设备上实际服务为准。
+
+**本地会话**（`apps/web-frontend` 下 `npm run e2e:ai-control:session`，对应 `scripts/ai-control-session.ts`）会按 `E2E_BASE_URL` 打开页面，并在本机 **`127.0.0.1:39281`** 提供 `GET /status`、`POST /run`。控制逻辑仍走本机会话端口，只是页面加载目标改为指定 IP。
+
+示例（设备 `192.168.1.104`、前端端口 `8080`）：
+
+```bash
+cd apps/web-frontend
+E2E_BASE_URL=http://192.168.1.104:8080 npm run e2e:ai-control:session
+```
+
+可选环境变量（与脚本一致）：`E2E_HEADED=0` 无头浏览器；`E2E_AI_CONTROL_SESSION_PORT` 改会话 HTTP 端口；`E2E_AI_CONTROL_RUN_TIMEOUT_MS` 调整单次 `POST /run` 默认超时；`E2E_AI_CONTROL_SESSION_NO_KILL_STALE=1` 跳过启动前占用端口的清理。
+
+在 **后台或非交互**环境启动同一会话时，若标准输入立即 EOF，进程会随 `readline` 结束而退出。需保持 stdin 打开，例如：
+
+```bash
+(while true; do sleep 3600; done) | E2E_BASE_URL=http://192.168.1.104:8080 E2E_HEADED=0 npm run e2e:ai-control:session
+```
+
+跑 **Playwright AI-Control 用例**（非会话 HTTP）时，同样用 `E2E_BASE_URL` 指向设备；仓库内 `scripts/ai-control-e2e-target.sh` 默认 `http://192.168.1.104:8080`，可被覆盖：
+
+```bash
+E2E_BASE_URL=http://192.168.1.113:8080 bash scripts/ai-control-e2e-target.sh
+```
+
+未设置 `E2E_BASE_URL` 时，`ai-control-session` 内置默认见 `scripts/ai-control-session.ts` 源码；以显式设置为准可避免误连错误设备。
+
 ### 默认执行顺序
 
 1. 先检查是否可以读取本地会话状态：调用 `GET /status`，或在知道命令名时调用 `GET /status?command=xxx`。
@@ -101,7 +130,7 @@ flowchart LR
 
 ### 本地会话执行规则
 
-- `GET /status`：读取当前 UI 状态，包括主页面、菜单抽屉、弹窗、设备、busy 状态、overlay 等。
+- `GET /status`：读取当前 UI 状态，包括主页面、菜单抽屉、弹窗、设备、busy 状态、overlay 等；其中 `capture.e2eExposureCompletedSeq` / `capture.e2eTileGpmSeq` 与隐藏探针 `e2e-exposure-completed` / `e2e-tilegpm` 的 `data-seq` 一致，便于轮询诊断。
 - `GET /status?command=xxx`：除读取状态外，还返回该命令的 `targetSurface`、`blockers`、`preSteps`、`coreStepIds`、`suggestions`。
 - `POST /run`：恢复层会先读取状态，再执行前置恢复步骤与命令核心 flow。
 
@@ -226,7 +255,7 @@ busy 策略概览如下：
 4. 若出现设备分配面板，按需绑定。
 5. 等待主相机连接成功。
 6. 若传入拍摄配置参数，则应用主相机菜单中的拍摄相关配置。
-7. 当 `doCapture !== false` 时，打开拍摄面板并执行 `device.captureOnce`；`captureCount > 1` 时重复执行。
+7. 当 `doCapture !== false` 时，打开拍摄面板并执行 `device.captureOnce`；`captureCount > 1` 时重复执行。每次点击拍摄前，步骤会等待 `cp-btn-capture` 根节点 **`data-capture-ready=true`**（与 `CircularButton.vue` 中「可再次触发 `takeExposure`」一致，避免上一帧完成后尚未解锁时连点无效）。
 8. 当 `doSave === true` 时，在拍摄完成后执行保存流程。
 
 #### `mount-connect-control`
@@ -334,13 +363,14 @@ busy 策略概览如下：
 前置条件：
 
 - 图像管理面板入口可达。
-- 若执行 `moveToUsb` / `delete` / `download`，允许对应按钮状态与确认弹层决定后续能否继续。
+- 若执行 `moveToUsb` / `delete` / `download`，需满足界面前置（已选文件/文件夹、USB 可用等）；可通过 `imageManagerInteract` 中的 `openFolderIndex`、`selectAllInOpenFolder` 先选中再删。
+- 弹窗类参数（`*ConfirmDialog`）为可选；不设则**不**自动点确认（与旧版兼容），设 `true` 或 `'confirm'` / `'cancel'` 则调用 `dialog.imageManager.confirm` / `cancel`（见 `scenario/imageManagerCliFlow.ts`）。
 
 操作步骤：
 
 1. 可选 `gotoHome`。
 2. 打开图像管理面板。
-3. 按 `imageManagerInteract` 依次执行移动到 USB、删除、下载、视图切换、刷新与关闭面板。
+3. 按 `imageManagerInteract` 展开步骤：可选 `openFolderIndex` → 可选 `selectAllInOpenFolder` → `moveToUsb`（可选 `usbSelectIndex`、`usbTransferConfirmDialog`）→ `delete`（可选 `deleteConfirmDialog`）→ `download`（可选 `downloadConcurrency`、`downloadConfirmDialog`、`downloadLocationReminderDialog`）→ `imageFileSwitch` → `refresh` → `panelClose`。
 
 #### `task-schedule`
 
@@ -628,7 +658,8 @@ busy 策略概览如下：
 | `doCapture` | `boolean` | `true` | 是否执行拍摄；为 `false` 时仅连接 / 配置。 |
 | `doSave` | `boolean` | `false` | 是否保存结果；仅在 `doCapture=true` 时生效。 |
 | `captureCount` | `number` | `1` | 拍摄次数。 |
-| `waitCaptureTimeoutMs` | `number` | — | 单次拍摄完成超时（毫秒）。 |
+| `captureReadyTimeoutMs` | `number` | — | 等待拍摄按钮 **`data-capture-ready=true`** 的最长时间（毫秒）。未传时取 `max(30000, stepTimeoutMs)`。用于连拍时与按钮解锁对齐；若页面无该属性（旧版前端），步骤不阻塞。 |
+| `waitCaptureTimeoutMs` | `number` | — | 无法从 `captureExposure` 或面板解析曝光时的回退超时（毫秒）；默认可由 `device.captureOnce` 分两段：cp-status 为「曝光 + 60s」，`e2e-tilegpm` 的 `data-seq` 为「曝光 + 120s」（TileGPM 可能晚于 idle）。 |
 | `captureGain` | `number` | — | 增益。 |
 | `captureOffset` | `number` | — | 偏置。 |
 | `captureCfaMode` | `string` | — | CFA 模式：`'GR'`、`'GB'`、`'BG'`、`'RGGB'`、`'null'`。 |
@@ -640,8 +671,11 @@ busy 策略概览如下：
 
 拍摄流程补充：
 
-- 流程为：设备已连接 → `capture.panel.ensureOpen` → `device.captureOnce` → 可选 `device.save`。
+- 流程为：设备已连接 → `capture.panel.ensureOpen` → `device.captureOnce`（可多次）→ 可选 `device.save`。
 - 当 `doCapture=false` 时，会跳过 `device.captureOnce` 与 `device.save`，仅保留连接 / 配置链路。
+- **拍摄按钮与连拍**：`cp-btn-capture` 所在根节点带 **`data-capture-ready`**（`true` / `false`），与 `CircularButton.vue` 内 `isClicked`、`isButtonDisabled`、`isLongPress` 对齐；收到 `ExposureCompleted` 后约 **500ms** 会 `resetProgress` 解锁（再点拍保护时长，以源码为准）。`device.captureOnce` 在每次点击前会轮询直至 `data-capture-ready=true`（或探针缺失时跳过等待），再读取 `exp/tile` 并点击。
+- `device.captureOnce`：**成功判定**以 Qt 下行 `ExposureCompleted` 驱动的探针 `e2e-exposure-completed`（`data-seq`）与 `e2e-tilegpm`（TileGPM）**任一前进**为准（短曝光时 `cp-status` busy 可能一闪而过，不宜作为唯一依据）；`cp-status→idle` 仅尽力等待。旧版仅 TileGPM 时仍可用 tile 探针。
+- 运行器会为每步注入 `__flowStepIndex` / `__flowStepTotal`（仅 `runFlow` 合并参数）；`device.captureOnce` 会打 `[flow i/n]`、点击前后探针与 `cp-status`；失败时输出 `exp/tile` 前后值。
 
 环境变量：
 
@@ -656,6 +690,7 @@ busy 策略概览如下：
 - `E2E_CAPTURE_EXPOSURE`
 - `E2E_CAPTURE_COUNT`
 - `E2E_WAIT_CAPTURE_TIMEOUT_MS`
+- `E2E_CAPTURE_READY_TIMEOUT_MS`：对应 `captureReadyTimeoutMs`，等待 `data-capture-ready=true` 的上限（毫秒）。
 
 ### `focuser-connect-control`
 
@@ -780,24 +815,36 @@ busy 策略概览如下：
 | 参数名 | 类型 | 默认值 | 说明 |
 |--------|------|--------|------|
 | `gotoHome` | `boolean` | `false` | 是否先刷新页面。 |
-| `imageManagerInteract` | `Partial<Record<'moveToUsb' \| 'delete' \| 'download' \| 'imageFileSwitch' \| 'refresh' \| 'panelClose', boolean>>` | 未传则不执行面板内交互 | 打开图像管理面板后依次执行。 |
+| `imageManagerInteract` | `ImageManagerInteractParams` | 未传则仅打开面板 | 见下表；展开逻辑见 `scenario/imageManagerCliFlow.ts`。 |
 
-`imageManagerInteract` 可用 key：
+`imageManagerInteract` 字段：
 
-| key | 控制功能 | testid |
-|-----|----------|--------|
-| `moveToUsb` | 点击“移动到 USB”按钮（无 USB 时按钮 disabled）。 | `imp-btn-move-file-to-usb` |
-| `delete` | 点击“删除”按钮（会弹出确认弹窗，流程不自动确认 / 取消）。 | `imp-btn-delete-btn-click` |
-| `download` | 点击“下载选中”按钮（会弹出下载确认弹窗）。 | `imp-btn-download-selected` |
-| `imageFileSwitch` | 点击图像 / 文件夹视图切换。 | `imp-btn-image-file-switch` |
-| `refresh` | 点击当前文件夹“刷新”按钮。 | `imp-btn-refresh-current-folder` |
-| `panelClose` | 点击关闭面板按钮。 | `imp-btn-panel-close` |
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `openFolderIndex` | `number` | 侧栏文件夹索引（从 0 起），点击打开该文件夹。 |
+| `selectAllInOpenFolder` | `boolean` | 为 `true` 时将 `openFolderIndex` 对应文件夹行复选框勾上（联动全选当前文件夹内文件）；**必须**与 `openFolderIndex` 同传。 |
+| `moveToUsb` | `boolean` | 点击「移动到 USB」（无 USB 时跳过 disabled）。 |
+| `usbSelectIndex` | `number` | 在 USB 选择列表中点第几项（0 起），对应 `imp-act-select-usb`。 |
+| `usbTransferConfirmDialog` | `boolean \| 'confirm' \| 'cancel'` | USB 传输确认弹层：确认或取消。 |
+| `delete` | `boolean` | 点击工具栏「删除」。 |
+| `deleteConfirmDialog` | `boolean \| 'confirm' \| 'cancel'` | 删除确认弹层；`true` 等同 `'confirm'`。不设则不点弹窗按钮。 |
+| `download` | `boolean` | 点击「下载选中」。 |
+| `downloadConcurrency` | `1 \| 2 \| 3` | 下载确认框内并发下载数（在确认「开始下载」前设置）。 |
+| `downloadConfirmDialog` | `boolean \| 'confirm' \| 'cancel'` | 批量下载确认弹层。 |
+| `downloadLocationReminderDialog` | `boolean \| 'confirm' \| 'cancel'` | 浏览器无法选路径时的「继续 / 取消」提示。 |
+| `imageFileSwitch` | `boolean` | 切换图像/文件夹视图。 |
+| `refresh` | `boolean` | 刷新当前文件夹列表。 |
+| `panelClose` | `boolean` | 关闭图像管理面板。 |
+
+对应步骤 id：`imageManager.openFolder`、`imageManager.setFolderCheckbox`、`imageManager.selectUsbByIndex`、`imageManager.setDownloadConcurrency`、`dialog.imageManager.confirm` / `cancel`（`dialog` 参数为 `usbConfirm` / `deleteConfirm` / `downloadConfirm` / `downloadLocationReminder`）、以及 `ui.click` 等。
 
 环境变量：
 
 - `E2E_GOTO_HOME`
 - `E2E_FLOW_PARAMS_JSON`
-- `E2E_IMAGE_MANAGER_INTERACT`
+- `E2E_IMAGE_MANAGER_INTERACT`：逗号分隔简写（`moveToUsb`、`delete`、`download`、`imageFileSwitch`、`refresh`、`panelClose`、`deleteConfirm`、`deleteCancel`、`usbTransferConfirm`、`usbTransferCancel`、`downloadConfirm`、`downloadCancel`、`downloadLocationContinue`、`downloadLocationCancel`、`selectAllInOpenFolder`）
+- `E2E_IMAGE_MANAGER_INTERACT_JSON`：`imageManagerInteract` 完整 JSON，与上一项及 `E2E_FLOW_PARAMS_JSON` 合并（后者覆盖前者）
+- `E2E_IMAGE_MANAGER_OPEN_FOLDER_INDEX` / `E2E_IMAGE_MANAGER_USB_SELECT_INDEX` / `E2E_IMAGE_MANAGER_DOWNLOAD_CONCURRENCY`（可选，非负整数或 1–3，写入对应 `imageManagerInteract` 字段）
 
 ### `task-schedule`
 

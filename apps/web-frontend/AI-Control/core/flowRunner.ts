@@ -84,6 +84,9 @@ export async function runFlow(args: {
     const params = {
       ...(globalParams ?? {}),
       ...(call.params ?? {}),
+      /** 供步骤内诊断日志（如 device.captureOnce 第几张），勿与业务 params 混用同名 */
+      __flowStepIndex: i + 1,
+      __flowStepTotal: calls.length,
     }
 
     const paramStr = formatStepParams(call.params)

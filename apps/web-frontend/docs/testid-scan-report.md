@@ -1,12 +1,12 @@
 # 测试标识扫描报告
 
-**生成时间**: 2026/3/20 17:29:57
+**生成时间**: 2026/3/26（与 `e2e-exposure-completed` 探针同步）
 
 ## 📊 统计摘要
 
 - **总组件数**: 55
 - **有标识的组件**: 55
-- **总标识数**: 660
+- **总标识数**: 661
 - **重复标识数**: 0
 
 ### 按前缀分类
@@ -34,7 +34,7 @@
 | `
                       'ui-` | 3 |
 | ``ui-` | 3 |
-| `e2e-` | 2 |
+| `e2e-` | 3 |
 | ``imp-` | 2 |
 | ``e2e-` | 1 |
 | `
@@ -209,16 +209,17 @@
 | `pa-trajectory-window-content` | div | 543 | - |
 | `pa-trajectory-canvas-windowed` | canvas | 544 | - |
 
-### App.vue (54 个标识)
+### App.vue (55 个标识)
 
 | 标识 | 元素 | 行号 | 状态属性 |
 |------|------|------|----------|
 | `ui-app-root` | v | 10 | - |
 | `e2e-probes` | unknown | 18 | - |
 | ``e2e-device-${d && d.driverType ? d.driverType : UNKNOWN_DRIVER_TYPE}-conn`` | unknown | 25 | - |
-| `e2e-tilegpm` | unknown | 32 | - |
-| `ui-app-submenu-drawer` | unknown | 40 | - |
-| `ui-app-submenu-device-page` | div | 44 | isOpenDevicePage ? 'open' : 'closed' |
+| `e2e-tilegpm` | unknown | 33 | - |
+| `e2e-exposure-completed` | unknown | 37 | - |
+| `ui-app-submenu-drawer` | unknown | 43 | - |
+| `ui-app-submenu-device-page` | div | 49 | isOpenDevicePage ? 'open' : 'closed' |
 | `ui-app-submenu-params-container` | unknown | 52 | - |
 | `ui-app-device-connection-panel` | unknown | 60 | - |
 | `ui-app-select-confirm-driver` | unknown | 69 | - |

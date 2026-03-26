@@ -2,9 +2,10 @@
 showViewSettingsDialog,ui-app-root,元素：root,v,10,-,-
 showViewSettingsDialog,e2e-probes,元素：probes,unknown,18,-,-
 showViewSettingsDialog,`e2e-device-${d && d.driverType ? d.driverType : UNKNOWN_DRIVER_TYPE}-conn`,元素：${d && d.driverType ? d.driverType : UNKNOWN_DRIVER_TYPE}-conn`,unknown,25,-,-
-showViewSettingsDialog,e2e-tilegpm,元素：tilegpm,unknown,32,-,-
-showViewSettingsDialog,ui-app-submenu-drawer,元素：submenu-drawer,unknown,40,-,-
-showViewSettingsDialog,ui-app-submenu-device-page,元素：submenu-device-page,div,44,-,isOpenDevicePage ? 'open' : 'closed'
+showViewSettingsDialog,e2e-tilegpm,元素：tilegpm,unknown,33,-,-
+showViewSettingsDialog,e2e-exposure-completed,元素：exposure-completed（Qt ExposureCompleted 探针）,unknown,37,-,-
+showViewSettingsDialog,ui-app-submenu-drawer,元素：submenu-drawer,unknown,43,-,-
+showViewSettingsDialog,ui-app-submenu-device-page,元素：submenu-device-page,div,49,-,isOpenDevicePage ? 'open' : 'closed'
 showViewSettingsDialog,ui-app-submenu-params-container,元素：submenu-params-container,unknown,52,-,-
 showViewSettingsDialog,ui-app-device-connection-panel,元素：device-connection-panel,unknown,60,-,-
 showViewSettingsDialog,ui-app-select-confirm-driver,元素：select-confirm-driver,unknown,69,-,-

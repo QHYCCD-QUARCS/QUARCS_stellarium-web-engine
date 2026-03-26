@@ -1,14 +1,14 @@
 {
   "summary": {
-    "totalTestIds": 647,
+    "totalTestIds": 648,
     "totalComponents": 55,
-    "totalIssues": 5,
+    "totalIssues": 6,
     "byType": {
-      "naming": 4,
+      "naming": 5,
       "coverage": 1
     },
     "bySeverity": {
-      "warning": 3,
+      "warning": 4,
       "info": 2
     }
   },
@@ -70,8 +70,34 @@
       "severity": "warning",
       "testId": "e2e-tilegpm",
       "file": "App.vue",
-      "line": 32,
+      "line": 33,
       "message": "测试标识 \"e2e-tilegpm\" 未使用规范的前缀",
+      "suggestion": "建议使用以下前缀之一: pa-, cp-, mcp-, fp-, imp-, scp-, hp-, dap-, dp-, sd-, chart-, tb-, gui-, ui-, bb-",
+      "expectedPrefixes": [
+        "pa-",
+        "cp-",
+        "mcp-",
+        "fp-",
+        "imp-",
+        "scp-",
+        "hp-",
+        "dap-",
+        "dp-",
+        "sd-",
+        "chart-",
+        "tb-",
+        "gui-",
+        "ui-",
+        "bb-"
+      ]
+    },
+    {
+      "type": "naming",
+      "severity": "warning",
+      "testId": "e2e-exposure-completed",
+      "file": "App.vue",
+      "line": 37,
+      "message": "测试标识 \"e2e-exposure-completed\" 未使用规范的前缀",
       "suggestion": "建议使用以下前缀之一: pa-, cp-, mcp-, fp-, imp-, scp-, hp-, dap-, dp-, sd-, chart-, tb-, gui-, ui-, bb-",
       "expectedPrefixes": [
         "pa-",

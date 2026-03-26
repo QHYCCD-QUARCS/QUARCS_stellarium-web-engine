@@ -29,8 +29,11 @@ import type { GuiderInteractParams } from '../device/guiderControlSteps'
 import { createStepError } from '../shared/errors'
 import { DEFAULT_QHY_DRIVER_TEXT } from '../shared/driverDefaults'
 import { buildDeviceConnectCaptureFlow } from './businessFlows'
+import { buildImageManagerFlowCalls, type ImageManagerInteractParams } from './imageManagerCliFlow'
 import type { ScheduleInteractParams } from '../device/scheduleSteps'
 import { hasAnyScheduleInteraction } from '../device/scheduleSteps'
+
+export type { ImageManagerInteractParams } from './imageManagerCliFlow'
 
 /** CLI 可用命令名。general-settings 不传 generalSettingsInteract 时仅打开对话框，传则按参数执行对话框内各项交互 */
 export const CLI_COMMANDS = [
@@ -101,8 +104,13 @@ export type CliFlowParams = {
   doCapture?: boolean
   /** 是否保存拍摄结果；仅在 doCapture !== false 时生效 */
   doSave?: boolean
-  /** 等待单次拍摄完成的超时（毫秒） */
+  /**
+   * 单次拍摄完成等待超时（毫秒），仅当无法从 `captureExposure` 或面板当前曝光解析出时长时作为回退；
+   * 默认可由 `device.captureOnce` 使用「曝光时长 + 60s」计算。
+   */
   waitCaptureTimeoutMs?: number
+  /** 等待拍摄按钮 `data-capture-ready=true` 的超时（毫秒），用于连拍前与 CircularButton 解锁对齐 */
+  captureReadyTimeoutMs?: number
   /** 连接后是否执行设备分配，默认 true */
   doBindAllocation?: boolean
   /** 设备分配时要优先匹配的设备文案 */
@@ -159,8 +167,8 @@ export type CliFlowParams = {
   generalSettingsLanguageRestoreItemText?: string
   /** power-management：打开电源管理页后执行的页面内交互；依次执行（output1/output2 为输出开关；restartQuarcsServer 为经管理进程重启 Qt；restart 为树莓派重启） */
   powerManagementInteract?: PowerManagementInteractParams
-  /** image-file-manager：打开图像管理面板后执行的面板内交互；为 true 的 key 会依次执行（见 README 图像管理） */
-  imageManagerInteract?: Partial<Record<'moveToUsb' | 'delete' | 'download' | 'imageFileSwitch' | 'refresh' | 'panelClose', boolean>>
+  /** image-file-manager：打开图像管理面板后的交互（含侧栏选文件夹、弹窗确认等），见 README「图像管理」与 `imageManagerCliFlow.ts` */
+  imageManagerInteract?: ImageManagerInteractParams
   /** mount-connect-control：连接完成后在侧栏内执行的控制；solveCurrentPosition/gotoClick 为 true 时点击对应按钮，gotoThenSolve/autoFlip 为布尔值时设置对应开关 */
   mountControlInteract?: Partial<Record<'solveCurrentPosition' | 'gotoClick' | 'gotoThenSolve' | 'autoFlip', boolean>>
   /** mount-connect-control / mount-park：连接并关闭抽屉后是否执行 mount.ensureParkedForTest（确保赤道仪 Park 为 on，参考 04-mount-park.spec.ts） */
@@ -530,6 +538,7 @@ export function getFlowCallsByCommand(
         captureSaveFailedParse: p.captureSaveFailedParse,
         captureSaveFolder: p.captureSaveFolder,
         captureExposure: p.captureExposure,
+        captureReadyTimeoutMs: p.captureReadyTimeoutMs,
       })
     }
 
@@ -658,28 +667,7 @@ export function getFlowCallsByCommand(
       const calls: FlowStepCall[] = []
       if (doGotoHome) calls.push({ id: 'device.gotoHome' })
       calls.push({ id: 'menu.openImageManager' })
-      const im = p.imageManagerInteract
-      if (im?.moveToUsb) {
-        calls.push({ id: 'ui.click', params: { testId: 'imp-btn-move-file-to-usb' } })
-      }
-      if (im?.delete) {
-        calls.push({ id: 'ui.click', params: { testId: 'imp-btn-delete-btn-click' } })
-      }
-      if (im?.download) {
-        calls.push({ id: 'ui.click', params: { testId: 'imp-btn-download-selected' } })
-      }
-      if (im?.imageFileSwitch) {
-        calls.push({ id: 'ui.click', params: { testId: 'imp-btn-image-file-switch' } })
-      }
-      if (im?.refresh) {
-        calls.push({
-          id: 'ui.click',
-          params: { testId: 'imp-btn-refresh-current-folder', skipIfDisabled: true },
-        })
-      }
-      if (im?.panelClose) {
-        calls.push({ id: 'ui.click', params: { testId: 'imp-btn-panel-close' } })
-      }
+      calls.push(...buildImageManagerFlowCalls(p.imageManagerInteract))
       return calls
     }
 

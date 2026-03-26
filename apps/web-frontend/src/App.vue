@@ -12,6 +12,7 @@
       E2E 探针（隐藏）：
       - 设备连接状态：来自 data().devices[*].isConnected
       - 出图成功信号：每次收到 TileGPM 时自增 e2eTileGpmSeq
+      - 曝光完成信号：Qt 下发 ExposureCompleted 时自增 e2eExposureCompletedSeq（短曝光时比 cp-status busy/idle 更可靠）
       目的：让 Playwright 不必“盲等超时”，而是等待真实状态变化。
     -->
     <div
@@ -32,6 +33,10 @@
         data-testid="e2e-tilegpm"
         :data-seq="String(e2eTileGpmSeq)"
         :data-session="String(tileSessionId || '')"
+      ></div>
+      <div
+        data-testid="e2e-exposure-completed"
+        :data-seq="String(e2eExposureCompletedSeq)"
       ></div>
     </div>
 
@@ -1037,7 +1042,7 @@ export default {
 
       QTClientVersion: 'Not connected',
       // VueClientVersion: process.env.VUE_APP_VERSION,
-      VueClientVersion: '20260325', // 手动指定版本号
+      VueClientVersion: '20260326-3', // 手动指定版本号
 
       // 全局总版本号（由 Qt 通过 WebSocket 从环境变量 QUARCS_TOTAL_VERSION 读取并发送）
       TotalVersion: '0.0.0',
@@ -1255,6 +1260,8 @@ export default {
       tileFrameId: null,          // 当前瓦片帧ID（用于丢弃旧帧瓦片/防错帧拉伸）
       // E2E：出图成功信号（每次收到 TileGPM 自增；用于 Playwright 等待真实状态变化）
       e2eTileGpmSeq: 0,
+      // E2E：Qt 下发 ExposureCompleted 时自增（与 TileGPM 解耦；短曝光时 cp-status 可能来不及观测 busy）
+      e2eExposureCompletedSeq: 0,
       tileCache: null,            // 瓦片缓存 Map<"z/x/y", ImageData> (在initCanvas中初始化)
       tileRawDataCache: null,     // 原始瓦片数据缓存 Map<"z/x/y", {width, height, type, data}> (在initCanvas中初始化)
       tilePendingLoads: null,     // 正在加载的瓦片集合 (在initCanvas中初始化)
@@ -2332,6 +2339,7 @@ export default {
                 break;
 
               case 'ExposureCompleted':
+                this.e2eExposureCompletedSeq = (Number(this.e2eExposureCompletedSeq) || 0) + 1;
                 this.$bus.$emit('ExposureCompleted');
                 // 以 ExposureCompleted 作为“UI刷新一帧”的信号，统计前端显示帧率
                 this.onLiveFramePresented();
