@@ -1254,7 +1254,7 @@ export default {
 
       // ========================= 瓦片金字塔相关 =========================
       TILE_PATH_SUFFIX: 'img/capture-tiles',  // 与 nginx location /img/capture-tiles/ 对应
-      TILE_DEBUG: true,   // 瓦片调试：true 时在控制台打印加载/渲染诊断，定位“局部瓦片不对”等问题
+      TILE_DEBUG: false,  // 瓦片调试：默认关闭，避免高频日志拖慢主线程；排查问题时可临时打开
       tileGPM: null,              // 全局处理元数据
       tileSessionId: null,        // 当前瓦片会话ID
       tileFrameId: null,          // 当前瓦片帧ID（用于丢弃旧帧瓦片/防错帧拉伸）
@@ -1267,7 +1267,7 @@ export default {
       tilePendingLoads: null,     // 正在加载的瓦片集合 (在initCanvas中初始化)
       tileAbortControllers: null, // 瓦片加载取消控制器 Map<"z/x/y", AbortController> (在initCanvas中初始化)
       tileLoadQueue: [],          // 瓦片加载队列
-      maxConcurrentTileLoads: 4,  // 最大并发加载数（live 覆盖写时过高会放大请求风暴/失败率）
+      maxConcurrentTileLoads: 2,  // 降低并发，减少多块瓦片同时解码/处理造成的主线程卡顿
       currentTileLoads: 0,        // 当前加载数
       tileLoadBatchSeq: 0,        // 可见瓦片加载批次号（用于“全齐再显示”屏障）
       activeTileLoadBatchId: 0,   // 当前有效批次ID（视窗变化/新帧会覆盖旧批次）
@@ -1277,6 +1277,8 @@ export default {
       tileRetryTimers: null,      // 后端尚未生成完成时的重试定时器 Map<"z/x/y", Timeout>
       tileRetryCounts: null,      // 瓦片重试次数 Map<"z/x/y", number>
       tileRenderRaf: null,        // 合并晚到瓦片的重绘请求，避免每片都立即重绘
+      tileDirtyKeys: null,        // 待补绘的瓦片键集合 Set<"z/x/y">
+      tileForceFullRender: true,  // 下一帧是否需要对当前可见瓦片做整批重绘
       tileCanvas: null,           // 瓦片合成画布
       tileCtx: null,              // 瓦片合成画布上下文
       viewportChangeTimer: null,  // 视窗变化防抖定时器
@@ -5869,6 +5871,9 @@ export default {
       if (!this.currentVisibleTiles) {
         this.currentVisibleTiles = new Set();
       }
+      if (!this.tileDirtyKeys) {
+        this.tileDirtyKeys = new Set();
+      }
       
       // 重要：后端每张图使用独立目录（sessionId=live_<epoch>），新 GPM 即新会话；保留 isOverwriteLiveFrame 兼容旧后端 sessionId=live 覆盖写
       const isOverwriteLiveFrame = (!isNewSession) && isLiveSession;
@@ -5879,6 +5884,7 @@ export default {
         this.tileRawDataCache.clear();
         this.tilePendingLoads.clear();
         this.currentVisibleTiles.clear();
+        this.tileDirtyKeys.clear();
 
         // 取消所有进行中的请求
         for (const [key, controller] of this.tileAbortControllers.entries()) {
@@ -5893,6 +5899,7 @@ export default {
 
         this.tileLoadQueue = [];
         this.currentTileLoads = 0;
+        this.tileForceFullRender = true;
 
         if (isNewSession) {
           // 重置上一次渲染的瓦片层级（避免新会话沿用旧层级状态）
@@ -5914,6 +5921,7 @@ export default {
       if (this.tileCanvas.width !== gpm.imageWidth || this.tileCanvas.height !== gpm.imageHeight) {
         this.tileCanvas.width = gpm.imageWidth;
         this.tileCanvas.height = gpm.imageHeight;
+        this.tileForceFullRender = true;
       }
 
       // 新会话时，标记下次渲染前需要清空瓦片画布；但不要在这里立刻清空，避免出现“先透明后补齐”的闪烁
@@ -6235,9 +6243,18 @@ export default {
         height: gpm.imageHeight,
       };
       // merged_single_level：仅两层——z=0 压缩合并整图 + z=maxZ 原图整图，均为 fullImageRect
+      // pyramid：不再请求 0..maxZ 全层级，避免前端为“看不见/很快被覆盖”的中间层付出过高代价。
+      // 仅保留：
+      // - z=0：整图粗预览
+      // - currentZ：当前缩放真正需要的层级
+      // - currentZ-1：作为过渡兜底层，兼顾渐进式体验与性能
       const requestLevels = (buildMode === 'merged_single_level')
         ? Array.from(new Set([0, requestMaxZ]))
-        : Array.from({ length: requestMaxZ + 1 }, (_, index) => index);
+        : Array.from(new Set([
+            0,
+            Math.max(0, currentZ - 1),
+            currentZ,
+          ])).sort((a, b) => a - b);
 
       for (const z of requestLevels) {
         const useFullImage = (buildMode === 'merged_single_level') || (z === 0);
@@ -6283,6 +6300,9 @@ export default {
       if (!this.tileGPM) return;
       if (!this.tileLoadWaiters) {
         this.tileLoadWaiters = new Map();
+      }
+      if (!this.tileDirtyKeys) {
+        this.tileDirtyKeys = new Set();
       }
       
       const tiles = this.calculateVisibleTiles();
@@ -6341,7 +6361,14 @@ export default {
         if (needReprocess) {
           try {
             const processedTile = this.processTile(this.tileRawDataCache.get(key));
-            this.tileCache.set(key, { imageData: processedTile, paramsKey });
+            const renderSource = this.createTileRenderSource(processedTile);
+            this.tileCache.set(key, {
+              renderSource,
+              width: processedTile.width,
+              height: processedTile.height,
+              paramsKey
+            });
+            this.tileDirtyKeys.add(key);
           } catch (e) {
             console.error(`Error processing cached raw tile ${key}:`, e);
           }
@@ -6503,6 +6530,14 @@ export default {
       }
     },
 
+    markTileDirty(key) {
+      if (!key) return;
+      if (!this.tileDirtyKeys) {
+        this.tileDirtyKeys = new Set();
+      }
+      this.tileDirtyKeys.add(key);
+    },
+
     /**
      * 加载单个瓦片（支持取消）
      * @param {Object} tile - 瓦片信息 {z, x, y}
@@ -6575,7 +6610,14 @@ export default {
           
           try {
             const processedTile = this.processTile(tileData);
-            this.tileCache.set(key, { imageData: processedTile, paramsKey });
+            const renderSource = this.createTileRenderSource(processedTile);
+            this.tileCache.set(key, {
+              renderSource,
+              width: processedTile.width,
+              height: processedTile.height,
+              paramsKey
+            });
+            this.markTileDirty(key);
             if (this.TILE_DEBUG) {
               console.log('[Tile] loadSingleTile ok', { key, rawSize: `${tileData.width}x${tileData.height}`, outSize: `${processedTile.width}x${processedTile.height}` });
             }
@@ -6716,6 +6758,17 @@ export default {
       }
     },
 
+    createTileRenderSource(imageData) {
+      if (!imageData) return null;
+      const canvas = document.createElement('canvas');
+      canvas.width = imageData.width;
+      canvas.height = imageData.height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return null;
+      ctx.putImageData(imageData, 0, 0);
+      return canvas;
+    },
+
     /**
      * 渲染所有已加载的瓦片到缓冲画布
      */
@@ -6725,11 +6778,13 @@ export default {
       const gpm = this.tileGPM;
       const T = gpm.tileSize;
       const ctx = this.tileCtx;
+      let needsFullRender = Boolean(this.tileForceFullRender);
       
       // 只在新会话开始时清空一次；层级切换时不清空，避免“先透明后补齐”的闪烁
       if (this.tileCanvasNeedsClear) {
         ctx.clearRect(0, 0, this.tileCanvas.width, this.tileCanvas.height);
         this.tileCanvasNeedsClear = false;
+        needsFullRender = true;
       }
       
       // 获取当前应该显示的层级（反向金字塔）
@@ -6769,6 +6824,7 @@ export default {
           ctx.clearRect(left, top, w, h);
         }
         this._tileLastRenderedZ = z;
+        needsFullRender = true;
       }
 
       const levelScale = Math.pow(2, gpm.maxZoomLevel - z);
@@ -6789,23 +6845,19 @@ export default {
       ctx.webkitImageSmoothingEnabled = smoothing;
       ctx.msImageSmoothingEnabled = smoothing;
       
-      // 渲染优化：只绘制当前“可见集合”内的瓦片，避免全缓存遍历；
-      // 同时复用一个临时画布，避免每块瓦片都创建 canvas（会非常慢）
-      if (!this._tileBlitCanvas) {
-        this._tileBlitCanvas = document.createElement('canvas');
-        this._tileBlitCtx = this._tileBlitCanvas.getContext('2d');
-      }
-
-      // 仅在需要时清空（参数变化/视图切换时由外部设置 tileCanvasNeedsClear），避免每块瓦片加载时“闪白/重置”观感
-      if (this.tileCanvasNeedsClear) {
-        ctx.clearRect(0, 0, this.tileCanvas.width, this.tileCanvas.height);
-        this.tileCanvasNeedsClear = false;
-      }
+      // 渲染优化：只绘制当前“可见集合”内的瓦片，避免全缓存遍历
 
       const keysToDraw =
-        (this.currentVisibleTiles && this.currentVisibleTiles.size > 0)
-          ? Array.from(this.currentVisibleTiles)
-          : Array.from(this.tileCache.keys());
+        needsFullRender
+          ? ((this.currentVisibleTiles && this.currentVisibleTiles.size > 0)
+              ? Array.from(this.currentVisibleTiles)
+              : Array.from(this.tileCache.keys()))
+          : ((this.tileDirtyKeys && this.tileDirtyKeys.size > 0)
+              ? Array.from(this.tileDirtyKeys)
+              : []);
+      if (!needsFullRender && keysToDraw.length === 0) {
+        return;
+      }
       keysToDraw.sort((a, b) => {
         const [az, ax, ay] = a.split('/').map(Number);
         const [bz, bx, by] = b.split('/').map(Number);
@@ -6817,13 +6869,27 @@ export default {
       let drawnCount = 0;
       let skipNoCache = 0;
       const drawDetails = this.TILE_DEBUG ? [] : null;
+      let dirtyLeft = Infinity;
+      let dirtyTop = Infinity;
+      let dirtyRight = -Infinity;
+      let dirtyBottom = -Infinity;
 
       for (const key of keysToDraw) {
+        if (!needsFullRender && this.currentVisibleTiles && !this.currentVisibleTiles.has(key)) {
+          this.tileDirtyKeys.delete(key);
+          continue;
+        }
+
         const cached = this.tileCache.get(key);
-        const imageData = cached && cached.imageData;
-        if (!imageData) {
+        const renderSource = cached && cached.renderSource;
+        const renderWidth = cached && cached.width;
+        const renderHeight = cached && cached.height;
+        if (!renderSource || !renderWidth || !renderHeight) {
           skipNoCache++;
           if (this.TILE_DEBUG) drawDetails.push({ key, reason: 'noCache' });
+          if (!needsFullRender && this.tileDirtyKeys) {
+            this.tileDirtyKeys.delete(key);
+          }
           continue;
         }
 
@@ -6836,34 +6902,55 @@ export default {
         // 边缘瓦片：层级尺寸不能整除 T 时，最后一列/行只覆盖部分图像，需裁剪到图像边界，避免右侧/下侧拉伸错位
         const destWidth = Math.min(fullTilePx, gpm.imageWidth - destX);
         const destHeight = Math.min(fullTilePx, gpm.imageHeight - destY);
-        if (destWidth <= 0 || destHeight <= 0) continue;
+        if (destWidth <= 0 || destHeight <= 0) {
+          if (!needsFullRender && this.tileDirtyKeys) {
+            this.tileDirtyKeys.delete(key);
+          }
+          continue;
+        }
 
         // 若裁剪了目标区域，源图也按比例取对应区域，避免拉伸
-        const srcWidth = destWidth < fullTilePx ? (imageData.width * destWidth / fullTilePx) : imageData.width;
-        const srcHeight = destHeight < fullTilePx ? (imageData.height * destHeight / fullTilePx) : imageData.height;
+        const srcWidth = destWidth < fullTilePx ? (renderWidth * destWidth / fullTilePx) : renderWidth;
+        const srcHeight = destHeight < fullTilePx ? (renderHeight * destHeight / fullTilePx) : renderHeight;
 
-        if (this._tileBlitCanvas.width !== imageData.width || this._tileBlitCanvas.height !== imageData.height) {
-          this._tileBlitCanvas.width = imageData.width;
-          this._tileBlitCanvas.height = imageData.height;
-        }
-        this._tileBlitCtx.putImageData(imageData, 0, 0);
-        ctx.drawImage(this._tileBlitCanvas, 0, 0, srcWidth, srcHeight, destX, destY, destWidth, destHeight);
+        ctx.drawImage(renderSource, 0, 0, srcWidth, srcHeight, destX, destY, destWidth, destHeight);
+        dirtyLeft = Math.min(dirtyLeft, destX);
+        dirtyTop = Math.min(dirtyTop, destY);
+        dirtyRight = Math.max(dirtyRight, destX + destWidth);
+        dirtyBottom = Math.max(dirtyBottom, destY + destHeight);
         drawnCount++;
+        if (!needsFullRender && this.tileDirtyKeys) {
+          this.tileDirtyKeys.delete(key);
+        }
         if (this.TILE_DEBUG) {
           drawDetails.push({
             key,
             dest: `(${Math.round(destX)},${Math.round(destY)}) ${Math.round(destWidth)}x${Math.round(destHeight)}`,
-            srcSize: `${imageData.width}x${imageData.height}`,
+            srcSize: `${renderWidth}x${renderHeight}`,
             clipped: destWidth < fullTilePx || destHeight < fullTilePx
           });
         }
       }
 
-      if (this.TILE_DEBUG && (drawnCount > 0 || skipNoCache > 0)) {
+      if (needsFullRender && this.tileDirtyKeys) {
+        this.tileDirtyKeys.clear();
+      }
+      this.tileForceFullRender = false;
+
+      if (needsFullRender) {
+        dirtyLeft = 0;
+        dirtyTop = 0;
+        dirtyRight = this.tileCanvas.width;
+        dirtyBottom = this.tileCanvas.height;
+      }
+      const hasDirtyRegion = dirtyRight > dirtyLeft && dirtyBottom > dirtyTop;
+
+      if (this.TILE_DEBUG && (drawnCount > 0 || skipNoCache > 0 || needsFullRender)) {
         console.log('[Tile] renderTiles', {
           canvasSize: `${this.tileCanvas.width}x${this.tileCanvas.height}`,
           z,
           levelScale,
+          fullRender: needsFullRender,
           keysTotal: keysToDraw.length,
           drawn: drawnCount,
           skipNoCache,
@@ -6871,14 +6958,26 @@ export default {
         });
       }
       
-      // 将瓦片画布复制到缓冲画布
+      // 将瓦片画布同步到缓冲画布：增量场景只更新脏区域，避免每片瓦片都搬运整张大图
       if (this.bufferCanvas) {
-        // 避免每次 resize 导致 bufferCanvas 被清空（闪烁）；仅在尺寸变化时调整
-        if (this.bufferCanvas.width !== this.tileCanvas.width || this.bufferCanvas.height !== this.tileCanvas.height) {
+        const resized = this.bufferCanvas.width !== this.tileCanvas.width || this.bufferCanvas.height !== this.tileCanvas.height;
+        if (resized) {
           this.bufferCanvas.width = this.tileCanvas.width;
           this.bufferCanvas.height = this.tileCanvas.height;
         }
-        this.bufferCtx.drawImage(this.tileCanvas, 0, 0);
+        if (needsFullRender || resized) {
+          this.bufferCtx.clearRect(0, 0, this.bufferCanvas.width, this.bufferCanvas.height);
+          this.bufferCtx.drawImage(this.tileCanvas, 0, 0);
+        } else if (hasDirtyRegion) {
+          const sx = dirtyLeft;
+          const sy = dirtyTop;
+          const sw = dirtyRight - dirtyLeft;
+          const sh = dirtyBottom - dirtyTop;
+          this.bufferCtx.clearRect(sx, sy, sw, sh);
+          this.bufferCtx.drawImage(this.tileCanvas, sx, sy, sw, sh, sx, sy, sw, sh);
+        } else if (!drawnCount) {
+          return;
+        }
 
         // 若存在 ROI 叠加层（通常来自对焦 ROI 循环），在瓦片渲染后叠加，避免被瓦片重绘覆盖
         this.applyRoiOverlay();
@@ -7863,6 +7962,8 @@ export default {
       this.tilePendingLoads = new Set();
       this.tileAbortControllers = new Map();
       this.currentVisibleTiles = new Set();
+      this.tileDirtyKeys = new Set();
+      this.tileForceFullRender = true;
     },
 
     //*/*/*/*/*/*/*/*/*/*/*/
@@ -7958,8 +8059,12 @@ export default {
 
       const canvas = this.$refs.mainCanvas;
       const ctx = canvas.getContext('2d');
-      canvas.width = this.CanvasWidth;
-      canvas.height = this.CanvasHeight;
+      if (canvas.width !== this.CanvasWidth) {
+        canvas.width = this.CanvasWidth;
+      }
+      if (canvas.height !== this.CanvasHeight) {
+        canvas.height = this.CanvasHeight;
+      }
 
       // 动态插值平滑：缩小时开启更顺滑；放大到一定倍率后关闭更锐利
       // 注意：scale 越小表示越“放大”（可见区域越小，放大倍率越高）

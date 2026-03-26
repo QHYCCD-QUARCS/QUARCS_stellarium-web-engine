@@ -420,6 +420,25 @@ busy 策略概览如下：
    - Qt：在电源管理中执行 **重启 QUARCS 服务端**（`data-action=restartQtServer`）。
 6. 若本地会话可用，更新完成后再次读取 `/status`，并在同一会话页完成必要的功能确认。
 
+**示例：目标设备 `192.168.1.104`（局域网 QUARCS 服务端）**
+
+`quarcs-publish.sh` 的第一个参数为 **IP 第四段**（与 `upload.py` 一致），`104` 即 `http://192.168.1.104:8000/`。在 `apps/web-frontend/scripts` 下执行，按需选前端、Qt 或二者：
+
+```bash
+cd /home/quarcs/workspace/QUARCS/QUARCS_stellarium-web-engine/apps/web-frontend/scripts
+
+# 仅发布前端（构建 dist 并上传）
+bash quarcs-publish.sh 104 --vue
+
+# 仅发布 Qt 服务端（交叉编译后上传）
+bash quarcs-publish.sh 104 --qt
+
+# 前端 + Qt 依次发布
+bash quarcs-publish.sh 104 --vue --qt
+```
+
+发布后按上表收口：前端刷新页面；Qt 在电源管理中 **重启 QUARCS 服务端**。验证时可将页面指向 `http://192.168.1.104:8080`，AI-Control 会话使用 `E2E_BASE_URL=http://192.168.1.104:8080`（见上文「指定设备 IP」）。
+
 ### 发布脚本说明
 
 脚本路径：
@@ -850,12 +869,14 @@ busy 策略概览如下：
 
 | 参数名 | 类型 | 说明 |
 |--------|------|------|
-| `selectRow` | `number` | 表格行号（从 1 起），点击该行单元格以选中行。 |
+| `fillRows` | `ScheduleFillRow[]` | 可选。按顺序自动填写第 1…N 行（目标、坐标、Shoot Time、曝光、滤镜、张数、类型、Refocus、Exp Delay）；**计划未运行**时可用。录入前会统计当前表格行数，若 **少于 N** 则自动点「新增行」补到 N 行；若行数已 ≥ N 则不再添加。每项字段见下表 `ScheduleFillRow`。 |
+| `selectRow` | `number` | 表格行号（从 1 起），点击该行 **Target 列** 单元格以选中行。 |
 | `toggleLeftToolbar` | `boolean` | 折叠 / 展开左侧竖条工具栏。 |
 | `addRow` | `boolean` | 新增一行（运行中不可用，与界面一致）。 |
 | `deleteSelectedRow` | `boolean` | 删除当前选中行。 |
 | `toggleStartPause` | `boolean` | 开始 / 暂停主按钮。 |
 | `openSavePresetDialog` | `boolean` | 打开保存预设内嵌对话框。 |
+| `clearAllSchedulePresets` | `boolean` | 为 `true` 时：打开「加载预设」对话框，**逐项删除**列表中全部预设（每次经全局确认框确认），再关闭对话框。 |
 | `openLoadPresetDialog` | `boolean` | 打开加载预设内嵌对话框。 |
 | `presetName` | `string` | 与保存 / 加载配合使用的预设名称。 |
 | `presetSave` | `boolean` | 在保存对话框点击“保存”。 |
@@ -864,8 +885,24 @@ busy 策略概览如下：
 | `closePresetDialog` | `boolean` | 关闭预设内嵌对话框。 |
 | `closePanel` | `boolean` | 关闭任务计划表面板。 |
 
+`ScheduleFillRow`（`fillRows` 数组元素）：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `target` | `string` | 目标名称 |
+| `ra` / `dec` | `string` | 赤经、赤纬（与侧栏输入一致） |
+| `shootTimeNow` | `boolean` | 默认 `true`：Shoot Time 为 **Now** |
+| `expTime` | `string` | 曝光，须与下拉选项一致（如 `10 s`、`60 s`） |
+| `filter` | `string` | 滤镜 pill 的 `data-value`，默认 `L` |
+| `reps` | `number` | 重复张数 |
+| `frameType` | `string` | 默认 `Light` |
+| `refocus` | `'ON' \| 'OFF'` | 重新调焦 |
+| `expDelaySeconds` | `number` | Exp Delay 秒数，默认 `0` |
+
 执行顺序约定：
 
+- 若存在 `fillRows`：**先**按需补足行数，再逐行录入，再执行其余项。
+- 若同时传 `clearAllSchedulePresets` 与 `openLoadPresetDialog`：**先**清空全部预设并关闭对话框，再打开加载对话框并 `presetLoadOk`（适合「删光再加载指定预设」）。
 - `selectRow` → 左侧栏 / 增删行 / 开始暂停 → 保存预设流程 → 加载预设流程 → `closePresetDialog` → `closePanel`
 
 补充说明：
@@ -877,6 +914,48 @@ busy 策略概览如下：
 
 - `E2E_SCHEDULE_INTERACT_JSON`
 
+**参数怎么设（`task-schedule`）**
+
+- **结构**：命令级参数放在 **`flowParams`** 里；任务计划表专用交互放在 **`flowParams.scheduleInteract`**，字段即上表（`selectRow`、`addRow`、`toggleStartPause`、`presetName` 等）。与所有命令一样，可选顶层 **`gotoHome`**：`true` 时先刷新页面再执行。
+- **`POST /run`（推荐）**：请求体为 JSON，至少包含 `commandName`，参数进 `flowParams`：
+
+```json
+{
+  "commandName": "task-schedule",
+  "runTimeoutMs": 120000,
+  "flowParams": {
+    "gotoHome": false,
+    "scheduleInteract": {
+      "addRow": true,
+      "closePanel": false
+    }
+  }
+}
+```
+
+`runTimeoutMs` 可选：单次请求若传入，则**只对该次** `POST /run` 生效；未传时使用环境变量 **`E2E_AI_CONTROL_RUN_TIMEOUT_MS`** 或脚本内置默认（见 `scripts/ai-control-session.ts`）。
+
+- **环境变量**：在**启动会话的同一终端**导出，或在调用 `curl` 前临时设置：
+  - **`E2E_BASE_URL`**：控制哪台设备上的页面（如 `http://192.168.1.104:8080`），须在**启动** `npm run e2e:ai-control:session` 时生效；仅 `curl` 里设置不会改变已打开浏览器的地址。
+  - **`E2E_SCHEDULE_INTERACT_JSON`**：一整段 JSON 对象，等价于 `flowParams.scheduleInteract`（若与 `E2E_FLOW_PARAMS_JSON` 合并，以后者覆盖规则为准，见 `setup/flowParamsFromEnv.ts`）。**注意**：通过 **`POST /run` 直接传 `flowParams` 时，会话侧一般不再读这些环境变量**，以请求体为准。
+  - **`E2E_FLOW_PARAMS_JSON`**：完整 `flowParams` 的 JSON 字符串，便于脚本注入多命令共用参数。
+
+- **终端 stdin**（交互模式）：输入 `task-schedule` 后空格接 JSON，与 HTTP 的 `flowParams` 相同，例如：  
+  `task-schedule {"scheduleInteract":{"openLoadPresetDialog":true,"presetName":"我的计划","presetLoadOk":true}}`
+
+**约定（任务计划表控制入口）**
+
+- **勿在仓库内新增**独立「任务计划」数据文件；仅使用本文档已有 **`task-schedule`** 命令与上表 **`scheduleInteract`** 参数。
+- 参数通过 **`E2E_SCHEDULE_INTERACT_JSON`**、**`E2E_FLOW_PARAMS_JSON`**，或本地会话 **`POST /run`** 的请求体（**内联 JSON 字符串**）传入。表格内容可 **`fillRows` 自动录入**，或在前端**手录**；持久化可用 **`openSavePresetDialog` + `presetName` + `presetSave`**，或之后在设备上用 **`openLoadPresetDialog` / `presetLoadOk`** 加载。
+- 局域网设备页面仍由 **`E2E_BASE_URL`**（如 `http://192.168.1.104:8080`）指定，见上文「指定设备 IP（局域网前端）」。
+
+示例（仅命令与内联 JSON，不依赖任何仓库内计划文件）：
+
+```bash
+curl -sS -X POST http://127.0.0.1:39281/run -H 'Content-Type: application/json' \
+  -d '{"commandName":"task-schedule","flowParams":{"scheduleInteract":{"toggleLeftToolbar":true,"addRow":true,"closePanel":true}}}'
+```
+
 ---
 
 ## 约束
@@ -884,6 +963,8 @@ busy 策略概览如下：
 - 所有交互必须走真实链路，不使用 `force`。
 - 每个关键步骤都要求具备前置检查、执行动作、后置确认。
 - `AI-Control/` 是当前保留的自动化控制入口，新增流程统一放在这里维护。
+- **文档契约（对外）**：使用方以本文档所列 **`listCliCommands()`**、各命令 **`flowParams`**、环境变量及会话 **`POST /run`** 为准；**禁止**将「必须查阅仓库源码」作为使用 AI-Control 的前提。若某能力需对外可用，应先在本 README（及必要时的 `commandRequirements` 等已有说明）中写清命令与参数，再视为稳定接口。
+- **命令复用（禁止无谓膨胀）**：若目标行为可通过**现有命令名的组合**（例如多次 `POST /run` 串联）或**同一命令下已有 `flowParams` 的字段组合**实现，则**禁止**新增 CLI 命令名；应优先**扩展既有命令的参数对象**（如为 `scheduleInteract` 增加字段）或**复用既有 Step**。**仅当**现有命令与参数在语义上**无法**覆盖（例如缺少不可替代的业务步骤）时，再考虑新增命令或 Step，并**必须同步更新本文档**。
 
 ---
 
@@ -902,7 +983,7 @@ busy 策略概览如下：
 
 ### 2. 交互实现要求
 
-- **不凭猜测模拟控件**：优先阅读源码，确认真实触发方式（如 `@click`、`v-model`、自定义事件）。
+- **不凭猜测模拟控件**（面向**实现者**）：编写或修改 Step 时，可阅读前端 / 相关源码以确认真实触发方式（如 `@click`、`v-model`、自定义事件）；这与上文「**对外使用不依赖查源码**」不冲突：实现细节留在代码与 testid，**对外契约**以本文档命令与参数为准。
 - **Vuetify 等组件**：确认 `data-testid` 所在节点是否可点击；若绑定在隐藏 input 上，应点击其可见父容器。
 - **依赖展开态/激活态**：先满足展开、hover、焦点或异步渲染完成，再执行后续动作。
 - **层级控件**：菜单、子菜单、弹窗、下拉、标签页按真实业务顺序逐级进入，不跳过链路。
@@ -938,3 +1019,9 @@ busy 策略概览如下：
 - 关键步骤记录清晰日志：业务动作、目标 testid、前置/后置结果、状态变化。
 - 流程中断时明确记录失败点、失败原因和上下文。
 - **职责边界**：E2E 验证元素可达可操作可验证；Flow 组织可复用业务步骤；CLI 提供稳定外部调用接口。
+
+### 7. CLI 扩展与复用（与「约束」呼应）
+
+- 新增能力前：先检索 **`CLI_COMMANDS`** / `getFlowCallsByCommand` 是否已有命令可通过 **`flowParams`** 或多次调用覆盖；能组合则**不新增命令名**。
+- 若需新交互：优先在**既有命令**下增加可选参数（保持向后兼容），而非平行增加「只做一件事」的新顶层命令。
+- 文档与代码同步：对外可见的行为变更必须反映在本 README 的「CLI 命令总览」「参数说明」与相关小节。

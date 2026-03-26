@@ -667,7 +667,11 @@ export function getFlowCallsByCommand(
       const calls: FlowStepCall[] = []
       if (doGotoHome) calls.push({ id: 'device.gotoHome' })
       calls.push({ id: 'menu.openImageManager' })
-      calls.push(...buildImageManagerFlowCalls(p.imageManagerInteract))
+      const imCalls = buildImageManagerFlowCalls(p.imageManagerInteract)
+      if (imCalls.length > 0) {
+        calls.push({ id: 'imageManager.dismissOpenDialogsIfAny' })
+      }
+      calls.push(...imCalls)
       return calls
     }
 

@@ -4,6 +4,7 @@
  */
 import type { StepRegistry } from '../core/flowTypes'
 import { createStepError } from '../shared/errors'
+import { IMAGE_MANAGER_DIALOG_CONFIGS } from '../shared/dialogConstants'
 import { sleep } from '../shared/interaction'
 
 function parseNonNegativeInt(params: Record<string, unknown>, key: string): number {
@@ -14,8 +15,49 @@ function parseNonNegativeInt(params: Record<string, unknown>, key: string): numb
   return n
 }
 
+/** 关闭按钮：多 USB 时的「选择 U 盘」弹层（与 usbConfirm 等并列，见 ImageManagerBrowser.vue） */
+const USB_SELECT_DIALOG_ROOT = 'imp-act-usb-select-dialog'
+const USB_SELECT_DIALOG_CLOSE_BTN = 'imp-btn-close-usbselect-dialog'
+
+function dismissPairsInOrder(): Array<{ root: string; close: string }> {
+  const pairs: Array<{ root: string; close: string }> = [
+    { root: USB_SELECT_DIALOG_ROOT, close: USB_SELECT_DIALOG_CLOSE_BTN },
+  ]
+  for (const cfg of Object.values(IMAGE_MANAGER_DIALOG_CONFIGS)) {
+    pairs.push({ root: cfg.rootTestId, close: cfg.cancelTestId })
+  }
+  return pairs
+}
+
 export function makeImageManagerStepRegistry(): StepRegistry {
   const registry: StepRegistry = new Map()
+
+  /**
+   * 若图像管理内仍有未关弹层（残留遮罩会拦截侧栏点击），按顺序尝试点「取消/关闭」。
+   * 与 `MoveFileToUSB` 单 U 盘直出确认框、多 U 盘先选再确认等行为兼容。
+   */
+  registry.set('imageManager.dismissOpenDialogsIfAny', {
+    async run(ctx) {
+      const page = ctx.page
+      const stepTimeout = ctx.stepTimeoutMs
+      const pairs = dismissPairsInOrder()
+      for (let round = 0; round < 2; round++) {
+        let closedAny = false
+        for (const { root, close } of pairs) {
+          const rootLoc = page.getByTestId(root).first()
+          const rootVisible = await rootLoc.isVisible().catch(() => false)
+          if (!rootVisible) continue
+          const closeBtn = page.getByTestId(close).first()
+          const btnVisible = await closeBtn.isVisible().catch(() => false)
+          if (!btnVisible) continue
+          await closeBtn.click({ timeout: stepTimeout })
+          await sleep(200)
+          closedAny = true
+        }
+        if (!closedAny) break
+      }
+    },
+  })
 
   /** 点击侧栏文件夹行（与界面「选中/切换当前文件夹」一致） */
   registry.set('imageManager.openFolder', {
@@ -45,7 +87,18 @@ export function makeImageManagerStepRegistry(): StepRegistry {
     async run(ctx, params) {
       const index = parseNonNegativeInt(params as Record<string, unknown>, 'usbIndex')
       const timeout = (params.timeoutMs as number | undefined) ?? ctx.stepTimeoutMs
-      await ctx.page.getByTestId('imp-act-select-usb').nth(index).click({ timeout })
+      const items = ctx.page.getByTestId('imp-act-select-usb')
+      const count = await items.count()
+      if (count === 0) {
+        return
+      }
+      if (index >= count) {
+        throw createStepError('imageManager.selectUsbByIndex', 'params', 'usbIndex 超出当前 USB 列表长度', {
+          usbIndex: index,
+          listLength: count,
+        })
+      }
+      await items.nth(index).click({ timeout })
     },
   })
 
@@ -61,7 +114,10 @@ export function makeImageManagerStepRegistry(): StepRegistry {
       await ctx.page
         .getByTestId('imp-select-download-concurrency')
         .first()
-        .selectOption({ value: String(v), timeout: (params.timeoutMs as number | undefined) ?? ctx.stepTimeoutMs })
+        .selectOption(
+          { value: String(v) },
+          { timeout: (params.timeoutMs as number | undefined) ?? ctx.stepTimeoutMs },
+        )
       await sleep(100)
     },
   })

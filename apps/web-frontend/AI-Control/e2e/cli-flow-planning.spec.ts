@@ -88,6 +88,7 @@ test('image-file-manager：deleteConfirmDialog 展开为 dialog.imageManager.con
   })
   const ids = calls.map((c) => c.id)
   expect(ids).toContain('menu.openImageManager')
+  expect(ids).toContain('imageManager.dismissOpenDialogsIfAny')
   expect(ids).toContain('ui.click')
   const confirmCall = calls.find((c) => c.id === 'dialog.imageManager.confirm')
   expect(confirmCall).toBeDefined()
@@ -108,11 +109,12 @@ test('image-file-manager：openFolderIndex + selectAllInOpenFolder', () => {
   })
   expect(calls.map((c) => c.id)).toEqual([
     'menu.openImageManager',
+    'imageManager.dismissOpenDialogsIfAny',
     'imageManager.openFolder',
     'imageManager.setFolderCheckbox',
   ])
-  expect(calls[1]?.params).toMatchObject({ folderIndex: 2 })
-  expect(calls[2]?.params).toMatchObject({ folderIndex: 2, checked: true })
+  expect(calls[2]?.params).toMatchObject({ folderIndex: 2 })
+  expect(calls[3]?.params).toMatchObject({ folderIndex: 2, checked: true })
 })
 
 test('image-file-manager：selectAllInOpenFolder 无 openFolderIndex 时报错', () => {
@@ -141,6 +143,7 @@ test('image-file-manager：moveToUsb + usbSelectIndex + usbTransferConfirmDialog
       (c) => c.id === 'dialog.imageManager.confirm' && paramField(c.params, 'dialog') === 'usbConfirm',
     ),
   ).toBeDefined()
+  expect(calls.map((c) => c.id)).toContain('imageManager.dismissOpenDialogsIfAny')
 })
 
 test('image-file-manager：download 步骤顺序为 点击下载 → 并发 → 下载确认 → 路径提示', () => {
@@ -154,6 +157,7 @@ test('image-file-manager：download 步骤顺序为 点击下载 → 并发 → 
   })
   const ids = calls.map((c) => c.id)
   const iMenu = ids.indexOf('menu.openImageManager')
+  expect(ids).toContain('imageManager.dismissOpenDialogsIfAny')
   const iDlClick = calls.findIndex(
     (c) => c.id === 'ui.click' && paramField(c.params, 'testId') === 'imp-btn-download-selected',
   )
