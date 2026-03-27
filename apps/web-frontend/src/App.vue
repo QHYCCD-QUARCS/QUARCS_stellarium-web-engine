@@ -1255,6 +1255,7 @@ export default {
       // ========================= 瓦片金字塔相关 =========================
       TILE_PATH_SUFFIX: 'img/capture-tiles',  // 与 nginx location /img/capture-tiles/ 对应
       TILE_DEBUG: false,  // 瓦片调试：默认关闭，避免高频日志拖慢主线程；排查问题时可临时打开
+      TILE_PERF: true, // 瓦片性能：为 true 时在控制台与界面日志中输出各阶段耗时（processTile / renderTiles / drawImageData 等）；仅排查卡顿时临时打开
       tileGPM: null,              // 全局处理元数据
       tileSessionId: null,        // 当前瓦片会话ID
       tileFrameId: null,          // 当前瓦片帧ID（用于丢弃旧帧瓦片/防错帧拉伸）
@@ -1277,6 +1278,10 @@ export default {
       tileRetryTimers: null,      // 后端尚未生成完成时的重试定时器 Map<"z/x/y", Timeout>
       tileRetryCounts: null,      // 瓦片重试次数 Map<"z/x/y", number>
       tileRenderRaf: null,        // 合并晚到瓦片的重绘请求，避免每片都立即重绘
+      tileRenderBatchSize: 4,     // 增量补绘批次：累计这么多已完成瓦片后再触发一次重绘
+      tileRenderBatchDelayMs: 80, // 增量补绘兜底延迟，避免最后零散瓦片长期不显示
+      tileRenderBufferedCount: 0, // 当前批次中已完成但尚未触发重绘的瓦片数
+      tileRenderBufferedTimer: null, // 增量补绘兜底定时器
       tileDirtyKeys: null,        // 待补绘的瓦片键集合 Set<"z/x/y">
       tileForceFullRender: true,  // 下一帧是否需要对当前可见瓦片做整批重绘
       tileCanvas: null,           // 瓦片合成画布
@@ -5900,6 +5905,7 @@ export default {
         this.tileLoadQueue = [];
         this.currentTileLoads = 0;
         this.tileForceFullRender = true;
+        this.resetIncrementalTileRenderBuffer();
 
         if (isNewSession) {
           // 重置上一次渲染的瓦片层级（避免新会话沿用旧层级状态）
@@ -6310,7 +6316,8 @@ export default {
       const batchId = ++this.tileLoadBatchSeq;
       this.activeTileLoadBatchId = batchId;
       this.tileAllowIncrementalRender = true;
-      
+      this.resetIncrementalTileRenderBuffer();
+
       // 更新当前可见瓦片集合
       const newVisibleTiles = new Set(tiles.map(t => `${t.z}/${t.x}/${t.y}`));
       
@@ -6530,6 +6537,33 @@ export default {
       }
     },
 
+    resetIncrementalTileRenderBuffer() {
+      this.tileRenderBufferedCount = 0;
+      if (this.tileRenderBufferedTimer) {
+        clearTimeout(this.tileRenderBufferedTimer);
+        this.tileRenderBufferedTimer = null;
+      }
+    },
+
+    scheduleIncrementalTileRender() {
+      const batchSize = Math.max(1, Number(this.tileRenderBatchSize) || 1);
+      const delayMs = Math.max(0, Number(this.tileRenderBatchDelayMs) || 0);
+      this.tileRenderBufferedCount = (Number(this.tileRenderBufferedCount) || 0) + 1;
+
+      if (this.tileRenderBufferedCount >= batchSize) {
+        this.resetIncrementalTileRenderBuffer();
+        this.scheduleTileRender();
+        return;
+      }
+
+      if (this.tileRenderBufferedTimer) return;
+      this.tileRenderBufferedTimer = setTimeout(() => {
+        this.tileRenderBufferedTimer = null;
+        this.tileRenderBufferedCount = 0;
+        this.scheduleTileRender();
+      }, delayMs);
+    },
+
     markTileDirty(key) {
       if (!key) return;
       if (!this.tileDirtyKeys) {
@@ -6609,8 +6643,27 @@ export default {
           }
           
           try {
-            const processedTile = this.processTile(tileData);
-            const renderSource = this.createTileRenderSource(processedTile);
+            let processedTile;
+            let renderSource;
+            if (this.TILE_PERF && typeof performance !== 'undefined' && performance.now) {
+              const t0 = performance.now();
+              processedTile = this.processTile(tileData);
+              const t1 = performance.now();
+              renderSource = this.createTileRenderSource(processedTile);
+              const t2 = performance.now();
+              const processTileMs = +(t1 - t0).toFixed(2);
+              const createTileRenderSourceMs = +(t2 - t1).toFixed(2);
+              const cpuMs = +(t2 - t0).toFixed(2);
+              const row = { processTileMs, createTileRenderSourceMs, cpuMs };
+              console.log('[TilePerf] loadSingleTile', key, row);
+              this.SendConsoleLogMsg(
+                `[TilePerf] loadSingleTile ${key} processTileMs=${processTileMs} createTileRenderSourceMs=${createTileRenderSourceMs} cpuMs=${cpuMs}`,
+                'info'
+              );
+            } else {
+              processedTile = this.processTile(tileData);
+              renderSource = this.createTileRenderSource(processedTile);
+            }
             this.tileCache.set(key, {
               renderSource,
               width: processedTile.width,
@@ -6629,7 +6682,7 @@ export default {
               this.currentVisibleTiles &&
               this.currentVisibleTiles.has(key);
             if (shouldPatchRender) {
-              this.scheduleTileRender();
+              this.scheduleIncrementalTileRender();
             }
           } catch (processErr) {
             if (this.TILE_DEBUG) {
@@ -6866,6 +6919,12 @@ export default {
         return ax - bx;
       });
 
+      const perf = this.TILE_PERF;
+      const pn = perf && typeof performance !== 'undefined' && performance.now
+        ? () => performance.now()
+        : null;
+      const tDraw0 = pn ? pn() : 0;
+
       let drawnCount = 0;
       let skipNoCache = 0;
       const drawDetails = this.TILE_DEBUG ? [] : null;
@@ -6932,6 +6991,8 @@ export default {
         }
       }
 
+      const tDraw1 = pn ? pn() : 0;
+
       if (needsFullRender && this.tileDirtyKeys) {
         this.tileDirtyKeys.clear();
       }
@@ -6960,6 +7021,7 @@ export default {
       
       // 将瓦片画布同步到缓冲画布：增量场景只更新脏区域，避免每片瓦片都搬运整张大图
       if (this.bufferCanvas) {
+        const tBuf0 = pn ? pn() : 0;
         const resized = this.bufferCanvas.width !== this.tileCanvas.width || this.bufferCanvas.height !== this.tileCanvas.height;
         if (resized) {
           this.bufferCanvas.width = this.tileCanvas.width;
@@ -6978,13 +7040,36 @@ export default {
         } else if (!drawnCount) {
           return;
         }
+        const tBuf1 = pn ? pn() : 0;
 
+        const tRoi0 = pn ? pn() : 0;
         // 若存在 ROI 叠加层（通常来自对焦 ROI 循环），在瓦片渲染后叠加，避免被瓦片重绘覆盖
         this.applyRoiOverlay();
-        
+        const tRoi1 = pn ? pn() : 0;
+
         // 更新显示
         this.drawImgData = true;
+        const tDisp0 = pn ? pn() : 0;
         this.drawImageData();
+        const tDisp1 = pn ? pn() : 0;
+
+        if (perf && pn) {
+          const row = {
+            tileCtxDrawLoopMs: +(tDraw1 - tDraw0).toFixed(2),
+            tileToBufferMs: +(tBuf1 - tBuf0).toFixed(2),
+            roiOverlayMs: +(tRoi1 - tRoi0).toFixed(2),
+            mainCanvasDrawImageDataMs: +(tDisp1 - tDisp0).toFixed(2),
+            frameMs: +(tDisp1 - tDraw0).toFixed(2),
+            drawn: drawnCount,
+            fullRender: needsFullRender,
+            resized,
+          };
+          console.log('[TilePerf] renderTiles', row);
+          this.SendConsoleLogMsg(
+            `[TilePerf] renderTiles tileCtxDrawLoopMs=${row.tileCtxDrawLoopMs} tileToBufferMs=${row.tileToBufferMs} roiOverlayMs=${row.roiOverlayMs} mainCanvasDrawImageDataMs=${row.mainCanvasDrawImageDataMs} frameMs=${row.frameMs} drawn=${row.drawn} fullRender=${row.fullRender} resized=${row.resized}`,
+            'info'
+          );
+        }
       }
     },
 
