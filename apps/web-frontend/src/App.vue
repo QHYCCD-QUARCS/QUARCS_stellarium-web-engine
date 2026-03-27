@@ -1132,7 +1132,7 @@ export default {
         // vue处理参数
         { driverType: 'MainCamera', label: 'ImageCFA', value: 'null', inputType: 'select', selectValue: ['GR', 'GB', 'BG', 'RGGB', 'null'] },
         // 硬件处理参数
-        { driverType: 'MainCamera', label: 'Binning', value: '', inputType: 'slider', inputMin: 1, inputMax: 16, inputStep: 1 },
+        // { driverType: 'MainCamera', label: 'Binning', value: '', inputType: 'slider', inputMin: 1, inputMax: 16, inputStep: 1 },
         { driverType: 'MainCamera', label: 'Temperature', value: '-5', inputType: 'select', selectValue: [5, 0, -5, -10, -15, -20, -25] },
         { driverType: 'MainCamera', label: 'Gain', value: '', inputType: 'slider', inputMin: 0, inputMax: 0, inputStep: 1 },
         { driverType: 'MainCamera', label: 'Offset', value: '', inputType: 'slider', inputMin: 0, inputMax: 0, inputStep: 1 },
@@ -3663,10 +3663,25 @@ export default {
               case 'SetRedBoxState':
                 if (parts.length === 4) {
                   const length = parseInt(parts[1]);
-                  this.ROI_x = parseFloat(parts[2]);
-                  this.ROI_y = parseFloat(parts[3]);
+                  const rx = parseFloat(parts[2]);
+                  const ry = parseFloat(parts[3]);
+                  this.ROI_x = rx;
+                  this.ROI_y = ry;
 
                   this.setRedBoxState(length, this.ROI_x, this.ROI_y);
+                  // 跟踪星居中：SaveJpgSuccess 与 SetRedBoxState 可能同批到达，叠加层像素仍是上一帧 ROI，而红框已被更新为新居中位置；仅当坐标仍一致时保留叠加层（如 sendRoiInfo 同步）。
+                  if (this.tileGPM && this.roiOverlayImageData != null) {
+                    const ox = this.roiOverlayX;
+                    const oy = this.roiOverlayY;
+                    const same =
+                      Number.isFinite(ox) &&
+                      Number.isFinite(oy) &&
+                      Math.abs(ox - rx) < 0.5 &&
+                      Math.abs(oy - ry) < 0.5;
+                    if (!same) {
+                      this.roiOverlayImageData = null;
+                    }
+                  }
                   console.log('设置红色ROI框: ', length, this.ROI_x, this.ROI_y);
                 }
                 break;
@@ -5949,8 +5964,10 @@ export default {
         this.tileCanvasNeedsClear = true;
       }
       
-      // 计算图像比例
-      this.ImageProportion = this.CanvasWidth / this.CanvasHeight;
+      // 图像宽高比：瓦片模式必须用传感器比例，否则 visible 区域/左上角与真实裁切不一致
+      this.ImageProportion = (iw > 0 && ih > 0)
+        ? (iw / ih)
+        : (this.CanvasWidth / this.CanvasHeight);
       
       // 新会话才重置缩放和平移
       if (isNewSession) {
@@ -6091,9 +6108,9 @@ export default {
     },
 
     /**
-     * 向 GUI 广播当前瓦片层级信息（用于显示合并等级与分辨率）
+     * 向 GUI 广播瓦片会话信息（含原图尺寸，供左上角显示）
      * - enabled=false：非瓦片模式（或瓦片元数据未就绪）
-     * - enabled=true：瓦片模式下包含 z/maxZoom/levelScale/levelWidth/levelHeight
+     * - enabled=true：含 imageWidth/imageHeight 等（GUI 仅用于展示原图像素尺寸）
      */
     emitTileLevelInfo() {
       const gpm = this.tileGPM;
@@ -8166,20 +8183,33 @@ export default {
       const visibleTop = newVisibleY - newVisibleHeight / 2;
       const visibleBottom = newVisibleY + newVisibleHeight / 2;
 
-      // ROI 在主画面中的边长应与当前预览倍率保持一致。
-      const roiDisplayLength = Math.max(2, Number(this.RedBoxSideLength || 0) / Math.max(1, Number(this.cameraBin) || 1));
-      const roiLeft = this.ROI_x;
-      const roiRight = this.ROI_x + roiDisplayLength;
-      const roiTop = this.ROI_y;
-      const roiBottom = this.ROI_y + roiDisplayLength;
+      // 瓦片 + 已有 ROI 叠加层时，红框/选星圆须与叠加层像素原点一致（roiOverlayX/Y）。
+      // 若仅用 this.ROI_x/y，可能被 SaveJpgSuccess 之后的 SetRedBoxState（下一帧居中）覆盖，导致框/星与当前帧小图错位。
+      const roiOriginX =
+        this.tileGPM && this.roiOverlayImageData != null ? this.roiOverlayX : this.ROI_x;
+      const roiOriginY =
+        this.tileGPM && this.roiOverlayImageData != null ? this.roiOverlayY : this.ROI_y;
+
+      // 瓦片模式：visible/ROI 均为传感器像素坐标，红框边长即 RedBoxSideLength（勿再除以预览 bin，否则框偏小）。
+      // 非瓦片：底图可能为 bin 后分辨率，边长按 hardware bin 折算到与 ROI_x/y 同一空间。
+      const roiDisplayLength = this.tileGPM
+        ? Math.max(2, Number(this.RedBoxSideLength || 0))
+        : Math.max(2, Number(this.RedBoxSideLength || 0) / Math.max(1, Number(this.cameraBin) || 1));
+      const roiLeft = roiOriginX;
+      const roiRight = roiOriginX + roiDisplayLength;
+      const roiTop = roiOriginY;
+      const roiBottom = roiOriginY + roiDisplayLength;
 
       // 判断 ROI 区域是否在可见区域内
       const isRoiInVisible = roiRight >= visibleLeft && roiLeft <= visibleRight && roiBottom >= visibleTop && roiTop <= visibleBottom;
 
-      // 计算 ROI 区域在屏幕上的位置，中心点坐标
-      const roiScreenX = (this.ROI_x - visibleLeft) * (window.innerWidth / newVisibleWidth) + roiDisplayLength * window.innerWidth / newVisibleWidth / 2;
-      const roiScreenY = (this.ROI_y - visibleTop) * (window.innerHeight / newVisibleHeight) + roiDisplayLength * window.innerHeight / newVisibleHeight / 2;
-      this.$bus.$emit('setRedBoxLength', roiDisplayLength * window.innerWidth / newVisibleWidth, roiDisplayLength * window.innerHeight / newVisibleHeight);
+      // 计算 ROI 区域在屏幕上的位置（中心点；与主画布 CSS 尺寸一致，并加画布在视口中的偏移）
+      const layout = this.getMainCanvasLayoutRect();
+      const lw = layout.width;
+      const lh = layout.height;
+      const roiScreenX = layout.left + (roiOriginX - visibleLeft) * (lw / newVisibleWidth) + roiDisplayLength * lw / newVisibleWidth / 2;
+      const roiScreenY = layout.top + (roiOriginY - visibleTop) * (lh / newVisibleHeight) + roiDisplayLength * lh / newVisibleHeight / 2;
+      this.$bus.$emit('setRedBoxLength', roiDisplayLength * lw / newVisibleWidth, roiDisplayLength * lh / newVisibleHeight);
       this.$bus.$emit('setRedBoxPosition', roiScreenX, roiScreenY);
 
 
@@ -8245,18 +8275,19 @@ export default {
       // 如果选择了星点，则根据选择位置，在ROI区域中绘制一个圆
       if (this.DrawSelectStarX != -1 && this.DrawSelectStarY != -1 && this.showSelectStar) {
         let radius, canvasStarX, canvasStarY, color;
+        const roiPrevBin = this.tileGPM ? 1 : Math.max(1, this.effectiveRoiPreviewBinFactor());
         // 如果有星点
         if (this.DrawSelectStarHFR != -1) {
           radius = this.DrawSelectStarHFR / this.scale * 2;
           if (radius <= 1) radius = 1;
-          canvasStarX = (this.DrawSelectStarX / this.cameraBin + this.ROI_x - visibleLeft) * ctx.canvas.width / newVisibleWidth;
-          canvasStarY = (this.DrawSelectStarY / this.cameraBin + this.ROI_y - visibleTop) * ctx.canvas.height / newVisibleHeight;
+          canvasStarX = (this.DrawSelectStarX / roiPrevBin + roiOriginX - visibleLeft) * ctx.canvas.width / newVisibleWidth;
+          canvasStarY = (this.DrawSelectStarY / roiPrevBin + roiOriginY - visibleTop) * ctx.canvas.height / newVisibleHeight;
           color = 'green'; // 有星点，绘制绿色的圆
         } else {
           // 否则，在选择的位置绘制一个圆
           radius = 10 / this.scale; // 你可以根据需要调整这个值
-          canvasStarX = (this.DrawSelectStarX / this.cameraBin + this.ROI_x - visibleLeft) * ctx.canvas.width / newVisibleWidth;
-          canvasStarY = (this.DrawSelectStarY / this.cameraBin + this.ROI_y - visibleTop) * ctx.canvas.height / newVisibleHeight;
+          canvasStarX = (this.DrawSelectStarX / roiPrevBin + roiOriginX - visibleLeft) * ctx.canvas.width / newVisibleWidth;
+          canvasStarY = (this.DrawSelectStarY / roiPrevBin + roiOriginY - visibleTop) * ctx.canvas.height / newVisibleHeight;
           color = 'red'; // 无星点，绘制红色的圆
         }
 
@@ -10577,14 +10608,18 @@ export default {
       const rect = canvas.getBoundingClientRect();// 获取 canvas 元素的边界矩形
       const x = event.clientX - rect.left;
       const y = event.clientY - rect.top;
+      const cw = Math.max(1, rect.width);
+      const ch = Math.max(1, rect.height);
       console.log('Mouse clicked at:', x, y);
       if (!this.isFocusLoopShooting) {
         // 期望中心（画布坐标 → 传感器像素坐标）
-        const desiredCenterX = (x / window.innerWidth * this.visibleWidth) + this.visibleX - this.visibleWidth / 2;
-        const desiredCenterY = (y / window.innerHeight * this.visibleHeight) + this.visibleY - this.visibleHeight / 2;
+        const desiredCenterX = (x / cw * this.visibleWidth) + this.visibleX - this.visibleWidth / 2;
+        const desiredCenterY = (y / ch * this.visibleHeight) + this.visibleY - this.visibleHeight / 2;
 
-        // ROI 边长（像素，偶数化），来源于固定 RedBoxSideLength
-        let side = this.RedBoxSideLength / this.cameraBin;
+        // ROI 边长（传感器像素；瓦片模式与全图逻辑坐标一致，勿再除以预览 bin）
+        let side = this.tileGPM
+          ? Number(this.RedBoxSideLength || 0)
+          : this.RedBoxSideLength / Math.max(1, Number(this.cameraBin) || 1);
         side = Math.max(2, Math.floor(side));
         if (side % 2 !== 0) side += 1; // 强制偶数
 
@@ -10619,8 +10654,14 @@ export default {
         this.ROI_y = roiY;
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'sendRedBoxState:' + this.RedBoxSideLength + ':' + this.ROI_x + ':' + this.ROI_y);
       } else {
-        this.selectStarX = ((x / window.innerWidth * this.visibleWidth) + this.visibleX - this.visibleWidth / 2 - this.ROI_x) * this.cameraBin; // 计算选择位置的x坐标
-        this.selectStarY = ((y / window.innerHeight * this.visibleHeight) + this.visibleY - this.visibleHeight / 2 - this.ROI_y) * this.cameraBin; // 计算选择位置的y坐标
+        if (this.tileGPM) {
+          this.selectStarX = (x / cw * this.visibleWidth) + this.visibleX - this.visibleWidth / 2 - this.ROI_x;
+          this.selectStarY = (y / ch * this.visibleHeight) + this.visibleY - this.visibleHeight / 2 - this.ROI_y;
+        } else {
+          const roiPrevBin = Math.max(1, Number(this.cameraBin) || 1);
+          this.selectStarX = ((x / cw * this.visibleWidth) + this.visibleX - this.visibleWidth / 2 - this.ROI_x) * roiPrevBin;
+          this.selectStarY = ((y / ch * this.visibleHeight) + this.visibleY - this.visibleHeight / 2 - this.ROI_y) * roiPrevBin;
+        }
 
         if (this.selectStarX >= 0 && this.selectStarX < this.RedBoxSideLength &&
           this.selectStarY >= 0 && this.selectStarY < this.RedBoxSideLength) {
@@ -10660,8 +10701,9 @@ export default {
         if (isNaN(dx) || isNaN(dy)) {
           return;
         }
-        let newVisibleX = this.visibleX + dx / window.innerWidth * this.visibleWidth;
-        let newVisibleY = this.visibleY + dy / window.innerHeight * this.visibleHeight;
+        const layout = this.getMainCanvasLayoutRect();
+        let newVisibleX = this.visibleX + dx / layout.width * this.visibleWidth;
+        let newVisibleY = this.visibleY + dy / layout.height * this.visibleHeight;
         if (newVisibleX < 0) {
           newVisibleX = 0;
         }
@@ -10779,15 +10821,18 @@ export default {
       const rect = canvas.getBoundingClientRect();// 获取 canvas 元素的边界矩形
       const x = touch.clientX - rect.left;
       const y = touch.clientY - rect.top;
+      const cw = Math.max(1, rect.width);
+      const ch = Math.max(1, rect.height);
       console.log('Touch at:', x, y);
       event.preventDefault();// 阻止默认事件，如页面滚动
       if (!this.isFocusLoopShooting) {
         // 期望中心（画布坐标 → 传感器像素坐标）
-        const desiredCenterX = (x / window.innerWidth * this.visibleWidth) + this.visibleX - this.visibleWidth / 2;
-        const desiredCenterY = (y / window.innerHeight * this.visibleHeight) + this.visibleY - this.visibleHeight / 2;
+        const desiredCenterX = (x / cw * this.visibleWidth) + this.visibleX - this.visibleWidth / 2;
+        const desiredCenterY = (y / ch * this.visibleHeight) + this.visibleY - this.visibleHeight / 2;
 
-        // ROI 边长（像素，偶数化），来源于固定 RedBoxSideLength
-        let side = this.RedBoxSideLength / this.cameraBin;
+        let side = this.tileGPM
+          ? Number(this.RedBoxSideLength || 0)
+          : this.RedBoxSideLength / Math.max(1, Number(this.cameraBin) || 1);
         side = Math.max(2, Math.floor(side));
         if (side % 2 !== 0) side += 1; // 强制偶数
 
@@ -10822,8 +10867,14 @@ export default {
         this.ROI_y = roiY;
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'sendRedBoxState:' + this.RedBoxSideLength + ':' + this.ROI_x + ':' + this.ROI_y);
       } else {
-        this.selectStarX = ((x / window.innerWidth * this.visibleWidth) + this.visibleX - this.visibleWidth / 2 - this.ROI_x) * this.cameraBin; // 计算选择位置的x坐标
-        this.selectStarY = ((y / window.innerHeight * this.visibleHeight) + this.visibleY - this.visibleHeight / 2 - this.ROI_y) * this.cameraBin; // 计算选择位置的y坐标
+        if (this.tileGPM) {
+          this.selectStarX = (x / cw * this.visibleWidth) + this.visibleX - this.visibleWidth / 2 - this.ROI_x;
+          this.selectStarY = (y / ch * this.visibleHeight) + this.visibleY - this.visibleHeight / 2 - this.ROI_y;
+        } else {
+          const roiPrevBin = Math.max(1, Number(this.cameraBin) || 1);
+          this.selectStarX = ((x / cw * this.visibleWidth) + this.visibleX - this.visibleWidth / 2 - this.ROI_x) * roiPrevBin;
+          this.selectStarY = ((y / ch * this.visibleHeight) + this.visibleY - this.visibleHeight / 2 - this.ROI_y) * roiPrevBin;
+        }
 
         if (this.selectStarX >= 0 && this.selectStarX < this.RedBoxSideLength &&
           this.selectStarY >= 0 && this.selectStarY < this.RedBoxSideLength) {
@@ -10915,8 +10966,9 @@ export default {
             return;
           }
 
-          let newVisibleX = this.visibleX + dx / window.innerWidth * this.visibleWidth;
-          let newVisibleY = this.visibleY + dy / window.innerHeight * this.visibleHeight;
+          const layout = this.getMainCanvasLayoutRect();
+          let newVisibleX = this.visibleX + dx / layout.width * this.visibleWidth;
+          let newVisibleY = this.visibleY + dy / layout.height * this.visibleHeight;
           if (newVisibleX < 0) {
             newVisibleX = 0;
           }
@@ -10971,14 +11023,12 @@ export default {
           const dx = this.currentTouchX[0] - this.currentTouchX[1];
           const dy = this.currentTouchY[0] - this.currentTouchY[1];
           const distance = Math.sqrt(dx * dx + dy * dy);
-          this.SendConsoleLogMsg('距离变化 distance:' + distance, 'info');
           if (this.startTouchDistance == 0) {
             this.startTouchDistance = distance;
           }
-          // 计算缩放比例的变化量
+          // 两指张开距离变大 → 应放大图像 → 本项目中 scale 越小越放大，故用除法而非乘法
           const scaleChange = distance / this.startTouchDistance;
-          this.SendConsoleLogMsg('距离变化比例 scaleChange:' + scaleChange, 'info');
-          let newScale = this.scale * scaleChange; // 更新缩放比例
+          let newScale = this.scale / scaleChange;
           if (newScale < 0.01) {
             newScale = 0.01;
           }
@@ -10986,15 +11036,11 @@ export default {
             newScale = 1.0;
           }
           if (newScale != this.scale) {
-            this.SendConsoleLogMsg('缩放比例变化,缩放比例:' + newScale, 'info');
-            this.scale = newScale; // 更新缩放比例
+            this.scale = newScale;
             this.$bus.$emit('setScale', this.scale);
             this.emitTileLevelInfo();
             this.drawImageData();
-            // 触发瓦片重新加载
             this.onViewportChange();
-          } else {
-            this.SendConsoleLogMsg('缩放比例没有变化,缩放比例:' + this.scale, 'info');
           }
           this.startTouchDistance = distance; // 更新两个触摸点之间的距离
         }, 100);
@@ -11052,8 +11098,37 @@ export default {
       this.onViewportChange();
     },
 
+    /** 非瓦片模式下选星等：与硬件 bin 对齐。ROI 循环 .bin 已与后端一致为全分辨率（见 showRoiImage 中 roiBinFactor=1）。 */
+    effectiveRoiPreviewBinFactor() {
+      const gpm = this.tileGPM;
+      const fromTile = gpm && gpm.previewBinningFactor != null && gpm.previewBinningFactor !== '';
+      const raw = fromTile ? parseInt(gpm.previewBinningFactor, 10) : parseInt(this.cameraBin || 1, 10);
+      const n = Number.isFinite(raw) && raw > 0 ? raw : 1;
+      return Math.max(1, n);
+    },
+
+    /** 主画布在视口中的布局（CSS 像素）。ROI 点击/红框/拖动须与此一致，勿用 window.innerWidth（侧栏时比例与偏移错误）。 */
+    getMainCanvasLayoutRect() {
+      const el = this.$refs.mainCanvas;
+      if (!el || typeof el.getBoundingClientRect !== 'function') {
+        return {
+          left: 0,
+          top: 0,
+          width: Math.max(1, window.innerWidth),
+          height: Math.max(1, window.innerHeight)
+        };
+      }
+      const r = el.getBoundingClientRect();
+      return {
+        left: Number.isFinite(r.left) ? r.left : 0,
+        top: Number.isFinite(r.top) ? r.top : 0,
+        width: Math.max(1, r.width || window.innerWidth),
+        height: Math.max(1, r.height || window.innerHeight)
+      };
+    },
+
     // 显示ROI图像
-    showRoiImage(fileName, destX, destY) {
+  showRoiImage(fileName, destX, destY) {
       if (this.RedBoxSideLength == 0 || this.RedBoxSideLength == null) {
         this.SendConsoleLogMsg('RedBoxSideLength is 0 or null', 'error');
         return;
@@ -11093,13 +11168,8 @@ export default {
           let src, imgData, targetImg8;
           try {
             const uint16Array = new Uint16Array(buffer);
-            // ROI 帧尺寸要与后端写入保持一致：
-            // - 非瓦片模式：使用 cameraBin
-            // - 瓦片模式：后端可能把 MainCameraBinning 固定回 1（坐标不缩放），但 ROI 叠加仍按 previewBinningFactor 写出
-            //   所以这里优先使用 tileGPM.previewBinningFactor
-            const roiBinFactor = (this.tileGPM && this.tileGPM.previewBinningFactor)
-              ? parseInt(this.tileGPM.previewBinningFactor)
-              : parseInt(this.cameraBin || 1);
+            // 与后端 saveFitsAsJPG 一致：ROI 为相机读出全分辨率，不做软合并
+            const roiBinFactor = 1;
             let newWidth = parseInt(this.RedBoxSideLength / roiBinFactor);
             let newHeight = parseInt(this.RedBoxSideLength / roiBinFactor);
             if (newWidth % 2 != 0) {
@@ -11236,31 +11306,37 @@ export default {
     /**
      * 将 ROI 叠加层应用到 bufferCanvas（仅影响显示层，不污染瓦片缓存）
      * - 瓦片模式下 renderTiles() 每次拷贝 tileCanvas → bufferCanvas 后都会调用本方法，保证 ROI 不被覆盖
+     * - 绘制宽高须与解码图在传感器上的实际像素一致。SDK 可能输出 500×500 而界面 RedBoxSideLength 仍为 502/512；
+     *   若用 RedBoxSideLength×tileRasterScale 作目标矩形会把小图拉伸，导致与瓦片底图错位。
      */
     applyRoiOverlay() {
       if (!this.roiOverlayImageData || !this.bufferCtx || !this.bufferCanvas) return;
 
-      const x = Math.max(0, Math.floor(this.roiOverlayX || 0));
-      const y = Math.max(0, Math.floor(this.roiOverlayY || 0));
+      const s = Number(this.tileRasterScale) > 0 ? Number(this.tileRasterScale) : 1;
+      // roiOverlayX/Y：传感器像素；bufferCanvas 与 tileCanvas 同为「传感器 × tileRasterScale」位图坐标
+      const bx = Math.max(0, Math.floor((this.roiOverlayX || 0) * s));
+      const by = Math.max(0, Math.floor((this.roiOverlayY || 0) * s));
 
-      // 边界保护：避免越界导致异常
       const w = this.roiOverlayImageData.width;
       const h = this.roiOverlayImageData.height;
-      const s = Number(this.tileRasterScale) > 0 ? Number(this.tileRasterScale) : 1;
-      if (x * s >= this.bufferCanvas.width || y * s >= this.bufferCanvas.height) return;
-      if (x + w <= 0 || y + h <= 0) return;
+      const sensorW = Math.max(1, w);
+      const sensorH = Math.max(1, h);
+      const dw = Math.max(1, Math.round(sensorW * s));
+      const dh = Math.max(1, Math.round(sensorH * s));
 
-      if (s >= 1 - 1e-15) {
-        this.bufferCtx.putImageData(this.roiOverlayImageData, x, y);
-        return;
-      }
+      if (bx >= this.bufferCanvas.width || by >= this.bufferCanvas.height) return;
+      if (bx + dw <= 0 || by + dh <= 0) return;
+
       const tmp = document.createElement('canvas');
       tmp.width = w;
       tmp.height = h;
       const tctx = tmp.getContext('2d');
       if (!tctx) return;
       tctx.putImageData(this.roiOverlayImageData, 0, 0);
-      this.bufferCtx.drawImage(tmp, 0, 0, w, h, x * s, y * s, w * s, h * s);
+      const prevSmooth = this.bufferCtx.imageSmoothingEnabled;
+      this.bufferCtx.imageSmoothingEnabled = false;
+      this.bufferCtx.drawImage(tmp, 0, 0, w, h, bx, by, dw, dh);
+      this.bufferCtx.imageSmoothingEnabled = prevSmooth;
     },
     setShowSelectStar(state) {
       this.showSelectStar = state;
