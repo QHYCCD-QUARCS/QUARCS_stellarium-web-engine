@@ -1286,6 +1286,10 @@ export default {
       tileForceFullRender: true,  // 下一帧是否需要对当前可见瓦片做整批重绘
       tileCanvas: null,           // 瓦片合成画布
       tileCtx: null,              // 瓦片合成画布上下文
+      /** 合成画布相对传感器像素的长边上限（降分辨率以减轻 drawImage 卡顿） */
+      tileRasterMaxEdge: 4096,
+      /** 当前合成缩放 s∈(0,1]：tileCanvas 像素尺寸 = round(image*s) */
+      tileRasterScale: 1,
       viewportChangeTimer: null,  // 视窗变化防抖定时器
       currentVisibleTiles: null,  // 当前可见的瓦片集合 Set<"z/x/y">
       tileHistogram: null,        // 当前会话直方图 { sessionId, bins, total, counts }
@@ -5922,12 +5926,22 @@ export default {
         this.tileCanvas = document.createElement('canvas');
         this.tileCtx = this.tileCanvas.getContext('2d');
       }
-      
-      // 设置瓦片画布尺寸为原图尺寸
-      if (this.tileCanvas.width !== gpm.imageWidth || this.tileCanvas.height !== gpm.imageHeight) {
-        this.tileCanvas.width = gpm.imageWidth;
-        this.tileCanvas.height = gpm.imageHeight;
+
+      const iw = Math.max(0, Math.floor(Number(gpm.imageWidth) || 0));
+      const ih = Math.max(0, Math.floor(Number(gpm.imageHeight) || 0));
+      const maxEdge = Math.max(1, Number(this.tileRasterMaxEdge) || 4096);
+      const maxDim = Math.max(iw, ih);
+      const tileS = maxDim > 0 ? Math.min(1, maxEdge / maxDim) : 1;
+      this.tileRasterScale = tileS;
+      const tw = Math.max(1, Math.round(iw * tileS));
+      const th = Math.max(1, Math.round(ih * tileS));
+
+      // 合成画布为下采样位图；逻辑坐标仍用 gpm.imageWidth/Height（传感器像素）
+      if (this.tileCanvas.width !== tw || this.tileCanvas.height !== th) {
+        this.tileCanvas.width = tw;
+        this.tileCanvas.height = th;
         this.tileForceFullRender = true;
+        this.tileCanvasNeedsClear = true;
       }
 
       // 新会话时，标记下次渲染前需要清空瓦片画布；但不要在这里立刻清空，避免出现“先透明后补齐”的闪烁
@@ -6108,6 +6122,9 @@ export default {
         levelHeight,
         imageWidth: Number(gpm.imageWidth),
         imageHeight: Number(gpm.imageHeight),
+        tileRasterScale: Number(this.tileRasterScale) > 0 ? Number(this.tileRasterScale) : 1,
+        tileCanvasPixelWidth: this.tileCanvas ? this.tileCanvas.width : null,
+        tileCanvasPixelHeight: this.tileCanvas ? this.tileCanvas.height : null,
         previewWidth: (gpm.previewWidth != null) ? Number(gpm.previewWidth) : null,
         previewHeight: (gpm.previewHeight != null) ? Number(gpm.previewHeight) : null,
         previewBinningFactor: (gpm.previewBinningFactor != null) ? Number(gpm.previewBinningFactor) : null,
@@ -6831,10 +6848,12 @@ export default {
       const gpm = this.tileGPM;
       const T = gpm.tileSize;
       const ctx = this.tileCtx;
+      const s = Number(this.tileRasterScale) > 0 ? Number(this.tileRasterScale) : 1;
       let needsFullRender = Boolean(this.tileForceFullRender);
       
       // 只在新会话开始时清空一次；层级切换时不清空，避免“先透明后补齐”的闪烁
       if (this.tileCanvasNeedsClear) {
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.clearRect(0, 0, this.tileCanvas.width, this.tileCanvas.height);
         this.tileCanvasNeedsClear = false;
         needsFullRender = true;
@@ -6874,6 +6893,7 @@ export default {
 
         // pyramid 模式：清空视口以移除旧层级；merged_single_level 跳过，由 z=0 全图重绘覆盖
         if (!isMergedSingleLevel && w > 0 && h > 0) {
+          ctx.setTransform(s, 0, 0, s, 0, 0);
           ctx.clearRect(left, top, w, h);
         }
         this._tileLastRenderedZ = z;
@@ -6893,6 +6913,8 @@ export default {
       } else {
         smoothing = levelScale > 1.0001;
       }
+      // 合成坐标系：整图传感器像素 → 乘 tileRasterScale 映射到 tileCanvas 位图
+      ctx.setTransform(s, 0, 0, s, 0, 0);
       ctx.imageSmoothingEnabled = smoothing;
       ctx.mozImageSmoothingEnabled = smoothing;
       ctx.webkitImageSmoothingEnabled = smoothing;
@@ -6909,6 +6931,7 @@ export default {
               ? Array.from(this.tileDirtyKeys)
               : []);
       if (!needsFullRender && keysToDraw.length === 0) {
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
         return;
       }
       keysToDraw.sort((a, b) => {
@@ -7001,10 +7024,12 @@ export default {
       if (needsFullRender) {
         dirtyLeft = 0;
         dirtyTop = 0;
-        dirtyRight = this.tileCanvas.width;
-        dirtyBottom = this.tileCanvas.height;
+        dirtyRight = gpm.imageWidth;
+        dirtyBottom = gpm.imageHeight;
       }
       const hasDirtyRegion = dirtyRight > dirtyLeft && dirtyBottom > dirtyTop;
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
 
       if (this.TILE_DEBUG && (drawnCount > 0 || skipNoCache > 0 || needsFullRender)) {
         console.log('[Tile] renderTiles', {
@@ -7031,10 +7056,10 @@ export default {
           this.bufferCtx.clearRect(0, 0, this.bufferCanvas.width, this.bufferCanvas.height);
           this.bufferCtx.drawImage(this.tileCanvas, 0, 0);
         } else if (hasDirtyRegion) {
-          const sx = dirtyLeft;
-          const sy = dirtyTop;
-          const sw = dirtyRight - dirtyLeft;
-          const sh = dirtyBottom - dirtyTop;
+          const sx = dirtyLeft * s;
+          const sy = dirtyTop * s;
+          const sw = (dirtyRight - dirtyLeft) * s;
+          const sh = (dirtyBottom - dirtyTop) * s;
           this.bufferCtx.clearRect(sx, sy, sw, sh);
           this.bufferCtx.drawImage(this.tileCanvas, sx, sy, sw, sh, sx, sy, sw, sh);
         } else if (!drawnCount) {
@@ -8095,27 +8120,43 @@ export default {
 
       // console.log('当前画布参数:\n bufferCanvas.width: ', this.bufferCanvas.width, '\n bufferCanvas.height: ', this.bufferCanvas.height, '\n ImageProportion: ', this.ImageProportion, '\n scale: ', this.scale, '\n visibleX: ', this.visibleX, '\n visibleY: ', this.visibleY, '\n visibleWidth: ', this.visibleWidth, '\n visibleHeight: ', this.visibleHeight, '\n ROI_x: ', this.ROI_x, '\n ROI_y: ', this.ROI_y, '\n ROI_length: ', this.ROI_length);
 
+      const prop = this.ImageProportion || (this.CanvasWidth / this.CanvasHeight);
 
-      // 计算可见区域
-      const newVisibleWidth = this.bufferCanvas.width * this.scale;
-      const newVisibleHeight = newVisibleWidth / this.ImageProportion;
-
-      // 计算可见区域x坐标
+      // 计算可见区域（传感器像素坐标；瓦片模式下 buffer 为下采样位图，与 getCurrentVisibleRect 一致）
+      let newVisibleWidth;
+      let newVisibleHeight;
       let newVisibleX = this.visibleX;
-      // 计算可见区域y坐标
       let newVisibleY = this.visibleY;
 
-      // 避免图像越界
-      if (newVisibleX - newVisibleWidth / 2 < 0) {
-        newVisibleX = newVisibleWidth / 2;
-      } else if (newVisibleX + newVisibleWidth / 2 > this.bufferCanvas.width) {
-        newVisibleX = this.bufferCanvas.width - newVisibleWidth / 2;
-      }
-
-      if (newVisibleY - newVisibleHeight / 2 < 0) {
-        newVisibleY = newVisibleHeight / 2;
-      } else if (newVisibleY + newVisibleHeight / 2 > this.bufferCanvas.height) {
-        newVisibleY = this.bufferCanvas.height - newVisibleHeight / 2;
+      if (this.tileGPM) {
+        const gpm = this.tileGPM;
+        const iw = Number(gpm.imageWidth) || 0;
+        const ih = Number(gpm.imageHeight) || 0;
+        newVisibleWidth = iw * this.scale;
+        newVisibleHeight = newVisibleWidth / prop;
+        if (newVisibleX - newVisibleWidth / 2 < 0) {
+          newVisibleX = newVisibleWidth / 2;
+        } else if (newVisibleX + newVisibleWidth / 2 > iw) {
+          newVisibleX = iw - newVisibleWidth / 2;
+        }
+        if (newVisibleY - newVisibleHeight / 2 < 0) {
+          newVisibleY = newVisibleHeight / 2;
+        } else if (newVisibleY + newVisibleHeight / 2 > ih) {
+          newVisibleY = ih - newVisibleHeight / 2;
+        }
+      } else {
+        newVisibleWidth = this.bufferCanvas.width * this.scale;
+        newVisibleHeight = newVisibleWidth / prop;
+        if (newVisibleX - newVisibleWidth / 2 < 0) {
+          newVisibleX = newVisibleWidth / 2;
+        } else if (newVisibleX + newVisibleWidth / 2 > this.bufferCanvas.width) {
+          newVisibleX = this.bufferCanvas.width - newVisibleWidth / 2;
+        }
+        if (newVisibleY - newVisibleHeight / 2 < 0) {
+          newVisibleY = newVisibleHeight / 2;
+        } else if (newVisibleY + newVisibleHeight / 2 > this.bufferCanvas.height) {
+          newVisibleY = this.bufferCanvas.height - newVisibleHeight / 2;
+        }
       }
 
       // 更新ROI区域
@@ -8170,7 +8211,22 @@ export default {
       ctx.webkitImageSmoothingEnabled = smoothing;
       ctx.msImageSmoothingEnabled = smoothing;
 
-      ctx.drawImage(this.bufferCanvas, visibleLeft, visibleTop, newVisibleWidth, newVisibleHeight, 0, 0, canvas.width, canvas.height);
+      if (this.tileGPM) {
+        const trs = Number(this.tileRasterScale) > 0 ? Number(this.tileRasterScale) : 1;
+        ctx.drawImage(
+          this.bufferCanvas,
+          visibleLeft * trs,
+          visibleTop * trs,
+          newVisibleWidth * trs,
+          newVisibleHeight * trs,
+          0,
+          0,
+          canvas.width,
+          canvas.height
+        );
+      } else {
+        ctx.drawImage(this.bufferCanvas, visibleLeft, visibleTop, newVisibleWidth, newVisibleHeight, 0, 0, canvas.width, canvas.height);
+      }
 
       this.visibleX = newVisibleX;
       this.visibleY = newVisibleY;
@@ -10534,14 +10590,14 @@ export default {
 
         // 将 ROI 左上角按中心反推，并约束在图像范围内
         const half = side / 2;
-        // ROI 边界约束以当前渲染底图尺寸为准（瓦片模式下 tileGPM / bufferCanvas）
+        // ROI 边界约束以传感器像素为准（瓦片合成 buffer 可能为下采样位图）
         const imgW =
-          (this.bufferCanvas && this.bufferCanvas.width) ? this.bufferCanvas.width :
-            (this.tileGPM && this.tileGPM.imageWidth) ? Number(this.tileGPM.imageWidth) :
+          (this.tileGPM && Number(this.tileGPM.imageWidth) > 0) ? Number(this.tileGPM.imageWidth) :
+            (this.bufferCanvas && this.bufferCanvas.width) ? this.bufferCanvas.width :
               Number(this.mainCameraSizeX);
         const imgH =
-          (this.bufferCanvas && this.bufferCanvas.height) ? this.bufferCanvas.height :
-            (this.tileGPM && this.tileGPM.imageHeight) ? Number(this.tileGPM.imageHeight) :
+          (this.tileGPM && Number(this.tileGPM.imageHeight) > 0) ? Number(this.tileGPM.imageHeight) :
+            (this.bufferCanvas && this.bufferCanvas.height) ? this.bufferCanvas.height :
               Number(this.mainCameraSizeY);
 
         let roiX = desiredCenterX - half;
@@ -10612,15 +10668,14 @@ export default {
         if (newVisibleY < 0) {
           newVisibleY = 0;
         }
-        // 关键修复：拖动边界应以“当前渲染底图”的尺寸为准（瓦片模式下是 tileGPM / bufferCanvas），
-        // 避免 mainCameraSizeX/Y 与瓦片基准尺寸不一致导致无法拖动/被钳制回原位。
+        // 拖动边界：瓦片模式用传感器像素尺寸（与 visibleX/Y 语义一致），不用下采样 buffer 尺寸
         const boundW =
-          (this.bufferCanvas && this.bufferCanvas.width) ? this.bufferCanvas.width :
-            (this.tileGPM && this.tileGPM.imageWidth) ? Number(this.tileGPM.imageWidth) :
+          (this.tileGPM && Number(this.tileGPM.imageWidth) > 0) ? Number(this.tileGPM.imageWidth) :
+            (this.bufferCanvas && this.bufferCanvas.width) ? this.bufferCanvas.width :
               Number(this.mainCameraSizeX);
         const boundH =
-          (this.bufferCanvas && this.bufferCanvas.height) ? this.bufferCanvas.height :
-            (this.tileGPM && this.tileGPM.imageHeight) ? Number(this.tileGPM.imageHeight) :
+          (this.tileGPM && Number(this.tileGPM.imageHeight) > 0) ? Number(this.tileGPM.imageHeight) :
+            (this.bufferCanvas && this.bufferCanvas.height) ? this.bufferCanvas.height :
               Number(this.mainCameraSizeY);
         if (Number.isFinite(boundW) && boundW > 0 && newVisibleX > boundW) {
           newVisibleX = boundW;
@@ -10738,14 +10793,14 @@ export default {
 
         // 将 ROI 左上角按中心反推，并约束在图像范围内
         const half = side / 2;
-        // ROI 边界约束以当前渲染底图尺寸为准（瓦片模式下 tileGPM / bufferCanvas）
+        // ROI 边界约束以传感器像素为准（瓦片合成 buffer 可能为下采样位图）
         const imgW =
-          (this.bufferCanvas && this.bufferCanvas.width) ? this.bufferCanvas.width :
-            (this.tileGPM && this.tileGPM.imageWidth) ? Number(this.tileGPM.imageWidth) :
+          (this.tileGPM && Number(this.tileGPM.imageWidth) > 0) ? Number(this.tileGPM.imageWidth) :
+            (this.bufferCanvas && this.bufferCanvas.width) ? this.bufferCanvas.width :
               Number(this.mainCameraSizeX);
         const imgH =
-          (this.bufferCanvas && this.bufferCanvas.height) ? this.bufferCanvas.height :
-            (this.tileGPM && this.tileGPM.imageHeight) ? Number(this.tileGPM.imageHeight) :
+          (this.tileGPM && Number(this.tileGPM.imageHeight) > 0) ? Number(this.tileGPM.imageHeight) :
+            (this.bufferCanvas && this.bufferCanvas.height) ? this.bufferCanvas.height :
               Number(this.mainCameraSizeY);
 
         let roiX = desiredCenterX - half;
@@ -10868,14 +10923,14 @@ export default {
           if (newVisibleY < 0) {
             newVisibleY = 0;
           }
-          // 同鼠标拖动：边界使用当前渲染底图尺寸（瓦片模式下 tileGPM / bufferCanvas）
+          // 同鼠标拖动：瓦片模式用传感器像素尺寸
           const boundW =
-            (this.bufferCanvas && this.bufferCanvas.width) ? this.bufferCanvas.width :
-              (this.tileGPM && this.tileGPM.imageWidth) ? Number(this.tileGPM.imageWidth) :
+            (this.tileGPM && Number(this.tileGPM.imageWidth) > 0) ? Number(this.tileGPM.imageWidth) :
+              (this.bufferCanvas && this.bufferCanvas.width) ? this.bufferCanvas.width :
                 Number(this.mainCameraSizeX);
           const boundH =
-            (this.bufferCanvas && this.bufferCanvas.height) ? this.bufferCanvas.height :
-              (this.tileGPM && this.tileGPM.imageHeight) ? Number(this.tileGPM.imageHeight) :
+            (this.tileGPM && Number(this.tileGPM.imageHeight) > 0) ? Number(this.tileGPM.imageHeight) :
+              (this.bufferCanvas && this.bufferCanvas.height) ? this.bufferCanvas.height :
                 Number(this.mainCameraSizeY);
           if (Number.isFinite(boundW) && boundW > 0 && newVisibleX > boundW) {
             newVisibleX = boundW;
@@ -11191,10 +11246,21 @@ export default {
       // 边界保护：避免越界导致异常
       const w = this.roiOverlayImageData.width;
       const h = this.roiOverlayImageData.height;
-      if (x >= this.bufferCanvas.width || y >= this.bufferCanvas.height) return;
+      const s = Number(this.tileRasterScale) > 0 ? Number(this.tileRasterScale) : 1;
+      if (x * s >= this.bufferCanvas.width || y * s >= this.bufferCanvas.height) return;
       if (x + w <= 0 || y + h <= 0) return;
 
-      this.bufferCtx.putImageData(this.roiOverlayImageData, x, y);
+      if (s >= 1 - 1e-15) {
+        this.bufferCtx.putImageData(this.roiOverlayImageData, x, y);
+        return;
+      }
+      const tmp = document.createElement('canvas');
+      tmp.width = w;
+      tmp.height = h;
+      const tctx = tmp.getContext('2d');
+      if (!tctx) return;
+      tctx.putImageData(this.roiOverlayImageData, 0, 0);
+      this.bufferCtx.drawImage(tmp, 0, 0, w, h, x * s, y * s, w * s, h * s);
     },
     setShowSelectStar(state) {
       this.showSelectStar = state;
