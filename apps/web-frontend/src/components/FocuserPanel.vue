@@ -75,7 +75,7 @@
           <img src="@/assets/images/svg/ui/arrow-left-circle.svg" height="20px" style="min-height: 20px; pointer-events: none;"></img>
         </div>
       </button> -->
-        <button :disabled="isBtnMoveDisabled" @mousedown="FocusMove('left')" @mouseup="FocusAbort" @mouseleave="FocusAbort"
+        <button :disabled="isBtnMoveDisabled" @mousedown="FocusMove('left')" @mouseup="FocusAbort"
           @touchstart.stop.prevent="FocusMove('left')" @touchend.stop.prevent="FocusAbort" @touchcancel.stop.prevent="FocusAbort" class="get-click btn-Left" data-testid="fp-btn-focus-move">
           <div style="display: flex; justify-content: center; align-items: center;">
             <img src="@/assets/images/svg/ui/arrow-left-circle.svg" height="20px"
@@ -112,7 +112,7 @@
           </div>
         </button> -->
 
-        <button :disabled="isBtnMoveDisabled" @mousedown="FocusMove('right')" @mouseup="FocusAbort" @mouseleave="FocusAbort"
+        <button :disabled="isBtnMoveDisabled" @mousedown="FocusMove('right')" @mouseup="FocusAbort"
           @touchstart.stop.prevent="FocusMove('right')" @touchend.stop.prevent="FocusAbort" @touchcancel.stop.prevent="FocusAbort" class="get-click btn-Right" data-testid="fp-btn-focus-move-2">
           <div style="display: flex; justify-content: center; align-items: center;">
             <img src="@/assets/images/svg/ui/arrow-right-circle.svg" height="20px"
@@ -187,6 +187,7 @@ export default {
       longPressTriggered: false,
       pressDirection: '',
       isPressing: false,
+      longPressCaptureCleanup: null,
 
       // 校准相关数据
       isCalibrating: false, // 是否正在校准
@@ -218,6 +219,7 @@ export default {
   },
   beforeDestroy() {
     window.removeEventListener('resize', this.updatePosition);
+    this.removeLongPressCaptureListeners();
   },
   created() {
     // this.$bus.$on('AutoHistogramNum', this.setAutoHistogramNum);
@@ -345,6 +347,13 @@ export default {
       this.$bus.$emit('RedBoxSizeChange', this.ROI_length); // 更新gui.vue和app.vue中的RedBoxSideLength
     },
 
+    removeLongPressCaptureListeners() {
+      if (this.longPressCaptureCleanup) {
+        this.longPressCaptureCleanup();
+        this.longPressCaptureCleanup = null;
+      }
+    },
+
     FocusMove(direction) {
       if (!this.FocuserIsConnected) {
         this.$bus.$emit('showMsgBox', 'Focuser is not connected!', 'warning');
@@ -359,7 +368,7 @@ export default {
       this.pressDirection = direction;
       this.isPressing = true;
       this.longPressTriggered = false;
-
+      this.removeLongPressCaptureListeners();
       // 清理可能存在的定时器
       if (this.longPressTimer) {
         clearTimeout(this.longPressTimer);
@@ -381,10 +390,20 @@ export default {
           this.$bus.$emit('AppSendMessage', 'Vue_Command', 'focusMove:' + 'Right');
         }
         this.isMoveInProgress = true;
+        const onPointerEnd = () => {
+          this.FocusAbort();
+        };
+        window.addEventListener('pointerup', onPointerEnd, true);
+        window.addEventListener('pointercancel', onPointerEnd, true);
+        this.longPressCaptureCleanup = () => {
+          window.removeEventListener('pointerup', onPointerEnd, true);
+          window.removeEventListener('pointercancel', onPointerEnd, true);
+        };
       }, 200);
     },
 
     FocusAbort() {
+      this.removeLongPressCaptureListeners();
       const pressDuration = new Date().getTime() - this.moveStartTime;
 
       // 停止长按定时器
