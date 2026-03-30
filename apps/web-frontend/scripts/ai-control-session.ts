@@ -256,6 +256,7 @@ async function main() {
         commandName === 'general-settings' ? resolveFlowParamsFromEnv(flowParams ?? {}) : (flowParams ?? {})
       const runCtx = ctx
       let timeoutHandle: ReturnType<typeof setTimeout> | undefined
+      const commandStartedAt = Date.now()
       const runPromise = runFlowByCommand({ ctx: runCtx, registry, commandName, flowParams: resolved })
       const timeoutPromise = new Promise<never>((_, reject) => {
         timeoutHandle = setTimeout(() => {
@@ -277,6 +278,9 @@ async function main() {
       } finally {
         if (timeoutHandle) clearTimeout(timeoutHandle)
       }
+      console.log(
+        `[ai-control] commandTiming commandName=${commandName} elapsedMs=${Date.now() - commandStartedAt}`,
+      )
     })
     runQueue = next.catch(() => {})
     await next
@@ -374,14 +378,15 @@ async function main() {
       sendJson(res, 400, { ok: false, error: `Unknown command: ${commandName}` })
       return
     }
+    const httpRunStarted = Date.now()
     try {
       await runOnPage(commandName, body.flowParams ?? {}, {
         runTimeoutMs: typeof body.runTimeoutMs === 'number' ? body.runTimeoutMs : undefined,
       })
-      sendJson(res, 200, { ok: true, commandName })
+      sendJson(res, 200, { ok: true, commandName, elapsedMs: Date.now() - httpRunStarted })
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
-      sendJson(res, 200, { ok: false, error: message })
+      sendJson(res, 200, { ok: false, error: message, elapsedMs: Date.now() - httpRunStarted })
     }
   })
   await new Promise<void>((resolve, reject) => {

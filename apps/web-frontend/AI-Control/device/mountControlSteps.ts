@@ -8,7 +8,9 @@
  */
 import { expect } from '@playwright/test'
 import type { FlowContext, StepRegistry } from '../core/flowTypes'
-import { clickLocator, sanitizeTestIdPart, sleep } from '../shared/interaction'
+import { clickLocator, clickVuetifySwitchByRoot, sanitizeTestIdPart, sleep } from '../shared/interaction'
+import { deviceMenuTestId } from '../shared/interaction'
+import { ensureMenuDrawerOpen } from '../shared/navigation'
 import { openDeviceSubmenu } from '../menu/drawerSteps'
 
 const MCP_PANEL = 'mcp-panel'
@@ -52,15 +54,16 @@ async function setMountSwitch(ctx: FlowContext, label: string, wanted: boolean) 
     console.log(`[ai-control] 未找到赤道仪 ${label} 开关，跳过（可能未连接或后端未下发该项）`)
     return
   }
-  const input = switchLoc.locator('input[type="checkbox"]').first()
-  const current = (await input.count()) > 0 ? await input.isChecked().catch(() => false) : false
+  const innerInput = switchLoc.locator('input[type="checkbox"]').first()
+  const current =
+    (await innerInput.count()) > 0
+      ? await innerInput.isChecked().catch(() => false)
+      : await switchLoc.isChecked().catch(() => false)
   if (current === wanted) {
     console.log(`[ai-control] 赤道仪 ${label} 已为 ${wanted}，跳过`)
     return
   }
-  await switchLoc.scrollIntoViewIfNeeded().catch(() => {})
-  await sleep(200)
-  await clickLocator(switchLoc, timeout)
+  await clickVuetifySwitchByRoot(switchLoc, timeout)
   await sleep(200)
   console.log(`[ai-control] 赤道仪 ${label} 已设为 ${wanted}`)
 }
@@ -112,7 +115,22 @@ export function makeMountControlStepRegistry(): StepRegistry {
   registry.set('device.mount.applyControl', {
     async run(ctx, params: MountControlInteractParams) {
       if (!hasMountControlInteract(params)) return
-      await openDeviceSubmenu(ctx, DEVICE_TYPE)
+      const navTimeout = Math.max(ctx.stepTimeoutMs, 15_000)
+      const page = ctx.page
+      const submenuDrawer = page.getByTestId('ui-app-submenu-drawer').first()
+      const submenuPage = page.getByTestId('ui-app-submenu-device-page').first()
+      const mountItem = page.getByTestId(deviceMenuTestId(DEVICE_TYPE)).first()
+      const d = await submenuDrawer.getAttribute('data-state').catch(() => null)
+      const p = await submenuPage.getAttribute('data-state').catch(() => null)
+      const sel = await mountItem.getAttribute('data-selected').catch(() => null)
+      /** 必须 drawer 与 page 同时为 open；仅 p=open 而 d=closed 时仍须 openDeviceSubmenu（见 connectDriverSuccess 与 drawerSteps 注释） */
+      if (d === 'open' && p === 'open' && sel === 'true') {
+        console.log('[ai-control] device.mount.applyControl 跳过 openDeviceSubmenu：Mount 子菜单已就绪')
+      } else {
+        await ensureMenuDrawerOpen(page, navTimeout)
+        await sleep(500)
+        await openDeviceSubmenu(ctx, DEVICE_TYPE)
+      }
 
       if (params.solveCurrentPosition === true) {
         await clickMountButton(ctx, 'SolveCurrentPosition')

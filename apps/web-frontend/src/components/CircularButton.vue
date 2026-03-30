@@ -1,5 +1,9 @@
 <template>
-  <div class="circular-button no-select" :data-testid="$attrs['data-testid'] || 'ui-circular-button-root'">
+  <div
+    class="circular-button no-select"
+    :data-testid="$attrs['data-testid'] || 'ui-circular-button-root'"
+    :data-capture-ready="captureReadyForUi"
+  >
     <svg
       v-bind="$attrs"
       @touchstart.prevent="handleMouseDown($event)" @touchend.prevent="handleMouseUp($event)"
@@ -156,6 +160,13 @@ export default {
       // 字体大小可以根据按钮的大小动态计算
       return this.radius / 3; // 示例比例
     },
+    /** 与 `animateProgress` 中 `if (this.isClicked) return` 对齐，供 E2E 在连拍前等待可再次触发拍摄 */
+    captureReadyForUi() {
+      if (this.isButtonDisabled) return 'false';
+      if (this.isClicked) return 'false';
+      if (this.isLongPress) return 'false';
+      return 'true';
+    },
   },
   methods: {
     handleMouseDown(event) {
@@ -274,10 +285,10 @@ export default {
       this.progress = 1;
       cancelAnimationFrame(this.animationRequest);
       this.$stopFeature(['MainCamera'], 'Capture')
-      // 延时2秒后重置进度
+      // 延时 500ms 后重置进度（解锁可再次点拍）
       setTimeout(() => {
         this.resetProgress();
-      }, 2000);
+      }, 500);
     },
 
     onExposureFailed(/* reason */) {

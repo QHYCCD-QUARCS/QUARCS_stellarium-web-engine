@@ -21,12 +21,13 @@ import type { FlowContext, StepRegistry } from '../core/flowTypes'
 import { clickLocator, deviceMenuTestId, sleep } from '../shared/interaction'
 import { ensureMenuDrawerClosed, ensureMenuDrawerOpen } from '../shared/navigation'
 
-const SUBMENU_OPEN_MAX_ATTEMPTS = 3
+const SUBMENU_OPEN_MAX_ATTEMPTS = 5
 /** 主菜单再次打开后等待抽屉稳定、可点击再操作，避免动画未结束或 DOM 未就绪导致点击无效 */
-const AFTER_MAIN_MENU_OPEN_DELAY_MS = 600
+const AFTER_MAIN_MENU_OPEN_DELAY_MS = 700
 
 async function openDeviceSubmenu(ctx: FlowContext, deviceType: string) {
   const page = ctx.page
+  const submenuOpenTimeout = Math.max(ctx.stepTimeoutMs, 15_000)
   const submenuDrawer = page.getByTestId('ui-app-submenu-drawer').first()
   const submenuPage = page.getByTestId('ui-app-submenu-device-page').first()
   /** 限定在主菜单抽屉内查找设备项，避免点到其它层或误触 overlay */
@@ -43,10 +44,15 @@ async function openDeviceSubmenu(ctx: FlowContext, deviceType: string) {
       await sleep(AFTER_MAIN_MENU_OPEN_DELAY_MS)
       await expect(deviceMenuItem).toBeVisible({ timeout: ctx.stepTimeoutMs })
 
-      const alreadyOpen = (await submenuPage.getAttribute('data-state').catch(() => null)) === 'open'
+      /** 二级抽屉 drawer_2 与设备页 isOpenDevicePage 需同时一致；仅看 submenu-page 不够：
+       * connectDriverSuccess 会设 drawer_2=false 却可能未清 isOpenDevicePage，导致 page 仍为 open、
+       * 但 ui-app-submenu-drawer 为 closed。若此时误判「已打开」而跳过点击，后续断言 drawer=open 会失败。 */
+      const drawerOpen = (await submenuDrawer.getAttribute('data-state').catch(() => null)) === 'open'
+      const pageOpen = (await submenuPage.getAttribute('data-state').catch(() => null)) === 'open'
       const alreadySelected = (await deviceMenuItem.getAttribute('data-selected').catch(() => null)) === 'true'
+      const submenuReady = drawerOpen && pageOpen && alreadySelected
 
-      if (!alreadyOpen || !alreadySelected) {
+      if (!submenuReady) {
         if (attempt > 1) await sleep(400)
         await deviceMenuItem.scrollIntoViewIfNeeded().catch(() => {})
         await sleep(200)
@@ -55,9 +61,9 @@ async function openDeviceSubmenu(ctx: FlowContext, deviceType: string) {
         await sleep(500)
       }
 
-      await expect(deviceMenuItem).toHaveAttribute('data-selected', 'true', { timeout: ctx.stepTimeoutMs })
-      await expect(submenuDrawer).toHaveAttribute('data-state', 'open', { timeout: ctx.stepTimeoutMs })
-      await expect(submenuPage).toHaveAttribute('data-state', 'open', { timeout: ctx.stepTimeoutMs })
+      await expect(deviceMenuItem).toHaveAttribute('data-selected', 'true', { timeout: submenuOpenTimeout })
+      await expect(submenuDrawer).toHaveAttribute('data-state', 'open', { timeout: submenuOpenTimeout })
+      await expect(submenuPage).toHaveAttribute('data-state', 'open', { timeout: submenuOpenTimeout })
       return
     } catch (e) {
       lastError = e

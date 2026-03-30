@@ -10,6 +10,53 @@
 
 ---
 
+## 控制流程图
+
+下图概括 **带恢复层的命令执行**（`core/commandExecutor.ts`）与 **`runFlow` 单步执行**（`core/flowRunner.ts`）。与「本地会话」配合时，外层可先 `GET /status` 再 `POST /run`，其内部仍落在此逻辑上。
+
+```mermaid
+flowchart LR
+  E2E[E2E / Playwright] --> RFB["runFlowByCommand(...)\ncliFlows"]
+  CLI[CLI 与脚本] --> RFB
+  MCP[MCP / 会话服务] --> RFB
+  RFB --> RCR["runCommandWithRecovery"]
+
+  EPS["evaluatePageStatus(page)\nstatus/pageStatus"]
+  PRS["planRecoverySteps(...)\nrecovery + commandRequirements"]
+  GFC["getFlowCallsByCommand(...)\n命令名 → 核心 FlowStepCall[]"]
+
+  RCR --> EPS
+  EPS --> PRS
+  EPS --> GFC
+  PRS --> CHK{"recoveryPlan.blockers 中\n存在 resolution=reject ?"}
+  GFC --> CHK
+
+  CHK -->|是| FAIL["抛出：当前页面状态阻塞命令执行"]
+  CHK -->|否| PRE{"preSteps 非空 ?"}
+  PRE -->|是| RF1["runFlow(calls: preSteps)"]
+  PRE -->|否| RF2["runFlow(calls: coreCalls)"]
+  RF1 --> RF2
+
+  subgraph rf["runFlow 内部（对每步循环）"]
+    direction LR
+    IDX["取下一步 FlowStepCall(id, params)"]
+    MERGE["合并 globalParams + call.params"]
+    LOOKUP["registry.get(id) → step.run(ctx, params)"]
+    DELAY["可选 stepDelayMs"]
+    IDX --> MERGE --> LOOKUP --> DELAY
+    DELAY -->|"尚有 calls"| IDX
+  end
+
+  RF1 --> IDX
+  RF2 --> IDX
+```
+
+- **规划**：先读 `PageStatus`，再得到 `recoveryPlan` 与 `coreCalls`；`preSteps` 与 `coreCalls` **均经同一 `runFlow`**，仅 `calls` 数组不同（先前置、后核心）。
+- **阻塞**：若某 blocker 对该命令的策略为 **reject**，则**不执行**任何 `runFlow`，直接失败。
+- **单步**：每步从 `StepRegistry` 取定义，失败时包装为带 `stepId` 的错误信息。
+
+---
+
 ## 目录结构
 
 | 目录 | 说明 |
@@ -45,6 +92,35 @@
 - 所有命令默认不刷新页面；若需要先回首页再执行，显式传 `gotoHome: true` 或设置 `E2E_GOTO_HOME=1`。
 - 会话 HTTP 只发到本机 `127.0.0.1`；不要从另一台机器通过局域网 IP 访问本地会话端口。
 
+### 指定设备 IP（局域网前端）
+
+控制树莓派 / 盒子等设备上的 QUARCS 前端时，用环境变量 **`E2E_BASE_URL`** 指定浏览器要打开的页面根地址（与 Playwright `baseURL` 一致）。常见形式为 **`http://<设备IP>:8080`**，端口以设备上实际服务为准。
+
+**本地会话**（`apps/web-frontend` 下 `npm run e2e:ai-control:session`，对应 `scripts/ai-control-session.ts`）会按 `E2E_BASE_URL` 打开页面，并在本机 **`127.0.0.1:39281`** 提供 `GET /status`、`POST /run`。控制逻辑仍走本机会话端口，只是页面加载目标改为指定 IP。
+
+示例（设备 `192.168.1.104`、前端端口 `8080`）：
+
+```bash
+cd apps/web-frontend
+E2E_BASE_URL=http://192.168.1.104:8080 npm run e2e:ai-control:session
+```
+
+可选环境变量（与脚本一致）：`E2E_HEADED=0` 无头浏览器；`E2E_AI_CONTROL_SESSION_PORT` 改会话 HTTP 端口；`E2E_AI_CONTROL_RUN_TIMEOUT_MS` 调整单次 `POST /run` 默认超时；`E2E_AI_CONTROL_SESSION_NO_KILL_STALE=1` 跳过启动前占用端口的清理。
+
+在 **后台或非交互**环境启动同一会话时，若标准输入立即 EOF，进程会随 `readline` 结束而退出。需保持 stdin 打开，例如：
+
+```bash
+(while true; do sleep 3600; done) | E2E_BASE_URL=http://192.168.1.104:8080 E2E_HEADED=0 npm run e2e:ai-control:session
+```
+
+跑 **Playwright AI-Control 用例**（非会话 HTTP）时，同样用 `E2E_BASE_URL` 指向设备；仓库内 `scripts/ai-control-e2e-target.sh` 默认 `http://192.168.1.104:8080`，可被覆盖：
+
+```bash
+E2E_BASE_URL=http://192.168.1.113:8080 bash scripts/ai-control-e2e-target.sh
+```
+
+未设置 `E2E_BASE_URL` 时，`ai-control-session` 内置默认见 `scripts/ai-control-session.ts` 源码；以显式设置为准可避免误连错误设备。
+
 ### 默认执行顺序
 
 1. 先检查是否可以读取本地会话状态：调用 `GET /status`，或在知道命令名时调用 `GET /status?command=xxx`。
@@ -54,7 +130,7 @@
 
 ### 本地会话执行规则
 
-- `GET /status`：读取当前 UI 状态，包括主页面、菜单抽屉、弹窗、设备、busy 状态、overlay 等。
+- `GET /status`：读取当前 UI 状态，包括主页面、菜单抽屉、弹窗、设备、busy 状态、overlay 等；其中 `capture.e2eExposureCompletedSeq` / `capture.e2eTileGpmSeq` 与隐藏探针 `e2e-exposure-completed` / `e2e-tilegpm` 的 `data-seq` 一致，便于轮询诊断。
 - `GET /status?command=xxx`：除读取状态外，还返回该命令的 `targetSurface`、`blockers`、`preSteps`、`coreStepIds`、`suggestions`。
 - `POST /run`：恢复层会先读取状态，再执行前置恢复步骤与命令核心 flow。
 
@@ -179,7 +255,7 @@ busy 策略概览如下：
 4. 若出现设备分配面板，按需绑定。
 5. 等待主相机连接成功。
 6. 若传入拍摄配置参数，则应用主相机菜单中的拍摄相关配置。
-7. 当 `doCapture !== false` 时，打开拍摄面板并执行 `device.captureOnce`；`captureCount > 1` 时重复执行。
+7. 当 `doCapture !== false` 时，打开拍摄面板并执行 `device.captureOnce`；`captureCount > 1` 时重复执行。每次点击拍摄前，步骤会等待 `cp-btn-capture` 根节点 **`data-capture-ready=true`**（与 `CircularButton.vue` 中「可再次触发 `takeExposure`」一致，避免上一帧完成后尚未解锁时连点无效）。
 8. 当 `doSave === true` 时，在拍摄完成后执行保存流程。
 
 #### `mount-connect-control`
@@ -287,13 +363,14 @@ busy 策略概览如下：
 前置条件：
 
 - 图像管理面板入口可达。
-- 若执行 `moveToUsb` / `delete` / `download`，允许对应按钮状态与确认弹层决定后续能否继续。
+- 若执行 `moveToUsb` / `delete` / `download`，需满足界面前置（已选文件/文件夹、USB 可用等）；可通过 `imageManagerInteract` 中的 `openFolderIndex`、`selectAllInOpenFolder` 先选中再删。
+- 弹窗类参数（`*ConfirmDialog`）为可选；不设则**不**自动点确认（与旧版兼容），设 `true` 或 `'confirm'` / `'cancel'` 则调用 `dialog.imageManager.confirm` / `cancel`（见 `scenario/imageManagerCliFlow.ts`）。
 
 操作步骤：
 
 1. 可选 `gotoHome`。
 2. 打开图像管理面板。
-3. 按 `imageManagerInteract` 依次执行移动到 USB、删除、下载、视图切换、刷新与关闭面板。
+3. 按 `imageManagerInteract` 展开步骤：可选 `openFolderIndex` → 可选 `selectAllInOpenFolder` → `moveToUsb`（可选 `usbSelectIndex`、`usbTransferConfirmDialog`）→ `delete`（可选 `deleteConfirmDialog`）→ `download`（可选 `downloadConcurrency`、`downloadConfirmDialog`、`downloadLocationReminderDialog`）→ `imageFileSwitch` → `refresh` → `panelClose`。
 
 #### `task-schedule`
 
@@ -343,6 +420,25 @@ busy 策略概览如下：
    - Qt：在电源管理中执行 **重启 QUARCS 服务端**（`data-action=restartQtServer`）。
 6. 若本地会话可用，更新完成后再次读取 `/status`，并在同一会话页完成必要的功能确认。
 
+**示例：目标设备 `192.168.1.104`（局域网 QUARCS 服务端）**
+
+`quarcs-publish.sh` 的第一个参数为 **IP 第四段**（与 `upload.py` 一致），`104` 即 `http://192.168.1.104:8000/`。在 `apps/web-frontend/scripts` 下执行，按需选前端、Qt 或二者：
+
+```bash
+cd /home/quarcs/workspace/QUARCS/QUARCS_stellarium-web-engine/apps/web-frontend/scripts
+
+# 仅发布前端（构建 dist 并上传）
+bash quarcs-publish.sh 104 --vue
+
+# 仅发布 Qt 服务端（交叉编译后上传）
+bash quarcs-publish.sh 104 --qt
+
+# 前端 + Qt 依次发布
+bash quarcs-publish.sh 104 --vue --qt
+```
+
+发布后按上表收口：前端刷新页面；Qt 在电源管理中 **重启 QUARCS 服务端**。验证时可将页面指向 `http://192.168.1.104:8080`，AI-Control 会话使用 `E2E_BASE_URL=http://192.168.1.104:8080`（见上文「指定设备 IP」）。
+
 ### 发布脚本说明
 
 脚本路径：
@@ -356,6 +452,15 @@ busy 策略概览如下：
 - **前端发布**：内部以 `ENGINE_UPDATE=0/1 BUILD_ONLY=1 bash kill_run.sh` 方式构建 `dist/`，不会在“仅出包”场景常驻启动预览服务。
 - **Qt 发布**：内部在 `QUARCS_QT-SeverProgram/src/BUILD` 执行交叉编译。
 - **上传更新包**：内部固定调用 `/home/quarcs/workspace/QUARCS/upload.py` 上传到目标设备。
+
+**前端「编译」具体包含什么（避免与文档歧义）**
+
+| 步骤 | 默认（`quarcs-publish.sh … --vue`，不加 `--engine-update`） | 说明 |
+| --- | --- | --- |
+| Vue 生产构建 | **会执行** | `kill_run.sh` 内 `vue-cli-service build`，产出 `apps/web-frontend/dist/`。 |
+| 引擎 wasm / `update-engine` | **不执行** | `ENGINE_UPDATE=0`，跳过 `stellarium-web-engine` 的 wasm 更新（耗时较长，且常需 docker 等环境）。若改了引擎侧，需加 **`--engine-update`**。 |
+| 本地预览服务 | **不启动** | `BUILD_ONLY=1` 只出包不上线 8080/9090。 |
+| Qt 服务端 | **不编译** | 仅 `--qt` 或 `--vue --qt` 时才会在 Qt 仓库里交叉编译。 |
 
 常用选项：
 
@@ -405,7 +510,19 @@ busy 策略概览如下：
 | `driverText` | 驱动文案，须与下拉展示一致。 |
 | `connectionModeText` | 连接模式，如 `SDK`、`INDI`。 |
 | `doBindAllocation` | 是否在出现设备分配面板时自动绑定，默认 `true`。 |
-| `allocationDeviceMatch` | 设备分配时优先匹配的设备名称片段。 |
+| `allocationDeviceMatch` | 设备分配时优先匹配的设备名称片段（列表项展示名 **包含** 该片段即选中，**忽略大小写**，空白会规范化后再比较）。 |
+| `devices` | 多设备 **依次连接**（`device.connectIfNeeded` 内与 `connectionSteps` 的 `devices` 一致）。每项：`deviceType`、`driverText?`、`connectionModeText?`、`allocationDeviceMatch?`。用于 `guider-connect-capture`、`maincamera-connect-capture`；若设置则优先于本表中单设备的 `driverText` / `allocationDeviceMatch` / 默认 `deviceType`。`resetBeforeConnect` 为 `true` 时按数组顺序对各 `deviceType` 执行断开再连接。 |
+
+### 设备分配：模糊匹配与导星默认
+
+- **模糊匹配**：`allocationDeviceMatch` 或 `devices[].allocationDeviceMatch` 只需与列表中的设备展示名 **部分一致**（子串），例如 `minicam8`、`462`。
+- **导星默认（5III）**：当绑定 **导星（Guider）**、列表中 **多于一台** 相机、且 **未指定** `allocationDeviceMatch` 时，自动优先选择名称中含 **`5III`** 的项（与 QHY5III 系列一致）；若无则选第一项。
+
+环境变量 `E2E_DEVICES_JSON` 可传入与 `devices` 相同的 JSON 数组，便于 E2E 无改代码注入，例如：
+
+```json
+[{"deviceType":"MainCamera","allocationDeviceMatch":"minicam8"},{"deviceType":"Guider","allocationDeviceMatch":"462"}]
+```
 
 ### `general-settings`
 
@@ -560,7 +677,8 @@ busy 策略概览如下：
 | `doCapture` | `boolean` | `true` | 是否执行拍摄；为 `false` 时仅连接 / 配置。 |
 | `doSave` | `boolean` | `false` | 是否保存结果；仅在 `doCapture=true` 时生效。 |
 | `captureCount` | `number` | `1` | 拍摄次数。 |
-| `waitCaptureTimeoutMs` | `number` | — | 单次拍摄完成超时（毫秒）。 |
+| `captureReadyTimeoutMs` | `number` | — | 等待拍摄按钮 **`data-capture-ready=true`** 的最长时间（毫秒）。未传时取 `max(30000, stepTimeoutMs)`。用于连拍时与按钮解锁对齐；若页面无该属性（旧版前端），步骤不阻塞。 |
+| `waitCaptureTimeoutMs` | `number` | — | 无法从 `captureExposure` 或面板解析曝光时的回退超时（毫秒）；默认可由 `device.captureOnce` 分两段：cp-status 为「曝光 + 60s」，`e2e-tilegpm` 的 `data-seq` 为「曝光 + 120s」（TileGPM 可能晚于 idle）。 |
 | `captureGain` | `number` | — | 增益。 |
 | `captureOffset` | `number` | — | 偏置。 |
 | `captureCfaMode` | `string` | — | CFA 模式：`'GR'`、`'GB'`、`'BG'`、`'RGGB'`、`'null'`。 |
@@ -572,8 +690,11 @@ busy 策略概览如下：
 
 拍摄流程补充：
 
-- 流程为：设备已连接 → `capture.panel.ensureOpen` → `device.captureOnce` → 可选 `device.save`。
+- 流程为：设备已连接 → `capture.panel.ensureOpen` → `device.captureOnce`（可多次）→ 可选 `device.save`。
 - 当 `doCapture=false` 时，会跳过 `device.captureOnce` 与 `device.save`，仅保留连接 / 配置链路。
+- **拍摄按钮与连拍**：`cp-btn-capture` 所在根节点带 **`data-capture-ready`**（`true` / `false`），与 `CircularButton.vue` 内 `isClicked`、`isButtonDisabled`、`isLongPress` 对齐；收到 `ExposureCompleted` 后约 **500ms** 会 `resetProgress` 解锁（再点拍保护时长，以源码为准）。`device.captureOnce` 在每次点击前会轮询直至 `data-capture-ready=true`（或探针缺失时跳过等待），再读取 `exp/tile` 并点击。
+- `device.captureOnce`：**成功判定**以 Qt 下行 `ExposureCompleted` 驱动的探针 `e2e-exposure-completed`（`data-seq`）与 `e2e-tilegpm`（TileGPM）**任一前进**为准（短曝光时 `cp-status` busy 可能一闪而过，不宜作为唯一依据）；`cp-status→idle` 仅尽力等待。旧版仅 TileGPM 时仍可用 tile 探针。
+- 运行器会为每步注入 `__flowStepIndex` / `__flowStepTotal`（仅 `runFlow` 合并参数）；`device.captureOnce` 会打 `[flow i/n]`、点击前后探针与 `cp-status`；失败时输出 `exp/tile` 前后值。
 
 环境变量：
 
@@ -588,6 +709,7 @@ busy 策略概览如下：
 - `E2E_CAPTURE_EXPOSURE`
 - `E2E_CAPTURE_COUNT`
 - `E2E_WAIT_CAPTURE_TIMEOUT_MS`
+- `E2E_CAPTURE_READY_TIMEOUT_MS`：对应 `captureReadyTimeoutMs`，等待 `data-capture-ready=true` 的上限（毫秒）。
 
 ### `focuser-connect-control`
 
@@ -712,35 +834,49 @@ busy 策略概览如下：
 | 参数名 | 类型 | 默认值 | 说明 |
 |--------|------|--------|------|
 | `gotoHome` | `boolean` | `false` | 是否先刷新页面。 |
-| `imageManagerInteract` | `Partial<Record<'moveToUsb' \| 'delete' \| 'download' \| 'imageFileSwitch' \| 'refresh' \| 'panelClose', boolean>>` | 未传则不执行面板内交互 | 打开图像管理面板后依次执行。 |
+| `imageManagerInteract` | `ImageManagerInteractParams` | 未传则仅打开面板 | 见下表；展开逻辑见 `scenario/imageManagerCliFlow.ts`。 |
 
-`imageManagerInteract` 可用 key：
+`imageManagerInteract` 字段：
 
-| key | 控制功能 | testid |
-|-----|----------|--------|
-| `moveToUsb` | 点击“移动到 USB”按钮（无 USB 时按钮 disabled）。 | `imp-btn-move-file-to-usb` |
-| `delete` | 点击“删除”按钮（会弹出确认弹窗，流程不自动确认 / 取消）。 | `imp-btn-delete-btn-click` |
-| `download` | 点击“下载选中”按钮（会弹出下载确认弹窗）。 | `imp-btn-download-selected` |
-| `imageFileSwitch` | 点击图像 / 文件夹视图切换。 | `imp-btn-image-file-switch` |
-| `refresh` | 点击当前文件夹“刷新”按钮。 | `imp-btn-refresh-current-folder` |
-| `panelClose` | 点击关闭面板按钮。 | `imp-btn-panel-close` |
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `openFolderIndex` | `number` | 侧栏文件夹索引（从 0 起），点击打开该文件夹。 |
+| `selectAllInOpenFolder` | `boolean` | 为 `true` 时将 `openFolderIndex` 对应文件夹行复选框勾上（联动全选当前文件夹内文件）；**必须**与 `openFolderIndex` 同传。 |
+| `moveToUsb` | `boolean` | 点击「移动到 USB」（无 USB 时跳过 disabled）。 |
+| `usbSelectIndex` | `number` | 在 USB 选择列表中点第几项（0 起），对应 `imp-act-select-usb`。 |
+| `usbTransferConfirmDialog` | `boolean \| 'confirm' \| 'cancel'` | USB 传输确认弹层：确认或取消。 |
+| `delete` | `boolean` | 点击工具栏「删除」。 |
+| `deleteConfirmDialog` | `boolean \| 'confirm' \| 'cancel'` | 删除确认弹层；`true` 等同 `'confirm'`。不设则不点弹窗按钮。 |
+| `download` | `boolean` | 点击「下载选中」。 |
+| `downloadConcurrency` | `1 \| 2 \| 3` | 下载确认框内并发下载数（在确认「开始下载」前设置）。 |
+| `downloadConfirmDialog` | `boolean \| 'confirm' \| 'cancel'` | 批量下载确认弹层。 |
+| `downloadLocationReminderDialog` | `boolean \| 'confirm' \| 'cancel'` | 浏览器无法选路径时的「继续 / 取消」提示。 |
+| `imageFileSwitch` | `boolean` | 切换图像/文件夹视图。 |
+| `refresh` | `boolean` | 刷新当前文件夹列表。 |
+| `panelClose` | `boolean` | 关闭图像管理面板。 |
+
+对应步骤 id：`imageManager.openFolder`、`imageManager.setFolderCheckbox`、`imageManager.selectUsbByIndex`、`imageManager.setDownloadConcurrency`、`dialog.imageManager.confirm` / `cancel`（`dialog` 参数为 `usbConfirm` / `deleteConfirm` / `downloadConfirm` / `downloadLocationReminder`）、以及 `ui.click` 等。
 
 环境变量：
 
 - `E2E_GOTO_HOME`
 - `E2E_FLOW_PARAMS_JSON`
-- `E2E_IMAGE_MANAGER_INTERACT`
+- `E2E_IMAGE_MANAGER_INTERACT`：逗号分隔简写（`moveToUsb`、`delete`、`download`、`imageFileSwitch`、`refresh`、`panelClose`、`deleteConfirm`、`deleteCancel`、`usbTransferConfirm`、`usbTransferCancel`、`downloadConfirm`、`downloadCancel`、`downloadLocationContinue`、`downloadLocationCancel`、`selectAllInOpenFolder`）
+- `E2E_IMAGE_MANAGER_INTERACT_JSON`：`imageManagerInteract` 完整 JSON，与上一项及 `E2E_FLOW_PARAMS_JSON` 合并（后者覆盖前者）
+- `E2E_IMAGE_MANAGER_OPEN_FOLDER_INDEX` / `E2E_IMAGE_MANAGER_USB_SELECT_INDEX` / `E2E_IMAGE_MANAGER_DOWNLOAD_CONCURRENCY`（可选，非负整数或 1–3，写入对应 `imageManagerInteract` 字段）
 
 ### `task-schedule`
 
 | 参数名 | 类型 | 说明 |
 |--------|------|------|
-| `selectRow` | `number` | 表格行号（从 1 起），点击该行单元格以选中行。 |
+| `fillRows` | `ScheduleFillRow[]` | 可选。按顺序自动填写第 1…N 行（目标、坐标、Shoot Time、曝光、滤镜、张数、类型、Refocus、Exp Delay）；**计划未运行**时可用。录入前会统计当前表格行数，若 **少于 N** 则自动点「新增行」补到 N 行；若行数已 ≥ N 则不再添加。每项字段见下表 `ScheduleFillRow`。 |
+| `selectRow` | `number` | 表格行号（从 1 起），点击该行 **Target 列** 单元格以选中行。 |
 | `toggleLeftToolbar` | `boolean` | 折叠 / 展开左侧竖条工具栏。 |
 | `addRow` | `boolean` | 新增一行（运行中不可用，与界面一致）。 |
 | `deleteSelectedRow` | `boolean` | 删除当前选中行。 |
 | `toggleStartPause` | `boolean` | 开始 / 暂停主按钮。 |
 | `openSavePresetDialog` | `boolean` | 打开保存预设内嵌对话框。 |
+| `clearAllSchedulePresets` | `boolean` | 为 `true` 时：打开「加载预设」对话框，**逐项删除**列表中全部预设（每次经全局确认框确认），再关闭对话框。 |
 | `openLoadPresetDialog` | `boolean` | 打开加载预设内嵌对话框。 |
 | `presetName` | `string` | 与保存 / 加载配合使用的预设名称。 |
 | `presetSave` | `boolean` | 在保存对话框点击“保存”。 |
@@ -749,8 +885,24 @@ busy 策略概览如下：
 | `closePresetDialog` | `boolean` | 关闭预设内嵌对话框。 |
 | `closePanel` | `boolean` | 关闭任务计划表面板。 |
 
+`ScheduleFillRow`（`fillRows` 数组元素）：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `target` | `string` | 目标名称 |
+| `ra` / `dec` | `string` | 赤经、赤纬（与侧栏输入一致） |
+| `shootTimeNow` | `boolean` | 默认 `true`：Shoot Time 为 **Now** |
+| `expTime` | `string` | 曝光，须与下拉选项一致（如 `10 s`、`60 s`） |
+| `filter` | `string` | 滤镜 pill 的 `data-value`，默认 `L` |
+| `reps` | `number` | 重复张数 |
+| `frameType` | `string` | 默认 `Light` |
+| `refocus` | `'ON' \| 'OFF'` | 重新调焦 |
+| `expDelaySeconds` | `number` | Exp Delay 秒数，默认 `0` |
+
 执行顺序约定：
 
+- 若存在 `fillRows`：**先**按需补足行数，再逐行录入，再执行其余项。
+- 若同时传 `clearAllSchedulePresets` 与 `openLoadPresetDialog`：**先**清空全部预设并关闭对话框，再打开加载对话框并 `presetLoadOk`（适合「删光再加载指定预设」）。
 - `selectRow` → 左侧栏 / 增删行 / 开始暂停 → 保存预设流程 → 加载预设流程 → `closePresetDialog` → `closePanel`
 
 补充说明：
@@ -762,6 +914,48 @@ busy 策略概览如下：
 
 - `E2E_SCHEDULE_INTERACT_JSON`
 
+**参数怎么设（`task-schedule`）**
+
+- **结构**：命令级参数放在 **`flowParams`** 里；任务计划表专用交互放在 **`flowParams.scheduleInteract`**，字段即上表（`selectRow`、`addRow`、`toggleStartPause`、`presetName` 等）。与所有命令一样，可选顶层 **`gotoHome`**：`true` 时先刷新页面再执行。
+- **`POST /run`（推荐）**：请求体为 JSON，至少包含 `commandName`，参数进 `flowParams`：
+
+```json
+{
+  "commandName": "task-schedule",
+  "runTimeoutMs": 120000,
+  "flowParams": {
+    "gotoHome": false,
+    "scheduleInteract": {
+      "addRow": true,
+      "closePanel": false
+    }
+  }
+}
+```
+
+`runTimeoutMs` 可选：单次请求若传入，则**只对该次** `POST /run` 生效；未传时使用环境变量 **`E2E_AI_CONTROL_RUN_TIMEOUT_MS`** 或脚本内置默认（见 `scripts/ai-control-session.ts`）。
+
+- **环境变量**：在**启动会话的同一终端**导出，或在调用 `curl` 前临时设置：
+  - **`E2E_BASE_URL`**：控制哪台设备上的页面（如 `http://192.168.1.104:8080`），须在**启动** `npm run e2e:ai-control:session` 时生效；仅 `curl` 里设置不会改变已打开浏览器的地址。
+  - **`E2E_SCHEDULE_INTERACT_JSON`**：一整段 JSON 对象，等价于 `flowParams.scheduleInteract`（若与 `E2E_FLOW_PARAMS_JSON` 合并，以后者覆盖规则为准，见 `setup/flowParamsFromEnv.ts`）。**注意**：通过 **`POST /run` 直接传 `flowParams` 时，会话侧一般不再读这些环境变量**，以请求体为准。
+  - **`E2E_FLOW_PARAMS_JSON`**：完整 `flowParams` 的 JSON 字符串，便于脚本注入多命令共用参数。
+
+- **终端 stdin**（交互模式）：输入 `task-schedule` 后空格接 JSON，与 HTTP 的 `flowParams` 相同，例如：  
+  `task-schedule {"scheduleInteract":{"openLoadPresetDialog":true,"presetName":"我的计划","presetLoadOk":true}}`
+
+**约定（任务计划表控制入口）**
+
+- **勿在仓库内新增**独立「任务计划」数据文件；仅使用本文档已有 **`task-schedule`** 命令与上表 **`scheduleInteract`** 参数。
+- 参数通过 **`E2E_SCHEDULE_INTERACT_JSON`**、**`E2E_FLOW_PARAMS_JSON`**，或本地会话 **`POST /run`** 的请求体（**内联 JSON 字符串**）传入。表格内容可 **`fillRows` 自动录入**，或在前端**手录**；持久化可用 **`openSavePresetDialog` + `presetName` + `presetSave`**，或之后在设备上用 **`openLoadPresetDialog` / `presetLoadOk`** 加载。
+- 局域网设备页面仍由 **`E2E_BASE_URL`**（如 `http://192.168.1.104:8080`）指定，见上文「指定设备 IP（局域网前端）」。
+
+示例（仅命令与内联 JSON，不依赖任何仓库内计划文件）：
+
+```bash
+curl -sS -X POST http://127.0.0.1:39281/run -H 'Content-Type: application/json' \
+  -d '{"commandName":"task-schedule","flowParams":{"scheduleInteract":{"toggleLeftToolbar":true,"addRow":true,"closePanel":true}}}'
+```
+
 ---
 
 ## 约束
@@ -769,6 +963,8 @@ busy 策略概览如下：
 - 所有交互必须走真实链路，不使用 `force`。
 - 每个关键步骤都要求具备前置检查、执行动作、后置确认。
 - `AI-Control/` 是当前保留的自动化控制入口，新增流程统一放在这里维护。
+- **文档契约（对外）**：使用方以本文档所列 **`listCliCommands()`**、各命令 **`flowParams`**、环境变量及会话 **`POST /run`** 为准；**禁止**将「必须查阅仓库源码」作为使用 AI-Control 的前提。若某能力需对外可用，应先在本 README（及必要时的 `commandRequirements` 等已有说明）中写清命令与参数，再视为稳定接口。
+- **命令复用（禁止无谓膨胀）**：若目标行为可通过**现有命令名的组合**（例如多次 `POST /run` 串联）或**同一命令下已有 `flowParams` 的字段组合**实现，则**禁止**新增 CLI 命令名；应优先**扩展既有命令的参数对象**（如为 `scheduleInteract` 增加字段）或**复用既有 Step**。**仅当**现有命令与参数在语义上**无法**覆盖（例如缺少不可替代的业务步骤）时，再考虑新增命令或 Step，并**必须同步更新本文档**。
 
 ---
 
@@ -787,7 +983,7 @@ busy 策略概览如下：
 
 ### 2. 交互实现要求
 
-- **不凭猜测模拟控件**：优先阅读源码，确认真实触发方式（如 `@click`、`v-model`、自定义事件）。
+- **不凭猜测模拟控件**（面向**实现者**）：编写或修改 Step 时，可阅读前端 / 相关源码以确认真实触发方式（如 `@click`、`v-model`、自定义事件）；这与上文「**对外使用不依赖查源码**」不冲突：实现细节留在代码与 testid，**对外契约**以本文档命令与参数为准。
 - **Vuetify 等组件**：确认 `data-testid` 所在节点是否可点击；若绑定在隐藏 input 上，应点击其可见父容器。
 - **依赖展开态/激活态**：先满足展开、hover、焦点或异步渲染完成，再执行后续动作。
 - **层级控件**：菜单、子菜单、弹窗、下拉、标签页按真实业务顺序逐级进入，不跳过链路。
@@ -823,3 +1019,9 @@ busy 策略概览如下：
 - 关键步骤记录清晰日志：业务动作、目标 testid、前置/后置结果、状态变化。
 - 流程中断时明确记录失败点、失败原因和上下文。
 - **职责边界**：E2E 验证元素可达可操作可验证；Flow 组织可复用业务步骤；CLI 提供稳定外部调用接口。
+
+### 7. CLI 扩展与复用（与「约束」呼应）
+
+- 新增能力前：先检索 **`CLI_COMMANDS`** / `getFlowCallsByCommand` 是否已有命令可通过 **`flowParams`** 或多次调用覆盖；能组合则**不新增命令名**。
+- 若需新交互：优先在**既有命令**下增加可选参数（保持向后兼容），而非平行增加「只做一件事」的新顶层命令。
+- 文档与代码同步：对外可见的行为变更必须反映在本 README 的「CLI 命令总览」「参数说明」与相关小节。

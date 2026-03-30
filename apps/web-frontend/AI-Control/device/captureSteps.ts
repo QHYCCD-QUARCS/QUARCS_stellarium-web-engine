@@ -3,7 +3,8 @@
  *
  * 职责：确保拍摄面板打开、单次拍摄、保存、设置曝光时间、按需断开设备。
  * 前置条件：设备已连接（通过 deviceProbeTestId 的 data-state=connected 校验）；拍摄前要求 cp-status=idle，
- * 拍摄后等待 cp-status 经 busy 再回到 idle，并可选校验 e2e-tilegpm 的 data-seq 变化以确认新图。
+ * 拍摄成功判定：优先 Qt「ExposureCompleted」探针 e2e-exposure-completed（短曝光时比 cp-status busy 可靠），
+ * 并与 e2e-tilegpm（TileGPM）二选一满足即视为本帧完成；cp-status 仅作尽力同步。
  */
 import { expect, type Page } from '@playwright/test'
 import type { FlowContext, StepRegistry } from '../core/flowTypes'
@@ -14,11 +15,17 @@ import {
   SAVE_SUCCESS_SUBSTRINGS,
 } from '../shared/messageConstants'
 import { clickByTestId, clickLocator, deviceProbeTestId, waitForTestIdState, sleep } from '../shared/interaction'
-import { ensureCaptureUiVisible } from '../shared/navigation'
+import { ensureCaptureUiVisible, ensureMenuDrawerClosed } from '../shared/navigation'
 import { openDeviceSubmenu } from '../menu/drawerSteps'
 import { confirmDialogIfOpen, disconnectDriverDialogIfOpen } from '../menu/dialogSteps'
 
 const EXPOSURE_PRESETS = ['1ms', '10ms', '100ms', '1s', '5s', '10s', '30s', '60s', '120s', '300s', '600s']
+
+/** cp-status busy→idle：曝光时长 + 该缓冲（毫秒） */
+const CAPTURE_WAIT_BUFFER_MS = 60_000
+
+/** e2e-tilegpm data-seq 自增依赖 TileGPM，常晚于 MainCameraStatus 已 idle，单独加长 */
+const SEQ_CHANGE_BUFFER_MS = 120_000
 
 function normalizeExposure(value: string) {
   return String(value || '')
@@ -26,16 +33,74 @@ function normalizeExposure(value: string) {
     .replace(/\s+/g, '')
 }
 
+/** 将拍摄面板曝光文案（如 10ms、1s）解析为毫秒；无法解析时返回 null */
+function parseExposurePresetToMs(normalized: string): number | null {
+  const n = normalizeExposure(normalized)
+  if (!n) return null
+  const m = n.match(/^(\d+(?:\.\d+)?)(ms|s)$/)
+  if (!m) return null
+  const v = parseFloat(m[1])
+  if (!Number.isFinite(v) || v < 0) return null
+  if (m[2] === 'ms') return v
+  return v * 1000
+}
+
+async function resolveCaptureTiming(
+  ctx: FlowContext,
+  params: Record<string, unknown>,
+): Promise<{ statusWaitMs: number; seqWaitMs: number }> {
+  const fromParam =
+    typeof params.captureExposure === 'string' && params.captureExposure.trim() !== ''
+      ? normalizeExposure(params.captureExposure.trim())
+      : ''
+  const fromUi = fromParam ? '' : normalizeExposure(await currentExposurePresetFromPanel(ctx.page))
+  const raw = fromParam || fromUi
+  const exposureMs = parseExposurePresetToMs(raw)
+  if (exposureMs != null) {
+    const em = Math.round(exposureMs)
+    return {
+      statusWaitMs: em + CAPTURE_WAIT_BUFFER_MS,
+      seqWaitMs: em + SEQ_CHANGE_BUFFER_MS,
+    }
+  }
+  const fallback =
+    typeof params.waitCaptureTimeoutMs === 'number' && Number.isFinite(params.waitCaptureTimeoutMs)
+      ? params.waitCaptureTimeoutMs
+      : Math.max(ctx.stepTimeoutMs, 60_000)
+  return { statusWaitMs: fallback, seqWaitMs: fallback }
+}
+
 function resolveDeviceType(params: Record<string, any>) {
   return String(params.deviceType ?? params.driverType ?? 'MainCamera')
 }
 
-/** 当前曝光显示文案（cp-exptime-value） */
-async function currentExposureText(page: Page) {
-  return ((await page.getByTestId('cp-exptime-value').first().textContent()) ?? '').trim()
+/** 当前曝光预设：优先 cp-exptime-value 的 data-value（与 ExpTimes 一致），否则用可见文案 */
+async function currentExposurePresetFromPanel(page: Page) {
+  const el = page.getByTestId('cp-exptime-value').first()
+  const dv = await el.getAttribute('data-value').catch(() => null)
+  if (dv != null && String(dv).trim() !== '') return String(dv).trim()
+  return ((await el.textContent()) ?? '').trim()
 }
 
 /** 校验设备已连接，否则抛错 */
+/** 与 `CircularButton.vue` 的 `data-capture-ready` 对齐：为 true 时点拍才会调用 `takeExposure` */
+async function waitForCaptureButtonReady(page: Page, timeoutMs: number, flowTag: string) {
+  const root = page.getByTestId('cp-btn-capture').first()
+  console.log(`[ai-control] device.captureOnce${flowTag} 等待拍摄按钮可再次拍摄 (data-capture-ready)`)
+  const t0 = Date.now()
+  await expect
+    .poll(
+      async () => {
+        const v = await root.getAttribute('data-capture-ready').catch(() => null)
+        if (v === null) return true
+        return v === 'true'
+      },
+      { timeout: timeoutMs },
+    )
+    .toBe(true)
+  console.log(`[ai-control] device.captureOnce${flowTag} 拍摄按钮已可再次拍摄（${Date.now() - t0}ms）`)
+}
+
 async function ensureDeviceConnected(ctx: FlowContext, params: Record<string, any>) {
   const deviceType = resolveDeviceType(params)
   const probe = ctx.page.getByTestId(deviceProbeTestId(deviceType)).first()
@@ -64,10 +129,15 @@ export function makeCaptureStepRegistry(): StepRegistry {
     },
   })
 
-  /** 单次拍摄：等待 idle -> 点 cp-btn-capture -> 等 busy -> idle，并校验 data-seq 变化 */
+  /** 单次拍摄：点拍后以 ExposureCompleted / TileGPM 探针为主，cp-status 为辅（短曝光友好） */
   registry.set('device.captureOnce', {
     async run(ctx, params) {
-      console.log('[ai-control] device.captureOnce 前置: capture.panel.ensureOpen + cp-status=idle')
+      const flowIdx = typeof params.__flowStepIndex === 'number' ? params.__flowStepIndex : undefined
+      const flowTot = typeof params.__flowStepTotal === 'number' ? params.__flowStepTotal : undefined
+      const flowTag =
+        flowIdx != null && flowTot != null ? ` [flow ${flowIdx}/${flowTot}]` : ''
+
+      console.log(`[ai-control] device.captureOnce${flowTag} 前置: capture.panel.ensureOpen + cp-status=idle`)
       await ensureDeviceConnected(ctx, params)
       await ensureCaptureUiVisible(ctx.page, ctx.stepTimeoutMs)
       await waitForTestIdState(ctx.page, 'cp-status', 'idle', ctx.stepTimeoutMs)
@@ -78,24 +148,90 @@ export function makeCaptureStepRegistry(): StepRegistry {
       await panel.scrollIntoViewIfNeeded().catch(() => {})
       await sleep(200)
 
-      const seqBefore = await ctx.page.getByTestId('e2e-tilegpm').first().getAttribute('data-seq').catch(() => null)
-      await clickByTestId(ctx.page, 'cp-btn-capture', ctx.stepTimeoutMs)
-      await waitForTestIdState(ctx.page, 'cp-status', 'busy', Math.min(10_000, params.waitCaptureTimeoutMs ?? ctx.stepTimeoutMs)).catch(() => {})
-      await waitForTestIdState(
-        ctx.page,
-        'cp-status',
-        'idle',
-        params.waitCaptureTimeoutMs ?? Math.max(ctx.stepTimeoutMs, 60_000),
+      const readyMs =
+        typeof params.captureReadyTimeoutMs === 'number' && Number.isFinite(params.captureReadyTimeoutMs)
+          ? Math.max(1_000, params.captureReadyTimeoutMs)
+          : Math.max(30_000, ctx.stepTimeoutMs)
+      await waitForCaptureButtonReady(ctx.page, readyMs, flowTag)
+
+      const { statusWaitMs, seqWaitMs } = await resolveCaptureTiming(ctx, params)
+      console.log(
+        `[ai-control] device.captureOnce${flowTag} 超时: cp-status(尽力)≤${statusWaitMs}ms, ExposureCompleted|TileGPM≤${seqWaitMs}ms（曝光+${SEQ_CHANGE_BUFFER_MS / 1000}s）`,
       )
 
-      if (seqBefore != null) {
-        await expect
-          .poll(
-            async () => ctx.page.getByTestId('e2e-tilegpm').first().getAttribute('data-seq'),
-            { timeout: params.waitCaptureTimeoutMs ?? Math.max(ctx.stepTimeoutMs, 60_000) },
-          )
-          .not.toBe(seqBefore)
+      const expBefore = await ctx.page.getByTestId('e2e-exposure-completed').first().getAttribute('data-seq').catch(() => null)
+      const tileBefore = await ctx.page.getByTestId('e2e-tilegpm').first().getAttribute('data-seq').catch(() => null)
+      const cpBefore = await ctx.page.getByTestId('cp-status').first().getAttribute('data-state').catch(() => null)
+      console.log(
+        `[ai-control] device.captureOnce${flowTag} 点击前: cp-status=${cpBefore} e2e-exposure-completed.seq=${expBefore} e2e-tilegpm.seq=${tileBefore}`,
+      )
+
+      const tClick = Date.now()
+      await clickByTestId(ctx.page, 'cp-btn-capture', ctx.stepTimeoutMs)
+      console.log(`[ai-control] device.captureOnce${flowTag} 已点击 cp-btn-capture`)
+
+      const hasExpProbe = expBefore != null
+      const hasTileProbe = tileBefore != null
+
+      try {
+        if (hasExpProbe || hasTileProbe) {
+          await expect
+            .poll(
+              async () => {
+                const curExp = await ctx.page
+                  .getByTestId('e2e-exposure-completed')
+                  .first()
+                  .getAttribute('data-seq')
+                  .catch(() => null)
+                const curTile = await ctx.page.getByTestId('e2e-tilegpm').first().getAttribute('data-seq').catch(() => null)
+                const expOk = hasExpProbe && curExp != null && curExp !== expBefore
+                const tileOk = hasTileProbe && curTile != null && curTile !== tileBefore
+                return expOk || tileOk
+              },
+              { timeout: seqWaitMs },
+            )
+            .toBe(true)
+        } else {
+          const deadlineStatus = Date.now() + statusWaitMs
+          const remainingStatusMs = () => Math.max(1, deadlineStatus - Date.now())
+          await waitForTestIdState(ctx.page, 'cp-status', 'busy', Math.min(10_000, remainingStatusMs())).catch(() => {})
+          await waitForTestIdState(ctx.page, 'cp-status', 'idle', remainingStatusMs())
+        }
+      } catch (e) {
+        const expFinal = await ctx.page.getByTestId('e2e-exposure-completed').first().getAttribute('data-seq').catch(() => null)
+        const tileFinal = await ctx.page.getByTestId('e2e-tilegpm').first().getAttribute('data-seq').catch(() => null)
+        const cpNow = await ctx.page.getByTestId('cp-status').first().getAttribute('data-state').catch(() => null)
+        console.error(
+          `[ai-control] device.captureOnce${flowTag} 拍摄完成信号未在 ${seqWaitMs}ms 内出现: exp ${expBefore}→${expFinal} tile ${tileBefore}→${tileFinal} cp-status=${cpNow}`,
+        )
+        throw createStepError(
+          'device.captureOnce',
+          'postcondition',
+          `未在 ${seqWaitMs}ms 内收到 ExposureCompleted 或 TileGPM 出图信号（见 e2e-exposure-completed / e2e-tilegpm）`,
+          {
+            flowStepIndex: flowIdx,
+            flowStepTotal: flowTot,
+            expBefore,
+            expFinal,
+            tileBefore,
+            tileFinal,
+            cpStatus: cpNow,
+            seqWaitMs,
+          },
+          e,
+        )
       }
+
+      const tDone = Date.now()
+      const expAfter = await ctx.page.getByTestId('e2e-exposure-completed').first().getAttribute('data-seq').catch(() => null)
+      const tileAfter = await ctx.page.getByTestId('e2e-tilegpm').first().getAttribute('data-seq').catch(() => null)
+      console.log(
+        `[ai-control] device.captureOnce${flowTag} 探针已前进: exp ${expBefore}→${expAfter} tile ${tileBefore}→${tileAfter}（${tDone - tClick}ms）`,
+      )
+
+      await waitForTestIdState(ctx.page, 'cp-status', 'idle', Math.min(statusWaitMs, 15_000)).catch(() => {
+        console.log(`[ai-control] device.captureOnce${flowTag} cp-status 未在短超时内回 idle（已忽略，以 ExposureCompleted/TileGPM 为准）`)
+      })
     },
   })
 
@@ -134,7 +270,7 @@ export function makeCaptureStepRegistry(): StepRegistry {
 
       await ensureDeviceConnected(ctx, params)
       await ensureCaptureUiVisible(ctx.page, ctx.stepTimeoutMs)
-      let current = normalizeExposure(await currentExposureText(ctx.page))
+      let current = normalizeExposure(await currentExposurePresetFromPanel(ctx.page))
       if (current === target) return
 
       const currentIndex = EXPOSURE_PRESETS.findIndex((x) => normalizeExposure(x) === current)
@@ -150,7 +286,7 @@ export function makeCaptureStepRegistry(): StepRegistry {
         await ctx.page.waitForTimeout(150)
       }
 
-      current = normalizeExposure(await currentExposureText(ctx.page))
+      current = normalizeExposure(await currentExposurePresetFromPanel(ctx.page))
       if (current !== target) {
         throw createStepError('device.setExposureTime', 'postcondition', '曝光值未生效', {
           expected: target,
@@ -191,6 +327,8 @@ export function makeCaptureStepRegistry(): StepRegistry {
           e,
         )
       }
+
+      await ensureMenuDrawerClosed(ctx.page, ctx.stepTimeoutMs).catch(() => {})
     },
   })
 

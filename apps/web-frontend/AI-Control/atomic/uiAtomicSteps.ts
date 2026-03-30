@@ -28,11 +28,21 @@ export function makeUiAtomicStepRegistry(): StepRegistry {
     },
   })
 
-  /** 按 params.testId 点击，可选 params.timeoutMs */
+  /** 按 params.testId 点击，可选 params.timeoutMs；params.skipIfDisabled 为 true 时若按钮 disabled 则跳过（不失败） */
   registry.set('ui.click', {
     description: '点击',
     async run(ctx, params) {
-      await clickByTestId(ctx.page, String(params.testId), params.timeoutMs ?? ctx.stepTimeoutMs)
+      const testId = String(params.testId)
+      const timeout = params.timeoutMs ?? ctx.stepTimeoutMs
+      const loc = ctx.page.getByTestId(testId).first()
+      if (params.skipIfDisabled === true) {
+        const enabled = await loc.isEnabled().catch(() => true)
+        if (!enabled) {
+          console.log(`[ai-control] ui.click 跳过（disabled） testId=${testId}`)
+          return
+        }
+      }
+      await clickByTestId(ctx.page, testId, timeout)
     },
   })
 

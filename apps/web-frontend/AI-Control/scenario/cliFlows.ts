@@ -29,8 +29,11 @@ import type { GuiderInteractParams } from '../device/guiderControlSteps'
 import { createStepError } from '../shared/errors'
 import { DEFAULT_QHY_DRIVER_TEXT } from '../shared/driverDefaults'
 import { buildDeviceConnectCaptureFlow } from './businessFlows'
+import { buildImageManagerFlowCalls, type ImageManagerInteractParams } from './imageManagerCliFlow'
 import type { ScheduleInteractParams } from '../device/scheduleSteps'
 import { hasAnyScheduleInteraction } from '../device/scheduleSteps'
+
+export type { ImageManagerInteractParams } from './imageManagerCliFlow'
 
 /** CLI 可用命令名。general-settings 不传 generalSettingsInteract 时仅打开对话框，传则按参数执行对话框内各项交互 */
 export const CLI_COMMANDS = [
@@ -75,6 +78,14 @@ export const GENERAL_SETTINGS_INTERACT_KEYS = [
 
 export type GeneralSettingsInteractKey = (typeof GENERAL_SETTINGS_INTERACT_KEYS)[number]
 
+/** 多设备依次连接时，每一项对应一次 device.connectIfNeeded 内的 resolveConnectTargets（与 connectionSteps 一致） */
+export type CliDeviceConnectEntry = {
+  deviceType: string
+  driverText?: string
+  connectionModeText?: string
+  allocationDeviceMatch?: string
+}
+
 /** 可选参数：部分命令支持覆盖默认（如焦距、驱动、连接模式等） */
 export type CliFlowParams = {
   /** 是否先刷新页面（执行 device.gotoHome），默认 false（不刷新，在当前页执行） */
@@ -93,12 +104,23 @@ export type CliFlowParams = {
   doCapture?: boolean
   /** 是否保存拍摄结果；仅在 doCapture !== false 时生效 */
   doSave?: boolean
-  /** 等待单次拍摄完成的超时（毫秒） */
+  /**
+   * 单次拍摄完成等待超时（毫秒），仅当无法从 `captureExposure` 或面板当前曝光解析出时长时作为回退；
+   * 默认可由 `device.captureOnce` 使用「曝光时长 + 60s」计算。
+   */
   waitCaptureTimeoutMs?: number
+  /** 等待拍摄按钮 `data-capture-ready=true` 的超时（毫秒），用于连拍前与 CircularButton 解锁对齐 */
+  captureReadyTimeoutMs?: number
   /** 连接后是否执行设备分配，默认 true */
   doBindAllocation?: boolean
   /** 设备分配时要优先匹配的设备文案 */
   allocationDeviceMatch?: string
+  /**
+   * 多设备连接（依次连接），用于 guider-connect-capture / maincamera-connect-capture 等。
+   * 若设置则优先于单设备的 deviceType/driverText/connectionModeText/allocationDeviceMatch。
+   * resetBeforeConnect 为 true 时按数组顺序依次 disconnectIfNeeded。
+   */
+  devices?: CliDeviceConnectEntry[]
   /** 拍摄次数，默认 1；仅在 doCapture !== false 时生效 */
   captureCount?: number
   /** 主相机拍摄配置：增益（滑块数值） */
@@ -145,8 +167,8 @@ export type CliFlowParams = {
   generalSettingsLanguageRestoreItemText?: string
   /** power-management：打开电源管理页后执行的页面内交互；依次执行（output1/output2 为输出开关；restartQuarcsServer 为经管理进程重启 Qt；restart 为树莓派重启） */
   powerManagementInteract?: PowerManagementInteractParams
-  /** image-file-manager：打开图像管理面板后执行的面板内交互；为 true 的 key 会依次执行（见 README 图像管理） */
-  imageManagerInteract?: Partial<Record<'moveToUsb' | 'delete' | 'download' | 'imageFileSwitch' | 'refresh' | 'panelClose', boolean>>
+  /** image-file-manager：打开图像管理面板后的交互（含侧栏选文件夹、弹窗确认等），见 README「图像管理」与 `imageManagerCliFlow.ts` */
+  imageManagerInteract?: ImageManagerInteractParams
   /** mount-connect-control：连接完成后在侧栏内执行的控制；solveCurrentPosition/gotoClick 为 true 时点击对应按钮，gotoThenSolve/autoFlip 为布尔值时设置对应开关 */
   mountControlInteract?: Partial<Record<'solveCurrentPosition' | 'gotoClick' | 'gotoThenSolve' | 'autoFlip', boolean>>
   /** mount-connect-control / mount-park：连接并关闭抽屉后是否执行 mount.ensureParkedForTest（确保赤道仪 Park 为 on，参考 04-mount-park.spec.ts） */
@@ -205,6 +227,26 @@ function resolveDeviceDisconnectType(params: CliFlowParams): string {
   return matched
 }
 
+function normalizeCliDevices(p: CliFlowParams): CliDeviceConnectEntry[] | undefined {
+  const raw = p.devices
+  if (!Array.isArray(raw) || raw.length === 0) return undefined
+  const out: CliDeviceConnectEntry[] = []
+  for (const d of raw) {
+    if (d == null || typeof d !== 'object') continue
+    const deviceType = String((d as CliDeviceConnectEntry).deviceType ?? '').trim()
+    if (!deviceType) continue
+    const entry = d as CliDeviceConnectEntry
+    out.push({
+      deviceType,
+      driverText: entry.driverText != null ? String(entry.driverText) : undefined,
+      connectionModeText: entry.connectionModeText != null ? String(entry.connectionModeText) : undefined,
+      allocationDeviceMatch:
+        entry.allocationDeviceMatch != null ? String(entry.allocationDeviceMatch).trim() || undefined : undefined,
+    })
+  }
+  return out.length > 0 ? out : undefined
+}
+
 function buildDeviceConnectCalls(args: {
   deviceType: string
   driverText: string
@@ -234,15 +276,42 @@ function buildDeviceConnectCalls(args: {
 }
 
 function buildGuiderControlFlow(p: CliFlowParams, opts: { gotoHome: boolean; resetBeforeConnect: boolean }): FlowStepCall[] {
-  const calls = buildDeviceConnectCalls({
-    deviceType: 'Guider',
-    driverText: p.driverText ?? DEFAULT_QHY_DRIVER_TEXT,
-    connectionModeText: p.connectionModeText ?? 'SDK',
-    gotoHome: opts.gotoHome,
-    resetBeforeConnect: opts.resetBeforeConnect,
-    doBindAllocation: p.doBindAllocation,
-    allocationDeviceMatch: p.allocationDeviceMatch,
-  })
+  const devices = normalizeCliDevices(p)
+  const calls: FlowStepCall[] = []
+  if (opts.gotoHome) calls.push({ id: 'device.gotoHome' })
+
+  if (devices?.length) {
+    if (opts.resetBeforeConnect) {
+      for (const d of devices) {
+        calls.push({ id: 'device.disconnectIfNeeded', params: { deviceType: d.deviceType } })
+      }
+    }
+    calls.push({
+      id: 'device.connectIfNeeded',
+      params: {
+        devices: devices.map((d) => ({
+          deviceType: d.deviceType,
+          driverText: d.driverText ?? DEFAULT_QHY_DRIVER_TEXT,
+          connectionModeText: d.connectionModeText ?? 'SDK',
+          allocationDeviceMatch: d.allocationDeviceMatch,
+        })),
+        doBindAllocation: p.doBindAllocation !== false,
+        keepDrawerOpen: true,
+      },
+    })
+  } else {
+    calls.push(
+      ...buildDeviceConnectCalls({
+        deviceType: 'Guider',
+        driverText: p.driverText ?? DEFAULT_QHY_DRIVER_TEXT,
+        connectionModeText: p.connectionModeText ?? 'SDK',
+        gotoHome: false,
+        resetBeforeConnect: opts.resetBeforeConnect,
+        doBindAllocation: p.doBindAllocation,
+        allocationDeviceMatch: p.allocationDeviceMatch,
+      }),
+    )
+  }
 
   const unsupportedParams: string[] = []
   if (p.doSave === true) unsupportedParams.push('doSave')
@@ -458,6 +527,7 @@ export function getFlowCallsByCommand(
         resetBeforeConnect: reset,
         doBindAllocation: p.doBindAllocation,
         allocationDeviceMatch: p.allocationDeviceMatch,
+        devices: normalizeCliDevices(p),
         gotoHome: doGotoHome,
         captureCount: p.captureCount,
         captureGain: p.captureGain,
@@ -468,6 +538,7 @@ export function getFlowCallsByCommand(
         captureSaveFailedParse: p.captureSaveFailedParse,
         captureSaveFolder: p.captureSaveFolder,
         captureExposure: p.captureExposure,
+        captureReadyTimeoutMs: p.captureReadyTimeoutMs,
       })
     }
 
@@ -596,25 +667,11 @@ export function getFlowCallsByCommand(
       const calls: FlowStepCall[] = []
       if (doGotoHome) calls.push({ id: 'device.gotoHome' })
       calls.push({ id: 'menu.openImageManager' })
-      const im = p.imageManagerInteract
-      if (im?.moveToUsb) {
-        calls.push({ id: 'ui.click', params: { testId: 'imp-btn-move-file-to-usb' } })
+      const imCalls = buildImageManagerFlowCalls(p.imageManagerInteract)
+      if (imCalls.length > 0) {
+        calls.push({ id: 'imageManager.dismissOpenDialogsIfAny' })
       }
-      if (im?.delete) {
-        calls.push({ id: 'ui.click', params: { testId: 'imp-btn-delete-btn-click' } })
-      }
-      if (im?.download) {
-        calls.push({ id: 'ui.click', params: { testId: 'imp-btn-download-selected' } })
-      }
-      if (im?.imageFileSwitch) {
-        calls.push({ id: 'ui.click', params: { testId: 'imp-btn-image-file-switch' } })
-      }
-      if (im?.refresh) {
-        calls.push({ id: 'ui.click', params: { testId: 'imp-btn-refresh-current-folder' } })
-      }
-      if (im?.panelClose) {
-        calls.push({ id: 'ui.click', params: { testId: 'imp-btn-panel-close' } })
-      }
+      calls.push(...imCalls)
       return calls
     }
 

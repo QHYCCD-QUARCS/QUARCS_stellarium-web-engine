@@ -10,6 +10,16 @@ import { createStepError, isStepError } from '../shared/errors'
 
 const DEFAULT_STEP_DELAY_MS = 200
 
+/** 与 e2e.config.cjs 中 E2E_FLOW_TIMING 对齐：默认输出每步 wall-clock 耗时（毫秒） */
+function isFlowStepTimingEnabled(): boolean {
+  const raw = process.env.E2E_FLOW_TIMING
+  if (raw == null || raw === '') return true
+  const v = String(raw).trim().toLowerCase()
+  if (['0', 'false', 'no', 'off'].includes(v)) return false
+  if (['1', 'true', 'yes', 'on'].includes(v)) return true
+  return true
+}
+
 /** 合并多个注册表；若存在重复 step id 则抛出错误 */
 export function mergeRegistries(...registries: StepRegistry[]): StepRegistry {
   const merged: StepRegistry = new Map()
@@ -60,6 +70,7 @@ export async function runFlow(args: {
 }) {
   const { ctx, registry, calls, globalParams, options } = args
   const stepDelayMs = options?.stepDelayMs ?? DEFAULT_STEP_DELAY_MS
+  const logStepTiming = isFlowStepTimingEnabled()
 
   for (let i = 0; i < calls.length; i += 1) {
     const call = calls[i]
@@ -73,11 +84,15 @@ export async function runFlow(args: {
     const params = {
       ...(globalParams ?? {}),
       ...(call.params ?? {}),
+      /** 供步骤内诊断日志（如 device.captureOnce 第几张），勿与业务 params 混用同名 */
+      __flowStepIndex: i + 1,
+      __flowStepTotal: calls.length,
     }
 
     const paramStr = formatStepParams(call.params)
     const desc = step.description ? `  # ${step.description}` : ''
     console.log(`[ai-control] ${i + 1}/${calls.length} ${call.id}${paramStr}${desc}`)
+    const stepStartedAt = Date.now()
     try {
       await step.run(ctx, params)
     } catch (e) {
@@ -89,6 +104,9 @@ export async function runFlow(args: {
         { originalMessage: e instanceof Error ? e.message : String(e) },
         e,
       )
+    }
+    if (logStepTiming) {
+      console.log(`[ai-control] stepTiming stepId=${call.id} elapsedMs=${Date.now() - stepStartedAt}`)
     }
     await maybeWait(stepDelayMs)
   }

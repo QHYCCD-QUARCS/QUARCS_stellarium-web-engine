@@ -578,16 +578,10 @@ export default {
       currentImageWidth: 0,
       currentImageHeight: 0,
 
-      // 瓦片模式下用于显示“合并等级/分辨率”的动态信息（由 App.vue 广播）
+      // 瓦片模式：左上角只显示原图像素尺寸（由 App.vue TileLevelInfo 广播 imageWidth/imageHeight）
       tileLevelEnabled: false,
-      tileZ: 0,
-      tileMaxZoomLevel: 0,
-      tileLevelScale: 1,
-      tileLevelWidth: 0,
-      tileLevelHeight: 0,
-      tilePreviewWidth: 0,
-      tilePreviewHeight: 0,
-      tilePreviewBinningFactor: 1,
+      tileFullImageWidth: 0,
+      tileFullImageHeight: 0,
 
       showRedBox: false, // 控制小红框显示与隐藏
       isInitRedBox: true,
@@ -1016,25 +1010,13 @@ export default {
     onTileLevelInfo(info) {
       if (!info || !info.enabled) {
         this.tileLevelEnabled = false;
-        this.tileZ = 0;
-        this.tileMaxZoomLevel = 0;
-        this.tileLevelScale = 1;
-        this.tileLevelWidth = 0;
-        this.tileLevelHeight = 0;
-        this.tilePreviewWidth = 0;
-        this.tilePreviewHeight = 0;
-        this.tilePreviewBinningFactor = 1;
+        this.tileFullImageWidth = 0;
+        this.tileFullImageHeight = 0;
         return;
       }
       this.tileLevelEnabled = true;
-      this.tileZ = Number(info.z) || 0;
-      this.tileMaxZoomLevel = Number(info.maxZoomLevel) || 0;
-      this.tileLevelScale = Number(info.levelScale) || 1;
-      this.tileLevelWidth = Number(info.levelWidth) || 0;
-      this.tileLevelHeight = Number(info.levelHeight) || 0;
-      this.tilePreviewWidth = Number(info.previewWidth) || 0;
-      this.tilePreviewHeight = Number(info.previewHeight) || 0;
-      this.tilePreviewBinningFactor = Number(info.previewBinningFactor) || 1;
+      this.tileFullImageWidth = Math.max(0, Math.floor(Number(info.imageWidth) || 0));
+      this.tileFullImageHeight = Math.max(0, Math.floor(Number(info.imageHeight) || 0));
     },
 
     FocalLengthSet(num) {
@@ -2041,33 +2023,20 @@ export default {
       return this.PolarAxisStepTips[this.currentPolarAxisStep - 1];
     },
     ImageInfo() {
-      let imageInfo;
-      if (this.currentImageWidth === 0 || this.currentImageHeight === 0) {
-        imageInfo = 'N/A';
-      } else {
-        // 瓦片模式：不再使用连接时计算的“合并/binning”，而是根据当前缩放映射到瓦片层级显示
-        if (this.tileLevelEnabled) {
-          const z = Number.isFinite(this.tileZ) ? this.tileZ : 0;
-          const maxZ = Number.isFinite(this.tileMaxZoomLevel) ? this.tileMaxZoomLevel : 0;
-          const zText = `${z}/${maxZ}`;
-          const scale = Number.isFinite(this.tileLevelScale) ? this.tileLevelScale : 1;
-          const w = (Number.isFinite(this.tileLevelWidth) && this.tileLevelWidth > 0) ? this.tileLevelWidth : this.currentImageWidth;
-          const h = (Number.isFinite(this.tileLevelHeight) && this.tileLevelHeight > 0) ? this.tileLevelHeight : this.currentImageHeight;
-          if (scale <= 1.0001) {
-            imageInfo = 'Tile level: ' + zText + ', Size: [' + w + 'x' + h + ']';
-          } else {
-            imageInfo = 'Tile level: ' + zText + ', Merge: ' + Math.round(scale) + 'x, Size: [' + w + 'x' + h + ']';
-          }
-        } else {
-          if (this.BinningNum === 1) {
-            imageInfo = 'Original image, Size: [' + this.currentImageWidth + 'x' + this.currentImageHeight + ']';
-          } else {
-            imageInfo = 'Binning: ' + this.BinningNum + ', Size: [' + this.currentImageWidth + 'x' + this.currentImageHeight + ']';
-          }
-        }
+      const tw = this.tileLevelEnabled && this.tileFullImageWidth > 0 ? this.tileFullImageWidth : 0;
+      const th = this.tileLevelEnabled && this.tileFullImageHeight > 0 ? this.tileFullImageHeight : 0;
+      const w = tw || this.currentImageWidth;
+      const h = th || this.currentImageHeight;
+      if (w === 0 || h === 0) {
+        return 'N/A';
       }
-
-      return imageInfo;
+      if (this.tileLevelEnabled) {
+        return 'Original image, Size: [' + w + 'x' + h + ']';
+      }
+      if (this.BinningNum === 1) {
+        return 'Original image, Size: [' + w + 'x' + h + ']';
+      }
+      return 'Binning: ' + this.BinningNum + ', Size: [' + w + 'x' + h + ']';
     },
     pickerDate: {
       get: function () {

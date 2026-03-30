@@ -115,6 +115,23 @@ export async function isCheckboxChecked(page: Page, testId: string, timeout = 10
 }
 
 /**
+ * Vuetify `v-switch`：写在 `<v-switch>` 上的 `data-testid` 会进入 `attrs$`，VSwitch 将其传入 `genInput`
+ *（见 node_modules/vuetify/.../VSwitch.ts：`genInput('checkbox', { ...this.attrs, ...switchAttrs })`），
+ * 因此 **testid 常落在内部 `<input type="checkbox">` 上**，而不是外层 `.v-input`。
+ * 此时 `root` 已指向 input，`root.locator('input[type="checkbox"]')` 无子级可匹配，若再回退到
+ * `clickLocator(root)`，仍会被同级的 ripple 层拦截。对最终命中的节点统一 `force: true` 即可。
+ */
+export async function clickVuetifySwitchByRoot(root: Locator, timeout = 10_000) {
+  await root.scrollIntoViewIfNeeded().catch(() => {})
+  await sleep(200)
+  const inner = root.locator('input[type="checkbox"]').first()
+  const target = (await inner.count()) > 0 ? inner : root
+  await expect(target).toBeAttached({ timeout })
+  await target.click({ timeout, force: true })
+  await sleep(ACTION_SETTLE_MS)
+}
+
+/**
  * 根据目标状态设置复选框：仅当当前状态与目标不一致时才点击，避免重复点击。
  * @param checked true 表示需要勾选，false 表示需要取消勾选
  */
@@ -235,6 +252,12 @@ export async function selectVSelectItemText(page: Page, testId: string, itemText
     if (await clickConfirmDriverOptionIfPossible(page, menu, itemText, timeout)) return
   }
 
+  const byRole = menu.getByRole('option', { name: new RegExp(`^${escapeRegExp(itemText)}$`, 'i') }).first()
+  if (await byRole.isVisible().catch(() => false)) {
+    await clickLocator(byRole, timeout)
+    return
+  }
+
   const exact = menu.getByText(itemText, { exact: true }).first()
   if (await exact.isVisible().catch(() => false)) {
     await clickLocator(exact, timeout)
@@ -244,4 +267,8 @@ export async function selectVSelectItemText(page: Page, testId: string, itemText
   const fallback = menu.getByText(itemText, { exact: false }).first()
   await expect(fallback).toBeVisible({ timeout: Math.min(8000, timeout) })
   await clickLocator(fallback, timeout)
+}
+
+function escapeRegExp(s: string) {
+  return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }

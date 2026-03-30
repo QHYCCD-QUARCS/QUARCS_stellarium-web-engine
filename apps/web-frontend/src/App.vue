@@ -12,6 +12,7 @@
       E2E 探针（隐藏）：
       - 设备连接状态：来自 data().devices[*].isConnected
       - 出图成功信号：每次收到 TileGPM 时自增 e2eTileGpmSeq
+      - 曝光完成信号：Qt 下发 ExposureCompleted 时自增 e2eExposureCompletedSeq（短曝光时比 cp-status busy/idle 更可靠）
       目的：让 Playwright 不必“盲等超时”，而是等待真实状态变化。
     -->
     <div
@@ -32,6 +33,10 @@
         data-testid="e2e-tilegpm"
         :data-seq="String(e2eTileGpmSeq)"
         :data-session="String(tileSessionId || '')"
+      ></div>
+      <div
+        data-testid="e2e-exposure-completed"
+        :data-seq="String(e2eExposureCompletedSeq)"
       ></div>
     </div>
 
@@ -1037,7 +1042,7 @@ export default {
 
       QTClientVersion: 'Not connected',
       // VueClientVersion: process.env.VUE_APP_VERSION,
-      VueClientVersion: '20260323-4', // 手动指定版本号
+      VueClientVersion: '20260326-3', // 手动指定版本号
 
       // 全局总版本号（由 Qt 通过 WebSocket 从环境变量 QUARCS_TOTAL_VERSION 读取并发送）
       TotalVersion: '0.0.0',
@@ -1127,7 +1132,7 @@ export default {
         // vue处理参数
         { driverType: 'MainCamera', label: 'ImageCFA', value: 'null', inputType: 'select', selectValue: ['GR', 'GB', 'BG', 'RGGB', 'null'] },
         // 硬件处理参数
-        { driverType: 'MainCamera', label: 'Binning', value: '', inputType: 'slider', inputMin: 1, inputMax: 16, inputStep: 1 },
+        // { driverType: 'MainCamera', label: 'Binning', value: '', inputType: 'slider', inputMin: 1, inputMax: 16, inputStep: 1 },
         { driverType: 'MainCamera', label: 'Temperature', value: '-5', inputType: 'select', selectValue: [5, 0, -5, -10, -15, -20, -25] },
         { driverType: 'MainCamera', label: 'Gain', value: '', inputType: 'slider', inputMin: 0, inputMax: 0, inputStep: 1 },
         { driverType: 'MainCamera', label: 'Offset', value: '', inputType: 'slider', inputMin: 0, inputMax: 0, inputStep: 1 },
@@ -1249,18 +1254,21 @@ export default {
 
       // ========================= 瓦片金字塔相关 =========================
       TILE_PATH_SUFFIX: 'img/capture-tiles',  // 与 nginx location /img/capture-tiles/ 对应
-      TILE_DEBUG: true,   // 瓦片调试：true 时在控制台打印加载/渲染诊断，定位“局部瓦片不对”等问题
+      TILE_DEBUG: false,  // 瓦片调试：默认关闭，避免高频日志拖慢主线程；排查问题时可临时打开
+      TILE_PERF: true, // 瓦片性能：为 true 时在控制台与界面日志中输出各阶段耗时（processTile / renderTiles / drawImageData 等）；仅排查卡顿时临时打开
       tileGPM: null,              // 全局处理元数据
       tileSessionId: null,        // 当前瓦片会话ID
       tileFrameId: null,          // 当前瓦片帧ID（用于丢弃旧帧瓦片/防错帧拉伸）
       // E2E：出图成功信号（每次收到 TileGPM 自增；用于 Playwright 等待真实状态变化）
       e2eTileGpmSeq: 0,
+      // E2E：Qt 下发 ExposureCompleted 时自增（与 TileGPM 解耦；短曝光时 cp-status 可能来不及观测 busy）
+      e2eExposureCompletedSeq: 0,
       tileCache: null,            // 瓦片缓存 Map<"z/x/y", ImageData> (在initCanvas中初始化)
       tileRawDataCache: null,     // 原始瓦片数据缓存 Map<"z/x/y", {width, height, type, data}> (在initCanvas中初始化)
       tilePendingLoads: null,     // 正在加载的瓦片集合 (在initCanvas中初始化)
       tileAbortControllers: null, // 瓦片加载取消控制器 Map<"z/x/y", AbortController> (在initCanvas中初始化)
       tileLoadQueue: [],          // 瓦片加载队列
-      maxConcurrentTileLoads: 4,  // 最大并发加载数（live 覆盖写时过高会放大请求风暴/失败率）
+      maxConcurrentTileLoads: 2,  // 降低并发，减少多块瓦片同时解码/处理造成的主线程卡顿
       currentTileLoads: 0,        // 当前加载数
       tileLoadBatchSeq: 0,        // 可见瓦片加载批次号（用于“全齐再显示”屏障）
       activeTileLoadBatchId: 0,   // 当前有效批次ID（视窗变化/新帧会覆盖旧批次）
@@ -1270,8 +1278,18 @@ export default {
       tileRetryTimers: null,      // 后端尚未生成完成时的重试定时器 Map<"z/x/y", Timeout>
       tileRetryCounts: null,      // 瓦片重试次数 Map<"z/x/y", number>
       tileRenderRaf: null,        // 合并晚到瓦片的重绘请求，避免每片都立即重绘
+      tileRenderBatchSize: 4,     // 增量补绘批次：累计这么多已完成瓦片后再触发一次重绘
+      tileRenderBatchDelayMs: 80, // 增量补绘兜底延迟，避免最后零散瓦片长期不显示
+      tileRenderBufferedCount: 0, // 当前批次中已完成但尚未触发重绘的瓦片数
+      tileRenderBufferedTimer: null, // 增量补绘兜底定时器
+      tileDirtyKeys: null,        // 待补绘的瓦片键集合 Set<"z/x/y">
+      tileForceFullRender: true,  // 下一帧是否需要对当前可见瓦片做整批重绘
       tileCanvas: null,           // 瓦片合成画布
       tileCtx: null,              // 瓦片合成画布上下文
+      /** 合成画布相对传感器像素的长边上限（降分辨率以减轻 drawImage 卡顿） */
+      tileRasterMaxEdge: 4096,
+      /** 当前合成缩放 s∈(0,1]：tileCanvas 像素尺寸 = round(image*s) */
+      tileRasterScale: 1,
       viewportChangeTimer: null,  // 视窗变化防抖定时器
       currentVisibleTiles: null,  // 当前可见的瓦片集合 Set<"z/x/y">
       tileHistogram: null,        // 当前会话直方图 { sessionId, bins, total, counts }
@@ -2332,6 +2350,7 @@ export default {
                 break;
 
               case 'ExposureCompleted':
+                this.e2eExposureCompletedSeq = (Number(this.e2eExposureCompletedSeq) || 0) + 1;
                 this.$bus.$emit('ExposureCompleted');
                 // 以 ExposureCompleted 作为“UI刷新一帧”的信号，统计前端显示帧率
                 this.onLiveFramePresented();
@@ -3644,10 +3663,25 @@ export default {
               case 'SetRedBoxState':
                 if (parts.length === 4) {
                   const length = parseInt(parts[1]);
-                  this.ROI_x = parseFloat(parts[2]);
-                  this.ROI_y = parseFloat(parts[3]);
+                  const rx = parseFloat(parts[2]);
+                  const ry = parseFloat(parts[3]);
+                  this.ROI_x = rx;
+                  this.ROI_y = ry;
 
                   this.setRedBoxState(length, this.ROI_x, this.ROI_y);
+                  // 跟踪星居中：SaveJpgSuccess 与 SetRedBoxState 可能同批到达，叠加层像素仍是上一帧 ROI，而红框已被更新为新居中位置；仅当坐标仍一致时保留叠加层（如 sendRoiInfo 同步）。
+                  if (this.tileGPM && this.roiOverlayImageData != null) {
+                    const ox = this.roiOverlayX;
+                    const oy = this.roiOverlayY;
+                    const same =
+                      Number.isFinite(ox) &&
+                      Number.isFinite(oy) &&
+                      Math.abs(ox - rx) < 0.5 &&
+                      Math.abs(oy - ry) < 0.5;
+                    if (!same) {
+                      this.roiOverlayImageData = null;
+                    }
+                  }
                   console.log('设置红色ROI框: ', length, this.ROI_x, this.ROI_y);
                 }
                 break;
@@ -5861,6 +5895,9 @@ export default {
       if (!this.currentVisibleTiles) {
         this.currentVisibleTiles = new Set();
       }
+      if (!this.tileDirtyKeys) {
+        this.tileDirtyKeys = new Set();
+      }
       
       // 重要：后端每张图使用独立目录（sessionId=live_<epoch>），新 GPM 即新会话；保留 isOverwriteLiveFrame 兼容旧后端 sessionId=live 覆盖写
       const isOverwriteLiveFrame = (!isNewSession) && isLiveSession;
@@ -5871,6 +5908,7 @@ export default {
         this.tileRawDataCache.clear();
         this.tilePendingLoads.clear();
         this.currentVisibleTiles.clear();
+        this.tileDirtyKeys.clear();
 
         // 取消所有进行中的请求
         for (const [key, controller] of this.tileAbortControllers.entries()) {
@@ -5885,6 +5923,8 @@ export default {
 
         this.tileLoadQueue = [];
         this.currentTileLoads = 0;
+        this.tileForceFullRender = true;
+        this.resetIncrementalTileRenderBuffer();
 
         if (isNewSession) {
           // 重置上一次渲染的瓦片层级（避免新会话沿用旧层级状态）
@@ -5901,11 +5941,22 @@ export default {
         this.tileCanvas = document.createElement('canvas');
         this.tileCtx = this.tileCanvas.getContext('2d');
       }
-      
-      // 设置瓦片画布尺寸为原图尺寸
-      if (this.tileCanvas.width !== gpm.imageWidth || this.tileCanvas.height !== gpm.imageHeight) {
-        this.tileCanvas.width = gpm.imageWidth;
-        this.tileCanvas.height = gpm.imageHeight;
+
+      const iw = Math.max(0, Math.floor(Number(gpm.imageWidth) || 0));
+      const ih = Math.max(0, Math.floor(Number(gpm.imageHeight) || 0));
+      const maxEdge = Math.max(1, Number(this.tileRasterMaxEdge) || 4096);
+      const maxDim = Math.max(iw, ih);
+      const tileS = maxDim > 0 ? Math.min(1, maxEdge / maxDim) : 1;
+      this.tileRasterScale = tileS;
+      const tw = Math.max(1, Math.round(iw * tileS));
+      const th = Math.max(1, Math.round(ih * tileS));
+
+      // 合成画布为下采样位图；逻辑坐标仍用 gpm.imageWidth/Height（传感器像素）
+      if (this.tileCanvas.width !== tw || this.tileCanvas.height !== th) {
+        this.tileCanvas.width = tw;
+        this.tileCanvas.height = th;
+        this.tileForceFullRender = true;
+        this.tileCanvasNeedsClear = true;
       }
 
       // 新会话时，标记下次渲染前需要清空瓦片画布；但不要在这里立刻清空，避免出现“先透明后补齐”的闪烁
@@ -5913,8 +5964,10 @@ export default {
         this.tileCanvasNeedsClear = true;
       }
       
-      // 计算图像比例
-      this.ImageProportion = this.CanvasWidth / this.CanvasHeight;
+      // 图像宽高比：瓦片模式必须用传感器比例，否则 visible 区域/左上角与真实裁切不一致
+      this.ImageProportion = (iw > 0 && ih > 0)
+        ? (iw / ih)
+        : (this.CanvasWidth / this.CanvasHeight);
       
       // 新会话才重置缩放和平移
       if (isNewSession) {
@@ -6055,9 +6108,9 @@ export default {
     },
 
     /**
-     * 向 GUI 广播当前瓦片层级信息（用于显示合并等级与分辨率）
+     * 向 GUI 广播瓦片会话信息（含原图尺寸，供左上角显示）
      * - enabled=false：非瓦片模式（或瓦片元数据未就绪）
-     * - enabled=true：瓦片模式下包含 z/maxZoom/levelScale/levelWidth/levelHeight
+     * - enabled=true：含 imageWidth/imageHeight 等（GUI 仅用于展示原图像素尺寸）
      */
     emitTileLevelInfo() {
       const gpm = this.tileGPM;
@@ -6086,6 +6139,9 @@ export default {
         levelHeight,
         imageWidth: Number(gpm.imageWidth),
         imageHeight: Number(gpm.imageHeight),
+        tileRasterScale: Number(this.tileRasterScale) > 0 ? Number(this.tileRasterScale) : 1,
+        tileCanvasPixelWidth: this.tileCanvas ? this.tileCanvas.width : null,
+        tileCanvasPixelHeight: this.tileCanvas ? this.tileCanvas.height : null,
         previewWidth: (gpm.previewWidth != null) ? Number(gpm.previewWidth) : null,
         previewHeight: (gpm.previewHeight != null) ? Number(gpm.previewHeight) : null,
         previewBinningFactor: (gpm.previewBinningFactor != null) ? Number(gpm.previewBinningFactor) : null,
@@ -6227,9 +6283,18 @@ export default {
         height: gpm.imageHeight,
       };
       // merged_single_level：仅两层——z=0 压缩合并整图 + z=maxZ 原图整图，均为 fullImageRect
+      // pyramid：不再请求 0..maxZ 全层级，避免前端为“看不见/很快被覆盖”的中间层付出过高代价。
+      // 仅保留：
+      // - z=0：整图粗预览
+      // - currentZ：当前缩放真正需要的层级
+      // - currentZ-1：作为过渡兜底层，兼顾渐进式体验与性能
       const requestLevels = (buildMode === 'merged_single_level')
         ? Array.from(new Set([0, requestMaxZ]))
-        : Array.from({ length: requestMaxZ + 1 }, (_, index) => index);
+        : Array.from(new Set([
+            0,
+            Math.max(0, currentZ - 1),
+            currentZ,
+          ])).sort((a, b) => a - b);
 
       for (const z of requestLevels) {
         const useFullImage = (buildMode === 'merged_single_level') || (z === 0);
@@ -6276,13 +6341,17 @@ export default {
       if (!this.tileLoadWaiters) {
         this.tileLoadWaiters = new Map();
       }
+      if (!this.tileDirtyKeys) {
+        this.tileDirtyKeys = new Set();
+      }
       
       const tiles = this.calculateVisibleTiles();
       const gpm = this.tileGPM;
       const batchId = ++this.tileLoadBatchSeq;
       this.activeTileLoadBatchId = batchId;
       this.tileAllowIncrementalRender = true;
-      
+      this.resetIncrementalTileRenderBuffer();
+
       // 更新当前可见瓦片集合
       const newVisibleTiles = new Set(tiles.map(t => `${t.z}/${t.x}/${t.y}`));
       
@@ -6333,7 +6402,14 @@ export default {
         if (needReprocess) {
           try {
             const processedTile = this.processTile(this.tileRawDataCache.get(key));
-            this.tileCache.set(key, { imageData: processedTile, paramsKey });
+            const renderSource = this.createTileRenderSource(processedTile);
+            this.tileCache.set(key, {
+              renderSource,
+              width: processedTile.width,
+              height: processedTile.height,
+              paramsKey
+            });
+            this.tileDirtyKeys.add(key);
           } catch (e) {
             console.error(`Error processing cached raw tile ${key}:`, e);
           }
@@ -6495,6 +6571,41 @@ export default {
       }
     },
 
+    resetIncrementalTileRenderBuffer() {
+      this.tileRenderBufferedCount = 0;
+      if (this.tileRenderBufferedTimer) {
+        clearTimeout(this.tileRenderBufferedTimer);
+        this.tileRenderBufferedTimer = null;
+      }
+    },
+
+    scheduleIncrementalTileRender() {
+      const batchSize = Math.max(1, Number(this.tileRenderBatchSize) || 1);
+      const delayMs = Math.max(0, Number(this.tileRenderBatchDelayMs) || 0);
+      this.tileRenderBufferedCount = (Number(this.tileRenderBufferedCount) || 0) + 1;
+
+      if (this.tileRenderBufferedCount >= batchSize) {
+        this.resetIncrementalTileRenderBuffer();
+        this.scheduleTileRender();
+        return;
+      }
+
+      if (this.tileRenderBufferedTimer) return;
+      this.tileRenderBufferedTimer = setTimeout(() => {
+        this.tileRenderBufferedTimer = null;
+        this.tileRenderBufferedCount = 0;
+        this.scheduleTileRender();
+      }, delayMs);
+    },
+
+    markTileDirty(key) {
+      if (!key) return;
+      if (!this.tileDirtyKeys) {
+        this.tileDirtyKeys = new Set();
+      }
+      this.tileDirtyKeys.add(key);
+    },
+
     /**
      * 加载单个瓦片（支持取消）
      * @param {Object} tile - 瓦片信息 {z, x, y}
@@ -6566,8 +6677,34 @@ export default {
           }
           
           try {
-            const processedTile = this.processTile(tileData);
-            this.tileCache.set(key, { imageData: processedTile, paramsKey });
+            let processedTile;
+            let renderSource;
+            if (this.TILE_PERF && typeof performance !== 'undefined' && performance.now) {
+              const t0 = performance.now();
+              processedTile = this.processTile(tileData);
+              const t1 = performance.now();
+              renderSource = this.createTileRenderSource(processedTile);
+              const t2 = performance.now();
+              const processTileMs = +(t1 - t0).toFixed(2);
+              const createTileRenderSourceMs = +(t2 - t1).toFixed(2);
+              const cpuMs = +(t2 - t0).toFixed(2);
+              const row = { processTileMs, createTileRenderSourceMs, cpuMs };
+              console.log('[TilePerf] loadSingleTile', key, row);
+              this.SendConsoleLogMsg(
+                `[TilePerf] loadSingleTile ${key} processTileMs=${processTileMs} createTileRenderSourceMs=${createTileRenderSourceMs} cpuMs=${cpuMs}`,
+                'info'
+              );
+            } else {
+              processedTile = this.processTile(tileData);
+              renderSource = this.createTileRenderSource(processedTile);
+            }
+            this.tileCache.set(key, {
+              renderSource,
+              width: processedTile.width,
+              height: processedTile.height,
+              paramsKey
+            });
+            this.markTileDirty(key);
             if (this.TILE_DEBUG) {
               console.log('[Tile] loadSingleTile ok', { key, rawSize: `${tileData.width}x${tileData.height}`, outSize: `${processedTile.width}x${processedTile.height}` });
             }
@@ -6579,7 +6716,7 @@ export default {
               this.currentVisibleTiles &&
               this.currentVisibleTiles.has(key);
             if (shouldPatchRender) {
-              this.scheduleTileRender();
+              this.scheduleIncrementalTileRender();
             }
           } catch (processErr) {
             if (this.TILE_DEBUG) {
@@ -6708,6 +6845,17 @@ export default {
       }
     },
 
+    createTileRenderSource(imageData) {
+      if (!imageData) return null;
+      const canvas = document.createElement('canvas');
+      canvas.width = imageData.width;
+      canvas.height = imageData.height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return null;
+      ctx.putImageData(imageData, 0, 0);
+      return canvas;
+    },
+
     /**
      * 渲染所有已加载的瓦片到缓冲画布
      */
@@ -6717,11 +6865,15 @@ export default {
       const gpm = this.tileGPM;
       const T = gpm.tileSize;
       const ctx = this.tileCtx;
+      const s = Number(this.tileRasterScale) > 0 ? Number(this.tileRasterScale) : 1;
+      let needsFullRender = Boolean(this.tileForceFullRender);
       
       // 只在新会话开始时清空一次；层级切换时不清空，避免“先透明后补齐”的闪烁
       if (this.tileCanvasNeedsClear) {
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.clearRect(0, 0, this.tileCanvas.width, this.tileCanvas.height);
         this.tileCanvasNeedsClear = false;
+        needsFullRender = true;
       }
       
       // 获取当前应该显示的层级（反向金字塔）
@@ -6758,9 +6910,11 @@ export default {
 
         // pyramid 模式：清空视口以移除旧层级；merged_single_level 跳过，由 z=0 全图重绘覆盖
         if (!isMergedSingleLevel && w > 0 && h > 0) {
+          ctx.setTransform(s, 0, 0, s, 0, 0);
           ctx.clearRect(left, top, w, h);
         }
         this._tileLastRenderedZ = z;
+        needsFullRender = true;
       }
 
       const levelScale = Math.pow(2, gpm.maxZoomLevel - z);
@@ -6776,28 +6930,27 @@ export default {
       } else {
         smoothing = levelScale > 1.0001;
       }
+      // 合成坐标系：整图传感器像素 → 乘 tileRasterScale 映射到 tileCanvas 位图
+      ctx.setTransform(s, 0, 0, s, 0, 0);
       ctx.imageSmoothingEnabled = smoothing;
       ctx.mozImageSmoothingEnabled = smoothing;
       ctx.webkitImageSmoothingEnabled = smoothing;
       ctx.msImageSmoothingEnabled = smoothing;
       
-      // 渲染优化：只绘制当前“可见集合”内的瓦片，避免全缓存遍历；
-      // 同时复用一个临时画布，避免每块瓦片都创建 canvas（会非常慢）
-      if (!this._tileBlitCanvas) {
-        this._tileBlitCanvas = document.createElement('canvas');
-        this._tileBlitCtx = this._tileBlitCanvas.getContext('2d');
-      }
-
-      // 仅在需要时清空（参数变化/视图切换时由外部设置 tileCanvasNeedsClear），避免每块瓦片加载时“闪白/重置”观感
-      if (this.tileCanvasNeedsClear) {
-        ctx.clearRect(0, 0, this.tileCanvas.width, this.tileCanvas.height);
-        this.tileCanvasNeedsClear = false;
-      }
+      // 渲染优化：只绘制当前“可见集合”内的瓦片，避免全缓存遍历
 
       const keysToDraw =
-        (this.currentVisibleTiles && this.currentVisibleTiles.size > 0)
-          ? Array.from(this.currentVisibleTiles)
-          : Array.from(this.tileCache.keys());
+        needsFullRender
+          ? ((this.currentVisibleTiles && this.currentVisibleTiles.size > 0)
+              ? Array.from(this.currentVisibleTiles)
+              : Array.from(this.tileCache.keys()))
+          : ((this.tileDirtyKeys && this.tileDirtyKeys.size > 0)
+              ? Array.from(this.tileDirtyKeys)
+              : []);
+      if (!needsFullRender && keysToDraw.length === 0) {
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        return;
+      }
       keysToDraw.sort((a, b) => {
         const [az, ax, ay] = a.split('/').map(Number);
         const [bz, bx, by] = b.split('/').map(Number);
@@ -6806,16 +6959,36 @@ export default {
         return ax - bx;
       });
 
+      const perf = this.TILE_PERF;
+      const pn = perf && typeof performance !== 'undefined' && performance.now
+        ? () => performance.now()
+        : null;
+      const tDraw0 = pn ? pn() : 0;
+
       let drawnCount = 0;
       let skipNoCache = 0;
       const drawDetails = this.TILE_DEBUG ? [] : null;
+      let dirtyLeft = Infinity;
+      let dirtyTop = Infinity;
+      let dirtyRight = -Infinity;
+      let dirtyBottom = -Infinity;
 
       for (const key of keysToDraw) {
+        if (!needsFullRender && this.currentVisibleTiles && !this.currentVisibleTiles.has(key)) {
+          this.tileDirtyKeys.delete(key);
+          continue;
+        }
+
         const cached = this.tileCache.get(key);
-        const imageData = cached && cached.imageData;
-        if (!imageData) {
+        const renderSource = cached && cached.renderSource;
+        const renderWidth = cached && cached.width;
+        const renderHeight = cached && cached.height;
+        if (!renderSource || !renderWidth || !renderHeight) {
           skipNoCache++;
           if (this.TILE_DEBUG) drawDetails.push({ key, reason: 'noCache' });
+          if (!needsFullRender && this.tileDirtyKeys) {
+            this.tileDirtyKeys.delete(key);
+          }
           continue;
         }
 
@@ -6828,34 +7001,59 @@ export default {
         // 边缘瓦片：层级尺寸不能整除 T 时，最后一列/行只覆盖部分图像，需裁剪到图像边界，避免右侧/下侧拉伸错位
         const destWidth = Math.min(fullTilePx, gpm.imageWidth - destX);
         const destHeight = Math.min(fullTilePx, gpm.imageHeight - destY);
-        if (destWidth <= 0 || destHeight <= 0) continue;
+        if (destWidth <= 0 || destHeight <= 0) {
+          if (!needsFullRender && this.tileDirtyKeys) {
+            this.tileDirtyKeys.delete(key);
+          }
+          continue;
+        }
 
         // 若裁剪了目标区域，源图也按比例取对应区域，避免拉伸
-        const srcWidth = destWidth < fullTilePx ? (imageData.width * destWidth / fullTilePx) : imageData.width;
-        const srcHeight = destHeight < fullTilePx ? (imageData.height * destHeight / fullTilePx) : imageData.height;
+        const srcWidth = destWidth < fullTilePx ? (renderWidth * destWidth / fullTilePx) : renderWidth;
+        const srcHeight = destHeight < fullTilePx ? (renderHeight * destHeight / fullTilePx) : renderHeight;
 
-        if (this._tileBlitCanvas.width !== imageData.width || this._tileBlitCanvas.height !== imageData.height) {
-          this._tileBlitCanvas.width = imageData.width;
-          this._tileBlitCanvas.height = imageData.height;
-        }
-        this._tileBlitCtx.putImageData(imageData, 0, 0);
-        ctx.drawImage(this._tileBlitCanvas, 0, 0, srcWidth, srcHeight, destX, destY, destWidth, destHeight);
+        ctx.drawImage(renderSource, 0, 0, srcWidth, srcHeight, destX, destY, destWidth, destHeight);
+        dirtyLeft = Math.min(dirtyLeft, destX);
+        dirtyTop = Math.min(dirtyTop, destY);
+        dirtyRight = Math.max(dirtyRight, destX + destWidth);
+        dirtyBottom = Math.max(dirtyBottom, destY + destHeight);
         drawnCount++;
+        if (!needsFullRender && this.tileDirtyKeys) {
+          this.tileDirtyKeys.delete(key);
+        }
         if (this.TILE_DEBUG) {
           drawDetails.push({
             key,
             dest: `(${Math.round(destX)},${Math.round(destY)}) ${Math.round(destWidth)}x${Math.round(destHeight)}`,
-            srcSize: `${imageData.width}x${imageData.height}`,
+            srcSize: `${renderWidth}x${renderHeight}`,
             clipped: destWidth < fullTilePx || destHeight < fullTilePx
           });
         }
       }
 
-      if (this.TILE_DEBUG && (drawnCount > 0 || skipNoCache > 0)) {
+      const tDraw1 = pn ? pn() : 0;
+
+      if (needsFullRender && this.tileDirtyKeys) {
+        this.tileDirtyKeys.clear();
+      }
+      this.tileForceFullRender = false;
+
+      if (needsFullRender) {
+        dirtyLeft = 0;
+        dirtyTop = 0;
+        dirtyRight = gpm.imageWidth;
+        dirtyBottom = gpm.imageHeight;
+      }
+      const hasDirtyRegion = dirtyRight > dirtyLeft && dirtyBottom > dirtyTop;
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+      if (this.TILE_DEBUG && (drawnCount > 0 || skipNoCache > 0 || needsFullRender)) {
         console.log('[Tile] renderTiles', {
           canvasSize: `${this.tileCanvas.width}x${this.tileCanvas.height}`,
           z,
           levelScale,
+          fullRender: needsFullRender,
           keysTotal: keysToDraw.length,
           drawn: drawnCount,
           skipNoCache,
@@ -6863,21 +7061,57 @@ export default {
         });
       }
       
-      // 将瓦片画布复制到缓冲画布
+      // 将瓦片画布同步到缓冲画布：增量场景只更新脏区域，避免每片瓦片都搬运整张大图
       if (this.bufferCanvas) {
-        // 避免每次 resize 导致 bufferCanvas 被清空（闪烁）；仅在尺寸变化时调整
-        if (this.bufferCanvas.width !== this.tileCanvas.width || this.bufferCanvas.height !== this.tileCanvas.height) {
+        const tBuf0 = pn ? pn() : 0;
+        const resized = this.bufferCanvas.width !== this.tileCanvas.width || this.bufferCanvas.height !== this.tileCanvas.height;
+        if (resized) {
           this.bufferCanvas.width = this.tileCanvas.width;
           this.bufferCanvas.height = this.tileCanvas.height;
         }
-        this.bufferCtx.drawImage(this.tileCanvas, 0, 0);
+        if (needsFullRender || resized) {
+          this.bufferCtx.clearRect(0, 0, this.bufferCanvas.width, this.bufferCanvas.height);
+          this.bufferCtx.drawImage(this.tileCanvas, 0, 0);
+        } else if (hasDirtyRegion) {
+          const sx = dirtyLeft * s;
+          const sy = dirtyTop * s;
+          const sw = (dirtyRight - dirtyLeft) * s;
+          const sh = (dirtyBottom - dirtyTop) * s;
+          this.bufferCtx.clearRect(sx, sy, sw, sh);
+          this.bufferCtx.drawImage(this.tileCanvas, sx, sy, sw, sh, sx, sy, sw, sh);
+        } else if (!drawnCount) {
+          return;
+        }
+        const tBuf1 = pn ? pn() : 0;
 
+        const tRoi0 = pn ? pn() : 0;
         // 若存在 ROI 叠加层（通常来自对焦 ROI 循环），在瓦片渲染后叠加，避免被瓦片重绘覆盖
         this.applyRoiOverlay();
-        
+        const tRoi1 = pn ? pn() : 0;
+
         // 更新显示
         this.drawImgData = true;
+        const tDisp0 = pn ? pn() : 0;
         this.drawImageData();
+        const tDisp1 = pn ? pn() : 0;
+
+        if (perf && pn) {
+          const row = {
+            tileCtxDrawLoopMs: +(tDraw1 - tDraw0).toFixed(2),
+            tileToBufferMs: +(tBuf1 - tBuf0).toFixed(2),
+            roiOverlayMs: +(tRoi1 - tRoi0).toFixed(2),
+            mainCanvasDrawImageDataMs: +(tDisp1 - tDisp0).toFixed(2),
+            frameMs: +(tDisp1 - tDraw0).toFixed(2),
+            drawn: drawnCount,
+            fullRender: needsFullRender,
+            resized,
+          };
+          console.log('[TilePerf] renderTiles', row);
+          this.SendConsoleLogMsg(
+            `[TilePerf] renderTiles tileCtxDrawLoopMs=${row.tileCtxDrawLoopMs} tileToBufferMs=${row.tileToBufferMs} roiOverlayMs=${row.roiOverlayMs} mainCanvasDrawImageDataMs=${row.mainCanvasDrawImageDataMs} frameMs=${row.frameMs} drawn=${row.drawn} fullRender=${row.fullRender} resized=${row.resized}`,
+            'info'
+          );
+        }
       }
     },
 
@@ -7855,6 +8089,8 @@ export default {
       this.tilePendingLoads = new Set();
       this.tileAbortControllers = new Map();
       this.currentVisibleTiles = new Set();
+      this.tileDirtyKeys = new Set();
+      this.tileForceFullRender = true;
     },
 
     //*/*/*/*/*/*/*/*/*/*/*/
@@ -7901,27 +8137,43 @@ export default {
 
       // console.log('当前画布参数:\n bufferCanvas.width: ', this.bufferCanvas.width, '\n bufferCanvas.height: ', this.bufferCanvas.height, '\n ImageProportion: ', this.ImageProportion, '\n scale: ', this.scale, '\n visibleX: ', this.visibleX, '\n visibleY: ', this.visibleY, '\n visibleWidth: ', this.visibleWidth, '\n visibleHeight: ', this.visibleHeight, '\n ROI_x: ', this.ROI_x, '\n ROI_y: ', this.ROI_y, '\n ROI_length: ', this.ROI_length);
 
+      const prop = this.ImageProportion || (this.CanvasWidth / this.CanvasHeight);
 
-      // 计算可见区域
-      const newVisibleWidth = this.bufferCanvas.width * this.scale;
-      const newVisibleHeight = newVisibleWidth / this.ImageProportion;
-
-      // 计算可见区域x坐标
+      // 计算可见区域（传感器像素坐标；瓦片模式下 buffer 为下采样位图，与 getCurrentVisibleRect 一致）
+      let newVisibleWidth;
+      let newVisibleHeight;
       let newVisibleX = this.visibleX;
-      // 计算可见区域y坐标
       let newVisibleY = this.visibleY;
 
-      // 避免图像越界
-      if (newVisibleX - newVisibleWidth / 2 < 0) {
-        newVisibleX = newVisibleWidth / 2;
-      } else if (newVisibleX + newVisibleWidth / 2 > this.bufferCanvas.width) {
-        newVisibleX = this.bufferCanvas.width - newVisibleWidth / 2;
-      }
-
-      if (newVisibleY - newVisibleHeight / 2 < 0) {
-        newVisibleY = newVisibleHeight / 2;
-      } else if (newVisibleY + newVisibleHeight / 2 > this.bufferCanvas.height) {
-        newVisibleY = this.bufferCanvas.height - newVisibleHeight / 2;
+      if (this.tileGPM) {
+        const gpm = this.tileGPM;
+        const iw = Number(gpm.imageWidth) || 0;
+        const ih = Number(gpm.imageHeight) || 0;
+        newVisibleWidth = iw * this.scale;
+        newVisibleHeight = newVisibleWidth / prop;
+        if (newVisibleX - newVisibleWidth / 2 < 0) {
+          newVisibleX = newVisibleWidth / 2;
+        } else if (newVisibleX + newVisibleWidth / 2 > iw) {
+          newVisibleX = iw - newVisibleWidth / 2;
+        }
+        if (newVisibleY - newVisibleHeight / 2 < 0) {
+          newVisibleY = newVisibleHeight / 2;
+        } else if (newVisibleY + newVisibleHeight / 2 > ih) {
+          newVisibleY = ih - newVisibleHeight / 2;
+        }
+      } else {
+        newVisibleWidth = this.bufferCanvas.width * this.scale;
+        newVisibleHeight = newVisibleWidth / prop;
+        if (newVisibleX - newVisibleWidth / 2 < 0) {
+          newVisibleX = newVisibleWidth / 2;
+        } else if (newVisibleX + newVisibleWidth / 2 > this.bufferCanvas.width) {
+          newVisibleX = this.bufferCanvas.width - newVisibleWidth / 2;
+        }
+        if (newVisibleY - newVisibleHeight / 2 < 0) {
+          newVisibleY = newVisibleHeight / 2;
+        } else if (newVisibleY + newVisibleHeight / 2 > this.bufferCanvas.height) {
+          newVisibleY = this.bufferCanvas.height - newVisibleHeight / 2;
+        }
       }
 
       // 更新ROI区域
@@ -7931,27 +8183,44 @@ export default {
       const visibleTop = newVisibleY - newVisibleHeight / 2;
       const visibleBottom = newVisibleY + newVisibleHeight / 2;
 
-      // ROI 在主画面中的边长应与当前预览倍率保持一致。
-      const roiDisplayLength = Math.max(2, Number(this.RedBoxSideLength || 0) / Math.max(1, Number(this.cameraBin) || 1));
-      const roiLeft = this.ROI_x;
-      const roiRight = this.ROI_x + roiDisplayLength;
-      const roiTop = this.ROI_y;
-      const roiBottom = this.ROI_y + roiDisplayLength;
+      // 瓦片 + 已有 ROI 叠加层时，红框/选星圆须与叠加层像素原点一致（roiOverlayX/Y）。
+      // 若仅用 this.ROI_x/y，可能被 SaveJpgSuccess 之后的 SetRedBoxState（下一帧居中）覆盖，导致框/星与当前帧小图错位。
+      const roiOriginX =
+        this.tileGPM && this.roiOverlayImageData != null ? this.roiOverlayX : this.ROI_x;
+      const roiOriginY =
+        this.tileGPM && this.roiOverlayImageData != null ? this.roiOverlayY : this.ROI_y;
+
+      // 瓦片模式：visible/ROI 均为传感器像素坐标，红框边长即 RedBoxSideLength（勿再除以预览 bin，否则框偏小）。
+      // 非瓦片：底图可能为 bin 后分辨率，边长按 hardware bin 折算到与 ROI_x/y 同一空间。
+      const roiDisplayLength = this.tileGPM
+        ? Math.max(2, Number(this.RedBoxSideLength || 0))
+        : Math.max(2, Number(this.RedBoxSideLength || 0) / Math.max(1, Number(this.cameraBin) || 1));
+      const roiLeft = roiOriginX;
+      const roiRight = roiOriginX + roiDisplayLength;
+      const roiTop = roiOriginY;
+      const roiBottom = roiOriginY + roiDisplayLength;
 
       // 判断 ROI 区域是否在可见区域内
       const isRoiInVisible = roiRight >= visibleLeft && roiLeft <= visibleRight && roiBottom >= visibleTop && roiTop <= visibleBottom;
 
-      // 计算 ROI 区域在屏幕上的位置，中心点坐标
-      const roiScreenX = (this.ROI_x - visibleLeft) * (window.innerWidth / newVisibleWidth) + roiDisplayLength * window.innerWidth / newVisibleWidth / 2;
-      const roiScreenY = (this.ROI_y - visibleTop) * (window.innerHeight / newVisibleHeight) + roiDisplayLength * window.innerHeight / newVisibleHeight / 2;
-      this.$bus.$emit('setRedBoxLength', roiDisplayLength * window.innerWidth / newVisibleWidth, roiDisplayLength * window.innerHeight / newVisibleHeight);
+      // 计算 ROI 区域在屏幕上的位置（中心点；与主画布 CSS 尺寸一致，并加画布在视口中的偏移）
+      const layout = this.getMainCanvasLayoutRect();
+      const lw = layout.width;
+      const lh = layout.height;
+      const roiScreenX = layout.left + (roiOriginX - visibleLeft) * (lw / newVisibleWidth) + roiDisplayLength * lw / newVisibleWidth / 2;
+      const roiScreenY = layout.top + (roiOriginY - visibleTop) * (lh / newVisibleHeight) + roiDisplayLength * lh / newVisibleHeight / 2;
+      this.$bus.$emit('setRedBoxLength', roiDisplayLength * lw / newVisibleWidth, roiDisplayLength * lh / newVisibleHeight);
       this.$bus.$emit('setRedBoxPosition', roiScreenX, roiScreenY);
 
 
       const canvas = this.$refs.mainCanvas;
       const ctx = canvas.getContext('2d');
-      canvas.width = this.CanvasWidth;
-      canvas.height = this.CanvasHeight;
+      if (canvas.width !== this.CanvasWidth) {
+        canvas.width = this.CanvasWidth;
+      }
+      if (canvas.height !== this.CanvasHeight) {
+        canvas.height = this.CanvasHeight;
+      }
 
       // 动态插值平滑：缩小时开启更顺滑；放大到一定倍率后关闭更锐利
       // 注意：scale 越小表示越“放大”（可见区域越小，放大倍率越高）
@@ -7972,7 +8241,22 @@ export default {
       ctx.webkitImageSmoothingEnabled = smoothing;
       ctx.msImageSmoothingEnabled = smoothing;
 
-      ctx.drawImage(this.bufferCanvas, visibleLeft, visibleTop, newVisibleWidth, newVisibleHeight, 0, 0, canvas.width, canvas.height);
+      if (this.tileGPM) {
+        const trs = Number(this.tileRasterScale) > 0 ? Number(this.tileRasterScale) : 1;
+        ctx.drawImage(
+          this.bufferCanvas,
+          visibleLeft * trs,
+          visibleTop * trs,
+          newVisibleWidth * trs,
+          newVisibleHeight * trs,
+          0,
+          0,
+          canvas.width,
+          canvas.height
+        );
+      } else {
+        ctx.drawImage(this.bufferCanvas, visibleLeft, visibleTop, newVisibleWidth, newVisibleHeight, 0, 0, canvas.width, canvas.height);
+      }
 
       this.visibleX = newVisibleX;
       this.visibleY = newVisibleY;
@@ -7991,18 +8275,19 @@ export default {
       // 如果选择了星点，则根据选择位置，在ROI区域中绘制一个圆
       if (this.DrawSelectStarX != -1 && this.DrawSelectStarY != -1 && this.showSelectStar) {
         let radius, canvasStarX, canvasStarY, color;
+        const roiPrevBin = this.tileGPM ? 1 : Math.max(1, this.effectiveRoiPreviewBinFactor());
         // 如果有星点
         if (this.DrawSelectStarHFR != -1) {
           radius = this.DrawSelectStarHFR / this.scale * 2;
           if (radius <= 1) radius = 1;
-          canvasStarX = (this.DrawSelectStarX / this.cameraBin + this.ROI_x - visibleLeft) * ctx.canvas.width / newVisibleWidth;
-          canvasStarY = (this.DrawSelectStarY / this.cameraBin + this.ROI_y - visibleTop) * ctx.canvas.height / newVisibleHeight;
+          canvasStarX = (this.DrawSelectStarX / roiPrevBin + roiOriginX - visibleLeft) * ctx.canvas.width / newVisibleWidth;
+          canvasStarY = (this.DrawSelectStarY / roiPrevBin + roiOriginY - visibleTop) * ctx.canvas.height / newVisibleHeight;
           color = 'green'; // 有星点，绘制绿色的圆
         } else {
           // 否则，在选择的位置绘制一个圆
           radius = 10 / this.scale; // 你可以根据需要调整这个值
-          canvasStarX = (this.DrawSelectStarX / this.cameraBin + this.ROI_x - visibleLeft) * ctx.canvas.width / newVisibleWidth;
-          canvasStarY = (this.DrawSelectStarY / this.cameraBin + this.ROI_y - visibleTop) * ctx.canvas.height / newVisibleHeight;
+          canvasStarX = (this.DrawSelectStarX / roiPrevBin + roiOriginX - visibleLeft) * ctx.canvas.width / newVisibleWidth;
+          canvasStarY = (this.DrawSelectStarY / roiPrevBin + roiOriginY - visibleTop) * ctx.canvas.height / newVisibleHeight;
           color = 'red'; // 无星点，绘制红色的圆
         }
 
@@ -9821,6 +10106,8 @@ export default {
       this.isConnecting = false;
       if (this.drawer_2 == true) {
         this.drawer_2 = false
+        // 与二级抽屉一并收起设备页，避免 data-state 仅 page=open、drawer=closed，自动化误判「子菜单已打开」而跳过点击
+        this.isOpenDevicePage = false
       }
 
       this.stopLoading();
@@ -10321,27 +10608,31 @@ export default {
       const rect = canvas.getBoundingClientRect();// 获取 canvas 元素的边界矩形
       const x = event.clientX - rect.left;
       const y = event.clientY - rect.top;
+      const cw = Math.max(1, rect.width);
+      const ch = Math.max(1, rect.height);
       console.log('Mouse clicked at:', x, y);
       if (!this.isFocusLoopShooting) {
         // 期望中心（画布坐标 → 传感器像素坐标）
-        const desiredCenterX = (x / window.innerWidth * this.visibleWidth) + this.visibleX - this.visibleWidth / 2;
-        const desiredCenterY = (y / window.innerHeight * this.visibleHeight) + this.visibleY - this.visibleHeight / 2;
+        const desiredCenterX = (x / cw * this.visibleWidth) + this.visibleX - this.visibleWidth / 2;
+        const desiredCenterY = (y / ch * this.visibleHeight) + this.visibleY - this.visibleHeight / 2;
 
-        // ROI 边长（像素，偶数化），来源于固定 RedBoxSideLength
-        let side = this.RedBoxSideLength / this.cameraBin;
+        // ROI 边长（传感器像素；瓦片模式与全图逻辑坐标一致，勿再除以预览 bin）
+        let side = this.tileGPM
+          ? Number(this.RedBoxSideLength || 0)
+          : this.RedBoxSideLength / Math.max(1, Number(this.cameraBin) || 1);
         side = Math.max(2, Math.floor(side));
         if (side % 2 !== 0) side += 1; // 强制偶数
 
         // 将 ROI 左上角按中心反推，并约束在图像范围内
         const half = side / 2;
-        // ROI 边界约束以当前渲染底图尺寸为准（瓦片模式下 tileGPM / bufferCanvas）
+        // ROI 边界约束以传感器像素为准（瓦片合成 buffer 可能为下采样位图）
         const imgW =
-          (this.bufferCanvas && this.bufferCanvas.width) ? this.bufferCanvas.width :
-            (this.tileGPM && this.tileGPM.imageWidth) ? Number(this.tileGPM.imageWidth) :
+          (this.tileGPM && Number(this.tileGPM.imageWidth) > 0) ? Number(this.tileGPM.imageWidth) :
+            (this.bufferCanvas && this.bufferCanvas.width) ? this.bufferCanvas.width :
               Number(this.mainCameraSizeX);
         const imgH =
-          (this.bufferCanvas && this.bufferCanvas.height) ? this.bufferCanvas.height :
-            (this.tileGPM && this.tileGPM.imageHeight) ? Number(this.tileGPM.imageHeight) :
+          (this.tileGPM && Number(this.tileGPM.imageHeight) > 0) ? Number(this.tileGPM.imageHeight) :
+            (this.bufferCanvas && this.bufferCanvas.height) ? this.bufferCanvas.height :
               Number(this.mainCameraSizeY);
 
         let roiX = desiredCenterX - half;
@@ -10363,8 +10654,14 @@ export default {
         this.ROI_y = roiY;
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'sendRedBoxState:' + this.RedBoxSideLength + ':' + this.ROI_x + ':' + this.ROI_y);
       } else {
-        this.selectStarX = ((x / window.innerWidth * this.visibleWidth) + this.visibleX - this.visibleWidth / 2 - this.ROI_x) * this.cameraBin; // 计算选择位置的x坐标
-        this.selectStarY = ((y / window.innerHeight * this.visibleHeight) + this.visibleY - this.visibleHeight / 2 - this.ROI_y) * this.cameraBin; // 计算选择位置的y坐标
+        if (this.tileGPM) {
+          this.selectStarX = (x / cw * this.visibleWidth) + this.visibleX - this.visibleWidth / 2 - this.ROI_x;
+          this.selectStarY = (y / ch * this.visibleHeight) + this.visibleY - this.visibleHeight / 2 - this.ROI_y;
+        } else {
+          const roiPrevBin = Math.max(1, Number(this.cameraBin) || 1);
+          this.selectStarX = ((x / cw * this.visibleWidth) + this.visibleX - this.visibleWidth / 2 - this.ROI_x) * roiPrevBin;
+          this.selectStarY = ((y / ch * this.visibleHeight) + this.visibleY - this.visibleHeight / 2 - this.ROI_y) * roiPrevBin;
+        }
 
         if (this.selectStarX >= 0 && this.selectStarX < this.RedBoxSideLength &&
           this.selectStarY >= 0 && this.selectStarY < this.RedBoxSideLength) {
@@ -10404,23 +10701,23 @@ export default {
         if (isNaN(dx) || isNaN(dy)) {
           return;
         }
-        let newVisibleX = this.visibleX + dx / window.innerWidth * this.visibleWidth;
-        let newVisibleY = this.visibleY + dy / window.innerHeight * this.visibleHeight;
+        const layout = this.getMainCanvasLayoutRect();
+        let newVisibleX = this.visibleX + dx / layout.width * this.visibleWidth;
+        let newVisibleY = this.visibleY + dy / layout.height * this.visibleHeight;
         if (newVisibleX < 0) {
           newVisibleX = 0;
         }
         if (newVisibleY < 0) {
           newVisibleY = 0;
         }
-        // 关键修复：拖动边界应以“当前渲染底图”的尺寸为准（瓦片模式下是 tileGPM / bufferCanvas），
-        // 避免 mainCameraSizeX/Y 与瓦片基准尺寸不一致导致无法拖动/被钳制回原位。
+        // 拖动边界：瓦片模式用传感器像素尺寸（与 visibleX/Y 语义一致），不用下采样 buffer 尺寸
         const boundW =
-          (this.bufferCanvas && this.bufferCanvas.width) ? this.bufferCanvas.width :
-            (this.tileGPM && this.tileGPM.imageWidth) ? Number(this.tileGPM.imageWidth) :
+          (this.tileGPM && Number(this.tileGPM.imageWidth) > 0) ? Number(this.tileGPM.imageWidth) :
+            (this.bufferCanvas && this.bufferCanvas.width) ? this.bufferCanvas.width :
               Number(this.mainCameraSizeX);
         const boundH =
-          (this.bufferCanvas && this.bufferCanvas.height) ? this.bufferCanvas.height :
-            (this.tileGPM && this.tileGPM.imageHeight) ? Number(this.tileGPM.imageHeight) :
+          (this.tileGPM && Number(this.tileGPM.imageHeight) > 0) ? Number(this.tileGPM.imageHeight) :
+            (this.bufferCanvas && this.bufferCanvas.height) ? this.bufferCanvas.height :
               Number(this.mainCameraSizeY);
         if (Number.isFinite(boundW) && boundW > 0 && newVisibleX > boundW) {
           newVisibleX = boundW;
@@ -10524,28 +10821,31 @@ export default {
       const rect = canvas.getBoundingClientRect();// 获取 canvas 元素的边界矩形
       const x = touch.clientX - rect.left;
       const y = touch.clientY - rect.top;
+      const cw = Math.max(1, rect.width);
+      const ch = Math.max(1, rect.height);
       console.log('Touch at:', x, y);
       event.preventDefault();// 阻止默认事件，如页面滚动
       if (!this.isFocusLoopShooting) {
         // 期望中心（画布坐标 → 传感器像素坐标）
-        const desiredCenterX = (x / window.innerWidth * this.visibleWidth) + this.visibleX - this.visibleWidth / 2;
-        const desiredCenterY = (y / window.innerHeight * this.visibleHeight) + this.visibleY - this.visibleHeight / 2;
+        const desiredCenterX = (x / cw * this.visibleWidth) + this.visibleX - this.visibleWidth / 2;
+        const desiredCenterY = (y / ch * this.visibleHeight) + this.visibleY - this.visibleHeight / 2;
 
-        // ROI 边长（像素，偶数化），来源于固定 RedBoxSideLength
-        let side = this.RedBoxSideLength / this.cameraBin;
+        let side = this.tileGPM
+          ? Number(this.RedBoxSideLength || 0)
+          : this.RedBoxSideLength / Math.max(1, Number(this.cameraBin) || 1);
         side = Math.max(2, Math.floor(side));
         if (side % 2 !== 0) side += 1; // 强制偶数
 
         // 将 ROI 左上角按中心反推，并约束在图像范围内
         const half = side / 2;
-        // ROI 边界约束以当前渲染底图尺寸为准（瓦片模式下 tileGPM / bufferCanvas）
+        // ROI 边界约束以传感器像素为准（瓦片合成 buffer 可能为下采样位图）
         const imgW =
-          (this.bufferCanvas && this.bufferCanvas.width) ? this.bufferCanvas.width :
-            (this.tileGPM && this.tileGPM.imageWidth) ? Number(this.tileGPM.imageWidth) :
+          (this.tileGPM && Number(this.tileGPM.imageWidth) > 0) ? Number(this.tileGPM.imageWidth) :
+            (this.bufferCanvas && this.bufferCanvas.width) ? this.bufferCanvas.width :
               Number(this.mainCameraSizeX);
         const imgH =
-          (this.bufferCanvas && this.bufferCanvas.height) ? this.bufferCanvas.height :
-            (this.tileGPM && this.tileGPM.imageHeight) ? Number(this.tileGPM.imageHeight) :
+          (this.tileGPM && Number(this.tileGPM.imageHeight) > 0) ? Number(this.tileGPM.imageHeight) :
+            (this.bufferCanvas && this.bufferCanvas.height) ? this.bufferCanvas.height :
               Number(this.mainCameraSizeY);
 
         let roiX = desiredCenterX - half;
@@ -10567,8 +10867,14 @@ export default {
         this.ROI_y = roiY;
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'sendRedBoxState:' + this.RedBoxSideLength + ':' + this.ROI_x + ':' + this.ROI_y);
       } else {
-        this.selectStarX = ((x / window.innerWidth * this.visibleWidth) + this.visibleX - this.visibleWidth / 2 - this.ROI_x) * this.cameraBin; // 计算选择位置的x坐标
-        this.selectStarY = ((y / window.innerHeight * this.visibleHeight) + this.visibleY - this.visibleHeight / 2 - this.ROI_y) * this.cameraBin; // 计算选择位置的y坐标
+        if (this.tileGPM) {
+          this.selectStarX = (x / cw * this.visibleWidth) + this.visibleX - this.visibleWidth / 2 - this.ROI_x;
+          this.selectStarY = (y / ch * this.visibleHeight) + this.visibleY - this.visibleHeight / 2 - this.ROI_y;
+        } else {
+          const roiPrevBin = Math.max(1, Number(this.cameraBin) || 1);
+          this.selectStarX = ((x / cw * this.visibleWidth) + this.visibleX - this.visibleWidth / 2 - this.ROI_x) * roiPrevBin;
+          this.selectStarY = ((y / ch * this.visibleHeight) + this.visibleY - this.visibleHeight / 2 - this.ROI_y) * roiPrevBin;
+        }
 
         if (this.selectStarX >= 0 && this.selectStarX < this.RedBoxSideLength &&
           this.selectStarY >= 0 && this.selectStarY < this.RedBoxSideLength) {
@@ -10660,22 +10966,23 @@ export default {
             return;
           }
 
-          let newVisibleX = this.visibleX + dx / window.innerWidth * this.visibleWidth;
-          let newVisibleY = this.visibleY + dy / window.innerHeight * this.visibleHeight;
+          const layout = this.getMainCanvasLayoutRect();
+          let newVisibleX = this.visibleX + dx / layout.width * this.visibleWidth;
+          let newVisibleY = this.visibleY + dy / layout.height * this.visibleHeight;
           if (newVisibleX < 0) {
             newVisibleX = 0;
           }
           if (newVisibleY < 0) {
             newVisibleY = 0;
           }
-          // 同鼠标拖动：边界使用当前渲染底图尺寸（瓦片模式下 tileGPM / bufferCanvas）
+          // 同鼠标拖动：瓦片模式用传感器像素尺寸
           const boundW =
-            (this.bufferCanvas && this.bufferCanvas.width) ? this.bufferCanvas.width :
-              (this.tileGPM && this.tileGPM.imageWidth) ? Number(this.tileGPM.imageWidth) :
+            (this.tileGPM && Number(this.tileGPM.imageWidth) > 0) ? Number(this.tileGPM.imageWidth) :
+              (this.bufferCanvas && this.bufferCanvas.width) ? this.bufferCanvas.width :
                 Number(this.mainCameraSizeX);
           const boundH =
-            (this.bufferCanvas && this.bufferCanvas.height) ? this.bufferCanvas.height :
-              (this.tileGPM && this.tileGPM.imageHeight) ? Number(this.tileGPM.imageHeight) :
+            (this.tileGPM && Number(this.tileGPM.imageHeight) > 0) ? Number(this.tileGPM.imageHeight) :
+              (this.bufferCanvas && this.bufferCanvas.height) ? this.bufferCanvas.height :
                 Number(this.mainCameraSizeY);
           if (Number.isFinite(boundW) && boundW > 0 && newVisibleX > boundW) {
             newVisibleX = boundW;
@@ -10716,14 +11023,12 @@ export default {
           const dx = this.currentTouchX[0] - this.currentTouchX[1];
           const dy = this.currentTouchY[0] - this.currentTouchY[1];
           const distance = Math.sqrt(dx * dx + dy * dy);
-          this.SendConsoleLogMsg('距离变化 distance:' + distance, 'info');
           if (this.startTouchDistance == 0) {
             this.startTouchDistance = distance;
           }
-          // 计算缩放比例的变化量
+          // 两指张开距离变大 → 应放大图像 → 本项目中 scale 越小越放大，故用除法而非乘法
           const scaleChange = distance / this.startTouchDistance;
-          this.SendConsoleLogMsg('距离变化比例 scaleChange:' + scaleChange, 'info');
-          let newScale = this.scale * scaleChange; // 更新缩放比例
+          let newScale = this.scale / scaleChange;
           if (newScale < 0.01) {
             newScale = 0.01;
           }
@@ -10731,15 +11036,11 @@ export default {
             newScale = 1.0;
           }
           if (newScale != this.scale) {
-            this.SendConsoleLogMsg('缩放比例变化,缩放比例:' + newScale, 'info');
-            this.scale = newScale; // 更新缩放比例
+            this.scale = newScale;
             this.$bus.$emit('setScale', this.scale);
             this.emitTileLevelInfo();
             this.drawImageData();
-            // 触发瓦片重新加载
             this.onViewportChange();
-          } else {
-            this.SendConsoleLogMsg('缩放比例没有变化,缩放比例:' + this.scale, 'info');
           }
           this.startTouchDistance = distance; // 更新两个触摸点之间的距离
         }, 100);
@@ -10797,8 +11098,37 @@ export default {
       this.onViewportChange();
     },
 
+    /** 非瓦片模式下选星等：与硬件 bin 对齐。ROI 循环 .bin 已与后端一致为全分辨率（见 showRoiImage 中 roiBinFactor=1）。 */
+    effectiveRoiPreviewBinFactor() {
+      const gpm = this.tileGPM;
+      const fromTile = gpm && gpm.previewBinningFactor != null && gpm.previewBinningFactor !== '';
+      const raw = fromTile ? parseInt(gpm.previewBinningFactor, 10) : parseInt(this.cameraBin || 1, 10);
+      const n = Number.isFinite(raw) && raw > 0 ? raw : 1;
+      return Math.max(1, n);
+    },
+
+    /** 主画布在视口中的布局（CSS 像素）。ROI 点击/红框/拖动须与此一致，勿用 window.innerWidth（侧栏时比例与偏移错误）。 */
+    getMainCanvasLayoutRect() {
+      const el = this.$refs.mainCanvas;
+      if (!el || typeof el.getBoundingClientRect !== 'function') {
+        return {
+          left: 0,
+          top: 0,
+          width: Math.max(1, window.innerWidth),
+          height: Math.max(1, window.innerHeight)
+        };
+      }
+      const r = el.getBoundingClientRect();
+      return {
+        left: Number.isFinite(r.left) ? r.left : 0,
+        top: Number.isFinite(r.top) ? r.top : 0,
+        width: Math.max(1, r.width || window.innerWidth),
+        height: Math.max(1, r.height || window.innerHeight)
+      };
+    },
+
     // 显示ROI图像
-    showRoiImage(fileName, destX, destY) {
+  showRoiImage(fileName, destX, destY) {
       if (this.RedBoxSideLength == 0 || this.RedBoxSideLength == null) {
         this.SendConsoleLogMsg('RedBoxSideLength is 0 or null', 'error');
         return;
@@ -10838,13 +11168,8 @@ export default {
           let src, imgData, targetImg8;
           try {
             const uint16Array = new Uint16Array(buffer);
-            // ROI 帧尺寸要与后端写入保持一致：
-            // - 非瓦片模式：使用 cameraBin
-            // - 瓦片模式：后端可能把 MainCameraBinning 固定回 1（坐标不缩放），但 ROI 叠加仍按 previewBinningFactor 写出
-            //   所以这里优先使用 tileGPM.previewBinningFactor
-            const roiBinFactor = (this.tileGPM && this.tileGPM.previewBinningFactor)
-              ? parseInt(this.tileGPM.previewBinningFactor)
-              : parseInt(this.cameraBin || 1);
+            // 与后端 saveFitsAsJPG 一致：ROI 为相机读出全分辨率，不做软合并
+            const roiBinFactor = 1;
             let newWidth = parseInt(this.RedBoxSideLength / roiBinFactor);
             let newHeight = parseInt(this.RedBoxSideLength / roiBinFactor);
             if (newWidth % 2 != 0) {
@@ -10981,20 +11306,37 @@ export default {
     /**
      * 将 ROI 叠加层应用到 bufferCanvas（仅影响显示层，不污染瓦片缓存）
      * - 瓦片模式下 renderTiles() 每次拷贝 tileCanvas → bufferCanvas 后都会调用本方法，保证 ROI 不被覆盖
+     * - 绘制宽高须与解码图在传感器上的实际像素一致。SDK 可能输出 500×500 而界面 RedBoxSideLength 仍为 502/512；
+     *   若用 RedBoxSideLength×tileRasterScale 作目标矩形会把小图拉伸，导致与瓦片底图错位。
      */
     applyRoiOverlay() {
       if (!this.roiOverlayImageData || !this.bufferCtx || !this.bufferCanvas) return;
 
-      const x = Math.max(0, Math.floor(this.roiOverlayX || 0));
-      const y = Math.max(0, Math.floor(this.roiOverlayY || 0));
+      const s = Number(this.tileRasterScale) > 0 ? Number(this.tileRasterScale) : 1;
+      // roiOverlayX/Y：传感器像素；bufferCanvas 与 tileCanvas 同为「传感器 × tileRasterScale」位图坐标
+      const bx = Math.max(0, Math.floor((this.roiOverlayX || 0) * s));
+      const by = Math.max(0, Math.floor((this.roiOverlayY || 0) * s));
 
-      // 边界保护：避免越界导致异常
       const w = this.roiOverlayImageData.width;
       const h = this.roiOverlayImageData.height;
-      if (x >= this.bufferCanvas.width || y >= this.bufferCanvas.height) return;
-      if (x + w <= 0 || y + h <= 0) return;
+      const sensorW = Math.max(1, w);
+      const sensorH = Math.max(1, h);
+      const dw = Math.max(1, Math.round(sensorW * s));
+      const dh = Math.max(1, Math.round(sensorH * s));
 
-      this.bufferCtx.putImageData(this.roiOverlayImageData, x, y);
+      if (bx >= this.bufferCanvas.width || by >= this.bufferCanvas.height) return;
+      if (bx + dw <= 0 || by + dh <= 0) return;
+
+      const tmp = document.createElement('canvas');
+      tmp.width = w;
+      tmp.height = h;
+      const tctx = tmp.getContext('2d');
+      if (!tctx) return;
+      tctx.putImageData(this.roiOverlayImageData, 0, 0);
+      const prevSmooth = this.bufferCtx.imageSmoothingEnabled;
+      this.bufferCtx.imageSmoothingEnabled = false;
+      this.bufferCtx.drawImage(tmp, 0, 0, w, h, bx, by, dw, dh);
+      this.bufferCtx.imageSmoothingEnabled = prevSmooth;
     },
     setShowSelectStar(state) {
       this.showSelectStar = state;

@@ -23,16 +23,20 @@
  * - E2E_CAPTURE_SAVE_FOLDER：保存文件夹选项文案（如 local）。
  * - E2E_CAPTURE_EXPOSURE：曝光预设（如 10ms、1s）。
  * - E2E_CAPTURE_COUNT：拍摄次数（正整数），用于 maincamera-connect-capture，默认 1。
- * - E2E_WAIT_CAPTURE_TIMEOUT_MS：等待单次拍摄完成的超时（毫秒）。
+ * - E2E_WAIT_CAPTURE_TIMEOUT_MS：无法从曝光解析时的回退超时（毫秒）；默认可由单次拍摄按「曝光 + 60s」计算。
+ * - E2E_CAPTURE_READY_TIMEOUT_MS：等待拍摄按钮 data-capture-ready 的超时（毫秒），与连拍解锁对齐。
  * - E2E_DO_BIND_ALLOCATION：连接后是否执行设备分配。
  * - E2E_ALLOCATION_DEVICE_MATCH：设备分配时优先匹配的设备文案。
+ * - E2E_DEVICES_JSON：多设备连接 JSON 数组（与 flowParams.devices 一致），会合并进 flowParams；单行字符串，如 [{"deviceType":"MainCamera","allocationDeviceMatch":"minicam8"},{"deviceType":"Guider","allocationDeviceMatch":"462"}]
  * - E2E_GUIDER_FOCAL_LENGTH_MM / E2E_GUIDER_GAIN / E2E_GUIDER_OFFSET：导星菜单焦距、增益、偏置。
  * - E2E_GUIDER_MULTI_STAR：导星菜单是否开启多星导星（1/0 或 true/false）。
  * - E2E_GUIDER_RA_DIRECTION / E2E_GUIDER_DEC_DIRECTION：导星菜单 RA/DEC 单步导星方向。
  * - E2E_GUIDER_EXPOSURE：导星页曝光档位（500ms、1s、2s）。
  * - E2E_GUIDER_INTERACT_JSON：导星页交互对象（loopExposure/guiding/dataClear/rangeSwitch/recalibrate/expTime）。
  * - E2E_POWER_MANAGEMENT_INTERACT：逗号分隔的 key（output1/2、restart-quarcs、restart、shutdown、force-update 等），用于 power-management 打开后的页面内交互。
- * - E2E_IMAGE_MANAGER_INTERACT：逗号分隔的 key（moveToUsb、delete、download、imageFileSwitch、refresh、panelClose），仅这些项为 true，用于 image-file-manager 打开后面板内交互。
+ * - E2E_IMAGE_MANAGER_INTERACT：逗号分隔的 key（moveToUsb、delete、download、imageFileSwitch、refresh、panelClose、deleteConfirm、deleteCancel、usbTransferConfirm、usbTransferCancel、downloadConfirm、downloadCancel、downloadLocationContinue、downloadLocationCancel、selectAllInOpenFolder），用于 image-file-manager；可与 E2E_IMAGE_MANAGER_INTERACT_JSON 合并（JSON 覆盖同名项）。
+ * - E2E_IMAGE_MANAGER_INTERACT_JSON：imageManagerInteract 对象的 JSON（如 openFolderIndex、deleteConfirmDialog、usbSelectIndex 等），与 E2E_FLOW_PARAMS_JSON 及逗号 env 合并。
+ * - E2E_IMAGE_MANAGER_OPEN_FOLDER_INDEX / E2E_IMAGE_MANAGER_USB_SELECT_INDEX / E2E_IMAGE_MANAGER_DOWNLOAD_CONCURRENCY：可选数值，分别合并到 openFolderIndex、usbSelectIndex、downloadConcurrency（并发仅 1/2/3）。
  * - E2E_FOCUSER_INTERACT_JSON / E2E_CFW_INTERACT_JSON / E2E_POLAR_AXIS_INTERACT_JSON / E2E_SCHEDULE_INTERACT_JSON：复杂交互对象的 JSON。
  *
  * 示例：只执行清理更新包
@@ -139,7 +143,49 @@ export function resolveFlowParamsFromEnv(defaults: Partial<CliFlowParams> = {}):
       imageFileSwitch: imKeys.includes('imagefileswitch'),
       refresh: imKeys.includes('refresh'),
       panelClose: imKeys.includes('panelclose'),
+      deleteConfirmDialog: imKeys.includes('deleteconfirm')
+        ? true
+        : imKeys.includes('deletecancel')
+          ? 'cancel'
+          : undefined,
+      usbTransferConfirmDialog: imKeys.includes('usbtransferconfirm')
+        ? true
+        : imKeys.includes('usbtransfercancel')
+          ? 'cancel'
+          : undefined,
+      downloadConfirmDialog: imKeys.includes('downloadconfirm')
+        ? true
+        : imKeys.includes('downloadcancel')
+          ? 'cancel'
+          : undefined,
+      downloadLocationReminderDialog: imKeys.includes('downloadlocationcontinue')
+        ? true
+        : imKeys.includes('downloadlocationcancel')
+          ? 'cancel'
+          : undefined,
+      selectAllInOpenFolder: imKeys.includes('selectallinopenfolder'),
     }
+  }
+  const imJson = parseJsonObject<CliFlowParams['imageManagerInteract']>(env.E2E_IMAGE_MANAGER_INTERACT_JSON)
+  if (imJson && typeof imJson === 'object') {
+    merged.imageManagerInteract = { ...(merged.imageManagerInteract ?? {}), ...imJson }
+  }
+
+  const imPatch: Partial<NonNullable<CliFlowParams['imageManagerInteract']>> = {}
+  if (env.E2E_IMAGE_MANAGER_OPEN_FOLDER_INDEX !== undefined && env.E2E_IMAGE_MANAGER_OPEN_FOLDER_INDEX !== '') {
+    const n = parseNumber(env.E2E_IMAGE_MANAGER_OPEN_FOLDER_INDEX, NaN)
+    if (Number.isFinite(n) && n >= 0) imPatch.openFolderIndex = Math.floor(n)
+  }
+  if (env.E2E_IMAGE_MANAGER_USB_SELECT_INDEX !== undefined && env.E2E_IMAGE_MANAGER_USB_SELECT_INDEX !== '') {
+    const n = parseNumber(env.E2E_IMAGE_MANAGER_USB_SELECT_INDEX, NaN)
+    if (Number.isFinite(n) && n >= 0) imPatch.usbSelectIndex = Math.floor(n)
+  }
+  if (env.E2E_IMAGE_MANAGER_DOWNLOAD_CONCURRENCY !== undefined && env.E2E_IMAGE_MANAGER_DOWNLOAD_CONCURRENCY !== '') {
+    const n = parseNumber(env.E2E_IMAGE_MANAGER_DOWNLOAD_CONCURRENCY, NaN)
+    if (n === 1 || n === 2 || n === 3) imPatch.downloadConcurrency = n as 1 | 2 | 3
+  }
+  if (Object.keys(imPatch).length > 0) {
+    merged.imageManagerInteract = { ...(merged.imageManagerInteract ?? {}), ...imPatch }
   }
 
   if (env.E2E_GENERAL_SETTINGS_RESTORE_AFTER_MS !== undefined) {
@@ -209,11 +255,21 @@ export function resolveFlowParamsFromEnv(defaults: Partial<CliFlowParams> = {}):
     const n = parseNumber(env.E2E_WAIT_CAPTURE_TIMEOUT_MS, 0)
     if (Number.isFinite(n) && n > 0) merged.waitCaptureTimeoutMs = n
   }
+  if (env.E2E_CAPTURE_READY_TIMEOUT_MS !== undefined && env.E2E_CAPTURE_READY_TIMEOUT_MS !== '') {
+    const n = parseNumber(env.E2E_CAPTURE_READY_TIMEOUT_MS, 0)
+    if (Number.isFinite(n) && n > 0) merged.captureReadyTimeoutMs = n
+  }
   if (env.E2E_DO_BIND_ALLOCATION !== undefined && env.E2E_DO_BIND_ALLOCATION !== '') {
     merged.doBindAllocation = parseBool(env.E2E_DO_BIND_ALLOCATION, true)
   }
   if (env.E2E_ALLOCATION_DEVICE_MATCH?.trim()) {
     merged.allocationDeviceMatch = env.E2E_ALLOCATION_DEVICE_MATCH.trim()
+  }
+  if (env.E2E_DEVICES_JSON?.trim()) {
+    const arr = parseJsonObject<unknown>(env.E2E_DEVICES_JSON)
+    if (Array.isArray(arr) && arr.length > 0) {
+      merged.devices = arr as CliFlowParams['devices']
+    }
   }
 
   if (env.E2E_GUIDER_FOCAL_LENGTH_MM?.trim()) {

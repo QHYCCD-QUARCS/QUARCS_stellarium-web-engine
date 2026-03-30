@@ -22,11 +22,17 @@
         </div>
       </button>
 
-      <!-- <button @click="saveMessages" class="save-button" data-testid="ui-indi-debug-dialog-btn-save-messages">
+      <button
+        type="button"
+        :title="$t('Copy current logs')"
+        @click="copyMessagesToClipboard"
+        class="save-button"
+        data-testid="ui-indi-debug-dialog-btn-copy-messages"
+      >
         <div style="display: flex; justify-content: center; align-items: center;">
           <img src="@/assets/images/svg/ui/Share.svg" height="20px" style="min-height: 20px; pointer-events: none;"></img>
         </div>
-      </button> -->
+      </button>
 
       <button @click="toggleErrorDebug" class="ErrorMsg-button" data-testid="ui-indi-debug-dialog-btn-toggle-error-debug">
         <template v-if="isErrorDebugActive">
@@ -161,33 +167,41 @@ export default {
       this.AllMessages = [];  // 清空消息数组
     },
 
-    saveMessages() {
+    /** 复制当前列表中可见日志（受 Client/Server/仅错误 筛选影响） */
+    copyMessagesToClipboard() {
       const messagesToSave = this.ShowMessages.map(msg => msg.msgtext).join('\n');
-      
-      // 创建一个按钮并绑定到 Clipboard.js
+      const ok = () => {
+        this.$bus.$emit('showMsgBox', this.$t('Messages copied to clipboard!'), 'success');
+      };
+      const fail = () => {
+        this.$bus.$emit('showMsgBox', this.$t('Failed to copy messages!'), 'error');
+      };
+
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        navigator.clipboard.writeText(messagesToSave).then(ok).catch(() => {
+          this._copyMessagesWithClipboardJs(messagesToSave, ok, fail);
+        });
+        return;
+      }
+      this._copyMessagesWithClipboardJs(messagesToSave, ok, fail);
+    },
+
+    _copyMessagesWithClipboardJs(messagesToSave, onSuccess, onFail) {
       const button = document.createElement('button');
       button.setAttribute('data-clipboard-text', messagesToSave);
       document.body.appendChild(button);
-      
-      // 初始化 Clipboard.js 实例
       const clipboard = new Clipboard(button);
-      
       clipboard.on('success', () => {
-        // this.$emit('showToast', 'Messages copied to clipboard!');
-        console.log('Messages copied to clipboard!');
-        this.$bus.$emit('showMsgBox', 'Messages copied to clipboard!', 'success');
+        onSuccess();
+        clipboard.destroy();
         document.body.removeChild(button);
       });
-      
       clipboard.on('error', (err) => {
         console.error('Clipboard.js error: ', err);
-        // this.$emit('showToast', 'Failed to copy messages!');
-        console.log('Failed to copy messages!');
-        this.$bus.$emit('showMsgBox', 'Failed to copy messages!', 'error');
+        onFail();
+        clipboard.destroy();
         document.body.removeChild(button);
       });
-      
-      // 触发点击事件
       button.click();
     },
 
