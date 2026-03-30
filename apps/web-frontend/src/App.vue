@@ -1137,7 +1137,7 @@ export default {
         { driverType: 'MainCamera', label: 'Gain', value: '', inputType: 'slider', inputMin: 0, inputMax: 0, inputStep: 1 },
         { driverType: 'MainCamera', label: 'Offset', value: '', inputType: 'slider', inputMin: 0, inputMax: 0, inputStep: 1 },
 
-        { driverType: 'MainCamera', label: 'LoopCaptureNum', value: 0, inputType: 'number', min: 0,max: 1000, step: 1 },  // 循环拍摄次数
+        // { driverType: 'MainCamera', label: 'LoopCaptureNum', value: 0, inputType: 'number', min: 0,max: 1000, step: 1 },  // 循环拍摄次数
 
         // QHYCCD SDK 专用：主相机三态采集模式（Single / Live / Burst）
         { driverType: 'MainCamera', label: 'Capture Mode', value: 'Single', inputType: 'select', selectValue: ['Single', 'Live', 'Burst'], qhyOnly: true },
@@ -1148,7 +1148,7 @@ export default {
         { driverType: 'MainCamera', label: 'Auto Save', value: false, inputType: 'switch' }, // 自动保存
         { driverType: 'MainCamera', label: 'Save Failed Parse', value: false, inputType: 'switch' }, // 保存解析失败图片
         { driverType: 'MainCamera', label: 'Save Folder', value: 'local', inputType: 'select' ,selectValue: ['local']}, // 保存文件夹
-        { driverType: 'MainCamera', label: 'Tile Build Mode', value: 'pyramid', inputType: 'select', selectValue: ['pyramid', 'merged_single_level'] }, // 瓦片构建模式
+        // { driverType: 'MainCamera', label: 'Tile Build Mode', value: 'merged_single_level', inputType: 'select', selectValue: ['pyramid', 'merged_single_level'] }, // 瓦片构建模式
         // 循环拍摄
         // { driverType: 'MainCamera', label: 'Exposuer delay', value: 0, inputType: 'number' }, // 循环拍摄间隔时间
         // { driverType: 'MainCamera', label: 'Loop Capture', value: false, inputType: 'switch' },  // 循环拍摄
@@ -2450,7 +2450,7 @@ export default {
                     previewHeight: (parts.length >= 14) ? parseInt(parts[12]) : null,
                     previewBinningFactor: (parts.length >= 14) ? parseInt(parts[13]) : null,
                     frameId: (parts.length >= 15) ? parseInt(parts[14]) : null,
-                    buildMode: (parts.length >= 16) ? parts[15] : 'pyramid',
+                    buildMode: (parts.length >= 16) ? parts[15] : 'merged_single_level',
                   };
                   this.handleTileGPM(gpm);
                 }
@@ -5772,7 +5772,8 @@ export default {
     // ========================= 瓦片金字塔方法 =========================
 
     normalizeTileBuildModeValue(value) {
-      return String(value || '').trim() === 'merged_single_level' ? 'merged_single_level' : 'pyramid';
+      const v = String(value || '').trim();
+      return v === 'pyramid' ? 'pyramid' : 'merged_single_level';
     },
 
     /**
