@@ -2392,8 +2392,15 @@ export default {
               case 'SaveJpgSuccess':
                 if (parts.length === 4) {
                   const fileName = parts[1];
-                  const roi_x = parseInt(parts[2]);
-                  const roi_y = parseInt(parts[3]);
+                  const roi_x = parseFloat(parts[2]);
+                  const roi_y = parseFloat(parts[3]);
+                  if (!Number.isFinite(roi_x) || !Number.isFinite(roi_y)) {
+                    this.SendConsoleLogMsg(
+                      `SaveJpgSuccess: invalid ROI coords parts=[${parts[2]}, ${parts[3]}]`,
+                      'error'
+                    );
+                    break;
+                  }
                   this.ROI_x = roi_x;
                   this.ROI_y = roi_y;
 
@@ -11234,6 +11241,16 @@ export default {
             // 以消息携带的 ROI 坐标为准（若缺失则回退当前状态）
             const x = Number.isFinite(destX) ? destX : this.ROI_x;
             const y = Number.isFinite(destY) ? destY : this.ROI_y;
+            {
+              const gpm = this.tileGPM;
+              const trs = Number(this.tileRasterScale) > 0 ? Number(this.tileRasterScale) : 1;
+              const bxDbg = Math.max(0, Math.floor((x || 0) * trs));
+              const byDbg = Math.max(0, Math.floor((y || 0) * trs));
+              this.SendConsoleLogMsg(
+                `ROI_align | showRoiImage dest=(${x},${y}) tileWH=${gpm ? `${gpm.imageWidth}x${gpm.imageHeight}` : 'n/a'} trs=${trs} overlayBuf_xy=(${bxDbg},${byDbg}) file=${fileName}`,
+                'info'
+              );
+            }
 
             if (this.tileGPM) {
               // 瓦片模式：保存为叠加层，由 renderTiles() 在每次瓦片重绘后自动叠加，避免丢失
