@@ -11,6 +11,13 @@ import {
   type ConfirmDialogActionMode,
   type ConfirmDialogVariant,
 } from '../shared/dialogConstants'
+import {
+  DEFAULT_UNIFIED_RUNTIME_STATE,
+  normalizeUnifiedRuntimeState,
+  type UnifiedLogEntry,
+  type UnifiedOperationStatus,
+  type UnifiedRuntimeState,
+} from './unifiedRuntime'
 
 export type MainPageName = 'Stel' | 'MainCamera' | 'GuiderCamera'
 export type DrawerState = 'open' | 'closed'
@@ -93,6 +100,16 @@ export interface PageStatus {
   mcpPanelVisible: boolean
   capturePanelVisible: boolean
   guiderPanelVisible: boolean
+  operationState: UnifiedRuntimeState
+  deviceRuntimeState: Array<{
+    deviceType: string
+    connectionState: string | null
+    activeOperationKey: string | null
+    activeOperationType: string | null
+    activeStatus: UnifiedOperationStatus | null
+    lastError: string | null
+  }>
+  recentLogs: UnifiedLogEntry[]
 }
 
 const PAGE_STATUS_EVALUATE_SCRIPT = `(() => {
@@ -268,6 +285,7 @@ const PAGE_STATUS_EVALUATE_SCRIPT = `(() => {
     mcpPanelVisible: mcpPanel ? visible(mcpPanel) : false,
     capturePanelVisible: cpPanel ? visible(cpPanel) : false,
     guiderPanelVisible: chartRoot ? visible(chartRoot) : false,
+    unifiedRuntime: window.__QUARCS_UNIFIED_RUNTIME__ || null,
   }
 })()`
 
@@ -339,6 +357,25 @@ const DEFAULT_STATUS: PageStatus = {
   mcpPanelVisible: false,
   capturePanelVisible: false,
   guiderPanelVisible: false,
+  operationState: DEFAULT_UNIFIED_RUNTIME_STATE,
+  deviceRuntimeState: [],
+  recentLogs: [],
+}
+
+function buildDeviceRuntimeState(status: Pick<PageStatus, 'devices'>, operationState: UnifiedRuntimeState): PageStatus['deviceRuntimeState'] {
+  return status.devices.map((device) => {
+    const ops = operationState.operationsByDevice[device.deviceType] ?? []
+    const active = ops.find((op) => op.status === 'running' || op.status === 'waiting') ?? null
+    const failed = ops.find((op) => op.status === 'failed' || Boolean(op.error)) ?? null
+    return {
+      deviceType: device.deviceType,
+      connectionState: device.connectionState,
+      activeOperationKey: active?.operationKey ?? null,
+      activeOperationType: active?.operationType ?? null,
+      activeStatus: active?.status ?? null,
+      lastError: failed?.error ?? failed?.message ?? null,
+    }
+  })
 }
 
 function normalizeStatus(raw: unknown): PageStatus {
@@ -351,6 +388,7 @@ function normalizeStatus(raw: unknown): PageStatus {
   const capture = (s.capture as PageStatus['capture']) ?? DEFAULT_STATUS.capture
   const guider = (s.guider as PageStatus['guider']) ?? DEFAULT_STATUS.guider
   const polarAxis = (s.polarAxis as PageStatus['polarAxis']) ?? DEFAULT_STATUS.polarAxis
+  const operationState = normalizeUnifiedRuntimeState((s as Record<string, unknown>).unifiedRuntime)
   const confirm = dialogs.confirm ?? { visible: false, availableButtons: [] }
   return {
     root: Boolean(s.root),
@@ -432,6 +470,9 @@ function normalizeStatus(raw: unknown): PageStatus {
     mcpPanelVisible: Boolean(s.mcpPanelVisible),
     capturePanelVisible: Boolean(s.capturePanelVisible),
     guiderPanelVisible: Boolean(s.guiderPanelVisible),
+    operationState,
+    deviceRuntimeState: buildDeviceRuntimeState({ devices: Array.isArray(s.devices) ? (s.devices as DeviceRuntimeStatus[]) : [] }, operationState),
+    recentLogs: operationState.recentLogs,
   }
 }
 

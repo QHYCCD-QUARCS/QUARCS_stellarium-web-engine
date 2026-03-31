@@ -943,6 +943,7 @@ import ProgressBar from '@/components/ProgressBar.vue';
 import MeridianFlipNotifier from '@/components/MeridianFlipNotifier.vue';
 import RaDecDialog from '@/components/RaDecDialog.vue';
 import NumberKeyboard from '@/components/NumberKeyboard.vue';
+import { ensureUnifiedRuntime, recordClientCommand, recordClientLog, recordServerRawMessage, setUnifiedWebSocketState } from '@/runtime/unifiedRuntime';
 
 let glTestCircle;
 let glLayer;
@@ -1487,6 +1488,7 @@ export default {
     // MessageBox,
   },
   created() {
+    ensureUnifiedRuntime();
     this.$bus.$on('AppSendMessage', this.sendMessage);
     this.$bus.$on('AppUpdateDevices', this.updateDevices);
     this.$bus.$on('Switch-MainPage', this.handleButtonTestClick);
@@ -2125,6 +2127,7 @@ export default {
 
       this.websocket.onopen = () => {
         this.websocketState = 'connected';
+        setUnifiedWebSocketState('connected', 'WebSocket connected');
         this.networkDisconnected = false; // WebSocket连接成功时重置网络连接状态
         if (this.disconnectTimeoutTriggered) {
           this.callShowMessageBox('WebSocket connected', 'success');
@@ -2138,6 +2141,9 @@ export default {
         // console.log('QHYCCD | Received message:', message.data);
 
         const data = JSON.parse(message.data);
+        if (data && typeof data.message === 'string') {
+          recordServerRawMessage(data.message);
+        }
 
         if (data.type === 'QT_Return') {
           const parts = data.message.split(':');
@@ -4476,12 +4482,14 @@ export default {
         console.error('WebSocket Error Details:', errorDetails);
         this.SendConsoleLogMsg('WebSocket Error: ' + JSON.stringify(errorDetails), 'error');
         this.websocketState = 'error';
+        setUnifiedWebSocketState('error', 'WebSocket error');
         this.networkDisconnected = true;
       };
 
       this.websocket.onclose = () => {
         console.log('QHYCCD | WebSocket disconnected');
         this.websocketState = 'disconnected';
+        setUnifiedWebSocketState('disconnected', 'WebSocket disconnected');
         this.networkDisconnected = true; // WebSocket连接关闭时设置网络连接状态
         console.log('QHYCCD | WebSocket disconnected');
         this.$bus.$emit('ShowNetStatus', 'false');
@@ -4503,6 +4511,7 @@ export default {
     reconnectWebSocket() {
       setTimeout(() => {
         console.log('QHYCCD | WebSocket reconnected');
+        setUnifiedWebSocketState('reconnecting', 'WebSocket reconnect scheduled');
         this.SendConsoleLogMsg('WebSocket reconnected.', 'info');
         this.connect();
       }, 2000); // 2秒后尝试重新连接
@@ -4546,6 +4555,7 @@ export default {
       const messageJson = JSON.stringify(messageObj); // 将消息对象转换为 JSON 字符串
       const messageState = { msgid: messageId, text: messageJson, success: false }; // 创建包含消息和状态信息的对象
 
+      recordClientCommand(message);
       if (this.websocket.readyState === WebSocket.OPEN) {
         this.websocket.send(messageJson);
         // messageState.success = true; // 设置消息为成功
@@ -5042,6 +5052,7 @@ export default {
     },
 
     SendConsoleLogMsg(message, type) {
+      recordClientLog(type || 'info', message);
       if (type == 'error') {
         console.error('Error: ' + message);
         this.$bus.$emit('SendConsoleLog', type, message);

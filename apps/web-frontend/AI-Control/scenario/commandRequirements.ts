@@ -141,7 +141,6 @@ export const COMMAND_REQUIREMENTS: Record<string, CommandRequirement> = {
     blockers: DEFAULT_BLOCKERS,
     busy: {
       capture: 'wait',
-      guiding: 'cancel',
       polarAxis: 'cancel',
       deviceAllocation: 'cancel',
     },

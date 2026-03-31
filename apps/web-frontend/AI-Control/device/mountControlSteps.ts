@@ -87,7 +87,10 @@ export type McpInteractParams = {
   stop?: boolean
   sync?: boolean
   solve?: boolean
+  slewSpeed?: number
   move?: { direction: 'ra-plus' | 'ra-minus' | 'dec-plus' | 'dec-minus'; durationMs?: number }
+  moveAllDirections?: boolean
+  moveDurationMs?: number
 }
 
 function hasMountControlInteract(p: MountControlInteractParams | undefined): boolean {
@@ -245,6 +248,65 @@ export function makeMountControlStepRegistry(): StepRegistry {
     },
   })
 
+  /** 主面板：将速度切到目标档位（循环点击 mcp-btn-speed，直到 data-value 匹配）。 */
+  registry.set('mount.panel.setSlewSpeed', {
+    async run(ctx, params: { value?: number }) {
+      const wanted = params?.value
+      if (typeof wanted !== 'number' || !Number.isFinite(wanted)) {
+        console.log('[ai-control] mount.panel.setSlewSpeed 缺少有效 value，跳过')
+        return
+      }
+      await ensureMountPanelOpen(ctx, ctx.stepTimeoutMs)
+      const btn = ctx.page.getByTestId('mcp-btn-speed').first()
+      await btn.scrollIntoViewIfNeeded().catch(() => {})
+      await sleep(200)
+      let bestObserved: number | null = null
+      let lastValue: string | null = null
+      let unchangedCount = 0
+      for (let i = 0; i < 8; i++) {
+        const value = await btn.getAttribute('data-value').catch(() => null)
+        const numericValue = value == null ? Number.NaN : Number(value)
+        if (Number.isFinite(numericValue)) {
+          bestObserved = bestObserved == null ? numericValue : Math.max(bestObserved, numericValue)
+        }
+        if (value === String(wanted)) {
+          console.log(`[ai-control] 赤道仪速度已为 ${wanted}`)
+          return
+        }
+        if (value === lastValue) unchangedCount += 1
+        else unchangedCount = 0
+        lastValue = value
+        await clickLocator(btn, ctx.stepTimeoutMs)
+        await sleep(400)
+        const nextValue = await btn.getAttribute('data-value').catch(() => null)
+        const nextNumericValue = nextValue == null ? Number.NaN : Number(nextValue)
+        if (Number.isFinite(nextNumericValue)) {
+          bestObserved = bestObserved == null ? nextNumericValue : Math.max(bestObserved, nextNumericValue)
+        }
+        if (nextValue === String(wanted)) {
+          console.log(`[ai-control] 赤道仪速度已切到 ${wanted}`)
+          return
+        }
+        if (nextValue === value) unchangedCount += 1
+        else unchangedCount = 0
+        lastValue = nextValue
+        if (bestObserved != null && bestObserved < wanted && unchangedCount >= 3) {
+          console.log(
+            `[ai-control] 赤道仪速度未命中目标 ${wanted}，当前设备最大可达档位疑似为 ${bestObserved}，按现场可达值继续`,
+          )
+          return
+        }
+      }
+      if (bestObserved != null && bestObserved < wanted) {
+        console.log(
+          `[ai-control] 赤道仪速度未命中目标 ${wanted}，循环后最高仅观察到 ${bestObserved}，按现场可达值继续`,
+        )
+        return
+      }
+      await expect(btn).toHaveAttribute('data-value', String(wanted), { timeout: 10_000 })
+    },
+  })
+
   const MCP_DIRECTIONS = ['ra-plus', 'ra-minus', 'dec-plus', 'dec-minus'] as const
   type McpDirectionLocal = (typeof MCP_DIRECTIONS)[number]
 
@@ -307,6 +369,10 @@ export function makeMountControlStepRegistry(): StepRegistry {
     async run(ctx, params: McpInteractParams) {
       if (!params || typeof params !== 'object') return
       await ensureMountPanelOpen(ctx, ctx.stepTimeoutMs)
+      if (typeof params.slewSpeed === 'number') {
+        const def = registry.get('mount.panel.setSlewSpeed')
+        if (def) await def.run(ctx, { value: params.slewSpeed })
+      }
       if (typeof params.park === 'boolean') {
         const def = registry.get('mount.panel.setPark')
         if (def) await def.run(ctx, { on: params.park })
@@ -319,10 +385,6 @@ export function makeMountControlStepRegistry(): StepRegistry {
         const def = registry.get('mount.panel.clickHome')
         if (def) await def.run(ctx, {})
       }
-      if (params.stop === true) {
-        const def = registry.get('mount.panel.clickStop')
-        if (def) await def.run(ctx, {})
-      }
       if (params.sync === true) {
         const def = registry.get('mount.panel.clickSync')
         if (def) await def.run(ctx, {})
@@ -331,9 +393,22 @@ export function makeMountControlStepRegistry(): StepRegistry {
         const def = registry.get('mount.panel.clickSolve')
         if (def) await def.run(ctx, {})
       }
-      if (params.move?.direction && MCP_DIRECTIONS.includes(params.move.direction)) {
+      if (params.moveAllDirections === true) {
+        const def = registry.get('mount.panel.moveDirection')
+        const durationMs = Math.max(params.moveDurationMs ?? params.move?.durationMs ?? 5_000, 5_000)
+        if (def) {
+          for (const direction of MCP_DIRECTIONS) {
+            await def.run(ctx, { direction, durationMs })
+            await sleep(300)
+          }
+        }
+      } else if (params.move?.direction && MCP_DIRECTIONS.includes(params.move.direction)) {
         const def = registry.get('mount.panel.moveDirection')
         if (def) await def.run(ctx, { direction: params.move.direction, durationMs: params.move.durationMs })
+      }
+      if (params.stop === true) {
+        const def = registry.get('mount.panel.clickStop')
+        if (def) await def.run(ctx, {})
       }
     },
   })

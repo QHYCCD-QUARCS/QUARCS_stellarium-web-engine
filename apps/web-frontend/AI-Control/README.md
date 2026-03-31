@@ -128,11 +128,86 @@ E2E_BASE_URL=http://192.168.1.113:8080 bash scripts/ai-control-e2e-target.sh
 3. 若无法获取本地会话状态，再启动或恢复会话；会话启动后，仍先读取 `/status`，确认页面已可控，再执行命令。
 4. 仅在明确不使用本地会话、或在代码 / Playwright 场景内嵌调用时，才直接走 `createFlowContextForSession` / `createFlowContext` + `runFlowByCommand(...)`。
 
+### 单命令验证表（当前本地会话）
+
+- 适用场景：本地会话已打开后，在会话终端 `>` 提示符下逐条输入，单独验证每个 CLI 命令，不使用深度验证脚本。
+- 当前默认端口为 `39281`；若会话使用其他端口，先导出 `E2E_AI_CONTROL_SESSION_PORT=<端口>`，深度验证脚本也会读取该值。
+- 结果记录建议统一使用 `PASS` / `SKIP` / `FAIL`；当前设备假设为 `Mount/MainCamera/Guider/Focuser/Telescopes` 已连接可测、`CFW` 不存在。
+- 深度验证脚本中的 mount 相关命令默认使用 `EQMod / INDI`；若现场设备不同，可设置 `E2E_DEEP_VERIFY_MOUNT_DRIVER_TEXT`、`E2E_DEEP_VERIFY_MOUNT_CONNECTION_MODE` 覆盖。
+
+| 命令名 | 单独命令 | 目的/覆盖点 | 前置硬件 | 预期结果 | 当前设备备注 |
+|--------|----------|-------------|----------|----------|--------------|
+| `disconnect-all` | `disconnect-all` | 验证主菜单“全部断开”链路及无设备时兼容处理 | 任意 | 设备全部断开；无设备时安全返回 | 可执行，建议作为首条清场 |
+| `general-settings` | `general-settings {"generalSettingsInteract":{"displayTab":true,"selectLanguage":true,"close":true}}` | 验证总设置打开、Display 页切换、语言切换、关闭 | 无特殊要求 | 对话框打开，完成交互后关闭 | `PASS` 目标 |
+| `power-management` | `power-management {"powerManagementInteract":{"output1":true,"restart":"cancel"}}` | 验证电源管理页、输出电源切换、重启确认框取消 | 电源管理入口可用 | 页面打开，Output1 置为开，重启框取消关闭 | `PASS` 目标 |
+| `image-file-manager` | `image-file-manager {"imageManagerInteract":{"imageFileSwitch":true,"refresh":true,"panelClose":true}}` | 验证图像管理面板、视图切换、刷新、关闭 | 图像管理入口可用 | 面板打开，交互完成后关闭 | `PASS` 目标 |
+| `task-schedule` | `task-schedule {"scheduleInteract":{"toggleLeftToolbar":true,"addRow":true,"closePanel":true}}` | 验证任务计划表打开、左栏切换、新增行、关闭 | 任务计划入口可用 | 面板打开并新增一行后关闭 | `PASS` 目标 |
+| `polar-axis-calibration` | `polar-axis-calibration {"polarAxisInteract":{"toggleTrajectory":true,"closeTrajectory":true,"quitPolarAxisMode":true}}` | 验证极轴页打开、轨迹层开关与退出 | 极轴入口可用 | 极轴组件打开并正常退出 | `PASS` 目标 |
+| `switch-to-guider-page` | `switch-to-guider-page` | 验证主页面切换到导星页 | 导星页入口可用 | 主页面切换为 `GuiderCamera` | `PASS` 目标 |
+| `guider-connect-capture` | `guider-connect-capture {"guiderGain":10,"guiderOffset":0,"guiderExposure":"1s","guiderInteract":{"loopExposure":true,"guiding":true}}` | 验证导星连接、参数设置、循环曝光与导星 | Guider 在线可连接 | 导星连接成功并进入导星链路 | `PASS` 目标 |
+| `maincamera-connect-capture` | `maincamera-connect-capture {"captureGain":10,"captureOffset":0,"captureExposure":"1s","captureAutoSave":true,"doSave":true}` | 验证主相机连接、拍摄参数、单次拍摄与保存 | MainCamera 在线可连接 | 主相机连接成功并完成拍摄/保存 | `PASS` 目标 |
+| `mount-connect-control` | `mount-connect-control {"mountControlInteract":{"gotoThenSolve":true}}` | 验证赤道仪连接及侧栏控制项 | Mount 在线可连接 | Mount 连接成功并设置 `GotoThenSolve` | `PASS` 目标 |
+| `mount-park` | `mount-park` | 验证赤道仪连接后 Park 打开 | Mount 在线可连接 | `mcp-btn-park` 最终为 `on` | `PASS` 目标 |
+| `mount-panel` | `mount-panel {"mcpInteract":{"slewSpeed":10,"park":false,"track":true,"sync":true,"moveAllDirections":true,"moveDurationMs":5000,"stop":true}}` | 验证主界面赤道仪控制面板交互 | Mount 面板可打开 | 先切回 10 档，再按四个方向各移动至少 5 秒，最后停止 | `PASS` 目标 |
+| `telescopes-focal-length` | `telescopes-focal-length {"focalLengthMm":"600"}` | 验证望远镜子菜单与焦距输入 | `Telescopes` 子菜单可达 | 焦距输入框更新为 `600` | `PASS` 目标 |
+| `focuser-connect-control` | `focuser-connect-control {"focuserInteract":{"speed":3,"roiLength":300,"move":{"direction":"right","durationMs":500}}}` | 验证电调连接、速度、ROI 与移动 | Focuser 在线可连接 | 电调连接成功并完成交互 | `PASS` 目标 |
+| `device-disconnect` | `device-disconnect {"deviceType":"Focuser"}` | 验证单设备断开弹框链路 | Focuser 已连接 | Focuser 断开成功 | 代表性断开用例，后续如需恢复可重跑连接 |
+| `cfw-capture-config` | `cfw-capture-config {"cfwInteract":{"capturePanelPlusCount":1,"capturePanelMinusCount":1,"menuNextCount":1,"menuPrevCount":1}}` | 验证主相机拍摄面板 CFW 加减与菜单级 CFW 切换 | MainCamera 已连接且 CFW 已连接 | CFW 面板与菜单控制均完成 | 当前无 CFW，应记为 `SKIP`，不计失败 |
+
 ### 本地会话执行规则
 
 - `GET /status`：读取当前 UI 状态，包括主页面、菜单抽屉、弹窗、设备、busy 状态、overlay 等；其中 `capture.e2eExposureCompletedSeq` / `capture.e2eTileGpmSeq` 与隐藏探针 `e2e-exposure-completed` / `e2e-tilegpm` 的 `data-seq` 一致，便于轮询诊断。
 - `GET /status?command=xxx`：除读取状态外，还返回该命令的 `targetSurface`、`blockers`、`preSteps`、`coreStepIds`、`suggestions`。
 - `POST /run`：恢复层会先读取状态，再执行前置恢复步骤与命令核心 flow。
+
+### 文档内可直接执行的测试 / 观测命令
+
+以下命令可直接复制执行；默认本地会话端口 `39281`。若会话端口不同，先导出 `E2E_AI_CONTROL_SESSION_PORT=<端口>`，或将命令里的端口改为实际值。
+
+1. 检查会话是否存活：
+
+```bash
+curl -fsS http://127.0.0.1:39281/status | jq '{mainPage, menuDrawer, selectedDevice, devices, busyStates}'
+```
+
+2. 在执行某条命令前，先看恢复层计划：
+
+```bash
+curl -fsS 'http://127.0.0.1:39281/status?command=focuser-connect-control' | jq '{targetSurface, blockers, preSteps, coreStepIds, suggestions}'
+```
+
+3. 执行单条命令（推荐）：
+
+```bash
+curl -sS -X POST http://127.0.0.1:39281/run \
+  -H 'Content-Type: application/json' \
+  -d '{"commandName":"task-schedule","flowParams":{"scheduleInteract":{"toggleLeftToolbar":true,"addRow":true,"closePanel":true}}}'
+```
+
+4. 执行后读取关键运行态，确认是否真正完成，而不是只看 `curl` 返回：
+
+```bash
+curl -fsS http://127.0.0.1:39281/status | jq '{
+  devices,
+  deviceRuntimeState,
+  activeOperations: .operationState.activeOperations,
+  recentOperationResults: .operationState.recentOperationResults[0:5],
+  recentLogs: .recentLogs[0:10]
+}'
+```
+
+判定建议：
+
+- `devices[].connectionState`：看设备是否真的连上 / 断开。
+- `deviceRuntimeState[].activeOperationType`：看设备当前是否仍有进行中的运行态动作。
+- `deviceRuntimeState[].lastError`：看最近一次失败原因。
+- `operationState.activeOperations` 为空：通常表示本轮异步动作已收口；若命令本就会持续运行（如导星、极轴自动校准），则以对应业务状态字段为准。
+- `recentLogs`：用于补看 Qt / 前端最近消息，避免只看到“点击成功”。
+
+补充：
+
+- `scripts/ai-control-deep-verify.sh` 是 HTTP 版 12 项深度验证脚本。
+- `AI-Control/deep-verify-commands.txt` 是“会话终端逐条输入版”，覆盖更全，包含 `task-schedule` 等补充命令；当你按 README 做手工逐条验证时，优先以该文件为准。
 
 ### 恢复层与前置检查
 
@@ -300,7 +375,7 @@ busy 策略概览如下：
 
 1. 可选 `gotoHome`。
 2. 打开主界面赤道仪控制面板。
-3. 若传 `mcpInteract`，执行 `park`、`track`、`home`、`stop`、`sync`、`solve` 或方向移动。
+3. 若传 `mcpInteract`，先按需将速度切到 `slewSpeed`（`mcp-btn-speed` 的 `data-value`），再执行 `park`、`track`、`home`、`stop`、`sync`、`solve` 或方向移动；若 `moveAllDirections=true`，则按 `ra-plus → ra-minus → dec-plus → dec-minus` 顺序逐个执行，且每个方向至少移动 `5000ms`。
 
 #### `telescopes-focal-length`
 
@@ -692,6 +767,7 @@ bash quarcs-publish.sh 104 --vue --qt
 
 - 流程为：设备已连接 → `capture.panel.ensureOpen` → `device.captureOnce`（可多次）→ 可选 `device.save`。
 - 当 `doCapture=false` 时，会跳过 `device.captureOnce` 与 `device.save`，仅保留连接 / 配置链路。
+- 当 `captureAutoSave=true` 且 `doSave=true` 时，流程视为“保存已由自动保存覆盖”，不会再额外执行一次 `device.save`，以避免重复保存导致的假失败。
 - **拍摄按钮与连拍**：`cp-btn-capture` 所在根节点带 **`data-capture-ready`**（`true` / `false`），与 `CircularButton.vue` 内 `isClicked`、`isButtonDisabled`、`isLongPress` 对齐；收到 `ExposureCompleted` 后约 **500ms** 会 `resetProgress` 解锁（再点拍保护时长，以源码为准）。`device.captureOnce` 在每次点击前会轮询直至 `data-capture-ready=true`（或探针缺失时跳过等待），再读取 `exp/tile` 并点击。
 - `device.captureOnce`：**成功判定**以 Qt 下行 `ExposureCompleted` 驱动的探针 `e2e-exposure-completed`（`data-seq`）与 `e2e-tilegpm`（TileGPM）**任一前进**为准（短曝光时 `cp-status` busy 可能一闪而过，不宜作为唯一依据）；`cp-status→idle` 仅尽力等待。旧版仅 TileGPM 时仍可用 tile 探针。
 - 运行器会为每步注入 `__flowStepIndex` / `__flowStepTotal`（仅 `runFlow` 合并参数）；`device.captureOnce` 会打 `[flow i/n]`、点击前后探针与 `cp-status`；失败时输出 `exp/tile` 前后值。
@@ -728,6 +804,16 @@ bash quarcs-publish.sh 104 --vue --qt
 | `focuserInteract.startCalibration` | `true \| 'cancel'` | — | 打开电调行程校准确认框并确认 / 取消。 |
 | `focuserInteract.autoFocusMode` | `'coarse' \| 'fine' \| 'cancel'` | — | 打开自动对焦确认框并选择粗调、精调或取消。 |
 | `focuserInteract.stopAutoFocus` | `boolean` | `false` | 再点击一次自动对焦按钮，停止自动对焦。 |
+
+运行态判定补充（为便于测试，已按源码补全）：
+
+- `startCalibration=true` 后，仅“确认框已关闭”不算成功；建议继续轮询 `GET /status`，观察 `operationState.operationsByDevice.Focuser` 或 `deviceRuntimeState`。
+- 行程校准启动时，运行态会出现 `move-to-min` / `move-to-max` / `travel-range` 一类 operation；其来源包括前端动作 `focusMoveToMin` / `focusMoveToMax`，以及 Qt 下行 `focusMoveToMinStarted` / `focusMoveToMaxStarted` / `focusSetTravelRangeStarted`。
+- 校准进行中时，`recentLogs` 或 operation `message` 可能出现 `FocusPosition:<数值>`；这表示电调仍在推进，不应误判为卡死。
+- 行程到位成功时，Qt 会下发 `FocusMoveToLimit:<...>`，对应 `move-to-min` / `move-to-max` operation 结束为 `succeeded`。
+- 行程范围写入成功时，Qt 会下发 `focusSetTravelRangeSuccess`，对应 `travel-range` operation 结束为 `succeeded`。
+- 若收到 `focusMoveFailed:<原因>`，则视为失败；可在 `deviceRuntimeState[].lastError` 或 `operationState.lastOperationError` 中读取错误。
+- `autoFocusMode='coarse'|'fine'` 后，文档层面当前仅保证“真实点击按钮并处理模式确认框”；若现场要判定自动对焦是否真正结束，建议额外读取 `recentLogs` 与 `deviceRuntimeState`，确认无新的 focuser 失败态残留后再继续后续命令。
 
 ### `telescopes-focal-length`
 
@@ -794,12 +880,13 @@ bash quarcs-publish.sh 104 --vue --qt
 | 参数名 | 类型 | 默认值 | 说明 |
 |--------|------|--------|------|
 | `gotoHome` | `boolean` | `false` | 是否先刷新页面。 |
-| `mcpInteract` | `Partial<Record<'park' \| 'track' \| 'home' \| 'stop' \| 'sync' \| 'solve', boolean>> & { move?: { direction: 'ra-plus' \| 'ra-minus' \| 'dec-plus' \| 'dec-minus', durationMs?: number } }` | — | 主界面赤道仪面板交互。 |
+| `mcpInteract` | `Partial<Record<'park' \| 'track' \| 'home' \| 'stop' \| 'sync' \| 'solve', boolean>> & { slewSpeed?: number, move?: { direction: 'ra-plus' \| 'ra-minus' \| 'dec-plus' \| 'dec-minus', durationMs?: number }, moveAllDirections?: boolean, moveDurationMs?: number }` | — | 主界面赤道仪面板交互。 |
 
 `mcpInteract` 可用 key：
 
 | key | 类型 | 说明 |
 |-----|------|------|
+| `slewSpeed` | `number` | 目标速度档位；与速度按钮 `data-value` 一致（如 `10` 表示直至 `data-value === '10'`）。通过 `clickByTestId('mcp-btn-speed')` 连点（与 `ui.click` 同源），先于其它项执行。 |
 | `park` | `boolean` | 将 Park 设为 `on` 或 `off`。 |
 | `track` | `boolean` | 将 Track 设为 `on` 或 `off`。 |
 | `home` | `boolean` | 为 `true` 时点击 Home。 |
@@ -807,6 +894,8 @@ bash quarcs-publish.sh 104 --vue --qt
 | `sync` | `boolean` | 为 `true` 时点击 Sync。 |
 | `solve` | `boolean` | 为 `true` 时点击 Solve。 |
 | `move` | `{ direction, durationMs? }` | 方向移动。 |
+| `moveAllDirections` | `boolean` | 为 `true` 时按 `ra-plus → ra-minus → dec-plus → dec-minus` 顺序逐个执行移动。 |
+| `moveDurationMs` | `number` | `moveAllDirections=true` 时每个方向按住的时长；实际执行会至少取 `5000ms`。 |
 
 ### `polar-axis-calibration`
 
