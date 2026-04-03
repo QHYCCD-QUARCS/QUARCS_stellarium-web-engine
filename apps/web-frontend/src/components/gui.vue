@@ -1584,6 +1584,9 @@ export default {
       this.ConfirmDialog = false;
       if (this.ConfirmToDo === 'Refresh') {
         window.location.reload();
+      } else if (this.ConfirmToDo === 'StopGuiding') {
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'GuiderSwitch:false');
+        this.$bus.$emit('SendConsoleLogMsg', this.$t('Stop guiding'), 'info');
       } else if (this.ConfirmToDo === 'disconnectAllDevice') {
         this.$bus.$emit('disconnectAllDevice', true);
       } else if (this.ConfirmToDo === 'SwitchOutPutPower') {

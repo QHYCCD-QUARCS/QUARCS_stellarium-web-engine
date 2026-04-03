@@ -233,13 +233,20 @@ export default {
     },
 
     GuiderSwitch() {
+      if (this.isGuiding) {
+        this.$bus.$emit(
+          'ShowConfirmDialog',
+          'Confirm',
+          'Are you sure you want to stop guiding?',
+          'StopGuiding'
+        );
+        return;
+      }
       if(this.isLoopping) {
-        if (!this.isGuiding) {
-          this.DataClear();
-        }
-        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'GuiderSwitch:'+!this.isGuiding);
+        this.DataClear();
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'GuiderSwitch:true');
       } else {
-        this.$bus.$emit('showMsgBox', 'Please open the loop exposure first.', 'error');
+        this.$bus.$emit('showMsgBox', this.$t('Please open the loop exposure first.'), 'error');
       }
     },
 
@@ -247,7 +254,7 @@ export default {
       if (this.GuiderConnect) {
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'GuiderLoopExpSwitch:' + !this.isLoopping);
       } else {
-        this.$bus.$emit('showMsgBox', 'Please connect the Guider camera first.', 'error');
+        this.$bus.$emit('showMsgBox', this.$t('Please connect the Guider camera first.'), 'error');
       }
     },
 
@@ -306,7 +313,7 @@ export default {
         this.lastStarLostAlertTime = 0;
       } else if(status === 'InCalibration') {
         if (this.CurrentGuiderStatus !== 'InCalibration') {
-          this.$bus.$emit('showMsgBox', '导星校准开始。', 'info');
+          this.$bus.$emit('showMsgBox', this.$t('Guiding calibration started.'), 'info');
         }
         this.CurrentGuiderStatus = 'InCalibration';
         // 校准状态也视为“未丢星”，重置丢星弹窗时间
@@ -478,4 +485,3 @@ export default {
 }
 
 </style>
-
