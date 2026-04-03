@@ -305,6 +305,9 @@ export default {
         this.CurrentGuiderStatus = 'InSelecting';
         this.lastStarLostAlertTime = 0;
       } else if(status === 'InCalibration') {
+        if (this.CurrentGuiderStatus !== 'InCalibration') {
+          this.$bus.$emit('showMsgBox', '导星校准开始。', 'info');
+        }
         this.CurrentGuiderStatus = 'InCalibration';
         // 校准状态也视为“未丢星”，重置丢星弹窗时间
         this.lastStarLostAlertTime = 0;

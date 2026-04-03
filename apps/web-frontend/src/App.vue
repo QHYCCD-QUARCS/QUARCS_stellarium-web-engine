@@ -4250,6 +4250,14 @@ export default {
                 }
                 break;
 
+              case 'AutoFocusCoarseRetryPrompt':
+                if (parts.length >= 3) {
+                  const question = parts.slice(2).join(':');
+                  console.log('AutoFocusCoarseRetryPrompt:', question);
+                  this.ShowConfirmDialog('自动对焦', question, 'AutoFocusCoarseRetry');
+                }
+                break;
+
               case 'AutoFocusStepChanged': // [AUTO_FOCUS_UI_ENHANCEMENT]
                 if (parts.length >= 3) {
                   const step = parts[1];
@@ -8377,20 +8385,45 @@ export default {
 
     getGuiderCanvasDisplayRect() {
       const canvas = this.$refs.guiderCanvas;
+      const fallbackWidth = Math.max(1, window.innerWidth || 1);
+      const fallbackHeight = Math.max(1, window.innerHeight || 1);
       if (!canvas || typeof canvas.getBoundingClientRect !== 'function') {
         return {
           left: 0,
           top: 0,
-          width: Math.max(1, window.innerWidth),
-          height: Math.max(1, window.innerHeight)
+          width: fallbackWidth,
+          height: fallbackHeight
         };
       }
       const rect = canvas.getBoundingClientRect();
+      let left = Number.isFinite(rect.left) ? rect.left : 0;
+      let top = Number.isFinite(rect.top) ? rect.top : 0;
+      let width = Math.max(
+        Number.isFinite(rect.width) ? rect.width : 0,
+        Number(canvas.clientWidth) || 0,
+        Number(canvas.offsetWidth) || 0
+      );
+      let height = Math.max(
+        Number.isFinite(rect.height) ? rect.height : 0,
+        Number(canvas.clientHeight) || 0,
+        Number(canvas.offsetHeight) || 0
+      );
+
+      // 某些机型/切页瞬间 canvas 的 DOMRect 可能短暂退化成 1x1，回退到父容器真实显示区域。
+      if ((width <= 1 || height <= 1) && canvas.parentElement &&
+          typeof canvas.parentElement.getBoundingClientRect === 'function') {
+        const parentRect = canvas.parentElement.getBoundingClientRect();
+        if (Number.isFinite(parentRect.left)) left = parentRect.left;
+        if (Number.isFinite(parentRect.top)) top = parentRect.top;
+        width = Math.max(width, Number(parentRect.width) || 0);
+        height = Math.max(height, Number(parentRect.height) || 0);
+      }
+
       return {
-        left: Number.isFinite(rect.left) ? rect.left : 0,
-        top: Number.isFinite(rect.top) ? rect.top : 0,
-        width: Math.max(1, rect.width || window.innerWidth),
-        height: Math.max(1, rect.height || window.innerHeight)
+        left,
+        top,
+        width: Math.max(1, width || fallbackWidth),
+        height: Math.max(1, height || fallbackHeight)
       };
     },
 
@@ -10057,11 +10090,13 @@ export default {
 
     handleGuiderCanvasClick(event) {
       const rect = this.getGuiderCanvasDisplayRect();
-      const x = event.clientX - rect.left; // 点击坐标X
-      const y = event.clientY - rect.top;  // 点击坐标Y
+      const rawX = Number.isFinite(event.offsetX) ? event.offsetX : (event.clientX - rect.left);
+      const rawY = Number.isFinite(event.offsetY) ? event.offsetY : (event.clientY - rect.top);
+      const x = Math.min(Math.max(rawX, 0), Math.max(0, rect.width - 1));
+      const y = Math.min(Math.max(rawY, 0), Math.max(0, rect.height - 1));
       console.log(`Clicked at: (${x}, ${y})`);
-      const CanvasWidth = Math.max(1, rect.width);
-      const CanvasHeight = Math.max(1, rect.height);
+      const CanvasWidth = Math.max(1, Math.round(rect.width));
+      const CanvasHeight = Math.max(1, Math.round(rect.height));
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'GuiderCanvasClick:' + CanvasWidth + ':' + CanvasHeight + ':' + x + ':' + y);
     },
     connectDriver() {
