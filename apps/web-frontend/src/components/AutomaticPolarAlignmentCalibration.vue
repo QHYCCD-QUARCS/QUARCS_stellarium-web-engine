@@ -1920,6 +1920,206 @@ export default {
         x = ((x + 540) % 360) - 180
         return x
       },
+      addVector3(a, b) {
+        return {
+          x: a.x + b.x,
+          y: a.y + b.y,
+          z: a.z + b.z
+        }
+      },
+      subtractVector3(a, b) {
+        return {
+          x: a.x - b.x,
+          y: a.y - b.y,
+          z: a.z - b.z
+        }
+      },
+      scaleVector3(v, s) {
+        return {
+          x: v.x * s,
+          y: v.y * s,
+          z: v.z * s
+        }
+      },
+      dotProduct3(a, b) {
+        return a.x * b.x + a.y * b.y + a.z * b.z
+      },
+      horizontalToCartesian(azDeg, altDeg, radius = 1) {
+        const azRad = azDeg * Math.PI / 180.0
+        const altRad = altDeg * Math.PI / 180.0
+        const cosAlt = Math.cos(altRad)
+        return {
+          x: radius * Math.sin(azRad) * cosAlt,
+          y: radius * Math.cos(azRad) * cosAlt,
+          z: radius * Math.sin(altRad)
+        }
+      },
+      cartesianToHorizontal(cart) {
+        const radius = Math.sqrt(cart.x * cart.x + cart.y * cart.y + cart.z * cart.z)
+        if (!Number.isFinite(radius) || radius <= 0) {
+          return { az: NaN, alt: NaN }
+        }
+        const alt = Math.asin(Math.max(-1, Math.min(1, cart.z / radius))) * 180.0 / Math.PI
+        let az = Math.atan2(cart.x, cart.y) * 180.0 / Math.PI
+        if (az < 0) az += 360.0
+        return { az, alt }
+      },
+      adjustmentValueToDegrees(value, unit) {
+        if (!Number.isFinite(value)) return NaN
+        return this.unitToArcmin(value, unit) / 60.0
+      },
+      computeWorldDirectionForRotationAxis(axisVec, pointingVec, currentHorizontal) {
+        const tangent = this.crossProduct(axisVec, pointingVec)
+        const tangentLen = this.vectorLength(tangent)
+        if (!Number.isFinite(tangentLen) || tangentLen < 1e-9) return null
+
+        const epsRad = 1e-4
+        const moved = this.normalizeVector(
+          this.addVector3(pointingVec, this.scaleVector3(tangent, epsRad))
+        )
+        const movedHorizontal = this.cartesianToHorizontal(moved)
+        if (!Number.isFinite(movedHorizontal.az) || !Number.isFinite(movedHorizontal.alt)) return null
+
+        return {
+          x: this.normalizeAzDelta(movedHorizontal.az - currentHorizontal.az) / epsRad,
+          y: (movedHorizontal.alt - currentHorizontal.alt) / epsRad
+        }
+      },
+      buildIdealGuideTrajectoryWorld() {
+        if (!this.targetRawPosition || !this.fieldData) return null
+        if (!Number.isFinite(this.fieldData.fakePolarRA) || !Number.isFinite(this.fieldData.fakePolarDEC)) return null
+
+        const { hasLatLon, lat, lon } = this.ensureObserverLocation()
+        if (!hasLatLon) return null
+
+        const lastRaw = this.rawTrajectoryPoints[this.rawTrajectoryPoints.length - 1]
+        const currentRa = lastRaw?.ra ?? this.fieldData.ra
+        const currentDec = lastRaw?.dec ?? this.fieldData.dec
+        const timeRef = new Date(lastRaw?.t || Date.now())
+        if (!Number.isFinite(currentRa) || !Number.isFinite(currentDec)) return null
+
+        const currentHorizontal = this.equatorialToHorizontal(currentRa, currentDec, timeRef, lat, lon)
+        const fakePolarHorizontal = this.equatorialToHorizontal(this.fieldData.fakePolarRA, this.fieldData.fakePolarDEC, timeRef, lat, lon)
+        if (![currentHorizontal.az, currentHorizontal.alt, fakePolarHorizontal.az, fakePolarHorizontal.alt].every(Number.isFinite)) {
+          return null
+        }
+
+        const pointingVec = this.horizontalToCartesian(currentHorizontal.az, currentHorizontal.alt)
+        const poleVec = this.horizontalToCartesian(fakePolarHorizontal.az, fakePolarHorizontal.alt)
+        const upVec = { x: 0, y: 0, z: 1 }
+        const eastVec = { x: 1, y: 0, z: 0 }
+
+        const upProj = this.dotProduct3(upVec, poleVec)
+        let altLike = null
+        if (Math.abs(Math.abs(upProj) - 1.0) < 1e-6) {
+          altLike = this.subtractVector3(eastVec, this.scaleVector3(poleVec, this.dotProduct3(eastVec, poleVec)))
+        } else {
+          altLike = this.subtractVector3(upVec, this.scaleVector3(poleVec, upProj))
+        }
+        const altLikeLen = this.vectorLength(altLike)
+        if (!Number.isFinite(altLikeLen) || altLikeLen < 1e-9) return null
+
+        const eAltLike = this.normalizeVector(altLike)
+        const eAzLike = this.normalizeVector(this.crossProduct(poleVec, eAltLike))
+        const azAxis = this.scaleVector3(eAltLike, -1)
+        const altAxis = eAzLike
+
+        const azBasis = this.computeWorldDirectionForRotationAxis(azAxis, pointingVec, currentHorizontal)
+        const altBasis = this.computeWorldDirectionForRotationAxis(altAxis, pointingVec, currentHorizontal)
+        if (!azBasis || !altBasis) return null
+
+        const azAdjustmentDeg = this.adjustmentValueToDegrees(this.adjustment.azimuth, this.adjustmentUnit)
+        const altAdjustmentDeg = this.adjustmentValueToDegrees(this.adjustment.altitude, this.adjustmentUnit)
+        if (![azAdjustmentDeg, altAdjustmentDeg].every(Number.isFinite)) return null
+
+        const origin = this.worldForPoint(currentRa, currentDec, timeRef)
+        const targetDelta = { x: -origin.x, y: -origin.y }
+        let direction = {
+          x: azBasis.x * azAdjustmentDeg + altBasis.x * altAdjustmentDeg,
+          y: azBasis.y * azAdjustmentDeg + altBasis.y * altAdjustmentDeg
+        }
+
+        const directNorm = Math.hypot(targetDelta.x, targetDelta.y)
+        const dirNorm = Math.hypot(direction.x, direction.y)
+        if ((!Number.isFinite(dirNorm) || dirNorm < 1e-8) && directNorm < 1e-8) return null
+        if (!Number.isFinite(dirNorm) || dirNorm < 1e-8) {
+          direction = targetDelta
+        }
+        if ((direction.x * targetDelta.x + direction.y * targetDelta.y) < 0) {
+          direction = { x: -direction.x, y: -direction.y }
+        }
+        return { origin, direction }
+      },
+      clipWorldLineToView(origin, direction) {
+        if (!origin || !direction) return null
+        const xmin = this.viewMinWorldX
+        const xmax = this.viewMaxWorldX
+        const ymin = this.viewMinWorldY
+        const ymax = this.viewMaxWorldY
+        if (![xmin, xmax, ymin, ymax].every(Number.isFinite)) return null
+
+        let tMin = -Infinity
+        let tMax = Infinity
+        const updateRange = (p, d, minV, maxV) => {
+          if (Math.abs(d) < 1e-12) {
+            return p >= minV && p <= maxV
+          }
+          const t1 = (minV - p) / d
+          const t2 = (maxV - p) / d
+          tMin = Math.max(tMin, Math.min(t1, t2))
+          tMax = Math.min(tMax, Math.max(t1, t2))
+          return tMin <= tMax
+        }
+
+        if (!updateRange(origin.x, direction.x, xmin, xmax)) return null
+        if (!updateRange(origin.y, direction.y, ymin, ymax)) return null
+
+        return {
+          start: {
+            x: origin.x + direction.x * tMin,
+            y: origin.y + direction.y * tMin
+          },
+          end: {
+            x: origin.x + direction.x * tMax,
+            y: origin.y + direction.y * tMax
+          }
+        }
+      },
+      drawIdealGuideAuxLine() {
+        const ideal = this.buildIdealGuideTrajectoryWorld()
+        if (!ideal) return false
+
+        const clipped = this.clipWorldLineToView(ideal.origin, ideal.direction)
+        if (!clipped) return false
+
+        const canvas = this.$refs.trajectoryCanvas
+        if (!canvas) return false
+        const ctx = canvas.getContext('2d')
+        const startPx = this.screenForWorld(clipped.start.x, clipped.start.y)
+        const endPx = this.screenForWorld(clipped.end.x, clipped.end.y)
+        const originPx = this.screenForWorld(ideal.origin.x, ideal.origin.y)
+
+        const dirNorm = Math.hypot(ideal.direction.x, ideal.direction.y)
+        if (!Number.isFinite(dirNorm) || dirNorm < 1e-8) return false
+        const arrowWorldLen = Math.max(this.outerRingDeg * 0.35, 10.0 / 3600.0)
+        const arrowTarget = this.screenForWorld(
+          ideal.origin.x + ideal.direction.x / dirNorm * arrowWorldLen,
+          ideal.origin.y + ideal.direction.y / dirNorm * arrowWorldLen
+        )
+
+        ctx.save()
+        ctx.setLineDash([8, 6])
+        ctx.lineWidth = 1.5
+        ctx.strokeStyle = '#4DD0E1'
+        ctx.beginPath()
+        ctx.moveTo(startPx.x, startPx.y)
+        ctx.lineTo(endPx.x, endPx.y)
+        ctx.stroke()
+        ctx.restore()
+
+        this.drawArrow(originPx.x, originPx.y, arrowTarget.x, arrowTarget.y, '#4DD0E1')
+        return true
+      },
 
       // === 轨迹点合并/追加（按 Alt/Az 容差） ===
       appendRawTrajectoryPoint(raDeg, decDeg, timeMs = Date.now()) {
@@ -2257,8 +2457,11 @@ export default {
           prevPt = { x: px, y: py }
           this.trajectoryPoints.push({ x: px, y: py })
         }
-        // 辅助：目标到最后段的垂线（虚线）
-        this.drawPerpendicularAuxLine()
+        // 优先绘制基于当前假极轴姿态推导出的理想移动轨迹；
+        // 若姿态数据暂不可用，则回退到历史轨迹的垂线近似。
+        if (!this.drawIdealGuideAuxLine()) {
+          this.drawPerpendicularAuxLine()
+        }
       },
       drawHollowCircle(x, y, r = 8, color = '#FFFFFF', lineWidth = 2) {
         const canvas = this.$refs.trajectoryCanvas
@@ -3252,6 +3455,10 @@ export default {
             isPolarAligned: this.isPolarAligned,
             calibrationRound: this.calibrationLoopCount
           })
+        }
+
+        if (this.showTrajectoryOverlay && this.targetRawPosition) {
+          this.redrawTrajectory()
         }
       },
 
