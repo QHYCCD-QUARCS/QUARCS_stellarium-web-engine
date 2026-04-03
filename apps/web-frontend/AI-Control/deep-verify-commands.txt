@@ -1,5 +1,8 @@
 # AI-Control 深度验证 - 终端逐条输入
 # 在 npm run e2e:ai-control:session 启动后，在 > 提示符下逐行复制粘贴执行
+# 默认会话端口为 39281；若使用其他端口，先导出 E2E_AI_CONTROL_SESSION_PORT
+# mount 相关命令默认按 EQMod / INDI 连接；若现场设备不同，可用 E2E_DEEP_VERIFY_MOUNT_DRIVER_TEXT / E2E_DEEP_VERIFY_MOUNT_CONNECTION_MODE 覆盖
+# 最后一条 cfw-capture-config 仅在 CFW 已连接时执行；当前无 CFW 时应跳过，不计失败
 
 general-settings {"generalSettingsInteract":{"displayTab":true,"selectLanguage":true,"close":true}}
 power-management {"powerManagementInteract":{"output1":true,"restart":"cancel"}}
@@ -10,7 +13,7 @@ task-schedule
 task-schedule {"scheduleInteract":{"toggleLeftToolbar":true,"addRow":true,"closePanel":true}}
 mount-connect-control {"mountControlInteract":{"gotoThenSolve":true}}
 mount-park
-mount-panel {"mcpInteract":{"park":false,"track":true,"sync":true,"move":{"direction":"ra-plus","durationMs":500},"stop":true}}
+mount-panel {"mcpInteract":{"slewSpeed":10,"park":false,"track":true,"sync":true,"moveAllDirections":true,"moveDurationMs":5000,"stop":true}}
 guider-connect-capture {"guiderGain":10,"guiderOffset":0,"guiderExposure":"1s","guiderInteract":{"loopExposure":true,"guiding":true}}
 maincamera-connect-capture {"captureGain":10,"captureOffset":0,"captureExposure":"1s","captureAutoSave":true,"doSave":true}
 focuser-connect-control {"focuserInteract":{"speed":3,"roiLength":300,"move":{"direction":"right","durationMs":500}}}

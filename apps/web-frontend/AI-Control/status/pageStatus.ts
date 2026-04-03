@@ -11,6 +11,13 @@ import {
   type ConfirmDialogActionMode,
   type ConfirmDialogVariant,
 } from '../shared/dialogConstants'
+import {
+  DEFAULT_UNIFIED_RUNTIME_STATE,
+  normalizeUnifiedRuntimeState,
+  type UnifiedLogEntry,
+  type UnifiedOperationStatus,
+  type UnifiedRuntimeState,
+} from './unifiedRuntime'
 
 export type MainPageName = 'Stel' | 'MainCamera' | 'GuiderCamera'
 export type DrawerState = 'open' | 'closed'
@@ -76,6 +83,16 @@ export interface PageStatus {
     e2eExposureCompletedSeq: string | null
     /** TileGPM 探针 `e2e-tilegpm[data-seq]` */
     e2eTileGpmSeq: string | null
+    /** 后端当前帧是否已全部生成完瓦片 */
+    tileGenerationComplete: boolean
+    /** 前端当前视口所需瓦片是否已全部下载完 */
+    tileDownloadComplete: boolean
+    /** 当前视口需要下载的瓦片 key 列表（JSON 字符串） */
+    requiredTileKeys: string | null
+    /** 当前视口已下载完成的瓦片 key 列表（JSON 字符串） */
+    downloadedTileKeys: string | null
+    requiredTileCount: string | null
+    downloadedTileCount: string | null
   }
   guider: {
     panelVisible: boolean
@@ -93,6 +110,16 @@ export interface PageStatus {
   mcpPanelVisible: boolean
   capturePanelVisible: boolean
   guiderPanelVisible: boolean
+  operationState: UnifiedRuntimeState
+  deviceRuntimeState: Array<{
+    deviceType: string
+    connectionState: string | null
+    activeOperationKey: string | null
+    activeOperationType: string | null
+    activeStatus: UnifiedOperationStatus | null
+    lastError: string | null
+  }>
+  recentLogs: UnifiedLogEntry[]
 }
 
 const PAGE_STATUS_EVALUATE_SCRIPT = `(() => {
@@ -251,6 +278,12 @@ const PAGE_STATUS_EVALUATE_SCRIPT = `(() => {
       cfwState: cpCfwDisplay ? attr(cpCfwDisplay, 'data-state') : null,
       e2eExposureCompletedSeq: e2eExposureCompleted ? attr(e2eExposureCompleted, 'data-seq') : null,
       e2eTileGpmSeq: e2eTilegpm ? attr(e2eTilegpm, 'data-seq') : null,
+      tileGenerationComplete: e2eTilegpm ? attr(e2eTilegpm, 'data-generation-complete') === 'true' : false,
+      tileDownloadComplete: e2eTilegpm ? attr(e2eTilegpm, 'data-download-complete') === 'true' : false,
+      requiredTileKeys: e2eTilegpm ? attr(e2eTilegpm, 'data-required-tile-keys') : null,
+      downloadedTileKeys: e2eTilegpm ? attr(e2eTilegpm, 'data-downloaded-tile-keys') : null,
+      requiredTileCount: e2eTilegpm ? attr(e2eTilegpm, 'data-required-tile-count') : null,
+      downloadedTileCount: e2eTilegpm ? attr(e2eTilegpm, 'data-downloaded-tile-count') : null,
     },
     guider: {
       panelVisible: chartRoot ? visible(chartRoot) : false,
@@ -268,6 +301,7 @@ const PAGE_STATUS_EVALUATE_SCRIPT = `(() => {
     mcpPanelVisible: mcpPanel ? visible(mcpPanel) : false,
     capturePanelVisible: cpPanel ? visible(cpPanel) : false,
     guiderPanelVisible: chartRoot ? visible(chartRoot) : false,
+    unifiedRuntime: window.__QUARCS_UNIFIED_RUNTIME__ || null,
   }
 })()`
 
@@ -322,6 +356,12 @@ const DEFAULT_STATUS: PageStatus = {
     cfwState: null,
     e2eExposureCompletedSeq: null,
     e2eTileGpmSeq: null,
+    tileGenerationComplete: false,
+    tileDownloadComplete: false,
+    requiredTileKeys: null,
+    downloadedTileKeys: null,
+    requiredTileCount: null,
+    downloadedTileCount: null,
   },
   guider: {
     panelVisible: false,
@@ -339,6 +379,25 @@ const DEFAULT_STATUS: PageStatus = {
   mcpPanelVisible: false,
   capturePanelVisible: false,
   guiderPanelVisible: false,
+  operationState: DEFAULT_UNIFIED_RUNTIME_STATE,
+  deviceRuntimeState: [],
+  recentLogs: [],
+}
+
+function buildDeviceRuntimeState(status: Pick<PageStatus, 'devices'>, operationState: UnifiedRuntimeState): PageStatus['deviceRuntimeState'] {
+  return status.devices.map((device) => {
+    const ops = operationState.operationsByDevice[device.deviceType] ?? []
+    const active = ops.find((op) => op.status === 'running' || op.status === 'waiting') ?? null
+    const failed = ops.find((op) => op.status === 'failed' || Boolean(op.error)) ?? null
+    return {
+      deviceType: device.deviceType,
+      connectionState: device.connectionState,
+      activeOperationKey: active?.operationKey ?? null,
+      activeOperationType: active?.operationType ?? null,
+      activeStatus: active?.status ?? null,
+      lastError: failed?.error ?? failed?.message ?? null,
+    }
+  })
 }
 
 function normalizeStatus(raw: unknown): PageStatus {
@@ -351,6 +410,7 @@ function normalizeStatus(raw: unknown): PageStatus {
   const capture = (s.capture as PageStatus['capture']) ?? DEFAULT_STATUS.capture
   const guider = (s.guider as PageStatus['guider']) ?? DEFAULT_STATUS.guider
   const polarAxis = (s.polarAxis as PageStatus['polarAxis']) ?? DEFAULT_STATUS.polarAxis
+  const operationState = normalizeUnifiedRuntimeState((s as Record<string, unknown>).unifiedRuntime)
   const confirm = dialogs.confirm ?? { visible: false, availableButtons: [] }
   return {
     root: Boolean(s.root),
@@ -415,6 +475,12 @@ function normalizeStatus(raw: unknown): PageStatus {
       cfwState: capture.cfwState ?? null,
       e2eExposureCompletedSeq: capture.e2eExposureCompletedSeq ?? null,
       e2eTileGpmSeq: capture.e2eTileGpmSeq ?? null,
+      tileGenerationComplete: Boolean(capture.tileGenerationComplete),
+      tileDownloadComplete: Boolean(capture.tileDownloadComplete),
+      requiredTileKeys: capture.requiredTileKeys ?? null,
+      downloadedTileKeys: capture.downloadedTileKeys ?? null,
+      requiredTileCount: capture.requiredTileCount ?? null,
+      downloadedTileCount: capture.downloadedTileCount ?? null,
     },
     guider: {
       panelVisible: Boolean(guider.panelVisible),
@@ -432,6 +498,9 @@ function normalizeStatus(raw: unknown): PageStatus {
     mcpPanelVisible: Boolean(s.mcpPanelVisible),
     capturePanelVisible: Boolean(s.capturePanelVisible),
     guiderPanelVisible: Boolean(s.guiderPanelVisible),
+    operationState,
+    deviceRuntimeState: buildDeviceRuntimeState({ devices: Array.isArray(s.devices) ? (s.devices as DeviceRuntimeStatus[]) : [] }, operationState),
+    recentLogs: operationState.recentLogs,
   }
 }
 

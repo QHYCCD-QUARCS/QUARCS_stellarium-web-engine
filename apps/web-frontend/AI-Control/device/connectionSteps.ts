@@ -93,7 +93,17 @@ async function selectDriverIfVisible(ctx: FlowContext, driverText: string) {
   const wanted = normalizeDriverLabelForCompare(driverText)
   const current = normalizeDriverLabelForCompare(await wrapper.textContent().catch(() => ''))
   if (wanted && current.includes(wanted)) return
-  await selectVSelectItemText(ctx.page, 'ui-app-select-confirm-driver', driverText, ctx.stepTimeoutMs)
+  let lastError: unknown = null
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      await selectVSelectItemText(ctx.page, 'ui-app-select-confirm-driver', driverText, ctx.stepTimeoutMs)
+      return
+    } catch (error) {
+      lastError = error
+      await sleep(1500)
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error(String(lastError ?? 'selectDriverIfVisible failed'))
 }
 
 /** 连接面板可见时选择连接模式（ui-app-select-on-connection-mode-change） */

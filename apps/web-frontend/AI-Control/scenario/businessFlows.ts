@@ -150,7 +150,8 @@ export function buildDeviceConnectCaptureFlow(params: {
     calls.push({ id: 'device.captureOnce', params: captureOnceParams })
   }
 
-  if (shouldCapture && params.doSave === true) {
+  const shouldRunExplicitSave = shouldCapture && params.doSave === true && params.captureAutoSave !== true
+  if (shouldRunExplicitSave) {
     calls.push({ id: 'device.save', params: { deviceType, doSave: true } })
   }
 

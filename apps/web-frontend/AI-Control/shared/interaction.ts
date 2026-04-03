@@ -40,19 +40,30 @@ export function sleep(ms: number) {
 /** 多次 Escape 尝试消除 Vuetify 残留 scrim；仍挡住时点击 scrim（与主菜单遮罩关闭策略一致） */
 export async function clearActiveOverlay(page: Page, timeout: number) {
   const deadline = Date.now() + Math.max(800, Math.min(timeout, 8000))
-  const activeScrim = page.locator('.v-overlay.v-overlay--active .v-overlay__scrim')
+  const activeScrim = page.locator('.v-overlay.v-overlay--active .v-overlay__scrim, .v-overlay__scrim')
   while (Date.now() < deadline) {
-    const hasActiveScrim = (await activeScrim.count().catch(() => 0)) > 0
-    if (!hasActiveScrim) return
+    const count = await activeScrim.count().catch(() => 0)
+    let visibleScrim = null as Locator | null
+    for (let i = 0; i < count; i += 1) {
+      const candidate = activeScrim.nth(i)
+      if (await candidate.isVisible().catch(() => false)) {
+        visibleScrim = candidate
+        break
+      }
+    }
+    if (!visibleScrim) return
     await page.keyboard.press('Escape').catch(() => {})
     await sleep(120)
   }
-  if ((await activeScrim.count().catch(() => 0)) > 0) {
-    await activeScrim
-      .first()
+  const count = await activeScrim.count().catch(() => 0)
+  for (let i = 0; i < count; i += 1) {
+    const candidate = activeScrim.nth(i)
+    if (!(await candidate.isVisible().catch(() => false))) continue
+    await candidate
       .click({ position: { x: 2, y: 2 }, timeout: Math.min(timeout, 5000) })
       .catch(() => {})
     await sleep(250)
+    return
   }
 }
 
@@ -205,6 +216,11 @@ function collectConfirmDriverOptionTestIdSuffixes(itemText: string): string[] {
     add('indi_qhy_ccd2')
     add('libqhyccd')
   }
+  if (norm === 'EQMOD') {
+    add('indi_eqmod_mount')
+    add('indi_eqmod_telescope')
+    add('eqmod')
+  }
   return [...out]
 }
 
@@ -218,6 +234,10 @@ async function clickConfirmDriverOptionIfPossible(
   for (const suffix of suffixes) {
     const tid = `ui-app-select-confirm-driver-option-${suffix}`
     const loc = page.getByTestId(tid).first()
+    if ((await loc.count().catch(() => 0)) > 0) {
+      await loc.scrollIntoViewIfNeeded().catch(() => {})
+      await sleep(ACTION_SETTLE_MS)
+    }
     if (await loc.isVisible().catch(() => false)) {
       await clickLocator(loc, timeout)
       return true
@@ -231,8 +251,18 @@ async function clickConfirmDriverOptionIfPossible(
   const n = await options.count()
   for (let i = 0; i < n; i += 1) {
     const el = options.nth(i)
+    await el.scrollIntoViewIfNeeded().catch(() => {})
+    await sleep(60)
     const txt = await el.innerText().catch(() => '')
-    if (normalizeDriverLabelForCompare(txt) === want) {
+    const normalizedText = normalizeDriverLabelForCompare(txt)
+    const tid = await el.getAttribute('data-testid').catch(() => '')
+    const normalizedTid = normalizeDriverLabelForCompare(tid)
+    if (
+      normalizedText === want ||
+      normalizedText.includes(want) ||
+      want.includes(normalizedText) ||
+      normalizedTid.includes(want)
+    ) {
       await clickLocator(el, timeout)
       return true
     }
@@ -253,18 +283,21 @@ export async function selectVSelectItemText(page: Page, testId: string, itemText
   }
 
   const byRole = menu.getByRole('option', { name: new RegExp(`^${escapeRegExp(itemText)}$`, 'i') }).first()
+  await byRole.scrollIntoViewIfNeeded().catch(() => {})
   if (await byRole.isVisible().catch(() => false)) {
     await clickLocator(byRole, timeout)
     return
   }
 
   const exact = menu.getByText(itemText, { exact: true }).first()
+  await exact.scrollIntoViewIfNeeded().catch(() => {})
   if (await exact.isVisible().catch(() => false)) {
     await clickLocator(exact, timeout)
     return
   }
 
   const fallback = menu.getByText(itemText, { exact: false }).first()
+  await fallback.scrollIntoViewIfNeeded().catch(() => {})
   await expect(fallback).toBeVisible({ timeout: Math.min(8000, timeout) })
   await clickLocator(fallback, timeout)
 }
