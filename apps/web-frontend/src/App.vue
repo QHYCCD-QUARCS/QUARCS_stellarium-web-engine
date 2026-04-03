@@ -33,6 +33,12 @@
         data-testid="e2e-tilegpm"
         :data-seq="String(e2eTileGpmSeq)"
         :data-session="String(tileSessionId || '')"
+        :data-generation-complete="tileGenerationComplete ? 'true' : 'false'"
+        :data-download-complete="tileDownloadComplete ? 'true' : 'false'"
+        :data-required-tile-keys="tileE2ERequiredKeys"
+        :data-downloaded-tile-keys="tileE2EDownloadedKeys"
+        :data-required-tile-count="String(tileE2ERequiredTileCount)"
+        :data-downloaded-tile-count="String(tileE2EDownloadedTileCount)"
       ></div>
       <div
         data-testid="e2e-exposure-completed"
@@ -1043,7 +1049,7 @@ export default {
 
       QTClientVersion: 'Not connected',
       // VueClientVersion: process.env.VUE_APP_VERSION,
-      VueClientVersion: '20260331', // 手动指定版本号
+      VueClientVersion: '20260401', // 手动指定版本号
 
       // 全局总版本号（由 Qt 通过 WebSocket 从环境变量 QUARCS_TOTAL_VERSION 读取并发送）
       TotalVersion: '0.0.0',
@@ -1255,11 +1261,25 @@ export default {
 
       // ========================= 瓦片金字塔相关 =========================
       TILE_PATH_SUFFIX: 'img/capture-tiles',  // 与 nginx location /img/capture-tiles/ 对应
-      TILE_DEBUG: false,  // 瓦片调试：默认关闭，避免高频日志拖慢主线程；排查问题时可临时打开
+      TILE_DEBUG: true,  // 瓦片调试：默认关闭，避免高频日志拖慢主线程；排查问题时可临时打开
       TILE_PERF: true, // 瓦片性能：为 true 时在控制台与界面日志中输出各阶段耗时（processTile / renderTiles / drawImageData 等）；仅排查卡顿时临时打开
       tileGPM: null,              // 全局处理元数据
       tileSessionId: null,        // 当前瓦片会话ID
       tileFrameId: null,          // 当前瓦片帧ID（用于丢弃旧帧瓦片/防错帧拉伸）
+      tileReadyKeys: null,        // 当前帧允许下载的瓦片集合 Set<"z/x/y">
+      pendingTileReadyBatches: null, // 提前收到的后端就绪批次 Map<"sessionId::frameId", Set<"z/x/y">>
+      pendingTileGenerationComplete: null, // 提前收到的“后端本帧全部生成完成”标记 Map<"sessionId::frameId", readyCount>
+      tileReadyPollTimer: null,   // TileBatchReady 丢失时的兜底轮询定时器
+      tileReadyPollInFlight: false, // 防止 ready 轮询请求并发发送
+      tileReadyPollIntervalMs: 2000, // 未拉齐瓦片时每 2s 向后端补拉一次 ready 列表
+      tileMergedPreviewReady: false, // merged_single_level: z=0 预览已显示，可进入原图瓦片渐进替换
+      tileGenerationComplete: false, // 后端当前帧“全部生成完成”标志
+      tileGenerationCompleteReadyCount: 0, // 后端完成时已生成的瓦片数量
+      tileDownloadComplete: false, // 前端当前视口所需瓦片“全部下载完成”标志
+      tileE2ERequiredKeys: '[]', // E2E: 当前视口需要下载的瓦片 key 列表（JSON 字符串）
+      tileE2EDownloadedKeys: '[]', // E2E: 当前视口已下载完成的瓦片 key 列表（JSON 字符串）
+      tileE2ERequiredTileCount: 0, // E2E: 当前视口需要下载的瓦片数量
+      tileE2EDownloadedTileCount: 0, // E2E: 当前视口已下载完成的瓦片数量
       // E2E：出图成功信号（每次收到 TileGPM 自增；用于 Playwright 等待真实状态变化）
       e2eTileGpmSeq: 0,
       // E2E：Qt 下发 ExposureCompleted 时自增（与 TileGPM 解耦；短曝光时 cp-status 可能来不及观测 busy）
@@ -1269,7 +1289,7 @@ export default {
       tilePendingLoads: null,     // 正在加载的瓦片集合 (在initCanvas中初始化)
       tileAbortControllers: null, // 瓦片加载取消控制器 Map<"z/x/y", AbortController> (在initCanvas中初始化)
       tileLoadQueue: [],          // 瓦片加载队列
-      maxConcurrentTileLoads: 2,  // 降低并发，减少多块瓦片同时解码/处理造成的主线程卡顿
+      maxConcurrentTileLoads: 6,  // 降低并发，减少多块瓦片同时解码/处理造成的主线程卡顿
       currentTileLoads: 0,        // 当前加载数
       tileLoadBatchSeq: 0,        // 可见瓦片加载批次号（用于“全齐再显示”屏障）
       activeTileLoadBatchId: 0,   // 当前有效批次ID（视窗变化/新帧会覆盖旧批次）
@@ -1278,6 +1298,7 @@ export default {
       tileAllowIncrementalRender: false, // 首次批量渲染完成后，允许晚到瓦片增量补绘
       tileRetryTimers: null,      // 后端尚未生成完成时的重试定时器 Map<"z/x/y", Timeout>
       tileRetryCounts: null,      // 瓦片重试次数 Map<"z/x/y", number>
+      tileMax404Retries: 2,       // 单个瓦片 404 最大重试次数，避免未就绪/不存在时无限刷日志
       tileRenderRaf: null,        // 合并晚到瓦片的重绘请求，避免每片都立即重绘
       tileRenderBatchSize: 4,     // 增量补绘批次：累计这么多已完成瓦片后再触发一次重绘
       tileRenderBatchDelayMs: 80, // 增量补绘兜底延迟，避免最后零散瓦片长期不显示
@@ -1292,6 +1313,8 @@ export default {
       /** 当前合成缩放 s∈(0,1]：tileCanvas 像素尺寸 = round(image*s) */
       tileRasterScale: 1,
       viewportChangeTimer: null,  // 视窗变化防抖定时器
+      visibleAreaSendTimer: null, // sendVisibleArea 防抖定时器，避免渐进渲染时高频打断后端瓦片生成
+      lastVisibleAreaMessageKey: '', // 最近一次已发送的可视区消息快照，避免同值重复发送
       currentVisibleTiles: null,  // 当前可见的瓦片集合 Set<"z/x/y">
       tileHistogram: null,        // 当前会话直方图 { sessionId, bins, total, counts }
       autoStretchBlackLevel: null, // 保存初始自动拉伸的黑点参数
@@ -2240,6 +2263,30 @@ export default {
             }
           }
 
+          if (data.message.startsWith('TileBatchReady:')) {
+            acceptMessage = true;
+            try {
+              const colonIndex = data.message.indexOf(':');
+              const jsonString = (colonIndex >= 0) ? data.message.substring(colonIndex + 1) : '';
+              const payload = JSON.parse(jsonString);
+              this.handleTileBatchReady(payload);
+            } catch (e) {
+              console.error('[Tile] failed to parse TileBatchReady', e);
+            }
+          }
+
+          if (data.message.startsWith('TileGenerationComplete:')) {
+            acceptMessage = true;
+            try {
+              const colonIndex = data.message.indexOf(':');
+              const jsonString = (colonIndex >= 0) ? data.message.substring(colonIndex + 1) : '';
+              const payload = JSON.parse(jsonString);
+              this.handleTileGenerationComplete(payload);
+            } catch (e) {
+              console.error('[Tile] failed to parse TileGenerationComplete', e);
+            }
+          }
+
           if (!acceptMessage) {
             switch (messageType) {
               case 'AddDriver':
@@ -2689,7 +2736,7 @@ export default {
               case 'MainCameraBinning':
                 if (parts.length === 2) {
                   this.cameraBin = parseInt(parts[1]);
-                  this.MainCameraConfigItems.find(item => item.label === 'Binning').value = this.cameraBin;
+                  this.updateConfigItemValue(this.MainCameraConfigItems, 'Binning', this.cameraBin, 'MainCameraBinning');
                   this.$bus.$emit('MainCameraBinning', this.cameraBin);
                 }
                 break;
@@ -3904,7 +3951,7 @@ export default {
                   }
                   this.ImageCFA = value;
                   console.log("获取到的主相机参数  MainCameraCFA: ", this.ImageCFA);
-                  this.MainCameraConfigItems.find(item => item.label === 'ImageCFA').value = this.ImageCFA;
+                  this.updateConfigItemValue(this.MainCameraConfigItems, 'ImageCFA', this.ImageCFA, 'MainCameraCFA');
                 }
                 break;
 
@@ -4096,7 +4143,7 @@ export default {
 
               case 'SolveCurrentPosition':
                 if (parts.length >= 2) {
-                  this.MountConfigItems.find(i => i.label === 'SolveCurrentPosition').value = false;
+                  this.updateConfigItemValue(this.MountConfigItems, 'SolveCurrentPosition', false, 'SolveCurrentPosition');
                   if (parts[1] === 'succeeded') {
                     const RA_Degree = parts[2];
                     const DEC_Degree = parts[3];
@@ -5067,6 +5114,17 @@ export default {
       }
     },
 
+    updateConfigItemValue(items, label, value, source = 'unknown') {
+      if (!Array.isArray(items)) return false;
+      const item = items.find(entry => entry && entry.label === label);
+      if (!item) {
+        console.warn(`[Config] item not found for ${source}: ${label}`);
+        return false;
+      }
+      item.value = value;
+      return true;
+    },
+
     DeviceAllocation() {
       this.$bus.$emit('toggleDeviceAllocationPanel');
       this.nav = false;
@@ -5787,6 +5845,242 @@ export default {
       return v === 'pyramid' ? 'pyramid' : 'merged_single_level';
     },
 
+    hasPendingVisibleTileDownloads() {
+      if (!this.tileGPM || !this.tileSessionId || this.tileFrameId == null) return false;
+      if (!this.currentVisibleTiles || this.currentVisibleTiles.size === 0) return true;
+      for (const key of this.currentVisibleTiles) {
+        const hasRaw = !!(this.tileRawDataCache && this.tileRawDataCache.has(key));
+        if (hasRaw) continue;
+        const pending = !!(this.tilePendingLoads && this.tilePendingLoads.has(key));
+        if (pending) return true;
+        const allowed = this.isTileKeyDownloadAllowed(key);
+        if (!allowed) return true;
+      }
+      return false;
+    },
+
+    requestCurrentTileBatchReady() {
+      if (!this.tileGPM || !this.tileSessionId || this.tileFrameId == null) return;
+      const sessionId = String(this.tileSessionId || '');
+      const frameId = String(this.tileFrameId);
+      if (!sessionId || !frameId) return;
+      this.tileReadyPollInFlight = true;
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', `queryTileBatchReady:${sessionId}:${frameId}`);
+      if (this.TILE_DEBUG) {
+        console.log('[TileBatchReadyPoll] request', { sessionId, frameId });
+      }
+      setTimeout(() => {
+        this.tileReadyPollInFlight = false;
+      }, 300);
+    },
+
+    stopTileReadyFallbackPolling() {
+      if (this.tileReadyPollTimer) {
+        clearInterval(this.tileReadyPollTimer);
+        this.tileReadyPollTimer = null;
+      }
+      this.tileReadyPollInFlight = false;
+    },
+
+    ensureTileReadyFallbackPolling() {
+      if (!this.tileGPM || !this.tileSessionId || this.tileFrameId == null) {
+        this.stopTileReadyFallbackPolling();
+        return;
+      }
+      if (!this.hasPendingVisibleTileDownloads()) {
+        this.stopTileReadyFallbackPolling();
+        return;
+      }
+      if (this.tileReadyPollTimer) return;
+      this.requestCurrentTileBatchReady();
+      this.tileReadyPollTimer = setInterval(() => {
+        if (this.tileReadyPollInFlight) return;
+        if (!this.hasPendingVisibleTileDownloads()) {
+          this.stopTileReadyFallbackPolling();
+          return;
+        }
+        this.requestCurrentTileBatchReady();
+      }, Math.max(500, Number(this.tileReadyPollIntervalMs) || 2000));
+    },
+
+    tileBatchReadyMapKey(sessionId, frameId) {
+      return `${String(sessionId || '')}::${String(frameId == null ? '' : frameId)}`;
+    },
+
+    storeTileBatchReadyPayload(payload) {
+      if (!payload || !Array.isArray(payload.tiles) || payload.tiles.length === 0) return;
+      if (!this.pendingTileReadyBatches) {
+        this.pendingTileReadyBatches = new Map();
+      }
+      const mapKey = this.tileBatchReadyMapKey(payload.sessionId, payload.frameId);
+      const target = this.pendingTileReadyBatches.get(mapKey) || new Set();
+      for (const key of payload.tiles) {
+        if (typeof key === 'string' && key) {
+          target.add(key);
+        }
+      }
+      this.pendingTileReadyBatches.set(mapKey, target);
+    },
+
+    applyPendingTileBatchReady(sessionId, frameId) {
+      if (!this.pendingTileReadyBatches || !this.tileReadyKeys) return;
+      const mapKey = this.tileBatchReadyMapKey(sessionId, frameId);
+      const pending = this.pendingTileReadyBatches.get(mapKey);
+      if (!pending || pending.size === 0) return;
+      for (const key of pending) {
+        this.tileReadyKeys.add(key);
+      }
+      this.pendingTileReadyBatches.delete(mapKey);
+    },
+
+    storePendingTileGenerationComplete(payload) {
+      if (!payload) return;
+      if (!this.pendingTileGenerationComplete) {
+        this.pendingTileGenerationComplete = new Map();
+      }
+      this.pendingTileGenerationComplete.set(
+        this.tileBatchReadyMapKey(payload.sessionId, payload.frameId),
+        Number(payload.readyCount) || 0
+      );
+    },
+
+    applyPendingTileGenerationComplete(sessionId, frameId) {
+      if (!this.pendingTileGenerationComplete) return;
+      const mapKey = this.tileBatchReadyMapKey(sessionId, frameId);
+      if (!this.pendingTileGenerationComplete.has(mapKey)) return;
+      const readyCount = this.pendingTileGenerationComplete.get(mapKey);
+      this.pendingTileGenerationComplete.delete(mapKey);
+      this.tileGenerationComplete = true;
+      this.tileGenerationCompleteReadyCount = Number(readyCount) || 0;
+    },
+
+    isTileKeyDownloadAllowed(key) {
+      return !!(this.tileReadyKeys && this.tileReadyKeys.has(key));
+    },
+
+    updateTileE2EState() {
+      const requiredKeys = this.currentVisibleTiles
+        ? Array.from(this.currentVisibleTiles).sort()
+        : [];
+      const downloadedKeys = requiredKeys.filter(key => (
+        !!(this.tileRawDataCache && this.tileRawDataCache.has(key))
+      ));
+
+      this.tileE2ERequiredTileCount = requiredKeys.length;
+      this.tileE2EDownloadedTileCount = downloadedKeys.length;
+      this.tileE2ERequiredKeys = JSON.stringify(requiredKeys);
+      this.tileE2EDownloadedKeys = JSON.stringify(downloadedKeys);
+    },
+
+    updateTileDownloadCompletionState() {
+      this.updateTileE2EState();
+
+      let complete = false;
+      const visibleCount = this.currentVisibleTiles ? this.currentVisibleTiles.size : 0;
+
+      if (this.tileGPM && this.tileSessionId && this.tileFrameId != null && visibleCount > 0) {
+        complete = true;
+        for (const key of this.currentVisibleTiles) {
+          const hasRaw = !!(this.tileRawDataCache && this.tileRawDataCache.has(key));
+          if (hasRaw) continue;
+
+          const pending = !!(this.tilePendingLoads && this.tilePendingLoads.has(key));
+          const allowed = this.isTileKeyDownloadAllowed(key);
+          if (pending || !allowed) {
+            complete = false;
+            break;
+          }
+
+          complete = false;
+          break;
+        }
+      }
+
+      const changed = this.tileDownloadComplete !== complete;
+      this.tileDownloadComplete = complete;
+      if (changed) {
+        console.log('[TileDownloadComplete]', {
+          sessionId: this.tileSessionId,
+          frameId: this.tileFrameId,
+          complete,
+          visibleCount,
+          generationComplete: this.tileGenerationComplete
+        });
+      }
+    },
+
+    handleTileBatchReady(payload) {
+      if (!payload || !Array.isArray(payload.tiles) || payload.tiles.length === 0) return;
+      const sessionId = String(payload.sessionId || '');
+      const frameId = String(payload.frameId == null ? '' : payload.frameId);
+      if (!sessionId || !frameId) return;
+
+      const currentSessionId = String(this.tileSessionId || '');
+      const currentFrameId = String(this.tileFrameId == null ? '' : this.tileFrameId);
+      if (!this.tileReadyKeys) {
+        this.tileReadyKeys = new Set();
+      }
+
+      if (sessionId !== currentSessionId || frameId !== currentFrameId) {
+        this.storeTileBatchReadyPayload(payload);
+        return;
+      }
+
+      let added = 0;
+      for (const key of payload.tiles) {
+        if (typeof key !== 'string' || !key || this.tileReadyKeys.has(key)) continue;
+        this.tileReadyKeys.add(key);
+        added++;
+      }
+
+      const sample = payload.tiles.slice(0, 8);
+      console.log('[TileBatchReady] received', {
+        payloadSessionId: sessionId,
+        payloadFrameId: frameId,
+        currentSessionId,
+        currentFrameId,
+        count: payload.tiles.length,
+        added,
+        sample
+      });
+
+      if (added > 0 && this.tileGPM) {
+        this.loadVisibleTiles();
+      }
+      this.updateTileDownloadCompletionState();
+      if (this.tileGPM) {
+        this.$nextTick(() => {
+          this.ensureTileReadyFallbackPolling();
+        });
+      }
+    },
+
+    handleTileGenerationComplete(payload) {
+      if (!payload || !payload.complete) return;
+      const sessionId = String(payload.sessionId || '');
+      const frameId = String(payload.frameId == null ? '' : payload.frameId);
+      if (!sessionId || !frameId) return;
+
+      const currentSessionId = String(this.tileSessionId || '');
+      const currentFrameId = String(this.tileFrameId == null ? '' : this.tileFrameId);
+      if (sessionId !== currentSessionId || frameId !== currentFrameId) {
+        this.storePendingTileGenerationComplete(payload);
+        return;
+      }
+
+      this.tileGenerationComplete = true;
+      this.tileGenerationCompleteReadyCount = Number(payload.readyCount) || 0;
+      console.log('[TileGenerationComplete] received', {
+        sessionId,
+        frameId,
+        readyCount: this.tileGenerationCompleteReadyCount
+      });
+      this.updateTileDownloadCompletionState();
+      this.$nextTick(() => {
+        this.ensureTileReadyFallbackPolling();
+      });
+    },
+
     /**
      * 处理后端发送的GPM消息
      * @param {Object} gpm - 全局处理元数据
@@ -5824,6 +6118,9 @@ export default {
       const nextMaxZoomLevel = Number.isFinite(Number(gpm.maxZoomLevel))
         ? Number(gpm.maxZoomLevel)
         : null;
+      const prevFrameId = (this.tileFrameId != null && Number.isFinite(Number(this.tileFrameId)))
+        ? Number(this.tileFrameId)
+        : null;
 
       const isNewSession =
         this.tileSessionId !== gpm.sessionId ||
@@ -5837,11 +6134,16 @@ export default {
 
       const sessionIdStr = String(gpm.sessionId || '');
       const isLiveSession = sessionIdStr === 'live' || sessionIdStr.startsWith('live_');
+      const isSameFrameUpdate =
+        incomingFrameId !== null &&
+        prevFrameId !== null &&
+        incomingFrameId === prevFrameId;
 
       // live 覆盖写帧节流：高帧率下若每条 TileGPM 都立即清缓存/abort，会导致前端持续“重启加载”，
       // 表现为跳帧、卡顿、瓦片大量失败、缩放后长时间不刷新。
-      // 策略：对 isNewSession=false 且 live 会话的 TileGPM 做节流，只处理“最新一条”。
-      const isLiveOverwriteFrame = (!isNewSession) && isLiveSession;
+      // 策略：仅对“同 session 下确实切到新 frame”的 live 覆盖写做节流。
+      // 对同一 frame 的 refined GPM（补发更精确 black/white）不应清缓存/abort。
+      const isLiveOverwriteFrame = (!isNewSession) && isLiveSession && !isSameFrameUpdate;
       if (isLiveOverwriteFrame) {
         const now = Date.now();
         const throttleMs = Number(this.liveTileGpmThrottleMs) || 250;
@@ -5902,6 +6204,9 @@ export default {
       if (!this.tilePendingLoads) {
         this.tilePendingLoads = new Set();
       }
+      if (!this.tileReadyKeys) {
+        this.tileReadyKeys = new Set();
+      }
       if (!this.tileAbortControllers) {
         this.tileAbortControllers = new Map();
       }
@@ -5919,13 +6224,14 @@ export default {
       }
       
       // 重要：后端每张图使用独立目录（sessionId=live_<epoch>），新 GPM 即新会话；保留 isOverwriteLiveFrame 兼容旧后端 sessionId=live 覆盖写
-      const isOverwriteLiveFrame = (!isNewSession) && isLiveSession;
+      const isOverwriteLiveFrame = isLiveOverwriteFrame;
 
       if (isNewSession || isOverwriteLiveFrame) {
         // 新会话或 live 覆盖写帧：清空瓦片缓存与队列，避免旧帧残留/命中缓存导致不刷新
         this.tileCache.clear();
         this.tileRawDataCache.clear();
         this.tilePendingLoads.clear();
+        this.tileReadyKeys.clear();
         this.currentVisibleTiles.clear();
         this.tileDirtyKeys.clear();
 
@@ -5943,6 +6249,15 @@ export default {
         this.tileLoadQueue = [];
         this.currentTileLoads = 0;
         this.tileForceFullRender = true;
+        this.tileMergedPreviewReady = false;
+        this.tileGenerationComplete = false;
+        this.tileGenerationCompleteReadyCount = 0;
+        this.tileDownloadComplete = false;
+        this.tileE2ERequiredKeys = '[]';
+        this.tileE2EDownloadedKeys = '[]';
+        this.tileE2ERequiredTileCount = 0;
+        this.tileE2EDownloadedTileCount = 0;
+        this.stopTileReadyFallbackPolling();
         this.resetIncrementalTileRenderBuffer();
 
         if (isNewSession) {
@@ -5954,6 +6269,10 @@ export default {
           this.autoStretchWhiteLevel = null;
         }
       }
+
+      this.applyPendingTileBatchReady(this.tileSessionId, this.tileFrameId);
+      this.applyPendingTileGenerationComplete(this.tileSessionId, this.tileFrameId);
+      this.updateTileDownloadCompletionState();
 
       // 初始化瓦片画布
       if (!this.tileCanvas) {
@@ -6057,9 +6376,16 @@ export default {
         console.log('[TileMode-GPM] GPM未包含有效的黑白点参数');
       }
       
-      // 开始加载可见区域的瓦片
+      // 关键约束：
+      // - 收到 TileGPM 只表示“本帧元数据已更新”，不表示瓦片已经允许下载
+      // - 前端必须等后端通过 TileBatchReady 放行后，才开始下载那一批瓦片
       this.DetectedStarsFinish = false;
-      await this.loadVisibleTiles();
+      if (this.tileReadyKeys && this.tileReadyKeys.size > 0) {
+        await this.loadVisibleTiles();
+      } else {
+        this.renderTiles();
+      }
+      this.ensureTileReadyFallbackPolling();
     },
 
     /**
@@ -6198,9 +6524,7 @@ export default {
       // 关键：每次新帧到来（TileGPM）都主动把当前可视区 + frameId 发给后端，避免“视口不变时 sendVisibleArea 被去抖/不触发”
       // 这能确保后端按最新帧调度视口瓦片生成，减少“看起来还是上一帧”的概率。
       try {
-        if (Number.isFinite(this.visibleX) && Number.isFinite(this.visibleY) && Number.isFinite(this.scale)) {
-          this.$bus.$emit('AppSendMessage', 'Vue_Command', 'sendVisibleArea:' + this.visibleX + ':' + this.visibleY + ':' + this.scale + ':' + this.tileFrameId);
-        }
+        this.scheduleVisibleAreaToBackend(true);
       } catch (e) {
         // ignore
       }
@@ -6246,6 +6570,10 @@ export default {
       if (!this.tileGPM) return [];
 
       const gpm = this.tileGPM;
+      const buildMode = this.normalizeTileBuildModeValue(gpm.buildMode);
+      if (buildMode === 'merged_single_level' && z === 0) {
+        return [{ z: 0, x: 0, y: 0 }];
+      }
       const rect = visibleRect || this.getCurrentVisibleRect();
       if (!rect) return [];
 
@@ -6263,8 +6591,8 @@ export default {
 
       const startTileX = Math.max(0, Math.floor(levelLeft / T));
       const startTileY = Math.max(0, Math.floor(levelTop / T));
-      const endTileX = Math.min(maxTilesX - 1, Math.floor(levelRight / T));
-      const endTileY = Math.min(maxTilesY - 1, Math.floor(levelBottom / T));
+      const endTileX = Math.min(maxTilesX - 1, Math.ceil(levelRight / T) - 1);
+      const endTileY = Math.min(maxTilesY - 1, Math.ceil(levelBottom / T) - 1);
 
       for (let ty = startTileY; ty <= endTileY; ty++) {
         for (let tx = startTileX; tx <= endTileX; tx++) {
@@ -6301,14 +6629,17 @@ export default {
         width: gpm.imageWidth,
         height: gpm.imageHeight,
       };
-      // merged_single_level：仅两层——z=0 压缩合并整图 + z=maxZ 原图整图，均为 fullImageRect
+      // merged_single_level：仅两层——z=0 压缩合并整图 + z=maxZ 原图视口
+      // 为避免首帧阶段 z=maxZ 还未生成就产生大量 404/重试，先等 0/0/0 就绪后再请求高精度层。
       // pyramid：不再请求 0..maxZ 全层级，避免前端为“看不见/很快被覆盖”的中间层付出过高代价。
       // 仅保留：
       // - z=0：整图粗预览
       // - currentZ：当前缩放真正需要的层级
       // - currentZ-1：作为过渡兜底层，兼顾渐进式体验与性能
       const requestLevels = (buildMode === 'merged_single_level')
-        ? Array.from(new Set([0, requestMaxZ]))
+        ? (this.tileMergedPreviewReady
+            ? Array.from(new Set([0, requestMaxZ]))
+            : [0])
         : Array.from(new Set([
             0,
             Math.max(0, currentZ - 1),
@@ -6316,7 +6647,10 @@ export default {
           ])).sort((a, b) => a - b);
 
       for (const z of requestLevels) {
-        const useFullImage = (buildMode === 'merged_single_level') || (z === 0);
+        // merged_single_level:
+        // - z=0 用整图单瓦片做预览
+        // - z=maxZ 只请求当前视口，并按中心距离渐进替换
+        const useFullImage = (z === 0);
         const levelTiles = this.calculateVisibleTilesForLevel(
           z,
           useFullImage ? fullImageRect : visibleRect
@@ -6439,8 +6773,32 @@ export default {
       const tilesToLoad = tiles.filter(t => {
         const key = `${t.z}/${t.x}/${t.y}`;
         const hasRaw = this.tileRawDataCache && this.tileRawDataCache.has(key);
-        return !hasRaw && !this.tilePendingLoads.has(key);
+        return !hasRaw && !this.tilePendingLoads.has(key) && this.isTileKeyDownloadAllowed(key);
       });
+      const visibleTileStates = tiles.slice(0, 8).map(t => {
+        const key = `${t.z}/${t.x}/${t.y}`;
+        const cached = this.tileCache && this.tileCache.get(key);
+        return {
+          key,
+          allowed: this.isTileKeyDownloadAllowed(key),
+          pending: !!(this.tilePendingLoads && this.tilePendingLoads.has(key)),
+          hasRaw: !!(this.tileRawDataCache && this.tileRawDataCache.has(key)),
+          hasCache: !!(cached && cached.renderSource && cached.width && cached.height),
+        };
+      });
+      console.log('[TileLoad] loadVisibleTiles summary', {
+        sessionId: this.tileSessionId,
+        frameId: this.tileFrameId,
+        visibleCount: tiles.length,
+        readyCount: this.tileReadyKeys ? this.tileReadyKeys.size : 0,
+        generationComplete: this.tileGenerationComplete,
+        downloadComplete: this.tileDownloadComplete,
+        toLoadCount: tilesToLoad.length,
+        sample: tilesToLoad.slice(0, 8).map(t => `${t.z}/${t.x}/${t.y}`),
+        visibleTileStates
+      });
+      this.updateTileDownloadCompletionState();
+      this.ensureTileReadyFallbackPolling();
 
       // 计算视口中心（用于同一层级内排序）
       const visibleRect = this.getCurrentVisibleRect();
@@ -6499,7 +6857,8 @@ export default {
         if ((this.tileRawDataCache && this.tileRawDataCache.has(key)) ||
             (this.tileCache && this.tileCache.has(key)) ||
             this.tilePendingLoads.has(key) ||
-            !this.currentVisibleTiles.has(key)) {
+            !this.currentVisibleTiles.has(key) ||
+            !this.isTileKeyDownloadAllowed(key)) {
           continue;
         }
         
@@ -6544,6 +6903,7 @@ export default {
       const key = `${tile.z}/${tile.x}/${tile.y}`;
       if (!this.currentVisibleTiles.has(key)) return;
       if (expectedSessionId !== this.tileSessionId || expectedFrameId !== this.tileFrameId) return;
+      if (!this.isTileKeyDownloadAllowed(key)) return;
       if (!this.tileRetryTimers) {
         this.tileRetryTimers = new Map();
       }
@@ -6554,11 +6914,24 @@ export default {
 
       const retryCount = (this.tileRetryCounts.get(key) || 0) + 1;
       this.tileRetryCounts.set(key, retryCount);
+      const maxRetries = Math.max(0, Number(this.tileMax404Retries) || 0);
+      if (retryCount > maxRetries) {
+        this.tileRetryCounts.delete(key);
+        if (this.tileReadyKeys) {
+          this.tileReadyKeys.delete(key);
+        }
+        this.updateTileDownloadCompletionState();
+        if (this.TILE_DEBUG) {
+          console.warn('[Tile] give up retry after max 404 retries', { key, retryCount, maxRetries });
+        }
+        return;
+      }
       const delayMs = Math.min(1500, 120 * Math.pow(1.6, Math.max(0, retryCount - 1)));
       const timer = setTimeout(() => {
         this.tileRetryTimers.delete(key);
         if (expectedSessionId !== this.tileSessionId || expectedFrameId !== this.tileFrameId) return;
         if (!this.currentVisibleTiles || !this.currentVisibleTiles.has(key)) return;
+        if (!this.isTileKeyDownloadAllowed(key)) return;
         if ((this.tileRawDataCache && this.tileRawDataCache.has(key)) || this.tilePendingLoads.has(key)) return;
 
         this.tileLoadQueue.unshift({
@@ -6568,6 +6941,7 @@ export default {
           priority: -1,
         });
         this.processLoadQueue();
+        this.updateTileDownloadCompletionState();
       }, delayMs);
 
       this.tileRetryTimers.set(key, timer);
@@ -6625,6 +6999,24 @@ export default {
       this.tileDirtyKeys.add(key);
     },
 
+    hasReadyVisibleTile(keys = null) {
+      if (!this.tileCache || this.tileCache.size === 0) return false;
+      const targetKeys = keys
+        || ((this.currentVisibleTiles && this.currentVisibleTiles.size > 0)
+          ? Array.from(this.currentVisibleTiles)
+          : []);
+      if (!targetKeys || targetKeys.length === 0) {
+        return this.tileCache.size > 0;
+      }
+      for (const key of targetKeys) {
+        const cached = this.tileCache.get(key);
+        if (cached && cached.renderSource && cached.width && cached.height) {
+          return true;
+        }
+      }
+      return false;
+    },
+
     /**
      * 加载单个瓦片（支持取消）
      * @param {Object} tile - 瓦片信息 {z, x, y}
@@ -6641,13 +7033,27 @@ export default {
       const url = `${base}${this.TILE_PATH_SUFFIX}/${this.tileSessionId}/${z}/${x}/${y}.bin${frameQ}`;
       const expectedSessionId = this.tileSessionId;
       const expectedFrameId = this.tileFrameId;
+      const allowedByBatchReady = this.isTileKeyDownloadAllowed(key);
+      console.log('[TileLoad] fetch start', {
+        key,
+        sessionId: expectedSessionId,
+        frameId: expectedFrameId,
+        allowedByBatchReady,
+        url
+      });
       
       // 创建AbortController用于取消请求
       const abortController = new AbortController();
       this.tileAbortControllers.set(key, abortController);
       
       if (this.TILE_DEBUG) {
-        console.log('[Tile] loadSingleTile start', { key, url: url.replace(/\?.*$/, '') });
+        console.log('[Tile] loadSingleTile start', {
+          key,
+          url: url.replace(/\?.*$/, ''),
+          sessionId: expectedSessionId,
+          frameId: expectedFrameId,
+          allowedByBatchReady
+        });
       }
       try {
         const response = await fetch(url, { 
@@ -6724,6 +7130,14 @@ export default {
               paramsKey
             });
             this.markTileDirty(key);
+            const isMergedPreviewTile =
+              this.normalizeTileBuildModeValue(this.tileGPM && this.tileGPM.buildMode) === 'merged_single_level'
+              && key === '0/0/0';
+            let shouldTriggerMergedDetailLoad = false;
+            if (isMergedPreviewTile && !this.tileMergedPreviewReady) {
+              this.tileMergedPreviewReady = true;
+              shouldTriggerMergedDetailLoad = true;
+            }
             if (this.TILE_DEBUG) {
               console.log('[Tile] loadSingleTile ok', { key, rawSize: `${tileData.width}x${tileData.height}`, outSize: `${processedTile.width}x${processedTile.height}` });
             }
@@ -6737,6 +7151,15 @@ export default {
             if (shouldPatchRender) {
               this.scheduleIncrementalTileRender();
             }
+            if (shouldTriggerMergedDetailLoad &&
+                expectedSessionId === this.tileSessionId &&
+                expectedFrameId === this.tileFrameId) {
+              this.$nextTick(() => {
+                if (expectedSessionId !== this.tileSessionId || expectedFrameId !== this.tileFrameId) return;
+                this.loadVisibleTiles();
+              });
+            }
+            this.updateTileDownloadCompletionState();
           } catch (processErr) {
             if (this.TILE_DEBUG) {
               console.error('[Tile] processTile error', { key, err: processErr });
@@ -6756,6 +7179,15 @@ export default {
         if (error.name === 'AbortError') {
           if (this.TILE_DEBUG) console.log('[Tile] loadSingleTile cancelled', { key });
         } else if (error && error.status === 404) {
+          console.warn('[Tile404]', {
+            key,
+            expectedSessionId,
+            expectedFrameId,
+            currentSessionId: this.tileSessionId,
+            currentFrameId: this.tileFrameId,
+            allowedByBatchReady: this.isTileKeyDownloadAllowed(key),
+            visible: !!(this.currentVisibleTiles && this.currentVisibleTiles.has(key))
+          });
           this.scheduleTileRetry(tile, expectedSessionId, expectedFrameId);
           if (this.TILE_DEBUG) {
             console.log('[Tile] loadSingleTile 404, will retry', { key });
@@ -6769,6 +7201,7 @@ export default {
       } finally {
         // 无论成功/失败/取消，都要通知等待中的批次，避免“全齐再显示”屏障悬挂
         this.notifyTileSettled(key);
+        this.updateTileDownloadCompletionState();
       }
     },
 
@@ -6970,6 +7403,12 @@ export default {
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         return;
       }
+      if (needsFullRender && keysToDraw.length > 0 && !this.hasReadyVisibleTile(keysToDraw)) {
+        // 新会话刚开始、预览瓦片尚未到达时，不要把“清空后的黑底”提交到主画布；
+        // 保留上一帧直到首个预览/细节瓦片可显示，再整体切到新会话。
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        return;
+      }
       keysToDraw.sort((a, b) => {
         const [az, ax, ay] = a.split('/').map(Number);
         const [bz, bx, by] = b.split('/').map(Number);
@@ -7013,13 +7452,15 @@ export default {
 
         const [tileZ, tileX, tileY] = key.split('/').map(Number);
         const tileLevelScale = Math.pow(2, gpm.maxZoomLevel - tileZ);
+        const singlePreviewTile = isMergedSingleLevel && tileZ === 0;
 
-        const destX = tileX * T * tileLevelScale;
-        const destY = tileY * T * tileLevelScale;
-        const fullTilePx = T * tileLevelScale;
+        const destX = singlePreviewTile ? 0 : (tileX * T * tileLevelScale);
+        const destY = singlePreviewTile ? 0 : (tileY * T * tileLevelScale);
+        const fullTilePxX = singlePreviewTile ? gpm.imageWidth : (T * tileLevelScale);
+        const fullTilePxY = singlePreviewTile ? gpm.imageHeight : (T * tileLevelScale);
         // 边缘瓦片：层级尺寸不能整除 T 时，最后一列/行只覆盖部分图像，需裁剪到图像边界，避免右侧/下侧拉伸错位
-        const destWidth = Math.min(fullTilePx, gpm.imageWidth - destX);
-        const destHeight = Math.min(fullTilePx, gpm.imageHeight - destY);
+        const destWidth = Math.min(fullTilePxX, gpm.imageWidth - destX);
+        const destHeight = Math.min(fullTilePxY, gpm.imageHeight - destY);
         if (destWidth <= 0 || destHeight <= 0) {
           if (!needsFullRender && this.tileDirtyKeys) {
             this.tileDirtyKeys.delete(key);
@@ -7028,8 +7469,8 @@ export default {
         }
 
         // 若裁剪了目标区域，源图也按比例取对应区域，避免拉伸
-        const srcWidth = destWidth < fullTilePx ? (renderWidth * destWidth / fullTilePx) : renderWidth;
-        const srcHeight = destHeight < fullTilePx ? (renderHeight * destHeight / fullTilePx) : renderHeight;
+        const srcWidth = destWidth < fullTilePxX ? (renderWidth * destWidth / fullTilePxX) : renderWidth;
+        const srcHeight = destHeight < fullTilePxY ? (renderHeight * destHeight / fullTilePxY) : renderHeight;
 
         ctx.drawImage(renderSource, 0, 0, srcWidth, srcHeight, destX, destY, destWidth, destHeight);
         dirtyLeft = Math.min(dirtyLeft, destX);
@@ -7045,7 +7486,7 @@ export default {
             key,
             dest: `(${Math.round(destX)},${Math.round(destY)}) ${Math.round(destWidth)}x${Math.round(destHeight)}`,
             srcSize: `${renderWidth}x${renderHeight}`,
-            clipped: destWidth < fullTilePx || destHeight < fullTilePx
+            clipped: destWidth < fullTilePxX || destHeight < fullTilePxY
           });
         }
       }
@@ -7149,6 +7590,45 @@ export default {
           this.loadVisibleTiles();
         }, 100);
       }
+    },
+
+    buildVisibleAreaMessageKey() {
+      const framePart = (this.tileFrameId != null) ? String(this.tileFrameId) : 'noframe';
+      const x = Number.isFinite(this.visibleX) ? this.visibleX.toFixed(2) : 'nan';
+      const y = Number.isFinite(this.visibleY) ? this.visibleY.toFixed(2) : 'nan';
+      const s = Number.isFinite(this.scale) ? this.scale.toFixed(4) : 'nan';
+      return `${framePart}|${x}|${y}|${s}`;
+    },
+
+    flushVisibleAreaToBackend() {
+      if (!Number.isFinite(this.visibleX) || !Number.isFinite(this.visibleY) || !Number.isFinite(this.scale)) {
+        return;
+      }
+      const messageKey = this.buildVisibleAreaMessageKey();
+      if (messageKey === this.lastVisibleAreaMessageKey) {
+        return;
+      }
+      this.lastVisibleAreaMessageKey = messageKey;
+      if (this.tileFrameId != null) {
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'sendVisibleArea:' + this.visibleX + ':' + this.visibleY + ':' + this.scale + ':' + this.tileFrameId);
+      } else {
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'sendVisibleArea:' + this.visibleX + ':' + this.visibleY + ':' + this.scale);
+      }
+    },
+
+    scheduleVisibleAreaToBackend(immediate = false) {
+      if (this.visibleAreaSendTimer) {
+        clearTimeout(this.visibleAreaSendTimer);
+        this.visibleAreaSendTimer = null;
+      }
+      if (immediate) {
+        this.flushVisibleAreaToBackend();
+        return;
+      }
+      this.visibleAreaSendTimer = setTimeout(() => {
+        this.visibleAreaSendTimer = null;
+        this.flushVisibleAreaToBackend();
+      }, 120);
     },
 
     /**
@@ -7438,7 +7918,7 @@ export default {
     normalizeStretchRange(blackLevel, whiteLevel, options = {}) {
       const { highlightSafe = false } = options;
       const maxValue = 65535;
-      const minRange = highlightSafe ? 4096 : 1;
+      const minRange = highlightSafe ? 8192 : 1;
 
       let normalizedBlack = Number.isFinite(blackLevel) ? Math.round(blackLevel) : 0;
       let normalizedWhite = Number.isFinite(whiteLevel) ? Math.round(whiteLevel) : maxValue;
@@ -7448,6 +7928,8 @@ export default {
 
       if (highlightSafe && normalizedWhite >= maxValue - 1) {
         normalizedWhite = maxValue;
+        // 过曝/高亮极强时，不要把黑点压得过高，否则整幅高亮图会被拉成近黑。
+        normalizedBlack = Math.min(normalizedBlack, Math.floor(maxValue * 0.5));
         normalizedBlack = Math.max(0, Math.min(normalizedBlack, normalizedWhite - minRange));
       }
 
@@ -8110,6 +8592,14 @@ export default {
       this.currentVisibleTiles = new Set();
       this.tileDirtyKeys = new Set();
       this.tileForceFullRender = true;
+      this.tileGenerationComplete = false;
+      this.tileGenerationCompleteReadyCount = 0;
+      this.tileDownloadComplete = false;
+      this.pendingTileGenerationComplete = new Map();
+      this.tileE2ERequiredKeys = '[]';
+      this.tileE2EDownloadedKeys = '[]';
+      this.tileE2ERequiredTileCount = 0;
+      this.tileE2EDownloadedTileCount = 0;
     },
 
     //*/*/*/*/*/*/*/*/*/*/*/
@@ -8283,13 +8773,8 @@ export default {
       this.visibleHeight = newVisibleHeight;
 
       this.$bus.$emit('setCurrentMainCanvasHasImage', true); // 发送给电调，用于判断是否可以进行循环拍摄
-      // 发送消息给QT客户端，用于信息图标
-      // 统一坐标：发送给 QT 的 ROI 坐标采用传感器像素坐标（不再按 bin 放大），避免在回环中被重复乘以 bin 导致指数级增长
-      if (this.tileFrameId != null) {
-        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'sendVisibleArea:' + this.visibleX + ':' + this.visibleY + ':' + this.scale + ':' + this.tileFrameId);
-      } else {
-        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'sendVisibleArea:' + this.visibleX + ':' + this.visibleY + ':' + this.scale);
-      }
+      // 发送给 QT 的可视区同步改为去重 + 防抖，避免瓦片渐进渲染时高频打断后端视口生成。
+      this.scheduleVisibleAreaToBackend(false);
 
       // 如果选择了星点，则根据选择位置，在ROI区域中绘制一个圆
       if (this.DrawSelectStarX != -1 && this.DrawSelectStarY != -1 && this.showSelectStar) {
@@ -11974,7 +12459,8 @@ export default {
 
   },
   // 在组件销毁时移除
-  beforeDestroy() {
+    beforeDestroy() {
+    this.stopTileReadyFallbackPolling();
     document.removeEventListener('touchstart', this.preventDefault);
     document.removeEventListener('touchmove', this.preventDefault);
     document.removeEventListener('touchend', this.preventDefault);
