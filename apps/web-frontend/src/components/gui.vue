@@ -351,6 +351,8 @@
             <span data-testid="ui-confirm-dialog-text">{{
               ConfirmToDo === 'startAutoFocus'
                 ? $t('Please confirm the auto focus mode')
+                : ConfirmToDo === 'AutoFocusCoarseRetry'
+                  ? ConfirmDialogText
                 : ConfirmToDo === 'DeleteSchedulePreset'
                   ? ConfirmDialogText
                   : $t(ConfirmDialogText)
@@ -1534,6 +1536,9 @@ export default {
       if (this.ConfirmToDo === 'startAutoFocus') {
         this.$bus.$emit('updateAutoFocuserState', false);
         this.$bus.$emit('SendConsoleLogMsg', 'Cancel Auto Focus', 'info');
+      } else if (this.ConfirmToDo === 'AutoFocusCoarseRetry') {
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'AutoFocusCoarseRetryDecision:No');
+        this.$bus.$emit('SendConsoleLogMsg', 'Cancel coarse autofocus retry', 'info');
       }
     },
 
@@ -1632,6 +1637,9 @@ export default {
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'AutoFocusConfirm:Yes');
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'ClearDataPoints');
         this.$bus.$emit('ClearAllData');
+      } else if (this.ConfirmToDo === 'AutoFocusCoarseRetry') {
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'AutoFocusCoarseRetryDecision:Yes');
+        this.$bus.$emit('SendConsoleLogMsg', 'Confirm coarse autofocus retry', 'info');
       } else if (this.ConfirmToDo === 'DeleteSchedulePreset') {
         // 删除当前选中的任务预设（名称通过 ConfirmDialogTitle 传入）
         const name = this.ConfirmDialogTitle;
