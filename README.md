@@ -62,6 +62,41 @@ source $PATCH_TO_EMSDK/emsdk_env.sh # If you have not switched terminals until n
 make js # build stellarium-web-engine.js and stellarium-web-engine.wasm
 ```
 
+### Root-level build and deploy helpers
+
+After the repo is ready, you can use the root-level helper scripts:
+
+```shell
+cd ~/workspace_origin/QUARCS_stellarium-web-engine
+
+# Fast frontend build: only rebuild the frontend bundle and skip skydata copy
+./compile_frontend.sh
+
+# If the wasm / engine side changed, explicitly refresh engine artifacts first
+./compile_frontend.sh --engine-update
+
+# Full frontend build: also copies skydata into dist/
+./compile_frontend.sh --with-skydata
+
+# Fast deploy: push the fresh frontend bundle to the Raspberry Pi, but skip skydata
+./deploy_to_pi.sh
+
+# Full deploy: also sync skydata to the Raspberry Pi
+./deploy_to_pi.sh --with-skydata
+
+# One-click hot update for common Vue/UI changes
+./hot_update_to_pi.sh
+```
+
+Notes:
+
+- `compile_frontend.sh` outputs to `apps/web-frontend/dist`.
+- By default it does not rebuild the wasm engine; add `--engine-update` only when engine-side code changed.
+- `deploy_to_pi.sh` reads Raspberry Pi connection info from the sibling `QUARCS_QT-SeverProgram/.env` by default.
+- If ETH / WiFi / ZeroTier all exist in env, `deploy_to_pi.sh` will automatically try them in order and use the first SSH-reachable host for deployment.
+- Both scripts default to the faster path because `skydata` is large and usually unchanged.
+- `hot_update_to_pi.sh` is the practical fast path for most button/panel/style/UI changes: fast build, then fast deploy.
+
 > [!IMPORTANT]
 > To install EMSDK in China, it is necessary to use a ladder or other methods to ensure that googleapi.com can be accessed
 
