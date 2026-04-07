@@ -1137,6 +1137,8 @@ export default {
       MainCameraConfigItems: [
         // vue处理参数
         { driverType: 'MainCamera', label: 'ImageCFA', value: 'null', inputType: 'select', selectValue: ['GR', 'GB', 'BG', 'RGGB', 'null'] },
+        { driverType: 'MainCamera', label: 'ImageGainR', value: 1, inputType: 'number', min: 0.01, max: 3, step: 0.001, colorOnly: true },
+        { driverType: 'MainCamera', label: 'ImageGainB', value: 1, inputType: 'number', min: 0.01, max: 3, step: 0.001, colorOnly: true },
         // 硬件处理参数
         // { driverType: 'MainCamera', label: 'Binning', value: '', inputType: 'slider', inputMin: 1, inputMax: 16, inputStep: 1 },
         { driverType: 'MainCamera', label: 'Temperature', value: '-5', inputType: 'select', selectValue: [5, 0, -5, -10, -15, -20, -25] },
@@ -1211,6 +1213,8 @@ export default {
 
       ImageGainR: 1,
       ImageGainB: 1,
+      autoWhiteBalanceGainR: 1,
+      autoWhiteBalanceGainB: 1,
 
       ImageOffset: 0,
 
@@ -1485,6 +1489,7 @@ export default {
       progressDescription: '', // 控制进度条显示内容
 
       calculateGain: true, // 控制是否计算白平衡增益
+      autoWhiteBalanceEnabled: true, // 彩色图像绘制时默认自动更新白平衡；手动修改增益后关闭
       lutCache: {
         lastParams: null, // 用于存储上次的参数
         lutR: null,
@@ -1570,6 +1575,9 @@ export default {
     this.$bus.$on('GetCurrentConnectedDevices', this.ReturnCurrentConnectedDevices);
     this.$bus.$on('CurrentCFWList', this.CurrentCFWList);
     this.$bus.$on('calcWhiteBalanceGains', this.calcWhiteBalanceGains);
+    this.$bus.$on('RequestAutoWhiteBalanceState', () => {
+      this.$bus.$emit('AutoWhiteBalanceState', !!this.autoWhiteBalanceEnabled);
+    });
     this.$bus.$on('SwitchOutPutPower', this.SwitchOutPutPower);
     this.$bus.$on('PolarAxisMode', this.PolarAxisMode);
     this.$bus.$on('SendConsoleLogMsg', this.SendConsoleLogMsg);
@@ -1665,6 +1673,46 @@ export default {
         }
         this.uiFrameCount = 0
         this.uiFpsLastTs = now
+      }
+    },
+    setAutoWhiteBalanceEnabled(enabled) {
+      const normalized = !!enabled;
+      this.autoWhiteBalanceEnabled = normalized;
+      this.$bus.$emit('AutoWhiteBalanceState', normalized);
+    },
+    updateMainCameraWhiteBalanceConfig(gainR, gainB) {
+      const GainRIndex = this.MainCameraConfigItems.findIndex(item => item.label === 'ImageGainR');
+      if (GainRIndex !== -1) {
+        this.MainCameraConfigItems[GainRIndex].value = gainR;
+      }
+      const GainBIndex = this.MainCameraConfigItems.findIndex(item => item.label === 'ImageGainB');
+      if (GainBIndex !== -1) {
+        this.MainCameraConfigItems[GainBIndex].value = gainB;
+      }
+    },
+    saveAutoWhiteBalanceGains(gainR, gainB) {
+      if (!Number.isFinite(gainR) || !Number.isFinite(gainB)) return;
+      this.autoWhiteBalanceGainR = gainR;
+      this.autoWhiteBalanceGainB = gainB;
+    },
+    applyStoredAutoWhiteBalance(options = {}) {
+      const { reprocess = true } = options;
+      const gainR = Number.isFinite(this.autoWhiteBalanceGainR) ? this.autoWhiteBalanceGainR : 1;
+      const gainB = Number.isFinite(this.autoWhiteBalanceGainB) ? this.autoWhiteBalanceGainB : 1;
+
+      this.ImageGainR = gainR;
+      this.ImageGainB = gainB;
+      this.updateMainCameraWhiteBalanceConfig(gainR, gainB);
+
+      if (this.tileGPM) {
+        const gainsChanged = this.tileGPM.gainR !== gainR || this.tileGPM.gainB !== gainB;
+        this.tileGPM.gainR = gainR;
+        this.tileGPM.gainB = gainB;
+        if (reprocess && gainsChanged) {
+          this.reprocessTilesWithNewGains();
+        }
+      } else if (reprocess && this.ImageArrayBuffer && this.ImageArrayBuffer.byteLength > 0) {
+        this.processImage(this.ImageArrayBuffer, this.currentHistogramMin, this.currentHistogramMax, { calculateHistogram: false });
       }
     },
     // =========================
@@ -2536,40 +2584,9 @@ export default {
                   
                   console.log(`[WhiteBalanceGains] 收到白平衡增益: R=${gainR}, B=${gainB}`);
                   this.SendConsoleLogMsg(`白平衡计算完成: R增益=${gainR.toFixed(3)}, B增益=${gainB.toFixed(3)}`, 'info');
-                  
-                  // 更新增益值
-                  const oldGainR = this.ImageGainR;
-                  const oldGainB = this.ImageGainB;
-                  this.ImageGainR = gainR;
-                  this.ImageGainB = gainB;
-                  
-                  // 更新配置面板显示
-                  const GainRIndex = this.MainCameraConfigItems.findIndex(item => item.label === 'ImageGainR');
-                  if (GainRIndex !== -1) {
-                    this.MainCameraConfigItems[GainRIndex].value = gainR;
-                  }
-                  
-                  const GainBIndex = this.MainCameraConfigItems.findIndex(item => item.label === 'ImageGainB');
-                  if (GainBIndex !== -1) {
-                    this.MainCameraConfigItems[GainBIndex].value = gainB;
-                  }
-                  
-                  // 如果在瓦片模式下，更新GPM并重新处理瓦片（不重新下载）
-                  if (this.tileGPM) {
-                    // 检查是否是灰度图且增益值没有实际变化
-                    const isGrayImage = !this.ImageCFA || this.ImageCFA === 'null';
-                    const gainsUnchanged = (gainR === oldGainR || (gainR === 1 && oldGainR === 1)) && 
-                                          (gainB === oldGainB || (gainB === 1 && oldGainB === 1));
-                    
-                    if (isGrayImage && gainsUnchanged) {
-                      console.log('[WhiteBalanceGains] 灰度图模式且增益值未变化，跳过重新处理瓦片');
-                      this.SendConsoleLogMsg('灰度图模式下白平衡增益保持不变', 'info');
-                    } else {
-                      this.tileGPM.gainR = gainR;
-                      this.tileGPM.gainB = gainB;
-                      console.log('[WhiteBalanceGains] 更新瓦片GPM增益参数，使用新增益重新处理已缓存瓦片');
-                      this.reprocessTilesWithNewGains();
-                    }
+                  this.saveAutoWhiteBalanceGains(gainR, gainB);
+                  if (this.autoWhiteBalanceEnabled) {
+                    this.applyStoredAutoWhiteBalance({ reprocess: true });
                   }
                 }
                 break;
@@ -4759,7 +4776,13 @@ export default {
             const isQhy = driverName.toLowerCase().includes('qhy');
             const isSdk = String(dev.connectionMode || '').toUpperCase() === 'SDK';
             const allowBurst = isQhy && isSdk;
-            return (this.MainCameraConfigItems || []).filter(it => !(it && it.qhyOnly) || allowBurst);
+            const isColorCamera = !!(this.ImageCFA && this.ImageCFA !== 'null');
+            return (this.MainCameraConfigItems || []).filter((it) => {
+              if (!it) return false;
+              if (it.qhyOnly && !allowBurst) return false;
+              if (it.colorOnly && !isColorCamera) return false;
+              return true;
+            });
           }
         case 'Mount':
           return this.MountConfigItems;
@@ -6222,6 +6245,8 @@ export default {
       this.ImageCFA = gpm.cfa || 'null';
       this.ImageGainR = gpm.gainR || 1;
       this.ImageGainB = gpm.gainB || 1;
+      this.saveAutoWhiteBalanceGains(this.ImageGainR, this.ImageGainB);
+      this.updateMainCameraWhiteBalanceConfig(this.ImageGainR, this.ImageGainB);
       
       // 确保Map/Set已初始化
       if (!this.tileCache) {
@@ -7778,16 +7803,21 @@ export default {
           isColorCamera = false;
         }
         console.log("当前拍摄参数:isColorCamera:", isColorCamera, "CFA:", CFA);
-        // 计算直方图
+        // 计算直方图；白平衡增益统一使用后端下发并缓存的值
+        const shouldAutoWhiteBalance = isColorCamera && this.autoWhiteBalanceEnabled;
+
         const analysis = await processAsync(() => {
           const result = isColorCamera
-            ? this.analyzeImageStatistics(mat, 'bayer', CFA, { calculateGain: this.calculateGain, calculateHistogram: calculateHistogram })
-            : this.analyzeImageStatistics(mat, 'gray', { calculateGain: this.calculateGain, calculateHistogram: calculateHistogram });
+            ? this.analyzeImageStatistics(mat, 'bayer', CFA, { calculateGain: false, calculateHistogram: calculateHistogram })
+            : this.analyzeImageStatistics(mat, 'gray', { calculateGain: false, calculateHistogram: calculateHistogram });
 
-          if (this.ImageGainR != 1 || this.ImageGainB != 1 || this.ImageOffset != 0) {
-            result.gainR = this.ImageGainR;
-            result.gainB = this.ImageGainB;
-            result.offset = this.ImageOffset;
+          if (isColorCamera) {
+            const gainR = shouldAutoWhiteBalance ? this.autoWhiteBalanceGainR : this.ImageGainR;
+            const gainB = shouldAutoWhiteBalance ? this.autoWhiteBalanceGainB : this.ImageGainB;
+            result.whiteBalance = {
+              gainR: Number.isFinite(gainR) ? gainR : 1,
+              gainB: Number.isFinite(gainB) ? gainB : 1,
+            };
           }
 
           this.progressValue = 40;
@@ -7814,22 +7844,14 @@ export default {
           isColorCamera: isColorCamera,
         };
 
-        // 传统模式白平衡：若本次是“计算增益”触发，将 analysis 中的增益写回 ImageGainR/ImageGainB 与配置项，与瓦片模式行为一致
-        if (this.calculateGain && analysis && analysis.whiteBalance) {
+        if (isColorCamera && analysis && analysis.whiteBalance) {
           const gainR = analysis.whiteBalance.gainR;
           const gainB = analysis.whiteBalance.gainB;
           this.ImageGainR = gainR;
           this.ImageGainB = gainB;
-          const GainRIndex = this.MainCameraConfigItems.findIndex(item => item.label === 'ImageGainR');
-          if (GainRIndex !== -1) {
-            this.MainCameraConfigItems[GainRIndex].value = gainR;
-          }
-          const GainBIndex = this.MainCameraConfigItems.findIndex(item => item.label === 'ImageGainB');
-          if (GainBIndex !== -1) {
-            this.MainCameraConfigItems[GainBIndex].value = gainB;
-          }
-          this.calculateGain = false;
+          this.updateMainCameraWhiteBalanceConfig(gainR, gainB);
         }
+        this.calculateGain = false;
 
         // 使用增益和拉伸，并转化为8位图像
         targetImg8 = await processAsync(() => {
@@ -8243,14 +8265,14 @@ export default {
                   const g1 = safeUshortAt(img16, i, j);
                   const g2 = safeUshortAt(img16, i + 1, j + 1);
                   histDataG[Math.floor((g1 + g2) / 2)]++;
-                  histDataR[safeUshortAt(img16, i + 1, j)]++;
-                  histDataB[safeUshortAt(img16, i, j + 1)]++;
+                  histDataR[safeUshortAt(img16, i, j + 1)]++;
+                  histDataB[safeUshortAt(img16, i + 1, j)]++;
                 } else if (bayerPattern === 'GB') {
                   const g1 = safeUshortAt(img16, i, j);
                   const g2 = safeUshortAt(img16, i + 1, j + 1);
                   histDataG[Math.floor((g1 + g2) / 2)]++;
-                  histDataB[safeUshortAt(img16, i + 1, j)]++;
-                  histDataR[safeUshortAt(img16, i, j + 1)]++;
+                  histDataB[safeUshortAt(img16, i, j + 1)]++;
+                  histDataR[safeUshortAt(img16, i + 1, j)]++;
                 } else if (bayerPattern === 'BG') {
                   histDataB[safeUshortAt(img16, i, j)]++;
                   const g1 = safeUshortAt(img16, i + 1, j);
@@ -8275,8 +8297,8 @@ export default {
             const bMean = this.truncatedMean(bValues);
 
             // 计算增益
-            const gainR = Math.min(Math.max(gMean / rMean, 0.1), 2);
-            const gainB = Math.min(Math.max(gMean / bMean, 0.1), 2);
+            const gainR = Math.min(Math.max(gMean / Math.max(rMean, 1), 0.1), 3);
+            const gainB = Math.min(Math.max(gMean / Math.max(bMean, 1), 0.1), 3);
 
             result.whiteBalance = {
               gainR: gainR,
@@ -9083,38 +9105,19 @@ export default {
 
 
     calcWhiteBalanceGains() {
-      console.log('[calcWhiteBalanceGains] 开始计算白平衡增益');
-      
-      // 瓦片模式：向后端请求计算白平衡增益
-      if (this.tileGPM) {
-        console.log('[calcWhiteBalanceGains] 瓦片模式：向后端请求计算白平衡');
-        this.SendConsoleLogMsg('正在计算白平衡增益...', 'info');
-        
-        // 发送命令到后端，请求计算白平衡
-        this.sendMessage('Vue_Command', 'CalcWhiteBalance');
-        
-        // 后端应该：
-        // 1. 接收 CalcWhiteBalance 命令
-        // 2. 基于当前原始图像计算 R 和 B 通道的增益值
-        // 3. 更新 ImageGainR 和 ImageGainB 变量
-        // 4. 发送消息回前端: "WhiteBalanceGains:<gainR>:<gainB>"
-        // 5. 前端收到增益值后，使用已缓存的原始瓦片数据重新处理显示（不重新生成瓦片）
-        
-        console.log('[calcWhiteBalanceGains] 已发送白平衡计算请求到后端');
+      console.log('[calcWhiteBalanceGains] 应用已保存的自动白平衡增益');
+      this.setAutoWhiteBalanceEnabled(true);
+
+      if (!Number.isFinite(this.autoWhiteBalanceGainR) || !Number.isFinite(this.autoWhiteBalanceGainB)) {
+        this.SendConsoleLogMsg('没有可用的自动白平衡缓存值，无法应用', 'warning');
         return;
       }
-      
-      // 检查是否有图像数据
-      if (!this.ImageArrayBuffer || this.ImageArrayBuffer.byteLength === 0) {
-        this.SendConsoleLogMsg('没有可用的图像数据，无法计算白平衡', 'warning');
-        console.log('[calcWhiteBalanceGains] ImageArrayBuffer为空');
-        return;
-      }
-      
-      // 传统模式：使用 processImage 重新处理图像并计算增益；processImage 内会根据 this.calculateGain 将 analysis.whiteBalance 写回 ImageGainR/ImageGainB 与配置项
-      this.calculateGain = true;
-      this.processImage(this.ImageArrayBuffer, this.currentHistogramMin, this.currentHistogramMax, { calculateHistogram: false });
-      console.log('[calcWhiteBalanceGains] 已触发图像重新处理以计算白平衡');
+
+      this.applyStoredAutoWhiteBalance({ reprocess: true });
+      this.SendConsoleLogMsg(
+        `已应用自动白平衡缓存值: R=${this.autoWhiteBalanceGainR.toFixed(3)}, B=${this.autoWhiteBalanceGainB.toFixed(3)}`,
+        'info'
+      );
     },
 
 
@@ -11924,6 +11927,13 @@ export default {
           } else {
             item.value = parameters[parameter];
           }
+          if (parameter === 'ImageGainR') {
+            this.ImageGainR = parseFloat(parameters[parameter]);
+            this.saveAutoWhiteBalanceGains(this.ImageGainR, this.autoWhiteBalanceGainB);
+          } else if (parameter === 'ImageGainB') {
+            this.ImageGainB = parseFloat(parameters[parameter]);
+            this.saveAutoWhiteBalanceGains(this.autoWhiteBalanceGainR, this.ImageGainB);
+          }
         } else {
           if (parameter == 'RedBoxSize') {
             this.$bus.$emit('setRedBoxSideLength', parameters[parameter]);
@@ -12010,6 +12020,9 @@ export default {
         // 主相机参数更改处理
         } else if (label === 'ImageCFA') {
           this.ImageCFASet(value);
+        } else if (label === 'ImageGainR' || label === 'ImageGainB') {
+          this.setAutoWhiteBalanceEnabled(false);
+          this.ImageGainSet(`${label}:${parseFloat(value)}`);
         }else if (label === 'Binning') {
           this.cameraBin = parseInt(value);
           this.sendMessage('Vue_Command', 'SetBinning:' + this.cameraBin);

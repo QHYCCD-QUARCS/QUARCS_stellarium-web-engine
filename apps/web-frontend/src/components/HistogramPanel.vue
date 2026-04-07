@@ -15,7 +15,14 @@
     <HistogramChart ref="histogramchart" class="histogram-chart" data-testid="hp-chart"/>
     <DialKnob class="dial-knob" data-testid="hp-dial-knob"/>
     <div class="buttons-container" data-testid="hp-buttons-container">
-      <button @click.stop.prevent="calcWhiteBalanceGains" class="get-click btn-Reset" data-testid="hp-btn-white-balance">
+      <button
+        @click.stop.prevent="calcWhiteBalanceGains"
+        class="get-click btn-Reset btn-WhiteBalance"
+        :class="{ 'active-white-balance': autoWhiteBalanceEnabled }"
+        :title="autoWhiteBalanceEnabled ? '自动白平衡已启用' : '自动白平衡已关闭'"
+        :data-state="autoWhiteBalanceEnabled ? 'enabled' : 'disabled'"
+        data-testid="hp-btn-white-balance"
+      >
         <div style="display: flex; justify-content: center; align-items: center;">
           <img src="@/assets/images/svg/ui/WhiteBalance.svg" height="20px" style="min-height: 20px; pointer-events: none;" data-testid="hp-img-white-balance"></img>
         </div>
@@ -59,6 +66,7 @@ export default {
 
       // true：只绘制有效区间；false：绘制全局直方图
       showEffectiveRange: true,
+      autoWhiteBalanceEnabled: false,
     };
   },
   components: {
@@ -67,14 +75,17 @@ export default {
   },
   created() {
     this.$bus.$on('AutoHistogramNum', this.setAutoHistogramNum);
+    this.$bus.$on('AutoWhiteBalanceState', this.setAutoWhiteBalanceState);
   },
   mounted() {
     this.updatePosition(); // 初始化位置
     window.addEventListener('resize', this.updatePosition);
+    this.$bus.$emit('RequestAutoWhiteBalanceState');
   },
   beforeDestroy() {
     window.removeEventListener('resize', this.updatePosition);
     this.$bus.$off('AutoHistogramNum', this.setAutoHistogramNum);
+    this.$bus.$off('AutoWhiteBalanceState', this.setAutoWhiteBalanceState);
   },
   methods: {
     updatePosition() {
@@ -121,6 +132,9 @@ export default {
     setAutoHistogramNum(min, max) {
       this.histogram_min = min;
       this.histogram_max = max;
+    },
+    setAutoWhiteBalanceState(enabled) {
+      this.autoWhiteBalanceEnabled = !!enabled;
     },
     calcWhiteBalanceGains() {
       console.log('[HistogramPanel] 触发白平衡计算');
@@ -240,6 +254,12 @@ export default {
   border: none;
   border-radius: 50%; 
   box-sizing: border-box;
+  transition: all 0.2s ease;
+}
+
+.btn-WhiteBalance.active-white-balance {
+  background-color: rgba(76, 175, 80, 0.78);
+  box-shadow: 0 0 10px rgba(76, 175, 80, 0.45);
 }
 
 .btn-Auto:active,
@@ -250,4 +270,3 @@ export default {
 }
 
 </style>
-
