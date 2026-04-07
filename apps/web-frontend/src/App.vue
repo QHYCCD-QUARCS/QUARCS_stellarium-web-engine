@@ -4813,7 +4813,26 @@ export default {
       }
     },
     clearDriver() {
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'ClearIndiDriver');
+      const currentDevice = this.devices.find(device => device.driverType === this.CurrentDriverType);
+      const rawTargetSlot = currentDevice?.ListNum;
+      let targetSlot = Number.parseInt(String(rawTargetSlot ?? ''), 10);
+      if (!Number.isInteger(targetSlot)) {
+        const fallbackSlotMap = {
+          Mount: 0,
+          Guider: 1,
+          PoleCamera: 2,
+          MainCamera: 20,
+          CFW: 21,
+          Focuser: 22,
+        };
+        targetSlot = fallbackSlotMap[this.CurrentDriverType];
+      }
+      if (!Number.isInteger(targetSlot)) {
+        this.SendConsoleLogMsg('Clear Indi Driver failed: target slot not found', 'warning');
+        this.callShowMessageBox('Unable to clear driver: target slot not found', 'warning');
+        return;
+      }
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'ClearIndiDriver:' + targetSlot);
       this.SendConsoleLogMsg('Clear Indi Driver', 'info');
       this.devices.forEach(device => {
         if (device.driverType === this.CurrentDriverType) {
