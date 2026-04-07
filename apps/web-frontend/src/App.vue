@@ -1061,7 +1061,6 @@ export default {
         calibrationStep: 0,
         calibrationMessage: ''
       },
-
       // 自动对焦信息对象 - [AUTO_FOCUS_UI_ENHANCEMENT]
       autoFocusInfo: {
         isRunning: false,
@@ -4455,6 +4454,9 @@ export default {
                   if (msg) {
                     // 进入前端日志（控制台/自定义 console log）
                     this.SendConsoleLogMsg(msg, 'info');
+                    if (msg.includes('当前帧未识别到可用星点')) {
+                      this.$bus.$emit('showMsgBox', this.$t('GuiderNoStarAvailableWaitingNextFrame'), 'warning');
+                    }
                     // 同步抛给组件（如果后续想在界面上显示导星提示）
                     this.$bus.$emit('GuiderCoreInfo', msg);
                   }
