@@ -82,6 +82,73 @@ require_dir() {
   [[ -d "$1" ]] || die "缺少目录: $1"
 }
 
+detect_sysroot_gcc_major() {
+  local sysroot="$1"
+  local gcc_dir="${sysroot}/usr/lib/gcc/aarch64-linux-gnu"
+  local version=""
+  [[ -d "$gcc_dir" ]] || return 1
+  version="$(find "$gcc_dir" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' 2>/dev/null | sort -V | tail -n 1)"
+  [[ -n "$version" ]] || return 1
+  printf '%s\n' "${version%%.*}"
+}
+
+detect_cross_compiler_version() {
+  local compiler="$1"
+  local version=""
+  command -v "$compiler" >/dev/null 2>&1 || return 1
+  version="$("$compiler" -dumpversion 2>/dev/null | head -n 1)"
+  [[ -n "$version" ]] || return 1
+  printf '%s\n' "$version"
+}
+
+pick_cross_cxx_compiler() {
+  local required_major="$1"
+  if command -v "aarch64-linux-gnu-g++-${required_major}" >/dev/null 2>&1; then
+    printf '%s\n' "aarch64-linux-gnu-g++-${required_major}"
+    return 0
+  fi
+  if command -v aarch64-linux-gnu-g++ >/dev/null 2>&1; then
+    printf '%s\n' "aarch64-linux-gnu-g++"
+    return 0
+  fi
+  return 1
+}
+
+preflight_qt_toolchain() {
+  local sysroot="/home/quarcs/rpi-sysroot"
+  local required_major=""
+  local compiler_name=""
+  local compiler_version=""
+  local compiler_major=""
+
+  for arg in "${CMAKE_EXTRA[@]}"; do
+    if [[ "$arg" == -DCMAKE_SYSROOT=* ]]; then
+      sysroot="${arg#-DCMAKE_SYSROOT=}"
+    fi
+  done
+
+  require_dir "$sysroot"
+  required_major="$(detect_sysroot_gcc_major "$sysroot")" || die \
+    "无法从 sysroot 检测 GCC 版本: ${sysroot}/usr/lib/gcc/aarch64-linux-gnu"
+
+  compiler_name="$(pick_cross_cxx_compiler "$required_major")" || die \
+    "未找到交叉编译器 aarch64-linux-gnu-g++。请先安装 gcc-aarch64-linux-gnu / g++-aarch64-linux-gnu"
+  compiler_version="$(detect_cross_compiler_version "$compiler_name")" || die \
+    "无法读取交叉编译器版本: ${compiler_name}"
+  compiler_major="${compiler_version%%.*}"
+
+  log "检测到 sysroot GCC 主版本: ${required_major}"
+  log "检测到将使用的交叉编译器: ${compiler_name} (${compiler_version})"
+
+  if [[ "$compiler_major" != "$required_major" ]]; then
+    local installed_compilers=""
+    installed_compilers="$(compgen -c | grep -E '^aarch64-linux-gnu-g\+\+(-[0-9]+)?$' | sort -u | tr '\n' ' ' || true)"
+    [[ -n "$installed_compilers" ]] && log "本机可见交叉 C++ 编译器: ${installed_compilers}"
+    die "Qt 交叉编译器版本与 sysroot 不匹配。请安装匹配版本后重试，例如:
+  sudo apt install gcc-${required_major}-aarch64-linux-gnu g++-${required_major}-aarch64-linux-gnu"
+  fi
+}
+
 # ---------- 参数解析 ----------
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -217,14 +284,17 @@ build_qt() {
     return 0
   fi
   require_dir "$QT_BUILD_DIR"
+  preflight_qt_toolchain
   (
     cd "$QT_BUILD_DIR"
-    local src_up
-    src_up="$(cd .. && pwd -P)"
-    log "CMake 源码目录 (-S ..): $src_up"
+    local cmake_src_dir
+    local cmake_toolchain_file
+    cmake_src_dir="${QT_REPO}/src"
+    cmake_toolchain_file="${QT_REPO}/toolchain-rpi-arm64.cmake"
+    log "CMake 源码目录 (-S): ${cmake_src_dir}"
     log "CMake 构建目录 (-B .): $(pwd -P)"
-    log "工具链文件: $(pwd -P)/${TOOLCHAIN_REL}"
-    run cmake -S .. -B . -DCMAKE_TOOLCHAIN_FILE="${TOOLCHAIN_REL}" "${CMAKE_EXTRA[@]}"
+    log "工具链文件: ${cmake_toolchain_file}"
+    run cmake -S "${cmake_src_dir}" -B . -DCMAKE_TOOLCHAIN_FILE="${cmake_toolchain_file}" "${CMAKE_EXTRA[@]}"
     run cmake --build . -j"$(nproc)"
   )
 }
