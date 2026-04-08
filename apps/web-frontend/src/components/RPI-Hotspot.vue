@@ -316,17 +316,37 @@ export default {
         this.StopStaPolling();
       }
     },
+    NormalizeSsidForMatch(ssid) {
+      return String(ssid || '')
+        .trim()
+        .replace(/\s+\d{1,3}%$/, '')
+        .trim();
+    },
+    GetSavedWifiProfile(ssid) {
+      if (!ssid) return null;
+      const exact = this.savedStaProfiles.find(x => x && x.ssid === ssid);
+      if (exact) return exact;
+      const normalized = this.NormalizeSsidForMatch(ssid);
+      return this.savedStaProfiles.find(x => this.NormalizeSsidForMatch(x && x.ssid) === normalized) || null;
+    },
+    GetSavedWifiPassword(ssid) {
+      const profile = this.GetSavedWifiProfile(ssid);
+      if (profile && profile.psk) {
+        return profile.psk;
+      }
+      if (ssid === this.savedStaSsid && this.savedStaPsk) {
+        return this.savedStaPsk;
+      }
+      return '';
+    },
     SyncSavedStaToForm() {
       const savedSsid = this.savedStaSsid;
-      const savedPsk = this.savedStaPsk;
       if (!savedSsid) return;
 
       if (!this.wifiSelectedSsid) {
         this.wifiSelectedSsid = savedSsid;
       }
-      if (this.wifiSelectedSsid === savedSsid && savedPsk) {
-        this.wifiPsk = savedPsk;
-      }
+      this.wifiPsk = this.GetSavedWifiPassword(this.wifiSelectedSsid);
     },
     StartStaPolling() {
       this.staPollAttemptsLeft = 6;
@@ -393,6 +413,18 @@ export default {
         ? this.netStatus.saved_sta_psk
         : '';
     },
+    savedStaProfiles() {
+      const arr = this.netStatus && Array.isArray(this.netStatus.saved_sta_profiles)
+        ? this.netStatus.saved_sta_profiles
+        : [];
+      return arr
+        .filter(x => x && x.ssid)
+        .map(x => ({
+          ssid: String(x.ssid || ''),
+          psk: String(x.psk || ''),
+          name: String(x.name || '')
+        }));
+    },
     currentStaTitle() {
       return this.netStatus && this.netStatus.sta_ssid
         ? this.netStatus.sta_ssid
@@ -422,9 +454,7 @@ export default {
   },
   watch: {
     wifiSelectedSsid(val) {
-      if (val && val === this.savedStaSsid && this.savedStaPsk) {
-        this.wifiPsk = this.savedStaPsk;
-      }
+      this.wifiPsk = this.GetSavedWifiPassword(val);
     }
   }
 };
