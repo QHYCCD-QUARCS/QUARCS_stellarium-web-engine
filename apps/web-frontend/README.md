@@ -32,6 +32,34 @@ the engine at any time by running
 make update-engine
 ```
 
+If you only changed the Vue/frontend code, you usually do not need to rebuild the engine again.
+From the repository root, `./compile_frontend.sh` reuses the existing engine artifacts and only rebuilds the frontend bundle.
+Use `./compile_frontend.sh --engine-update` only when the engine-side wasm/js outputs changed.
+
+## Deploy to Raspberry Pi
+
+After `dist/` is built, you can deploy the frontend to the Raspberry Pi web root:
+
+```bash
+cd /path/to/QUARCS_stellarium-web-engine
+
+# Fast deploy: sync the page bundle, skip the heavy skydata assets.
+./deploy_to_pi.sh
+
+# Full deploy: also sync skydata/ when those large static assets changed.
+./deploy_to_pi.sh --with-skydata
+```
+
+Behavior:
+
+- The script reads Raspberry Pi connection info from `REMOTE_HOST/REMOTE_USER/REMOTE_PASSWORD`,
+  or falls back to the sibling `QUARCS_QT-SeverProgram/.env`.
+- Default remote path is `/var/www/html`.
+- It creates a timestamped backup before deployment unless `--no-backup` is used.
+- `css/`, `fonts/`, `images/`, and `js/` are synced with `--delete` to remove stale hashed files.
+- `img/` is synced without `--delete`, so runtime-generated files on the device are preserved.
+- `tiles/` on the device is left untouched.
+
 For a detailed explanation on how things work, check out the [guide](http://vuejs-templates.github.io/webpack/) and [docs for vue-loader](http://vuejs.github.io/vue-loader).
 
 ## Cursor MCP（Model Context Protocol）: E2E 动态测试工具
@@ -127,5 +155,3 @@ npm run mcp:e2e
     - `workspaceDir` (string, 可选): 工作目录，默认使用 QUARCS 根目录
 
 > 注意：这些工具需要 `autoTestAndUpdate.sh` 脚本位于 QUARCS 根目录。环境变量 `QUARCS_TOTAL_VERSION` 可用于指定当前版本号。
-
-

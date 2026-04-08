@@ -1,6 +1,7 @@
 const fs = require('fs');
 const CopyWebpackPlugin = require('copy-webpack-plugin');
 const path = require('path');
+const express = require('express');
 
 function envBool(name, defaultValue = false) {
   const v = process.env[name];
@@ -13,8 +14,10 @@ function envBool(name, defaultValue = false) {
 // - SWE_TILES_MODE=copy   -> 由 webpack 在构建时复制 tiles 到 dist/tiles（最慢，但产物自包含）
 // - SWE_TILES_MODE=symlink/none/未设置 -> 默认不在 webpack 阶段复制（推荐在 Makefile/脚本里做 symlink 或按需复制）
 const tilesMode = String(process.env.SWE_TILES_MODE || '').toLowerCase();
+const embeddedBuild = envBool('QUARCS_EMBEDDED_BUILD', false);
 const copyTiles = envBool('SWE_COPY_TILES', tilesMode === 'copy');
-const copySkydata = envBool('SWE_COPY_SKYDATA', false);
+const copySkydata = envBool('SWE_COPY_SKYDATA', embeddedBuild);
+const publicPath = process.env.QUARCS_PUBLIC_PATH || process.env.CDN_ENV || '/';
 
 function resolveTilesPath() {
   const candidates = [];
@@ -50,7 +53,7 @@ function resolveSkydataPath() {
 
 module.exports = {
   runtimeCompiler: true,
-  publicPath: process.env.CDN_ENV ? process.env.CDN_ENV : '/',
+  publicPath,
   productionSourceMap: true,
   css: {
     loaderOptions: {
@@ -87,7 +90,13 @@ module.exports = {
 
   devServer: {
     https: false,  // 禁用HTTPS
-    port: 8080
+    port: 8080,
+    before(app) {
+      const skydataPath = resolveSkydataPath();
+      if (skydataPath) {
+        app.use('/skydata', express.static(skydataPath));
+      }
+    }
   },
 
   chainWebpack: config => {

@@ -15,9 +15,11 @@ VariantDir('build/ext_src', 'ext_src', duplicate=0)
 env = Environment(variables=vars)
 
 env.Append(CFLAGS= '-Wall -std=gnu11 -Wno-unknown-pragmas -D_GNU_SOURCE '
-                   '-Wno-missing-braces',
+                   '-Wno-missing-braces -Wno-error=deprecated-non-prototype '
+                   '-Wno-error=unused-but-set-variable',
            CXXFLAGS='-Wall -std=gnu++11 -Wno-narrowing '
-                    '-Wno-unknown-pragmas -Wno-unused-function')
+                    '-Wno-unknown-pragmas -Wno-unused-function '
+                    '-Wno-error=unused-but-set-variable')
 
 if env['werror']:
     env.Append(CCFLAGS='-Werror')
@@ -129,42 +131,47 @@ extra_exported = [
 ]
 extra_exported = ','.join("'%s'" % x for x in extra_exported)
 
-flags = [
-         '-s', 'MODULARIZE=1', '-s', 'EXPORT_NAME=StelWebEngine',
-         '-s', 'ALLOW_MEMORY_GROWTH=1',
-         '-s', 'ALLOW_TABLE_GROWTH=1',
-         '--pre-js', 'src/js/pre.js',
-         '--pre-js', 'src/js/obj.js',
-         '--pre-js', 'src/js/geojson.js',
-         '--pre-js', 'src/js/canvas.js',
-         # '-s', 'STRICT=1', # Note: to put back once we switch to emsdk 2
-         '-s', 'RESERVED_FUNCTION_POINTERS=10',
-         '-O3',
-         '-s', 'USE_WEBGL2=1',
-         '-s', 'NO_EXIT_RUNTIME=1',
-         '-s', '"EXPORTED_FUNCTIONS=[]"',
-         '-s', '"EXTRA_EXPORTED_RUNTIME_METHODS=[%s]"' % extra_exported,
-         '-s', 'FILESYSTEM=0'
-        ]
+compile_flags = ['-O3', '-s', 'SUPPORT_LONGJMP=emscripten']
+
+link_flags = [
+    '-s', 'MODULARIZE=1',
+    '-s', 'EXPORT_NAME=StelWebEngine',
+    '-s', 'ALLOW_MEMORY_GROWTH=1',
+    '-s', 'ALLOW_TABLE_GROWTH=1',
+    '--pre-js', 'src/js/pre.js',
+    '--pre-js', 'src/js/obj.js',
+    '--pre-js', 'src/js/geojson.js',
+    '--pre-js', 'src/js/canvas.js',
+    # '-s', 'STRICT=1', # Note: to put back once we switch to emsdk 2
+    '-s', 'RESERVED_FUNCTION_POINTERS=10',
+    '-O3',
+    '-s', 'USE_WEBGL2=1',
+    '-s', 'NO_EXIT_RUNTIME=1',
+    '-s', 'SUPPORT_LONGJMP=emscripten',
+    '-s', '"EXPORTED_FUNCTIONS=[]"',
+    '-s', '"EXTRA_EXPORTED_RUNTIME_METHODS=[%s]"' % extra_exported,
+    '-s', 'FILESYSTEM=0',
+]
 
 #if env['mode'] not in ['profile', 'debug']:
 #    flags += ['--closure', '1']
 
 if env['mode'] in ['profile', 'debug']:
-    flags += [
+    compile_flags += ['-g']
+    link_flags += [
         '--profiling',
         '-s', 'ASM_JS=2', # Removes 'use asm'.
     ]
 
 if env['mode'] == 'debug':
-    flags += ['-s', 'SAFE_HEAP=1', '-s', 'ASSERTIONS=1',
-              '-s', 'WARN_UNALIGNED=1']
+    link_flags += ['-s', 'SAFE_HEAP=1', '-s', 'ASSERTIONS=1',
+                   '-s', 'WARN_UNALIGNED=1']
 
 if env['es6']:
-    flags += ['-s', 'EXPORT_ES6=1', '-s', 'USE_ES6_IMPORT_META=0']
+    link_flags += ['-s', 'EXPORT_ES6=1', '-s', 'USE_ES6_IMPORT_META=0']
 
-env.Append(CCFLAGS=['-DNO_ARGP', '-DGLES2 1'] + flags)
-env.Append(LINKFLAGS=flags)
+env.Append(CCFLAGS=['-DNO_ARGP', '-DGLES2=1'] + compile_flags)
+env.Append(LINKFLAGS=link_flags)
 env.Append(LIBS=['GL'])
 
 prog = env.Program(target='build/stellarium-web-engine.js', source=sources)

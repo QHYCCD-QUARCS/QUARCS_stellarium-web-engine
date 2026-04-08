@@ -131,9 +131,7 @@
       </div>
 
       <div class="State-Bar" data-testid="fp-act-state-bar" :style="{ left: 80 + 'px', right: 80 + 'px', fontSize: '8px' }">
-        <div style="text-align: left;" data-testid="fp-state-current"> Current:{{ this.CurrentPosition }}</div>
-        <div style="text-align: center;"> FWHM:{{ this.FWHM }}</div>
-        <!-- <div style="text-align: right;">Target:{{ this.TargetPosition }} </div> -->
+        <div class="State-BarLine" data-testid="fp-state-current">Current:{{ this.CurrentPosition }}  FWHM:{{ this.FWHM }}  SNR:{{ this.SNR }}  Max:{{ this.LocalMax }}  Std:{{ this.BgStd }}</div>
       </div>
 
       <div class="Steps-Bar" :style="{ fontSize: '8px' }">
@@ -166,6 +164,9 @@ export default {
       CurrentPosition: 0,
       // TargetPosition: 0,
       FWHM: 0,
+      SNR: 0,
+      LocalMax: 0,
+      BgStd: 0,
 
       isBtnMoveDisabled: false, // 调焦按钮是否禁用
       isMoveInProgress: false, // 调焦是否进行中
@@ -227,6 +228,8 @@ export default {
     this.$bus.$on('FocusPosition', this.ShowPositionNum);
     // this.$bus.$on('FocusMoveDone', this.MoveDone);
     this.$bus.$on('UpdateFWHM', this.UpdateFWHM);
+    this.$bus.$on('addSnrNow', this.UpdateSNR);
+    this.$bus.$on('updateFocusMetrics', this.UpdateFocusMetrics);
     this.$bus.$on('showRoiImage', this.loadAndDisplayImage);
     // this.$bus.$on('setTargetPosition', this.setTargetPosition);
     this.$bus.$on('AutoFocusOver', this.AutoFocusOver);
@@ -484,6 +487,18 @@ export default {
     UpdateFWHM(current, FWHM) {
       this.CurrentPosition = current;
       this.FWHM = FWHM;
+    },
+
+    UpdateSNR(SNR) {
+      this.SNR = Number.isFinite(SNR) ? SNR.toFixed(2) : '0.00';
+    },
+
+    UpdateFocusMetrics(payload) {
+      if (!payload || typeof payload !== 'object') return;
+      const { snr, localMax, bgStd } = payload;
+      if (Number.isFinite(snr)) this.SNR = snr.toFixed(2);
+      if (Number.isFinite(localMax)) this.LocalMax = localMax.toFixed(0);
+      if (Number.isFinite(bgStd)) this.BgStd = bgStd.toFixed(2);
     },
 
     // loadAndDisplayImage(file) {
@@ -1000,12 +1015,18 @@ export default {
   box-sizing: border-box;
 
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
+  align-items: center;
   font-size: 10px;
 
   text-align: center;
-  line-height: 10px;
   white-space: nowrap;
+}
+
+.State-BarLine {
+  width: 100%;
+  line-height: 10px;
+  text-align: center;
 }
 
 .Steps-Bar {

@@ -1447,6 +1447,9 @@ export default {
       DrawSelectStarX: -1,
       DrawSelectStarY: -1,
       DrawSelectStarHFR: -1,
+      DrawSelectStarSNR: -1,
+      DrawSelectStarLocalMax: -1,
+      DrawSelectStarBgStd: -1,
       ROI_x: -1,    // 用来保存ROI区域的x坐标,在vue中计算
       ROI_y: -1,    // 用来保存ROI区域的y坐标,在vue中计算
       ROI_x_qt: -1,    // 用来保存ROI区域的x坐标,在qt中计算
@@ -3729,10 +3732,23 @@ export default {
               //   break;
 
               case 'setSelectStarPosition':
-                if (parts.length === 4) {
+                if (parts.length >= 4) {
                   this.DrawSelectStarX = parseFloat(parts[1]);
                   this.DrawSelectStarY = parseFloat(parts[2]);
                   this.DrawSelectStarHFR = parseFloat(parts[3]);
+                  if (parts.length >= 5) {
+                    this.DrawSelectStarSNR = parseFloat(parts[4]);
+                    this.$bus.$emit('addSnrNow', this.DrawSelectStarSNR);
+                  }
+                  if (parts.length >= 7) {
+                    this.DrawSelectStarLocalMax = parseFloat(parts[5]);
+                    this.DrawSelectStarBgStd = parseFloat(parts[6]);
+                    this.$bus.$emit('updateFocusMetrics', {
+                      snr: this.DrawSelectStarSNR,
+                      localMax: this.DrawSelectStarLocalMax,
+                      bgStd: this.DrawSelectStarBgStd
+                    });
+                  }
                 }
                 break;
 
@@ -4186,6 +4202,13 @@ export default {
                   const fwhm = parseFloat(parts[1]);
                   console.log('Received addFwhmNow:', fwhm);
                   this.$bus.$emit('addFwhmNow', fwhm);
+                }
+                break;
+              case 'addSnrNow':
+                if (parts.length >= 2) {
+                  const snr = parseFloat(parts[1]);
+                  console.log('Received addSnrNow:', snr);
+                  this.$bus.$emit('addSnrNow', snr);
                 }
                 break;
               case 'Box_Space':
