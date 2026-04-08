@@ -45,6 +45,9 @@
 <script>
 import DevicePicker from './DevicePicker.vue';
 
+const CAMERA_DEVICE_TYPES = ['MainCamera', 'Guider', 'PoleCamera'];
+const ALLOCATABLE_DEVICE_TYPES = ['CCD'];
+
 export default {
   name: 'DeviceAllocationPanel',
   props: {
@@ -93,6 +96,12 @@ export default {
     this.$bus.$on('loadBindDeviceTypeList',this.loadBindDeviceTypeList);
   },
   methods: {
+    isCameraDeviceType(deviceType) {
+      return CAMERA_DEVICE_TYPES.includes(deviceType);
+    },
+    isAllocatableDeviceType(deviceType) {
+      return ALLOCATABLE_DEVICE_TYPES.includes(deviceType);
+    },
     SelectPickerIndex(num) {
       for(let i = 0; i < this.DeviceTypes.length; i++) {
         this.DeviceTypes[i].isSelected = false;
@@ -104,6 +113,7 @@ export default {
     },
 
     SelectedDeviceName(device) {
+      if (!device || !this.isAllocatableDeviceType(device.DeviceType)) return;
       // 若当前没有选中任何角色卡片，直接忽略（避免把选择写到未知槽位）
       const selectedRole = (this.DeviceTypes || []).find(t => t && t.isSelected);
       if (!selectedRole) return;
@@ -126,6 +136,7 @@ export default {
     },
 
     AddDeviceType(DeviceType) {
+      if (!this.isCameraDeviceType(DeviceType)) return;
       const exists = this.DeviceTypes.some(item => item.DeviceType === DeviceType);
       if (exists) {
         console.log('Device Type already exists:', DeviceType);
@@ -150,6 +161,7 @@ export default {
         name = b;
       }
 
+      if (!this.isAllocatableDeviceType(deviceType)) return;
       if (!name || String(name).trim() === '') return;
 
       // 关键：必须区分设备类型，否则同名/同端口会造成错绑（例如电调/赤道仪）
@@ -179,6 +191,7 @@ export default {
     },
 
     DeviceConnectSuccess(type, DeviceName, DriverName, isBind = true) {
+      if (!this.isCameraDeviceType(type)) return;
       if (type == '' || type == "undefined" || type == null || DriverName == '' || DriverName == "undefined" || DriverName == null){
         return;
       }
@@ -226,6 +239,7 @@ export default {
     },
 
     BindingDevice(index) {
+      if (!this.DeviceTypes[index] || !this.isCameraDeviceType(this.DeviceTypes[index].DeviceType)) return;
       const type = this.DeviceTypes[index].DeviceType;
       const selectedIndex = this.DeviceTypes[index].selectedDeviceIndex;
       if (selectedIndex === null || typeof selectedIndex === 'undefined') {
@@ -237,6 +251,7 @@ export default {
     },
 
     UnBindingDevice(index) {
+      if (!this.DeviceTypes[index] || !this.isCameraDeviceType(this.DeviceTypes[index].DeviceType)) return;
       const type = this.DeviceTypes[index].DeviceType;
       const name = this.DeviceTypes[index].DeviceName;
 
@@ -277,6 +292,7 @@ export default {
       this.DeviceList = [];
     },
     deleteDeviceTypeAllocationList(type) {
+      if (type !== "all" && !this.isCameraDeviceType(type)) return;
 
       if (type == "all"){
         this.clearDeviceAllocationList()
@@ -346,7 +362,7 @@ export default {
       return selected ? selected.DeviceType : '';
     },
     unboundDeviceList() {
-      return (this.DeviceList || []).filter(d => d && !d.isBind);
+      return (this.DeviceList || []).filter(d => d && !d.isBind && this.isAllocatableDeviceType(d.DeviceType));
     },
     panelWidth() {
       // 如果 DeviceTypes 中的项目数小于或等于 3，则宽度为 360px
