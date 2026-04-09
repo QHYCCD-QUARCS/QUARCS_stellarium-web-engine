@@ -82,7 +82,9 @@
           label="Password"
           v-model="wifiPsk"
           variant="outlined"
-          type="password"
+          :type="showWifiPsk ? 'text' : 'password'"
+          :append-icon="showWifiPsk ? 'mdi-eye-off' : 'mdi-eye'"
+          @click:append="showWifiPsk = !showWifiPsk"
           hide-details
         ></v-text-field>
 
@@ -122,6 +124,7 @@ export default {
       wifiScanResults: [],
       wifiSelectedSsid: '',
       wifiPsk: '',
+      showWifiPsk: false,
       staFeedback: '',
       staPollTimer: null,
       staPollAttemptsLeft: 0,
