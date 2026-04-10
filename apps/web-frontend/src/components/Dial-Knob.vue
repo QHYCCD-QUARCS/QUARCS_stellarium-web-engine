@@ -75,11 +75,11 @@ export default {
     this.dragging = false;
     this.secondDragging = false;
     document.removeEventListener("mousemove", this.onDrag);
-    document.removeEventListener("mouseup", this.stopDrag);
+    document.removeEventListener("mouseup", this.stopDrag, true);
     document.removeEventListener("touchmove", this.onDragMobile);
     document.removeEventListener("touchend", this.stopDragMobile);
     document.removeEventListener("mousemove", this.onSecondDrag);
-    document.removeEventListener("mouseup", this.stopSecondDrag);
+    document.removeEventListener("mouseup", this.stopSecondDrag, true);
     document.removeEventListener("touchmove", this.onSecondDragMobile);
     document.removeEventListener("touchend", this.stopSecondDragMobile);
     window.removeEventListener("blur", this.stopDrag);
@@ -95,13 +95,18 @@ export default {
       this.dragging = true;
       this.startPositionX = event.clientX - this.positionX;
       document.addEventListener("mousemove", this.onDrag);
-      document.addEventListener("mouseup", this.stopDrag);
+      document.addEventListener("mouseup", this.stopDrag, true);
       // 关键：如果鼠标按住拖出浏览器/窗口外再松开，document 可能收不到 mouseup，
       // 这里监听 window blur 来强制结束拖拽，避免“粘鼠标”
       window.addEventListener("blur", this.stopDrag);
     },
     onDrag(event) {
       if (this.dragging) {
+        // 某些场景 mouseup 会被组件内部 stopPropagation 截住；一旦检测到左键已松开，立即结束拖拽
+        if (typeof event.buttons === 'number' && event.buttons === 0) {
+          this.stopDrag();
+          return;
+        }
         const clientX = event.touches ? event.touches[0].clientX : event.clientX;
         const newPositionX = clientX - this.startPositionX;
 
@@ -119,7 +124,7 @@ export default {
     stopDrag() {
       this.dragging = false;
       document.removeEventListener("mousemove", this.onDrag);
-      document.removeEventListener("mouseup", this.stopDrag);
+      document.removeEventListener("mouseup", this.stopDrag, true);
       window.removeEventListener("blur", this.stopDrag);
       
       const HistMin = this.mappedWidth(this.positionX);
@@ -169,12 +174,16 @@ export default {
       this.secondDragging = true;
       this.secondStartPositionX = event.clientX - this.secondPositionX;
       document.addEventListener("mousemove", this.onSecondDrag);
-      document.addEventListener("mouseup", this.stopSecondDrag);
+      document.addEventListener("mouseup", this.stopSecondDrag, true);
       // 同上：窗口失焦时强制结束，避免拖拽状态卡住
       window.addEventListener("blur", this.stopSecondDrag);
     },
     onSecondDrag(event) {
       if (this.secondDragging) {
+        if (typeof event.buttons === 'number' && event.buttons === 0) {
+          this.stopSecondDrag();
+          return;
+        }
         const clientX = event.touches ? event.touches[0].clientX : event.clientX;
         const newSecondPositionX = clientX - this.secondStartPositionX;
         
@@ -191,7 +200,7 @@ export default {
     stopSecondDrag() {
       this.secondDragging = false;
       document.removeEventListener("mousemove", this.onSecondDrag);
-      document.removeEventListener("mouseup", this.stopSecondDrag);
+      document.removeEventListener("mouseup", this.stopSecondDrag, true);
       window.removeEventListener("blur", this.stopSecondDrag);
       
       const HistMin = this.mappedWidth(this.positionX);
@@ -382,4 +391,3 @@ export default {
   box-sizing: border-box;
 }
 </style>
-
