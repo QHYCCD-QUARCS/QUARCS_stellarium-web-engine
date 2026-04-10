@@ -530,7 +530,9 @@ export default {
         if (d.DeviceType !== expectedType) return false;
         const occupant = this.getDeviceOccupant(d);
         if (!occupant) return true;
-        return occupant === selectedRole.DeviceType || this.canSwapBetweenRoles(selectedRole.DeviceType, occupant);
+        // 前端显示策略：候选设备不显示“当前角色自身已绑定”的设备。
+        if (occupant === selectedRole.DeviceType) return false;
+        return this.canSwapBetweenRoles(selectedRole.DeviceType, occupant);
       });
     },
     panelWidth() {
