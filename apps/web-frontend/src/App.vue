@@ -2493,10 +2493,11 @@ export default {
                 break;
 
               case 'SaveJpgSuccess':
-                if (parts.length === 4) {
+                if (parts.length >= 4) {
                   const fileName = parts[1];
                   const roi_x = parseFloat(parts[2]);
                   const roi_y = parseFloat(parts[3]);
+                  const roiCfa = parts.length >= 5 ? parts[4] : null;
                   if (!Number.isFinite(roi_x) || !Number.isFinite(roi_y)) {
                     this.SendConsoleLogMsg(
                       `SaveJpgSuccess: invalid ROI coords parts=[${parts[2]}, ${parts[3]}]`,
@@ -2508,7 +2509,7 @@ export default {
                   this.ROI_y = roi_y;
 
                   // this.$bus.$emit('showRoiImage', fileName);
-                  this.showRoiImage(fileName, roi_x, roi_y);
+                  this.showRoiImage(fileName, roi_x, roi_y, roiCfa);
                 }
                 break;
 
@@ -2537,6 +2538,7 @@ export default {
                 // - v3(追加): ...:{frameId}
                 // - v4(追加): ...:{buildMode}
                 if (parts.length >= 11) {
+                  const normalizedCfa = this.normalizeCfaPattern(parts[8]);
                   const gpm = {
                     sessionId: parts[1],
                     imageWidth: parseInt(parts[2]),
@@ -2545,7 +2547,7 @@ export default {
                     maxZoomLevel: parseInt(parts[5]),
                     blackLevel: parseInt(parts[6]),
                     whiteLevel: parseInt(parts[7]),
-                    cfa: parts[8],
+                    cfa: normalizedCfa,
                     gainR: parseFloat(parts[9]),
                     gainB: parseFloat(parts[10]),
                     // 兼容字段（可能不存在）
@@ -3969,18 +3971,7 @@ export default {
 
               case 'MainCameraCFA':
                 if (parts.length === 2) {
-                  let value = parts[1];
-                  if (value === '') {
-                    value = 'null';
-                  } else if (value === 'GRBG') {
-                    value = 'GR';
-                  } else if (value === 'GBRG') {
-                    value = 'GB';
-                  } else if (value === 'BGGR') {
-                    value = 'BG';
-                  } else if (value === 'RG') {
-                    value = 'RGGB';
-                  }
+                  const value = this.normalizeCfaPattern(parts[1]);
                   this.ImageCFA = value;
                   console.log("获取到的主相机参数  MainCameraCFA: ", this.ImageCFA);
                   this.updateConfigItemValue(this.MainCameraConfigItems, 'ImageCFA', this.ImageCFA, 'MainCameraCFA');
@@ -5415,21 +5406,78 @@ export default {
     //   this.sendMessage('Vue_Command', 'SetCameraOffset:' + IntValue);
     // },
 
-    ImageCFASet(value) {
+    normalizeCfaPattern(value) {
+      let normalized = String(value == null ? '' : value).trim().toUpperCase();
+      if (normalized === '') {
+        return 'null';
+      }
+      if (normalized === 'GRBG' || normalized === 'GR') {
+        return 'GR';
+      }
+      if (normalized === 'GBRG' || normalized === 'GB') {
+        return 'GB';
+      }
+      if (normalized === 'BGGR' || normalized === 'BG') {
+        return 'BG';
+      }
+      if (normalized === 'RG' || normalized === 'RGGB') {
+        return 'RGGB';
+      }
+      if (normalized === 'NULL') {
+        return 'null';
+      }
+      return normalized;
+    },
 
-      // if (['GR', 'GB', 'BG', 'RGGB','null'].includes(value)) {
-      if (['GR', 'GB', 'BG', 'RG', 'GRBG', 'GBRG', 'BGGR', 'RGGB', 'null', ''].includes(value)) {
-        if (value === '') {
-          value = 'null';
-        } else if (value === 'GRBG') {
-          value = 'GR';
-        } else if (value === 'GBRG') {
-          value = 'GB';
-        } else if (value === 'BGGR') {
-          value = 'BG';
-        } else if (value === 'RG') {
-          value = 'RGGB';
+    getBayerTopLeftColorName(pattern) {
+      switch (this.normalizeCfaPattern(pattern)) {
+        case 'RGGB': return 'R';
+        case 'GR': return 'G';
+        case 'GB': return 'G';
+        case 'BG': return 'B';
+        default: return 'mono';
+      }
+    },
+
+    formatRoiBayer2x2Sample(mat) {
+      if (!mat || !mat.data16U || mat.rows <= 0 || mat.cols <= 0) {
+        return 'n/a';
+      }
+      const rows = Math.min(2, mat.rows);
+      const cols = Math.min(2, mat.cols);
+      const parts = [];
+      for (let y = 0; y < rows; y++) {
+        const row = [];
+        for (let x = 0; x < cols; x++) {
+          row.push(String(mat.ushortAt(y, x)));
         }
+        parts.push(row.join(','));
+      }
+      return `[${parts.join(';')}]`;
+    },
+
+    logRoiBayerDebug({ fileName, src, destX, destY, roiCfa, effectiveRoiCfa, bufferLen, width, height, sourceTag }) {
+      const coordScale = this.tileGPM ? 1 : Math.max(1, Number(this.cameraBin) || 1);
+      const sensorX = Math.round((Number.isFinite(destX) ? destX : 0) * coordScale);
+      const sensorY = Math.round((Number.isFinite(destY) ? destY : 0) * coordScale);
+      const tileCfa = this.normalizeCfaPattern(this.tileGPM?.cfa);
+      const previewCfa = this.normalizeCfaPattern(this.lastImageProcessParams?.CFA);
+      const mainCfa = this.normalizeCfaPattern(this.ImageCFA);
+      this.SendConsoleLogMsg(
+        `ROI_BAYER_DEBUG | file=${fileName} source=${sourceTag} ` +
+        `dest=(${destX},${destY}) sensor=(${sensorX},${sensorY}) parity=(${sensorX & 1},${sensorY & 1}) ` +
+        `buf=${bufferLen} mat=${width}x${height} redBox=${this.RedBoxSideLength} cameraBin=${this.cameraBin} coordScale=${coordScale} ` +
+        `msgCFA=${this.normalizeCfaPattern(roiCfa)} effectiveCFA=${effectiveRoiCfa} topLeft=${this.getBayerTopLeftColorName(effectiveRoiCfa)} ` +
+        `tileCFA=${tileCfa} previewCFA=${previewCfa} mainCFA=${mainCfa} sample2x2=${this.formatRoiBayer2x2Sample(src)}`,
+        'info'
+      );
+    },
+
+    ImageCFASet(value) {
+      const normalizedValue = this.normalizeCfaPattern(value);
+
+      if (['GR', 'GB', 'BG', 'RGGB', 'null'].includes(normalizedValue)) {
+        value = normalizedValue;
         this.ImageCFA = value;
         // console.log('ImageCFA is set to:', value);
         this.SendConsoleLogMsg('ImageCFA is set to:' + value, 'info');
@@ -6470,14 +6518,20 @@ export default {
      * 参数变化（白平衡/拉伸）不应导致重新下载 raw，仅需要重处理渲染。
      */
     getTileRenderParamsKey() {
-      const gpm = this.tileGPM;
-      if (!gpm) return 'no-gpm';
-      const cfa = gpm.cfa || 'null';
-      const gainR = Number.isFinite(gpm.gainR) ? gpm.gainR : 1;
-      const gainB = Number.isFinite(gpm.gainB) ? gpm.gainB : 1;
-      const black = Number.isFinite(gpm.blackLevel) ? gpm.blackLevel : 0;
-      const white = Number.isFinite(gpm.whiteLevel) ? gpm.whiteLevel : 65535;
-      return `${cfa}|${gainR}|${gainB}|${black}|${white}`;
+      const params = this.getTileRenderParamsSnapshot();
+      if (!params) return 'no-gpm';
+      return `${params.cfa}|${params.gainR}|${params.gainB}|${params.blackLevel}|${params.whiteLevel}`;
+    },
+
+    getTileRenderParamsSnapshot(sourceGpm = this.tileGPM) {
+      if (!sourceGpm) return null;
+      return {
+        cfa: sourceGpm.cfa || 'null',
+        gainR: Number.isFinite(sourceGpm.gainR) ? sourceGpm.gainR : 1,
+        gainB: Number.isFinite(sourceGpm.gainB) ? sourceGpm.gainB : 1,
+        blackLevel: Number.isFinite(sourceGpm.blackLevel) ? sourceGpm.blackLevel : 0,
+        whiteLevel: Number.isFinite(sourceGpm.whiteLevel) ? sourceGpm.whiteLevel : 65535,
+      };
     },
 
     /**
@@ -7110,6 +7164,7 @@ export default {
       const url = `${base}${this.TILE_PATH_SUFFIX}/${this.tileSessionId}/${z}/${x}/${y}.bin${frameQ}`;
       const expectedSessionId = this.tileSessionId;
       const expectedFrameId = this.tileFrameId;
+      const expectedRenderParams = this.getTileRenderParamsSnapshot();
       const allowedByBatchReady = this.isTileKeyDownloadAllowed(key);
       console.log('[TileLoad] fetch start', {
         key,
@@ -7167,7 +7222,10 @@ export default {
         // 解析瓦片数据
         const tileData = this.parseTileData(buffer);
         if (tileData) {
-          const paramsKey = this.getTileRenderParamsKey();
+          const paramsSnapshot = expectedRenderParams || this.getTileRenderParamsSnapshot();
+          const paramsKey = paramsSnapshot
+            ? `${paramsSnapshot.cfa}|${paramsSnapshot.gainR}|${paramsSnapshot.gainB}|${paramsSnapshot.blackLevel}|${paramsSnapshot.whiteLevel}`
+            : 'no-gpm';
           // 保存原始瓦片数据（用于白平衡等参数变化时重新处理）
           this.tileRawDataCache.set(key, tileData);
           if (this.tileRetryTimers && this.tileRetryTimers.has(key)) {
@@ -7183,7 +7241,7 @@ export default {
             let renderSource;
             if (this.TILE_PERF && typeof performance !== 'undefined' && performance.now) {
               const t0 = performance.now();
-              processedTile = this.processTile(tileData);
+              processedTile = this.processTile(tileData, paramsSnapshot);
               const t1 = performance.now();
               renderSource = this.createTileRenderSource(processedTile);
               const t2 = performance.now();
@@ -7197,7 +7255,7 @@ export default {
                 'info'
               );
             } else {
-              processedTile = this.processTile(tileData);
+              processedTile = this.processTile(tileData, paramsSnapshot);
               renderSource = this.createTileRenderSource(processedTile);
             }
             this.tileCache.set(key, {
@@ -7320,9 +7378,10 @@ export default {
      * @param {Object} tileData - 解析后的瓦片数据
      * @returns {ImageData} 处理后的ImageData
      */
-    processTile(tileData) {
+    processTile(tileData, renderParams = null) {
       const { width, height, data, border = 0 } = tileData;
-      const gpm = this.tileGPM;
+      const params = renderParams || this.getTileRenderParamsSnapshot();
+      if (!params) return null;
       
       // 创建OpenCV Mat
       let mat = null;
@@ -7335,18 +7394,18 @@ export default {
         mat.data16U.set(data);
         
         // 应用统一的处理参数
-        const isColorCamera = gpm.cfa && gpm.cfa !== '' && gpm.cfa !== 'null';
+        const isColorCamera = params.cfa && params.cfa !== '' && params.cfa !== 'null';
         
         if (isColorCamera) {
           // applyStretchAndGain() 期望 analysis.whiteBalance.gainR/gainB
-          const analysis = { whiteBalance: { gainR: gpm.gainR ?? 1, gainB: gpm.gainB ?? 1 } };
-          resultImg = this.applyStretchAndGain(mat, analysis, 'bayer', gpm.cfa, gpm.blackLevel, gpm.whiteLevel);
+          const analysis = { whiteBalance: { gainR: params.gainR, gainB: params.gainB } };
+          resultImg = this.applyStretchAndGain(mat, analysis, 'bayer', params.cfa, params.blackLevel, params.whiteLevel);
         } else {
           resultImg = this.applyStretchAndGain(mat, {
             gainR: 1,
             gainB: 1,
             offset: 0
-          }, 'gray', gpm.cfa, gpm.blackLevel, gpm.whiteLevel);
+          }, 'gray', params.cfa, params.blackLevel, params.whiteLevel);
         }
 
         // 如果后端为瓦片附带了边界像素（用于避免局部去马赛克接缝），这里裁掉边界再返回
@@ -8113,6 +8172,8 @@ export default {
         return {};
       }
 
+      bayerPattern = this.normalizeCfaPattern(bayerPattern);
+
       const { calculateGain = true, calculateHistogram = true } = options;
       const result = {};
 
@@ -8418,6 +8479,7 @@ export default {
      * @returns {cv.Mat} 处理后的8位RGBA图像
      */
     applyStretchAndGain(img16, analysis, imageType, bayerPattern = 'RGGB', blackLevel, whiteLevel) {
+      bayerPattern = this.normalizeCfaPattern(bayerPattern);
       const normalizedRange = this.normalizeStretchRange(blackLevel, whiteLevel, {
         highlightSafe: whiteLevel >= 65534
       });
@@ -11230,14 +11292,10 @@ export default {
         roiX = Math.min(Math.max(0, roiX), maxX);
         roiY = Math.min(Math.max(0, roiY), maxY);
 
-        // 偶数对齐位置
-        roiX = Math.floor(roiX);
-        roiY = Math.floor(roiY);
-        if (roiX % 2 !== 0) roiX += 1;
-        if (roiY % 2 !== 0) roiY += 1;
-
-        this.ROI_x = roiX;
-        this.ROI_y = roiY;
+        // 按传感器像素奇偶吸附 ROI 起点，避免 Bayer 相位被破坏
+        const snapped = this.snapRoiOriginToBayerSafePhase(roiX, roiY, side);
+        this.ROI_x = snapped.x;
+        this.ROI_y = snapped.y;
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'sendRedBoxState:' + this.RedBoxSideLength + ':' + this.ROI_x + ':' + this.ROI_y);
       } else {
         if (this.tileGPM) {
@@ -11443,14 +11501,10 @@ export default {
         roiX = Math.min(Math.max(0, roiX), maxX);
         roiY = Math.min(Math.max(0, roiY), maxY);
 
-        // 偶数对齐位置
-        roiX = Math.floor(roiX);
-        roiY = Math.floor(roiY);
-        if (roiX % 2 !== 0) roiX += 1;
-        if (roiY % 2 !== 0) roiY += 1;
-
-        this.ROI_x = roiX;
-        this.ROI_y = roiY;
+        // 按传感器像素奇偶吸附 ROI 起点，避免 Bayer 相位被破坏
+        const snapped = this.snapRoiOriginToBayerSafePhase(roiX, roiY, side);
+        this.ROI_x = snapped.x;
+        this.ROI_y = snapped.y;
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'sendRedBoxState:' + this.RedBoxSideLength + ':' + this.ROI_x + ':' + this.ROI_y);
       } else {
         if (this.tileGPM) {
@@ -11713,8 +11767,50 @@ export default {
       };
     },
 
+    /**
+     * 将 ROI 左上角吸附到 Bayer-safe 起点：
+     * 1) 先按传感器像素坐标钳制在边界内
+     * 2) 再按奇偶对齐（可进则 +1，否则 -1）
+     * 3) 再次钳制后回写到当前 ROI 坐标系（瓦片=传感器坐标；非瓦片=按硬件 bin 缩放）
+     */
+    snapRoiOriginToBayerSafePhase(roiX, roiY, sideInCurrentCoords) {
+      const coordScale = this.tileGPM ? 1 : Math.max(1, Number(this.cameraBin) || 1);
+      const imgW = (this.tileGPM && Number(this.tileGPM.imageWidth) > 0)
+        ? Number(this.tileGPM.imageWidth)
+        : Number(this.mainCameraSizeX || 0);
+      const imgH = (this.tileGPM && Number(this.tileGPM.imageHeight) > 0)
+        ? Number(this.tileGPM.imageHeight)
+        : Number(this.mainCameraSizeY || 0);
+
+      let sideSensor = Math.max(2, Math.round(Number(sideInCurrentCoords || 0) * coordScale));
+      if ((sideSensor & 1) !== 0) sideSensor += 1;
+
+      let sx = Math.round(Number(roiX || 0) * coordScale);
+      let sy = Math.round(Number(roiY || 0) * coordScale);
+
+      const maxX = Math.max(0, imgW - sideSensor);
+      const maxY = Math.max(0, imgH - sideSensor);
+      sx = Math.min(Math.max(0, sx), maxX);
+      sy = Math.min(Math.max(0, sy), maxY);
+
+      if ((sx & 1) !== 0) {
+        sx = (sx + 1 <= maxX) ? sx + 1 : Math.max(0, sx - 1);
+      }
+      if ((sy & 1) !== 0) {
+        sy = (sy + 1 <= maxY) ? sy + 1 : Math.max(0, sy - 1);
+      }
+
+      sx = Math.min(Math.max(0, sx), maxX);
+      sy = Math.min(Math.max(0, sy), maxY);
+
+      return {
+        x: sx / coordScale,
+        y: sy / coordScale
+      };
+    },
+
     // 显示ROI图像
-  showRoiImage(fileName, destX, destY) {
+  showRoiImage(fileName, destX, destY, roiCfa = null) {
       if (this.RedBoxSideLength == 0 || this.RedBoxSideLength == null) {
         this.SendConsoleLogMsg('RedBoxSideLength is 0 or null', 'error');
         return;
@@ -11792,26 +11888,30 @@ export default {
             let time2 = performance.now();
             this.SendConsoleLogMsg('创建mat对象时间: ' + (time2 - time1).toFixed(0) + 'ms', 'info');
             // 瓦片模式下 ROI 显示参数应与 tileGPM 保持一致（白平衡/黑白点/CFA）
+            let effectiveRoiCfa = this.normalizeCfaPattern(roiCfa);
+            let roiCfaSource = 'message';
             if (this.tileGPM) {
               const gpm = this.tileGPM;
-              const isColorCamera = gpm.cfa && gpm.cfa !== '' && gpm.cfa !== 'null';
+              effectiveRoiCfa = this.normalizeCfaPattern(roiCfa || gpm.cfa);
+              roiCfaSource = roiCfa ? 'message' : 'tileGPM';
+              const isColorCamera = effectiveRoiCfa && effectiveRoiCfa !== '' && effectiveRoiCfa !== 'null';
               if (isColorCamera) {
                 const analysis = { whiteBalance: { gainR: gpm.gainR ?? 1, gainB: gpm.gainB ?? 1 } };
-                targetImg8 = this.applyStretchAndGain(src, analysis, 'bayer', gpm.cfa, gpm.blackLevel, gpm.whiteLevel);
+                targetImg8 = this.applyStretchAndGain(src, analysis, 'bayer', effectiveRoiCfa, gpm.blackLevel, gpm.whiteLevel);
               } else {
-                targetImg8 = this.applyStretchAndGain(src, { gainR: 1, gainB: 1, offset: 0 }, 'gray', gpm.cfa, gpm.blackLevel, gpm.whiteLevel);
+                targetImg8 = this.applyStretchAndGain(src, { gainR: 1, gainB: 1, offset: 0 }, 'gray', effectiveRoiCfa, gpm.blackLevel, gpm.whiteLevel);
               }
             } else {
+              effectiveRoiCfa = this.normalizeCfaPattern(roiCfa || this.lastImageProcessParams.CFA);
+              roiCfaSource = roiCfa ? 'message' : 'preview';
               if (this.lastImageProcessParams.isColorCamera == 'true' || this.lastImageProcessParams.isColorCamera == 'True' || this.lastImageProcessParams.isColorCamera) {
-                targetImg8 = this.applyStretchAndGain(src, this.lastImageProcessParams.analysis, 'bayer', this.lastImageProcessParams.CFA, this.lastImageProcessParams.blackLevel, this.lastImageProcessParams.whiteLevel);
+                targetImg8 = this.applyStretchAndGain(src, this.lastImageProcessParams.analysis, 'bayer', effectiveRoiCfa, this.lastImageProcessParams.blackLevel, this.lastImageProcessParams.whiteLevel);
               } else {
-                targetImg8 = this.applyStretchAndGain(src, this.lastImageProcessParams.analysis, 'gray', this.lastImageProcessParams.CFA, this.lastImageProcessParams.blackLevel, this.lastImageProcessParams.whiteLevel);
+                targetImg8 = this.applyStretchAndGain(src, this.lastImageProcessParams.analysis, 'gray', effectiveRoiCfa, this.lastImageProcessParams.blackLevel, this.lastImageProcessParams.whiteLevel);
               }
             }
             time1 = performance.now();
             this.SendConsoleLogMsg('applyStretchAndGain时间: ' + (time1 - time2).toFixed(0) + 'ms', 'info');
-            src.delete();
-            src = null;
 
             // 将 Mat 对象转换回 ImageData 对象
             imgData = new ImageData(new Uint8ClampedArray(targetImg8.data), targetImg8.cols, targetImg8.rows);
@@ -11820,6 +11920,20 @@ export default {
             // 以消息携带的 ROI 坐标为准（若缺失则回退当前状态）
             const x = Number.isFinite(destX) ? destX : this.ROI_x;
             const y = Number.isFinite(destY) ? destY : this.ROI_y;
+            this.logRoiBayerDebug({
+              fileName,
+              src,
+              destX: x,
+              destY: y,
+              roiCfa,
+              effectiveRoiCfa,
+              bufferLen: uint16Array.length,
+              width: newWidth,
+              height: newHeight,
+              sourceTag: roiCfaSource
+            });
+            src.delete();
+            src = null;
             {
               const gpm = this.tileGPM;
               const trs = Number(this.tileRasterScale) > 0 ? Number(this.tileRasterScale) : 1;
