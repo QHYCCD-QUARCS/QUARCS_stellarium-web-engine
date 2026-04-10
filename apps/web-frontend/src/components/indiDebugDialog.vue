@@ -6,6 +6,26 @@
       data-testid="ui-indi-debug-dialog-root"
       :data-state="isOpen ? 'open' : 'closed'"
     >
+      <div class="filter-bar">
+        <input
+          v-model.trim="keywordFilter"
+          type="text"
+          class="keyword-input"
+          :placeholder="$t('Filter logs by keyword')"
+          data-testid="ui-indi-debug-dialog-input-keyword-filter"
+        >
+        <button
+          v-if="keywordFilter"
+          type="button"
+          class="keyword-clear-button"
+          :title="$t('Clear keyword filter')"
+          @click="keywordFilter = ''"
+          data-testid="ui-indi-debug-dialog-btn-clear-keyword-filter"
+        >
+          <v-icon style="font-size: 16px;">mdi-close</v-icon>
+        </button>
+      </div>
+
       <div class="debug-messages" ref="messageContainer" @scroll="checkIfScrolledToBottom">
         <p v-for="(msg, index) in ShowMessages" :key="index" :style="getMsgStyle(msg.msgtype)">
           {{ msg.msgtext }}
@@ -102,6 +122,7 @@ export default {
       isServerDebugActive: true,  // 后端按钮激活状态
       isErrorDebugActive: false,
       isAtBottom: true,
+      keywordFilter: '',
     };
   },
   created() {
@@ -232,6 +253,13 @@ export default {
       container.scrollTop = container.scrollHeight;
     },
 
+    messageMatchesKeyword(msg) {
+      if (!this.keywordFilter) {
+        return true;
+      }
+      return msg.msgtext.toLowerCase().includes(this.keywordFilter.toLowerCase());
+    },
+
   },
   computed: {
     ShowMessages() {
@@ -244,16 +272,14 @@ export default {
         if (this.isClientDebugActive && msg.msgfrom === 'Client') {
           if (this.isErrorDebugActive && msg.msgtype != 'error') {
             return false;
-          } else {
-            return true;
           }
+          return this.messageMatchesKeyword(msg);
         }
         if (this.isServerDebugActive && msg.msgfrom === 'Server') {
           if (this.isErrorDebugActive && msg.msgtype != 'error') {
             return false;
-          } else {
-            return true;
           }
+          return this.messageMatchesKeyword(msg);
         }
         return false;
       });
@@ -315,7 +341,7 @@ export default {
 
 .debug-messages {
   position:absolute;
-  top: 10px;
+  top: 52px;
   bottom: 10px;
   left: 55px;
   right: 55px;
@@ -336,6 +362,49 @@ export default {
   font-family: 'Droid Sans Mono', 'monospace', monospace;
   user-select: none;
   overflow-x: auto; /* 允许水平滚动 */
+}
+
+.filter-bar {
+  position: absolute;
+  top: 10px;
+  left: 55px;
+  right: 55px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 1;
+}
+
+.keyword-input {
+  width: 100%;
+  height: 34px;
+  padding: 0 12px;
+  color: white;
+  background-color: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 6px;
+  outline: none;
+  font-size: 13px;
+  font-family: 'Droid Sans Mono', 'monospace', monospace;
+}
+
+.keyword-input::placeholder {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.keyword-input:focus {
+  border-color: rgba(255, 255, 255, 0.42);
+}
+
+.keyword-clear-button {
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  color: white;
+  background-color: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 6px;
 }
 
 .debug-messages p {

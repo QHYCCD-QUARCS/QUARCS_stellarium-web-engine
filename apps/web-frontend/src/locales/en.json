@@ -251,6 +251,8 @@
   "Messages copied to clipboard!": "Messages copied to clipboard!",
   "Failed to copy messages!": "Failed to copy messages!",
   "Copy current logs": "Copy current logs",
+  "Filter logs by keyword": "Filter logs by keyword",
+  "Clear keyword filter": "Clear keyword filter",
   "AutoFocusFitResultFlatLine": "The auto-focus fit result is a flat line.",
   "AutoFocusFailed": "Auto focus failed.",
   "DeviceBusyWithFeatures": "Device {device} is busy with features: {features}",
