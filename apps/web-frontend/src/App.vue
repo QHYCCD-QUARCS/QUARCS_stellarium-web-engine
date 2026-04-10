@@ -1049,7 +1049,7 @@ export default {
 
       QTClientVersion: 'Not connected',
       // VueClientVersion: process.env.VUE_APP_VERSION,
-      VueClientVersion: '20260403', // 手动指定版本号
+      VueClientVersion: '20260410', // 手动指定版本号
 
       // 全局总版本号（由 Qt 通过 WebSocket 从环境变量 QUARCS_TOTAL_VERSION 读取并发送）
       TotalVersion: '0.0.0',
@@ -1139,6 +1139,7 @@ export default {
         { driverType: 'MainCamera', label: 'ImageCFA', value: 'null', inputType: 'select', selectValue: ['GR', 'GB', 'BG', 'RGGB', 'null'] },
         { driverType: 'MainCamera', label: 'ImageGainR', value: 1, inputType: 'number', min: 0.01, max: 3, step: 0.001, colorOnly: true },
         { driverType: 'MainCamera', label: 'ImageGainB', value: 1, inputType: 'number', min: 0.01, max: 3, step: 0.001, colorOnly: true },
+        { driverType: 'MainCamera', label: 'ROICalcMode', value: 'full', inputType: 'select', selectValue: ['full', 'roi'] },
         // 硬件处理参数
         // { driverType: 'MainCamera', label: 'Binning', value: '', inputType: 'slider', inputMin: 1, inputMax: 16, inputStep: 1 },
         { driverType: 'MainCamera', label: 'Temperature', value: '-5', inputType: 'select', selectValue: [5, 0, -5, -10, -15, -20, -25] },
@@ -3782,13 +3783,23 @@ export default {
 
               case 'SetVisibleArea':
                 if (parts.length === 4) {
-                  this.visibleX = parseFloat(parts[1]);
-                  this.visibleY = parseFloat(parts[2]);
-                  this.scale = parseFloat(parts[3]);
+                  const nextVisibleX = parseFloat(parts[1]);
+                  const nextVisibleY = parseFloat(parts[2]);
+                  const nextScale = parseFloat(parts[3]);
+                  if (!Number.isFinite(nextVisibleX) || !Number.isFinite(nextVisibleY) || !Number.isFinite(nextScale)) {
+                    break;
+                  }
+                  this.visibleX = nextVisibleX;
+                  this.visibleY = nextVisibleY;
+                  this.scale = nextScale;
                   this.$bus.$emit('setScale', this.scale);
                   this.emitTileLevelInfo();
                   // SetVisibleArea 也代表一次视窗变化，记录位置以便下次拍摄恢复
                   this.rememberTileViewportState();
+                  // 关键：外部回推可见区后，需要立即触发重绘与可见瓦片重算，
+                  // 否则会出现高精瓦片仍按旧可见区下载/绘制的位置滞后。
+                  this.drawImageData();
+                  this.onViewportChange();
                   console.log('设置可见区域: ', this.visibleX, this.visibleY, this.scale);
                   this.SendConsoleLogMsg('update VisibleArea x=' + this.visibleX + ', y=' + this.visibleY + ', scale=' + this.scale, 'info');
                 }
@@ -6839,13 +6850,19 @@ export default {
       
       const tiles = this.calculateVisibleTiles();
       const gpm = this.tileGPM;
+      const buildMode = this.normalizeTileBuildModeValue(gpm.buildMode);
+      const currentZ = this.calculateTileLevel(this.scale, gpm.maxZoomLevel);
       const batchId = ++this.tileLoadBatchSeq;
       this.activeTileLoadBatchId = batchId;
       this.tileAllowIncrementalRender = true;
       this.resetIncrementalTileRenderBuffer();
 
       // 更新当前可见瓦片集合
+      const prevVisibleTiles = this.currentVisibleTiles instanceof Set ? this.currentVisibleTiles : new Set();
       const newVisibleTiles = new Set(tiles.map(t => `${t.z}/${t.x}/${t.y}`));
+      const visibleTilesChanged =
+        prevVisibleTiles.size !== newVisibleTiles.size ||
+        Array.from(newVisibleTiles).some(key => !prevVisibleTiles.has(key));
       
       // 取消不在可见范围内的加载请求
       for (const [key, controller] of this.tileAbortControllers.entries()) {
@@ -6870,6 +6887,11 @@ export default {
       });
       
       this.currentVisibleTiles = newVisibleTiles;
+      // 关键：仅平移视口时常见“无新下载瓦片”，但可见集合已变化。
+      // 若不强制整批重绘，renderTiles 可能因无 dirty key 直接跳过，导致高精区域显示停留在旧位置。
+      if (visibleTilesChanged) {
+        this.tileForceFullRender = true;
+      }
       
       const paramsKey = this.getTileRenderParamsKey();
 
@@ -6909,10 +6931,14 @@ export default {
       }
 
       // 过滤需要“下载原始数据”的瓦片：只有 raw 不存在且不在加载中，才发起请求
+      const blockedByReadyKeys = [];
       const tilesToLoad = tiles.filter(t => {
         const key = `${t.z}/${t.x}/${t.y}`;
         const hasRaw = this.tileRawDataCache && this.tileRawDataCache.has(key);
-        return !hasRaw && !this.tilePendingLoads.has(key) && this.isTileKeyDownloadAllowed(key);
+        if (hasRaw || this.tilePendingLoads.has(key)) return false;
+        const allowed = this.isTileKeyDownloadAllowed(key);
+        if (!allowed) blockedByReadyKeys.push(key);
+        return allowed;
       });
       const visibleTileStates = tiles.slice(0, 8).map(t => {
         const key = `${t.z}/${t.x}/${t.y}`;
@@ -6938,6 +6964,11 @@ export default {
       });
       this.updateTileDownloadCompletionState();
       this.ensureTileReadyFallbackPolling();
+      // 视口变化后若存在“可见但尚未放行”的瓦片，立即主动拉一次 ready，
+      // 避免仅依赖 2s 轮询导致高精瓦片进入下载队列偏慢。
+      if (blockedByReadyKeys.length > 0 && !this.tileReadyPollInFlight) {
+        this.requestCurrentTileBatchReady();
+      }
 
       // 计算视口中心（用于同一层级内排序）
       const visibleRect = this.getCurrentVisibleRect();
@@ -6958,11 +6989,29 @@ export default {
         const dy = tileCenterY - centerY;
         const distance = Math.sqrt(dx * dx + dy * dy);
         
-        // 渐进式优先级：
-        // 1. 先拉最低分辨率层，尽快给出全局粗图
-        // 2. 再按层级逐步细化
-        // 3. 同层内优先离视口中心更近的瓦片
-        tile.priority = tile.z * 1000 + distance;
+        // 交互体验优化：缩放/平移时优先显示高精瓦片。
+        // merged_single_level:
+        // - z=maxZ（原图层）优先
+        // - z=0（整图预览）最低优先级，仅兜底
+        // pyramid:
+        // - 当前层级 currentZ 优先
+        // - 再 currentZ-1
+        // - 最后 z=0 预览层
+        let levelPenalty = 0;
+        if (buildMode === 'merged_single_level') {
+          levelPenalty = (tile.z === gpm.maxZoomLevel) ? 0 : 100000;
+        } else {
+          const fallbackZ = Math.max(0, currentZ - 1);
+          if (tile.z === currentZ) {
+            levelPenalty = 0;
+          } else if (tile.z === fallbackZ) {
+            levelPenalty = 2000;
+          } else {
+            levelPenalty = 4000;
+          }
+        }
+        // 同层内优先离视口中心更近的瓦片
+        tile.priority = levelPenalty + distance;
       });
       
       // 按优先级排序（优先级值越小越优先）
@@ -12170,6 +12219,9 @@ export default {
         } else if (label === 'ImageGainR' || label === 'ImageGainB') {
           this.setAutoWhiteBalanceEnabled(false);
           this.ImageGainSet(`${label}:${parseFloat(value)}`);
+        } else if (label === 'ROICalcMode') {
+          const mode = String(value || 'full').toLowerCase();
+          this.sendMessage('Vue_Command', 'ROICalcMode:' + (mode === 'roi' ? 'roi' : 'full'));
         }else if (label === 'Binning') {
           this.cameraBin = parseInt(value);
           this.sendMessage('Vue_Command', 'SetBinning:' + this.cameraBin);
