@@ -4913,6 +4913,13 @@ export default {
       this.loadingConnectAllDevice = false;
     },
 
+    refreshHaveDeviceConnect() {
+      // 仅统计真实可连接设备，忽略固定占位项 Telescopes
+      this.haveDeviceConnect = (this.devices || []).some(
+        d => d && d.driverType !== 'Telescopes' && d.isConnected === true
+      );
+    },
+
     updateDevicesConnect(type, DeviceName, DriverName, isBind = true, opts = {}) {    // 连接成功
       const silent = !!opts.silent;
       this.SendConsoleLogMsg('updateDevicesConnect' + type + ' ' + DeviceName + ' ' + DriverName + ' ' + isBind, 'info');
@@ -4939,7 +4946,7 @@ export default {
         const shownName = (isBind && DeviceName) ? DeviceName : 'Not Bind Device';
         this.callShowMessageBox(shownName + ' success connected', 'success');
       }
-      this.haveDeviceConnect = true;
+      this.refreshHaveDeviceConnect();
       // 注释掉：不再在单个设备连接成功时关闭进度条，等待全部连接完成消息
       // this.loadingConnectAllDevice = false;
 
@@ -5094,6 +5101,7 @@ export default {
       this.devicesList = [];
       this.drivers = [];
       this.$bus.$emit('clearDeviceAllocationList');
+      this.refreshHaveDeviceConnect();
     },
 
     SwitchOutPutPower(index, isPowerON) {
@@ -10846,6 +10854,7 @@ export default {
       if (this.CurrentDriverType === devicetype) {
         this.updateSelectedDriver(devicetype);
       }
+      this.refreshHaveDeviceConnect();
     },
 
     disconnectDriverFail(devicetype) {
@@ -10902,6 +10911,7 @@ export default {
       if (this.CurrentDriverType === devicetype) {
         this.updateSelectedDriver(devicetype);
       }
+      this.refreshHaveDeviceConnect();
     },
     // 兼容处理 SelectedDriverList（旧/新协议）
     // - 旧：SelectedDriverList:Desc1:Driver1:Desc2:Driver2:...
