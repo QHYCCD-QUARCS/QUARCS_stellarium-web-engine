@@ -1,27 +1,16 @@
 <template>
-  <div :class="{ 'DevicePicker': !PickerSelect, 'DevicePicker-select': PickerSelect, 'DevicePicker-bind': DeviceBind }"
-       :style="{ width: width + 'px', height: height + 'px' }"
+  <div :class="{ 'DevicePicker': true, 'DevicePicker-select': PickerSelect, 'DevicePicker-bind': DeviceBind }"
        @click="togglePicker"
        data-testid="dp-picker"
        :data-state="DeviceBind ? 'bound' : (PickerSelect ? 'selected' : 'normal')"
        :data-index="PickerIndex">
-
-    <span class="device-type" style="position: absolute; top: 10px; left: 8px; color: rgba(255, 255, 255, 0.7); user-select: none;" data-testid="dp-device-type"> {{ DeviceType }}</span>
-
-    <span class="device-name" style="position: absolute; bottom: 8px; left: 8px; color: rgba(255, 255, 255, 0.7); user-select: none;" data-testid="dp-device-name"> {{ DeviceName }}</span>
-  
-    <!-- 阻止按钮点击冒泡到外层卡片（外层 @click 会切换选中类型，导致右侧待分配列表按类型过滤后"消失"） -->
-    <button
-      v-show="!OnCamera"
-      class="btn-Connect"
-      @click.stop="DeviceSwitch"
-      @mousedown.stop
-      @touchstart.stop
-      data-testid="dp-btn-toggle-bind"
-      :data-state="DeviceBind ? 'bound' : 'unbound'"
-    >
-      {{ DeviceBind ? '[Unbind]' : '[Bind]' }}
-    </button>
+    <div class="picker-top">
+      <span class="device-type" data-testid="dp-device-type">{{ DeviceType }}</span>
+      <span class="device-state">{{ DeviceBind ? $t('DevicePicker_State_Bound') : (PickerSelect ? $t('DevicePicker_State_Selected') : $t('DevicePicker_State_Idle')) }}</span>
+    </div>
+    <span class="device-name" data-testid="dp-device-name">
+      {{ DeviceName || $t('DevicePicker_NoDeviceBound') }}
+    </span>
   </div>
 </template>
 
@@ -50,33 +39,10 @@ export default {
       default: false
     }
   },
-  data() {
-    return {
-      width: 150,
-      height: 60,
-      OnCamera: false,
-    };
-  },
-  mounted() {
-    // 检查 DeviceName 是否包含 "on camera"
-    if (this.DeviceName.toLowerCase().includes("on camera")) {
-      this.OnCamera = true;
-    }
-  },
   methods: {
     togglePicker() {
-      if(!this.DeviceBind) {
-        console.log('PickerIndex:', this.PickerIndex);
-        this.$bus.$emit('SelectPickerIndex', this.PickerIndex);
-      }
-    },
-    DeviceSwitch() {
-      console.log('Device Connect:', this.DeviceBind);
-      if(!this.DeviceBind) {
-        this.$bus.$emit('BindDeviceIndex', this.PickerIndex);
-      } else {
-        this.$bus.$emit('UnBindDeviceIndex', this.PickerIndex);
-      }
+      console.log('PickerIndex:', this.PickerIndex);
+      this.$bus.$emit('SelectPickerIndex', this.PickerIndex);
     }
   }
 }
@@ -85,65 +51,66 @@ export default {
 <style scoped>
 .DevicePicker {
   pointer-events: auto;
-  position: fixed;
-  background-color: rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(5px);
-  border-radius: 5px;
+  position: relative;
+  min-height: 86px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: linear-gradient(145deg, rgba(17, 26, 42, 0.88), rgba(36, 48, 71, 0.62));
+  backdrop-filter: blur(8px);
   box-sizing: border-box;
-  /* transition: background-color 0.1s ease; */
-  
+  cursor: pointer;
+  transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-
 .DevicePicker-select {
-  pointer-events: auto;
-  position: fixed;
-  background-color: rgba(255, 255, 255, 0.3);
-  backdrop-filter: blur(5px);
-  border-radius: 5px;
-  box-sizing: border-box;
-  /* transition: background-color 0.1s ease; */
+  border-color: rgba(102, 225, 255, 0.95);
+  box-shadow: 0 0 0 1px rgba(102, 225, 255, 0.25), 0 8px 24px rgba(26, 42, 88, 0.35);
+  transform: translateY(-1px);
 }
 
 .DevicePicker-bind {
-  pointer-events: auto;
-  position: fixed;
-  background-color: rgba(0, 255, 0, 0.3);
-  /* background: linear-gradient(to right, rgba(255, 0, 0, 0.5) 30%, rgba(75, 155, 250, 0.5) 70%); */
-  backdrop-filter: blur(5px);
-  border-radius: 5px;
-  box-sizing: border-box;
-  /* transition: background-color 0.3s ease; */
+  border-color: rgba(122, 243, 168, 0.95);
+  background: linear-gradient(145deg, rgba(18, 43, 38, 0.88), rgba(29, 81, 71, 0.66));
+}
+
+.DevicePicker:hover {
+  border-color: rgba(255, 255, 255, 0.4);
+  transform: translateY(-1px);
+}
+
+.picker-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
 }
 
 .device-type {
+  color: rgba(255, 255, 255, 0.92);
   font-size: 13px;
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+.device-state {
+  color: rgba(198, 217, 255, 0.95);
+  font-size: 11px;
+  padding: 2px 8px;
+  border: 1px solid rgba(198, 217, 255, 0.35);
+  border-radius: 999px;
+  white-space: nowrap;
 }
 
 .device-name {
-  font-size: 10px;
-  line-height: 1.3;
+  color: rgba(224, 236, 255, 0.8);
+  font-size: 12px;
+  line-height: 1.35;
   display: -webkit-box;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 
-.btn-Connect {
-  position: absolute;
-  width: 50px;
-  height: 30px;
-  top: 7px;
-  right: 7px;
-
-  user-select: none;
-  backdrop-filter: blur(5px);
-  background-color: rgba(0, 0, 0, 0.3);
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.8);
-}
 </style>

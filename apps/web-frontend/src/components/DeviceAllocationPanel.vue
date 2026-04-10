@@ -8,36 +8,69 @@
          data-testid="dap-root"
          :data-state="isOpen ? 'open' : 'closed'"
     >
-      <!-- <ul class="device-list">
-        <li v-for="(device, index) in DeviceList" :key="index" @click="SelectedDeviceName(device)" data-testid="dap-act-selected-device-name" :data-index="index">
-          {{ device.DeviceName }}
-        </li>
-      </ul> -->
-      <div class="DeviceTypes-list">
-        <DevicePicker v-for="(deviceType, index) in DeviceTypes" :key="index" :DeviceType="deviceType.DeviceType"
-          :DeviceName="deviceType.DeviceName" :DeviceBind="deviceType.isBind" :PickerIndex="index" :PickerSelect="deviceType.isSelected"
-          :style="{ top: Position[index].top, left: Position[index].left }" />
+      <div class="panel-header">
+        <div class="panel-title-wrap">
+          <span class="panel-title">{{ $t('Device Allocation') }}</span>
+          <span class="panel-subtitle">
+            {{ selectedDeviceType ? $t('DeviceAllocation_SelectedSlot', { slot: selectedDeviceType }) : $t('DeviceAllocation_StepHint') }}
+          </span>
+        </div>
+        <span class="panel-close"
+              @click.stop="ClosePanel"
+              data-testid="dap-act-close-panel">
+          {{ $t('CLOSE') }}
+        </span>
       </div>
 
-      <span style="position: absolute; top: 10px; right: 15px; font-size: 15px; color: rgba(255, 255, 255, 0.5); user-select: none;"> 
-        {{ $t('Device To Be Allocated') }}
-      </span>
+      <div class="panel-body">
+        <div class="slot-column">
+          <div class="column-title">{{ $t('DeviceAllocation_Slots') }}</div>
+          <div class="slot-list">
+            <DevicePicker
+              v-for="(deviceType, index) in DeviceTypes"
+              :key="index"
+              :DeviceType="deviceType.DeviceType"
+              :DeviceName="deviceType.DeviceName"
+              :DeviceBind="deviceType.isBind"
+              :PickerIndex="index"
+              :PickerSelect="deviceType.isSelected"
+            />
+          </div>
+        </div>
 
-      <ul class="device-list">
-        <!-- 不做类型过滤：统一显示所有“未绑定的待分配设备” -->
-        <li v-for="(device, index) in unboundDeviceList" :key="index" @click="SelectedDeviceName(device)" data-testid="dap-act-selected-device-name-2" :data-index="index">
-          <!-- 显示来源类型，避免用户误选（例如 CCD / Mount / Focuser） -->
-          {{ device.DeviceType ? ('[' + device.DeviceType + '] ') : '' }}{{ device.DeviceName }}
-        </li>
-      </ul>
+        <div class="candidate-column">
+          <div class="column-title">{{ $t('DeviceAllocation_CandidateDevices') }}</div>
+          <div class="list-hint">
+            {{ selectedDeviceType ? $t('DeviceAllocation_ListHint_Selected') : $t('DeviceAllocation_ListHint_Unselected') }}
+          </div>
 
-      <span style="position: absolute; bottom: 5px; right: 15px; font-size: 12px; font-weight: bold; color: rgba(0, 121, 214, 0.8); user-select: none;"
-            @click.stop="ClosePanel" data-testid="dap-act-close-panel">
-        {{ $t('CLOSE') }}
-      </span>
-
-
-
+          <ul class="device-list">
+            <li
+              v-for="(device, index) in candidateDeviceList"
+              :key="device.DeviceType + ':' + device.DeviceIndex"
+              @click="SelectedDeviceName(device)"
+              data-testid="dap-act-selected-device-name-2"
+              :data-index="index"
+              :class="{
+                selected: isSelectedCandidate(device),
+                occupied: !!getDeviceOccupant(device),
+                swappable: canSwapWithSelectedRole(device),
+              }"
+            >
+              <div class="device-main-row">
+                <span class="device-type-tag">{{ device.DeviceType || $t('Device') }}</span>
+                <span class="device-name-text">{{ device.DeviceName }}</span>
+              </div>
+              <span v-if="getDeviceOccupant(device)" class="device-meta">
+                {{ canSwapWithSelectedRole(device) ? $t('DeviceAllocation_SwappableWith') : $t('DeviceAllocation_BoundTo') }} {{ getDeviceOccupant(device) }}
+              </span>
+            </li>
+            <li v-if="candidateDeviceList.length === 0" class="device-empty">
+              {{ $t('DeviceAllocation_NoAvailableCandidateDevice') }}
+            </li>
+          </ul>
+        </div>
+      </div>
     </div>
   </transition>
 </template>
@@ -47,6 +80,9 @@ import DevicePicker from './DevicePicker.vue';
 
 const CAMERA_DEVICE_TYPES = ['MainCamera', 'Guider', 'PoleCamera'];
 const ALLOCATABLE_DEVICE_TYPES = ['CCD'];
+const SWAPPABLE_ROLE_GROUPS = [
+  ['MainCamera', 'Guider', 'PoleCamera'],
+];
 
 export default {
   name: 'DeviceAllocationPanel',
@@ -71,15 +107,7 @@ export default {
       // - 一旦检测到至少有设备已连接：初始化默认槽位，后续由 BindDeviceTypeList/DeviceConnectSuccess 覆盖绑定状态
       DeviceTypes: [],
 
-      Position: [
-        { top: '12%', left: '15px' },
-        { top: '39%', left: '15px' },
-        { top: '66%', left: '15px' },
-
-        { top: '12%', left: '175px' },
-        { top: '39%', left: '175px' },
-        { top: '66%', left: '175px' },
-      ],
+      selectedCandidateKey: '',
     };
   },
   created() {
@@ -87,8 +115,6 @@ export default {
     this.$bus.$on('AddDeviceType',this.AddDeviceType);
     this.$bus.$on('DeviceToBeAllocated',this.DeviceToBeAllocated);
     this.$bus.$on('DeviceConnectSuccess', this.DeviceConnectSuccess);
-    this.$bus.$on('BindDeviceIndex', this.BindingDevice);
-    this.$bus.$on('UnBindDeviceIndex', this.UnBindingDevice);
     this.$bus.$on('clearDeviceAllocationList',this.clearDeviceAllocationList);
     this.$bus.$on('deleteDeviceTypeAllocationList',this.deleteDeviceTypeAllocationList);
     this.$bus.$on('deleteDeviceAllocationList',this.deleteDeviceAllocationList);
@@ -107,8 +133,9 @@ export default {
         this.DeviceTypes[i].isSelected = false;
       }
       console.log('Select Picker Index:', num);
-      if(!this.DeviceTypes[num].isBind){
+      if(this.DeviceTypes[num]){
         this.DeviceTypes[num].isSelected = true;
+        this.syncSelectedCandidateByType(this.DeviceTypes[num].DeviceType);
       }
     },
 
@@ -122,17 +149,26 @@ export default {
       const role = selectedRole.DeviceType;
       const expectedCandidateType = (role === 'MainCamera' || role === 'Guider' || role === 'PoleCamera') ? 'CCD' : role;
       if (device && device.DeviceType && expectedCandidateType && device.DeviceType !== expectedCandidateType) {
-        this.$bus.$emit('SendConsoleLogMsg', `Device type mismatch: ${role} expects ${expectedCandidateType}, but selected ${device.DeviceType}`, 'warning');
+        this.$bus.$emit('SendConsoleLogMsg', this.$t('DeviceAllocation_DeviceTypeMismatch', { role, expected: expectedCandidateType, selected: device.DeviceType }), 'warning');
         return;
       }
-      // 重要：不要跨角色清空其他 DeviceType 的 DeviceName。
-      // 否则在给 Guider 选设备时，可能把 MainCamera 的绑定信息误清空，造成“主相机异常绑定”的错觉/误操作。
-      for (let i = 0; i < this.DeviceTypes.length; i++) {
-        if (this.DeviceTypes[i].isSelected === true) {
-          this.DeviceTypes[i].DeviceName = device.DeviceName;
-          this.DeviceTypes[i].selectedDeviceIndex = device.DeviceIndex;
-        }
+      const occupant = this.getDeviceOccupant(device);
+      if (occupant && occupant !== role && !this.canSwapBetweenRoles(role, occupant)) {
+        this.$bus.$emit('SendConsoleLogMsg', this.$t('DeviceAllocation_SelectedDeviceAlreadyBoundNoSwap', { role: occupant }), 'warning');
+        return;
       }
+      this.selectedCandidateKey = this.getDeviceKey(device);
+      const selectedRoleIndex = (this.DeviceTypes || []).findIndex(item => item && item.isSelected);
+      if (selectedRoleIndex < 0) return;
+      const selectedRoleObj = this.DeviceTypes[selectedRoleIndex];
+      if (selectedRoleObj.isBind && selectedRoleObj.selectedDeviceIndex === device.DeviceIndex) {
+        this.$bus.$emit('SendConsoleLogMsg', this.$t('DeviceAllocation_RoleAlreadyBoundToThisDevice', { role }), 'info');
+        return;
+      }
+      // 两步操作：先选槽位，再点右侧设备。点击后立即提交绑定/换绑。
+      selectedRoleObj.DeviceName = device.DeviceName;
+      selectedRoleObj.selectedDeviceIndex = device.DeviceIndex;
+      this.BindingDevice(selectedRoleIndex);
     },
 
     AddDeviceType(DeviceType) {
@@ -188,6 +224,7 @@ export default {
           this.DeviceList.push({DeviceType: deviceType, DeviceName: name, DeviceIndex: index, isBind: false });
         }
       }
+      this.syncRoleIndexesByDeviceName(deviceType, name, index);
     },
 
     DeviceConnectSuccess(type, DeviceName, DriverName, isBind = true) {
@@ -202,6 +239,7 @@ export default {
           this.DeviceTypes[i].DeviceName = DeviceName;
           this.DeviceTypes[i].isBind = isBind;
           this.DeviceTypes[i].isSelected = false;
+          this.DeviceTypes[i].selectedDeviceIndex = this.resolveDeviceIndexForRole(type, DeviceName);
           found = true; // 标记已找到匹配项
           break; // 找到后可以跳出循环，优化性能
         }
@@ -214,7 +252,7 @@ export default {
           DeviceName: DeviceName,
           isBind: isBind,
           isSelected: false,
-          selectedDeviceIndex: null,
+          selectedDeviceIndex: this.resolveDeviceIndexForRole(type, DeviceName),
         });
       }
       const indexToRemove = this.DeviceList.findIndex(item => item.DeviceName === DeviceName);
@@ -236,6 +274,7 @@ export default {
           }
         });
       }
+      this.syncSelectedCandidateByType(type);
     },
 
     BindingDevice(index) {
@@ -243,11 +282,18 @@ export default {
       const type = this.DeviceTypes[index].DeviceType;
       const selectedIndex = this.DeviceTypes[index].selectedDeviceIndex;
       if (selectedIndex === null || typeof selectedIndex === 'undefined') {
-        this.$bus.$emit('SendConsoleLogMsg', 'Please select a device first', 'warning');
+        this.$bus.$emit('SendConsoleLogMsg', this.$t('DeviceAllocation_PleaseSelectDeviceFirst'), 'warning');
+        return;
+      }
+      const selectedDevice = this.findDeviceByIndexAndType(selectedIndex, this.roleCandidateType(type));
+      const occupant = this.getDeviceOccupant(selectedDevice);
+      if (occupant && occupant !== type && !this.canSwapBetweenRoles(type, occupant)) {
+        this.$bus.$emit('SendConsoleLogMsg', this.$t('DeviceAllocation_SelectedDeviceAlreadyBoundNoSwap', { role: occupant }), 'warning');
         return;
       }
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'BindingDevice:' + type + ':' + selectedIndex);
-      this.$bus.$emit('SendConsoleLogMsg', 'Binding Device:' + type + ':' + selectedIndex, 'info');
+      const action = occupant && occupant !== type ? this.$t('DeviceAllocation_Action_Swap') : this.$t('DeviceAllocation_Action_Binding');
+      this.$bus.$emit('SendConsoleLogMsg', `${action} Device:` + type + ':' + selectedIndex, 'info');
     },
 
     UnBindingDevice(index) {
@@ -279,6 +325,7 @@ export default {
           }
         });
       }
+      this.syncSelectedCandidateByType(type);
       // 解绑后由 App.vue 从当前 devices 状态中读取 driverName，避免传入 undefined 污染 driverName
       this.$bus.$emit('UnBindingDevice', type, name);
     },
@@ -322,6 +369,115 @@ export default {
       }
       this.$bus.$emit('SendConsoleLogMsg', 'Device(' + deviceName + ') has removed', 'info');
     },
+    getDeviceKey(device) {
+      if (!device) return '';
+      return `${device.DeviceType}:${device.DeviceIndex}`;
+    },
+    isSelectedCandidate(device) {
+      return this.selectedCandidateKey !== '' && this.selectedCandidateKey === this.getDeviceKey(device);
+    },
+    getSelectedRole() {
+      return (this.DeviceTypes || []).find(t => t && t.isSelected) || null;
+    },
+    roleCandidateType(role) {
+      return this.isCameraDeviceType(role) ? 'CCD' : role;
+    },
+    isCompatibleCandidateType(actualType, expectedType) {
+      if (actualType === expectedType) return true;
+      // 某些后端路径会把 CCD 设备类型回传为 Device，这里做兼容映射。
+      return expectedType === 'CCD' && actualType === 'Device';
+    },
+    normalizeCandidateType(actualType, expectedType) {
+      if (this.isCompatibleCandidateType(actualType, expectedType)) return expectedType;
+      return actualType;
+    },
+    resolveDeviceIndexByNameLoose(deviceName) {
+      if (!deviceName) return null;
+      const matches = (this.DeviceList || []).filter(item => item && item.DeviceName === deviceName);
+      if (matches.length === 1) return matches[0].DeviceIndex;
+      return null;
+    },
+    resolveDeviceIndexForRole(role, deviceName) {
+      if (!deviceName) return null;
+      const candidateType = this.roleCandidateType(role);
+      const matched = (this.DeviceList || []).find(item => item && this.isCompatibleCandidateType(item.DeviceType, candidateType) && item.DeviceName === deviceName);
+      if (matched) return matched.DeviceIndex;
+      // 严格匹配失败时，尝试按名称唯一匹配，兼容旧列表或类型漂移。
+      return this.resolveDeviceIndexByNameLoose(deviceName);
+    },
+    findDeviceByIndexAndType(deviceIndex, deviceType) {
+      return (this.DeviceList || []).find(item => item && item.DeviceIndex === deviceIndex && item.DeviceType === deviceType) || null;
+    },
+    getDeviceOccupant(device) {
+      if (!device) return '';
+      const matched = (this.DeviceTypes || []).find((item) => {
+        if (!item || !item.isBind) return false;
+        return item.selectedDeviceIndex === device.DeviceIndex && this.roleCandidateType(item.DeviceType) === device.DeviceType;
+      });
+      return matched ? matched.DeviceType : '';
+    },
+    canSwapBetweenRoles(targetRole, occupantRole) {
+      if (!targetRole || !occupantRole || targetRole === occupantRole) return false;
+      return SWAPPABLE_ROLE_GROUPS.some(group => group.includes(targetRole) && group.includes(occupantRole));
+    },
+    canSwapWithSelectedRole(device) {
+      const selectedRole = this.getSelectedRole();
+      const occupant = this.getDeviceOccupant(device);
+      return !!(selectedRole && occupant && occupant !== selectedRole.DeviceType && this.canSwapBetweenRoles(selectedRole.DeviceType, occupant));
+    },
+    syncSelectedCandidateByType(type) {
+      const role = (this.DeviceTypes || []).find(item => item && item.DeviceType === type);
+      if (!role || role.selectedDeviceIndex === null || typeof role.selectedDeviceIndex === 'undefined') return;
+      const candidate = this.findDeviceByIndexAndType(role.selectedDeviceIndex, this.roleCandidateType(type));
+      if (candidate) {
+        this.selectedCandidateKey = this.getDeviceKey(candidate);
+      }
+    },
+    syncRoleIndexesByDeviceName(deviceType, deviceName, deviceIndex) {
+      if (!deviceName) return;
+      (this.DeviceTypes || []).forEach((role) => {
+        if (!role || !this.isCameraDeviceType(role.DeviceType)) return;
+        if (this.roleCandidateType(role.DeviceType) !== deviceType) return;
+        if (role.DeviceName === deviceName && (role.selectedDeviceIndex === null || typeof role.selectedDeviceIndex === 'undefined')) {
+          role.selectedDeviceIndex = deviceIndex;
+        }
+      });
+    },
+    collectExpectedTypeCandidates(expectedType) {
+      const merged = new Map();
+      (this.DeviceList || []).forEach((device) => {
+        if (!device) return;
+        if (!this.isCompatibleCandidateType(device.DeviceType, expectedType)) return;
+        const normalized = {
+          ...device,
+          DeviceType: this.normalizeCandidateType(device.DeviceType, expectedType),
+        };
+        merged.set(this.getDeviceKey(normalized), normalized);
+      });
+
+      // 兜底：如果绑定中的设备未出现在 DeviceList，仍将其补进候选，保证可见并可交换。
+      (this.DeviceTypes || []).forEach((role) => {
+        if (!role || !this.isCameraDeviceType(role.DeviceType)) return;
+        if (this.roleCandidateType(role.DeviceType) !== expectedType) return;
+        let roleIndex = role.selectedDeviceIndex;
+        if (roleIndex === null || typeof roleIndex === 'undefined') {
+          roleIndex = this.resolveDeviceIndexForRole(role.DeviceType, role.DeviceName);
+        }
+        if (roleIndex === null || typeof roleIndex === 'undefined') return;
+        const fallbackDevice = {
+          DeviceType: expectedType,
+          DeviceIndex: roleIndex,
+          DeviceName: role.DeviceName || role.DeviceType,
+          isBind: !!role.isBind,
+        };
+        const key = this.getDeviceKey(fallbackDevice);
+        if (!merged.has(key)) {
+          merged.set(key, fallbackDevice);
+        }
+      });
+
+      return Array.from(merged.values());
+    },
 
 
     GetConnectedDevices() {
@@ -347,7 +503,8 @@ export default {
 
     loadBindDeviceTypeList(deviceTypeObject) {
       deviceTypeObject.forEach(deviceType => {
-        const { type, DeviceName, DriverName, isbind } = deviceType;
+        const type = deviceType.Type || deviceType.type;
+        const { DeviceName, DriverName, isbind } = deviceType;
         this.DeviceConnectSuccess(type, DeviceName, DriverName, isbind);
       });
     }
@@ -361,13 +518,23 @@ export default {
       const selected = (this.DeviceTypes || []).find(t => t && t.isSelected);
       return selected ? selected.DeviceType : '';
     },
-    unboundDeviceList() {
-      return (this.DeviceList || []).filter(d => d && !d.isBind && this.isAllocatableDeviceType(d.DeviceType));
+    candidateDeviceList() {
+      const selectedRole = this.getSelectedRole();
+      if (!selectedRole) {
+        return (this.DeviceList || []).filter(d => d && this.isAllocatableDeviceType(d.DeviceType) && !d.isBind);
+      }
+      const expectedType = this.roleCandidateType(selectedRole.DeviceType);
+      const allCandidates = this.collectExpectedTypeCandidates(expectedType);
+      return allCandidates.filter((d) => {
+        if (!d || !this.isAllocatableDeviceType(d.DeviceType)) return false;
+        if (d.DeviceType !== expectedType) return false;
+        const occupant = this.getDeviceOccupant(d);
+        if (!occupant) return true;
+        return occupant === selectedRole.DeviceType || this.canSwapBetweenRoles(selectedRole.DeviceType, occupant);
+      });
     },
     panelWidth() {
-      // 如果 DeviceTypes 中的项目数小于或等于 3，则宽度为 360px
-      // 如果大于 3，则宽度为 500px
-      return this.DeviceTypes.length <= 3 ? '360px' : '500px';
+      return this.DeviceTypes.length <= 3 ? '760px' : '860px';
     },
   },
   mounted: function () {
@@ -381,15 +548,18 @@ export default {
 .DeviceAllocationPanel-panel {
   pointer-events: auto;
   position: fixed;
-  background-color: rgba(64, 64, 64, 0.5);
-  backdrop-filter: blur(5px);
+  background: linear-gradient(155deg, rgba(9, 15, 30, 0.9), rgba(17, 28, 50, 0.82));
+  backdrop-filter: blur(12px);
   box-sizing: border-box;
   overflow: hidden;
   left: 50%;
   transform: translateX(-50%);
-
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 14px;
+  border: 1px solid rgba(153, 187, 255, 0.35);
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  padding: 14px;
 }
 
 @keyframes showPanelAnimation {
@@ -428,58 +598,194 @@ export default {
   animation: hidePanelAnimation 0.3s forwards;
 }
 
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.panel-title-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.panel-title {
+  color: rgba(244, 249, 255, 0.96);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+.panel-subtitle {
+  color: rgba(169, 197, 255, 0.85);
+  font-size: 12px;
+}
+
+.panel-close {
+  color: rgba(143, 188, 255, 0.95);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(143, 188, 255, 0.4);
+  background-color: rgba(143, 188, 255, 0.1);
+  user-select: none;
+  cursor: pointer;
+}
+
+.panel-close:hover {
+  background-color: rgba(143, 188, 255, 0.18);
+}
+
+.panel-body {
+  display: flex;
+  gap: 14px;
+  min-height: 250px;
+  flex: 1;
+}
+
+.slot-column {
+  width: 36%;
+  min-width: 250px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.candidate-column {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.column-title {
+  color: rgba(212, 229, 255, 0.95);
+  font-size: 12px;
+  letter-spacing: 0.9px;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.slot-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.list-hint {
+  color: rgba(170, 194, 235, 0.86);
+  font-size: 12px;
+}
+
 .device-list {
-  position: absolute;
-  top: 30px;
-  right: 15px;
-  bottom: 25px;
-
-  list-style-type: none;
-  /* 去掉列表前的默认点 */
-  padding: 0;
-  /* 去掉内边距 */
+  list-style: none;
   margin: 0;
-  /* 去掉外边距 */
-  width: 150px;
-  /* 控制列表宽度 */
-  max-height: 200px;
-  /* 控制列表最大高度 */
+  padding: 4px;
+  border: 1px solid rgba(125, 154, 211, 0.35);
+  border-radius: 10px;
+  background: rgba(7, 14, 27, 0.42);
+  flex: 1;
   overflow-y: auto;
-  /* 允许垂直滚动 */
-  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-li {
+.device-list li {
   color: white;
-  /* 设定文字颜色 */
-  padding: 5px 10px;
-  /* 添加一些内边距 */
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-  /* 添加底部边框 */
+  padding: 9px 10px;
+  border-radius: 8px;
+  margin-bottom: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+  transition: border-color 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
+}
+
+.device-list li:last-child {
+  margin-bottom: 0;
+}
+
+.device-list li:hover {
+  background-color: rgba(113, 159, 235, 0.16);
+  border-color: rgba(145, 183, 241, 0.45);
+}
+
+.device-main-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.device-type-tag {
+  color: rgba(193, 219, 255, 0.96);
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(193, 219, 255, 0.38);
   white-space: nowrap;
-  /* 确保文本不换行 */
+}
+
+.device-name-text {
+  font-size: 13px;
+  color: rgba(244, 249, 255, 0.95);
+  white-space: nowrap;
   overflow: hidden;
-  /* 超出部分隐藏 */
   text-overflow: ellipsis;
-  /* 超出部分用省略号表示 */
 }
 
-li:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-  /* 悬停效果 */
+.device-empty {
+  color: rgba(169, 197, 255, 0.8) !important;
+  text-align: center;
+  cursor: default !important;
+  background: rgba(255, 255, 255, 0.02) !important;
 }
 
-.DeviceTypes-list {
-  position: absolute;
-  top: 30px;
-  /* 根据需要调整位置 */
-  right: 15px;
-  /* 根据需要调整位置 */
-  bottom: 15px;
-  /* 根据需要调整位置 */
-  width: 150px;
-  /* 设置宽度，确保右侧的 DevicePicker 组件能够显示 */
-  overflow-y: auto;
-  /* 允许垂直滚动，如果需要的话 */
+.device-list li.selected {
+  background-color: rgba(77, 159, 255, 0.26);
+  border-color: rgba(99, 184, 255, 0.82);
+}
+
+.device-list li.occupied {
+  background-color: rgba(219, 160, 74, 0.16);
+  border-color: rgba(219, 160, 74, 0.38);
+}
+
+.device-list li.swappable {
+  border-left: 3px solid rgba(255, 203, 124, 0.95);
+}
+
+.device-meta {
+  display: inline-block;
+  margin-top: 6px;
+  color: rgba(221, 230, 245, 0.72);
+  font-size: 12px;
+}
+
+.device-list::-webkit-scrollbar,
+.slot-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.device-list::-webkit-scrollbar-thumb,
+.slot-list::-webkit-scrollbar-thumb {
+  background: rgba(153, 187, 255, 0.35);
+  border-radius: 999px;
+}
+
+@media (max-width: 820px) {
+  .panel-body {
+    flex-direction: column;
+  }
+  .slot-column {
+    width: 100%;
+    min-width: 0;
+  }
 }
 </style>
