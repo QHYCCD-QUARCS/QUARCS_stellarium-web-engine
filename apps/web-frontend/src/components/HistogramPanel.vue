@@ -88,6 +88,17 @@ export default {
     this.$bus.$off('AutoWhiteBalanceState', this.setAutoWhiteBalanceState);
   },
   methods: {
+    logMainCameraImagePipeLine(functionName, variableName, value) {
+      let normalizedValue = value;
+      if (typeof value === 'object' && value !== null) {
+        try {
+          normalizedValue = JSON.stringify(value);
+        } catch (error) {
+          normalizedValue = String(value);
+        }
+      }
+      this.$bus.$emit('SendConsoleLogMsg', `MainCameraImagePipeLine | HistogramPanel.vue | ${functionName} | ${variableName} = ${normalizedValue}`, 'info');
+    },
     updatePosition() {
       const screenWidth = window.innerWidth;
       const halfWidth = screenWidth / 2 - 250;
@@ -100,6 +111,7 @@ export default {
     },
     AutoHistogram() {
       console.log('[HistogramPanel] 触发自动拉伸模式（使用后端计算的黑白点）');
+      this.logMainCameraImagePipeLine('AutoHistogram', 'requestMinMax', '-1,-1');
       // 自动拉伸通常配合“区间模式”观察有效范围
       if (!this.showEffectiveRange) {
         this.showEffectiveRange = true;

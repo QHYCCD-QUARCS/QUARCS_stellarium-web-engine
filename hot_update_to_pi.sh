@@ -6,7 +6,6 @@ REPO_ROOT="${SCRIPT_DIR}"
 
 WITH_SKYDATA=0
 ENGINE_UPDATE=0
-NO_BACKUP=0
 SKIP_BUILD=0
 SHOW_HELP=0
 
@@ -23,7 +22,6 @@ Options:
   --with-skydata   Include skydata in both build and deploy.
   --engine-update  Rebuild stellarium-web-engine.{js,wasm} before frontend build.
   --skip-build     Skip local build and deploy the existing dist/ directly.
-  --no-backup      Skip the remote backup during deployment.
   -h, --help       Show this help message.
 
 Typical use:
@@ -50,10 +48,6 @@ while [[ $# -gt 0 ]]; do
       ;;
     --skip-build)
       SKIP_BUILD=1
-      shift
-      ;;
-    --no-backup)
-      NO_BACKUP=1
       shift
       ;;
     -h|--help)
@@ -83,10 +77,6 @@ fi
 
 if [[ "${ENGINE_UPDATE}" -eq 1 ]]; then
   BUILD_ARGS+=(--engine-update)
-fi
-
-if [[ "${NO_BACKUP}" -eq 1 ]]; then
-  DEPLOY_ARGS+=(--no-backup)
 fi
 
 if [[ "${SKIP_BUILD}" -eq 0 ]]; then

@@ -803,6 +803,14 @@ export default {
       this.guiderLockFlashTimer = null;
     }
   },
+  watch: {
+    showFocuserPanel: {
+      immediate: true,
+      handler(visible) {
+        this.$bus.$emit('FocuserPanelVisibilityChanged', !!visible);
+      }
+    }
+  },
   methods: {
     toggleFloatingBox() {
       this.showFloatingBox = !this.showFloatingBox; // 切换显示状态

@@ -1048,8 +1048,7 @@ export default {
       networkDisconnected: false, // 添加网络连接状态
 
       QTClientVersion: 'Not connected',
-      // VueClientVersion: process.env.VUE_APP_VERSION,
-      VueClientVersion: '20260410', // 手动指定版本号
+      VueClientVersion: process.env.VUE_APP_VERSION || '—',
 
       // 全局总版本号（由 Qt 通过 WebSocket 从环境变量 QUARCS_TOTAL_VERSION 读取并发送）
       TotalVersion: '0.0.0',
@@ -1329,6 +1328,8 @@ export default {
       pendingLiveTileGpm: null,
       pendingLiveTileGpmTimer: null,
       // ========================= 瓦片金字塔相关结束 =========================
+      isFocuserPanelVisible: false,
+      focuserPanelTileZoomCap: 2,
 
       // 记忆瓦片层级：当再次拍摄（新 TileGPM 会话）时，若 maxZoomLevel 未变化则保持在此前层级
       preferredTileZ: null,
@@ -1610,6 +1611,7 @@ export default {
     this.$bus.$on('StartAutoFocus', this.startAutoFocusProcess);
     this.$bus.$on('UpdateAutoFocusStep', this.updateAutoFocusStep);
     this.$bus.$on('EndAutoFocus', this.endAutoFocus);
+    this.$bus.$on('FocuserPanelVisibilityChanged', this.handleFocuserPanelVisibilityChanged);
 
     // 曝光状态（页面刷新后由后端通知同步）
     this.$bus.$on('CameraInExposuring', (state) => {
@@ -1654,6 +1656,18 @@ export default {
 
   },
   methods: {
+    logMainCameraImagePipeLine(fileName, functionName, variableName, value) {
+      let normalizedValue = value
+      if (typeof value === 'object' && value !== null) {
+        try {
+          normalizedValue = JSON.stringify(value)
+        } catch (error) {
+          normalizedValue = String(value)
+        }
+      }
+      const message = `MainCameraImagePipeLine | ${fileName} | ${functionName} | ${variableName} = ${normalizedValue}`
+      this.SendConsoleLogMsg(message, 'info')
+    },
     // 每当“UI完成一帧刷新”的信号到来时调用，用于统计 UI 刷新 FPS
     // 说明：后端使用 ExposureCompleted 作为“刷新一帧”的信号，因此这里以 ExposureCompleted 作为 UI FPS 的统计触发。
     onLiveFramePresented () {
@@ -1698,6 +1712,8 @@ export default {
       if (!Number.isFinite(gainR) || !Number.isFinite(gainB)) return;
       this.autoWhiteBalanceGainR = gainR;
       this.autoWhiteBalanceGainB = gainB;
+      this.logMainCameraImagePipeLine('App.vue', 'saveAutoWhiteBalanceGains', 'autoWhiteBalanceGainR', gainR);
+      this.logMainCameraImagePipeLine('App.vue', 'saveAutoWhiteBalanceGains', 'autoWhiteBalanceGainB', gainB);
     },
     applyStoredAutoWhiteBalance(options = {}) {
       const { reprocess = true } = options;
@@ -2290,9 +2306,9 @@ export default {
           if (data.message.startsWith('SendDebugMessage|')) {
             acceptMessage = true;
             const parts = data.message.split('|');
-            if (parts.length === 3) {
+            if (parts.length >= 3) {
               const type = parts[1];
-              const message = parts[2];
+              const message = parts.slice(2).join('|');
               this.$bus.$emit('SendDebugMessage', type, message);
             }
           }
@@ -2558,6 +2574,7 @@ export default {
                     frameId: (parts.length >= 15) ? parseInt(parts[14]) : null,
                     buildMode: (parts.length >= 16) ? parts[15] : 'merged_single_level',
                   };
+                  this.logMainCameraImagePipeLine('App.vue', 'WebSocketOnMessage.TileGPM', 'gpmMessage', gpm);
                   this.handleTileGPM(gpm);
                 }
                 break;
@@ -6230,6 +6247,10 @@ export default {
     async handleTileGPM(gpm) {
       gpm.buildMode = this.normalizeTileBuildModeValue(gpm.buildMode);
       this.SendConsoleLogMsg(`Received TileGPM: session=${gpm.sessionId}, size=${gpm.imageWidth}x${gpm.imageHeight}, maxZoom=${gpm.maxZoomLevel}`, 'info');
+      this.logMainCameraImagePipeLine('App.vue', 'handleTileGPM', 'incomingSessionId', gpm.sessionId);
+      this.logMainCameraImagePipeLine('App.vue', 'handleTileGPM', 'incomingFrameId', gpm.frameId);
+      this.logMainCameraImagePipeLine('App.vue', 'handleTileGPM', 'incomingBlackWhite', `${gpm.blackLevel},${gpm.whiteLevel}`);
+      this.logMainCameraImagePipeLine('App.vue', 'handleTileGPM', 'incomingGainRB', `${gpm.gainR},${gpm.gainB}`);
 
       // frameId：用于让“瓦片下载回包/缓存写入”与“当前 GPM”强绑定，避免错帧拉伸（尤其是 live 覆盖写 + 异步 fetch）
       const incomingFrameId = (typeof gpm.frameId === 'number' && isFinite(gpm.frameId)) ? gpm.frameId : null;
@@ -6335,6 +6356,9 @@ export default {
       this.ImageCFA = gpm.cfa || 'null';
       this.ImageGainR = gpm.gainR || 1;
       this.ImageGainB = gpm.gainB || 1;
+      this.logMainCameraImagePipeLine('App.vue', 'handleTileGPM', 'ImageCFA', this.ImageCFA);
+      this.logMainCameraImagePipeLine('App.vue', 'handleTileGPM', 'ImageGainR', this.ImageGainR);
+      this.logMainCameraImagePipeLine('App.vue', 'handleTileGPM', 'ImageGainB', this.ImageGainB);
       this.saveAutoWhiteBalanceGains(this.ImageGainR, this.ImageGainB);
       this.updateMainCameraWhiteBalanceConfig(this.ImageGainR, this.ImageGainB);
       
@@ -6512,6 +6536,8 @@ export default {
           this.autoStretchBlackLevel = gpm.blackLevel;
           this.autoStretchWhiteLevel = gpm.whiteLevel;
           console.log(`[TileMode-GPM] 保存初始自动拉伸参数: black=${this.autoStretchBlackLevel}, white=${this.autoStretchWhiteLevel}`);
+          this.logMainCameraImagePipeLine('App.vue', 'handleTileGPM', 'autoStretchBlackLevel', this.autoStretchBlackLevel);
+          this.logMainCameraImagePipeLine('App.vue', 'handleTileGPM', 'autoStretchWhiteLevel', this.autoStretchWhiteLevel);
         }
         
         this.$bus.$emit('ChangeDialPosition', gpm.blackLevel, gpm.whiteLevel);
@@ -6551,6 +6577,36 @@ export default {
         blackLevel: Number.isFinite(sourceGpm.blackLevel) ? sourceGpm.blackLevel : 0,
         whiteLevel: Number.isFinite(sourceGpm.whiteLevel) ? sourceGpm.whiteLevel : 65535,
       };
+    },
+
+    getCurrentTileZoomCap() {
+      if (!this.isFocuserPanelVisible) return null;
+      const cap = Number(this.focuserPanelTileZoomCap);
+      if (!Number.isFinite(cap)) return 2;
+      return Math.max(0, Math.floor(cap));
+    },
+
+    getEffectiveRequestedTileMaxZ(gpm = this.tileGPM) {
+      const imageMeta = gpm || this.tileGPM;
+      const maxZ = Math.max(0, Number(imageMeta && imageMeta.maxZoomLevel) || 0);
+      const cap = this.getCurrentTileZoomCap();
+      if (cap == null) return maxZ;
+      return Math.max(0, Math.min(maxZ, cap));
+    },
+
+    handleFocuserPanelVisibilityChanged(visible) {
+      const nextVisible = !!visible;
+      if (this.isFocuserPanelVisible === nextVisible) return;
+      this.isFocuserPanelVisible = nextVisible;
+
+      if (!this.tileGPM) return;
+
+      // 对焦面板显隐会改变允许请求的最高瓦片层级。
+      // 这里强制清空一次合成缓冲，避免旧的高精/低精层残留在画面上。
+      this.tileCanvasNeedsClear = true;
+      this.tileForceFullRender = true;
+      this.scheduleVisibleAreaToBackend(true);
+      this.loadVisibleTiles();
     },
 
     /**
@@ -6761,8 +6817,8 @@ export default {
       if (!this.tileGPM) return [];
 
       const gpm = this.tileGPM;
-      const currentZ = this.calculateTileLevel(this.scale, gpm.maxZoomLevel);
-      const requestMaxZ = gpm.maxZoomLevel;
+      const requestMaxZ = this.getEffectiveRequestedTileMaxZ(gpm);
+      const currentZ = Math.min(this.calculateTileLevel(this.scale, gpm.maxZoomLevel), requestMaxZ);
       const buildMode = this.normalizeTileBuildModeValue(gpm.buildMode);
       const visibleRect = this.getCurrentVisibleRect();
       if (!visibleRect) return [];
@@ -6851,7 +6907,7 @@ export default {
       const tiles = this.calculateVisibleTiles();
       const gpm = this.tileGPM;
       const buildMode = this.normalizeTileBuildModeValue(gpm.buildMode);
-      const currentZ = this.calculateTileLevel(this.scale, gpm.maxZoomLevel);
+      const currentZ = Math.min(this.calculateTileLevel(this.scale, gpm.maxZoomLevel), this.getEffectiveRequestedTileMaxZ(gpm));
       const batchId = ++this.tileLoadBatchSeq;
       this.activeTileLoadBatchId = batchId;
       this.tileAllowIncrementalRender = true;
@@ -7456,8 +7512,23 @@ export default {
         if (isColorCamera) {
           // applyStretchAndGain() 期望 analysis.whiteBalance.gainR/gainB
           const analysis = { whiteBalance: { gainR: params.gainR, gainB: params.gainB } };
+          this.logMainCameraImagePipeLine('App.vue', 'processTile', 'tileColorParams', {
+            cfa: params.cfa,
+            blackLevel: params.blackLevel,
+            whiteLevel: params.whiteLevel,
+            gainR: params.gainR,
+            gainB: params.gainB,
+            width,
+            height,
+          });
           resultImg = this.applyStretchAndGain(mat, analysis, 'bayer', params.cfa, params.blackLevel, params.whiteLevel);
         } else {
+          this.logMainCameraImagePipeLine('App.vue', 'processTile', 'tileGrayParams', {
+            blackLevel: params.blackLevel,
+            whiteLevel: params.whiteLevel,
+            width,
+            height,
+          });
           resultImg = this.applyStretchAndGain(mat, {
             gainR: 1,
             gainB: 1,
@@ -7790,7 +7861,9 @@ export default {
       const x = Number.isFinite(this.visibleX) ? this.visibleX.toFixed(2) : 'nan';
       const y = Number.isFinite(this.visibleY) ? this.visibleY.toFixed(2) : 'nan';
       const s = Number.isFinite(this.scale) ? this.scale.toFixed(4) : 'nan';
-      return `${framePart}|${x}|${y}|${s}`;
+      const zCap = this.getCurrentTileZoomCap();
+      const zCapPart = (zCap == null) ? 'default' : String(zCap);
+      return `${framePart}|${x}|${y}|${s}|${zCapPart}`;
     },
 
     flushVisibleAreaToBackend() {
@@ -7802,7 +7875,10 @@ export default {
         return;
       }
       this.lastVisibleAreaMessageKey = messageKey;
-      if (this.tileFrameId != null) {
+      const zCap = this.getCurrentTileZoomCap();
+      if (this.tileFrameId != null && zCap != null) {
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'sendVisibleArea:' + this.visibleX + ':' + this.visibleY + ':' + this.scale + ':' + this.tileFrameId + ':' + zCap);
+      } else if (this.tileFrameId != null) {
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'sendVisibleArea:' + this.visibleX + ':' + this.visibleY + ':' + this.scale + ':' + this.tileFrameId);
       } else {
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'sendVisibleArea:' + this.visibleX + ':' + this.visibleY + ':' + this.scale);
@@ -8546,6 +8622,11 @@ export default {
       // 计算转换比例和偏移
       const scale = 255.0 / (whiteLevel - blackLevel);
       const offset = -blackLevel * scale;
+      this.logMainCameraImagePipeLine('App.vue', 'applyStretchAndGain', 'imageType', imageType);
+      this.logMainCameraImagePipeLine('App.vue', 'applyStretchAndGain', 'bayerPattern', bayerPattern);
+      this.logMainCameraImagePipeLine('App.vue', 'applyStretchAndGain', 'blackLevel', blackLevel);
+      this.logMainCameraImagePipeLine('App.vue', 'applyStretchAndGain', 'whiteLevel', whiteLevel);
+      this.logMainCameraImagePipeLine('App.vue', 'applyStretchAndGain', 'scaleOffset', `${scale},${offset}`);
 
       if (imageType === 'gray') {
         // 单色相机 - 一步转换到8位RGBA
@@ -8564,6 +8645,8 @@ export default {
           gainR = analysis.whiteBalance.gainR;
           gainB = analysis.whiteBalance.gainB;
         }
+        this.logMainCameraImagePipeLine('App.vue', 'applyStretchAndGain', 'gainR', gainR);
+        this.logMainCameraImagePipeLine('App.vue', 'applyStretchAndGain', 'gainB', gainB);
 
         // 使用LUT优化白平衡和拉伸
         // 1. 创建三个LUT表
@@ -9188,6 +9271,7 @@ export default {
 
     applyHistStretch(Min, Max) {
       console.log(`[applyHistStretch] 应用直方图拉伸: Min=${Min}, Max=${Max}`);
+      this.logMainCameraImagePipeLine('App.vue', 'applyHistStretch', 'requestMinMax', `${Min},${Max}`);
       
       // -1, -1 表示自动拉伸模式：使用初始保存的黑白点参数
       if (Min === -1 && Max === -1) {
@@ -9213,6 +9297,7 @@ export default {
             this.currentHistogramMax = this.autoStretchWhiteLevel;
             this.tileGPM.blackLevel = this.autoStretchBlackLevel;
             this.tileGPM.whiteLevel = this.autoStretchWhiteLevel;
+            this.logMainCameraImagePipeLine('App.vue', 'applyHistStretch', 'autoStretchApplied', `${this.autoStretchBlackLevel},${this.autoStretchWhiteLevel}`);
             
             this.SendConsoleLogMsg(`应用自动拉伸: black=${this.autoStretchBlackLevel}, white=${this.autoStretchWhiteLevel}`, 'info');
             
@@ -9243,6 +9328,7 @@ export default {
         this.SendConsoleLogMsg(`[瓦片模式] 更新直方图参数: blackLevel=${Min}, whiteLevel=${Max}`, 'info');
         this.tileGPM.blackLevel = Min;
         this.tileGPM.whiteLevel = Max;
+        this.logMainCameraImagePipeLine('App.vue', 'applyHistStretch', 'manualStretchApplied', `${Min},${Max}`);
         console.log('[applyHistStretch] 触发瓦片重新加载');
         this.reloadTilesWithNewParams();
       } else {
@@ -12738,6 +12824,7 @@ export default {
   // 在组件销毁时移除
     beforeDestroy() {
     this.stopTileReadyFallbackPolling();
+    this.$bus.$off('FocuserPanelVisibilityChanged', this.handleFocuserPanelVisibilityChanged);
     document.removeEventListener('touchstart', this.preventDefault);
     document.removeEventListener('touchmove', this.preventDefault);
     document.removeEventListener('touchend', this.preventDefault);

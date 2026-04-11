@@ -7,6 +7,7 @@ FRONTEND_DIR="${REPO_ROOT}/apps/web-frontend"
 FRONTEND_ENGINE_DIR="${FRONTEND_DIR}/src/assets/js"
 LOCAL_NODE_PATH="${LOCAL_NODE_PATH:-/usr/bin:${PATH}}"
 WEBPACK_NODE_OPTIONS="${WEBPACK_NODE_OPTIONS:---openssl-legacy-provider}"
+BUILD_VERSION="${BUILD_VERSION:-${VUE_APP_VERSION:-$(date +%Y%m%d%H%M)}}"
 
 INCLUDE_SKYDATA=0
 INSTALL_MODE="auto"
@@ -89,6 +90,8 @@ if [[ ! -d "${FRONTEND_DIR}" ]]; then
   exit 1
 fi
 
+echo "Using frontend build version: ${BUILD_VERSION}"
+
 if [[ "${ENGINE_UPDATE}" -eq 1 ]]; then
   require_cmd emcc
   require_cmd scons
@@ -146,6 +149,8 @@ fi
   env \
     PATH="${LOCAL_NODE_PATH}" \
     NODE_OPTIONS="${WEBPACK_NODE_OPTIONS}" \
+    BUILD_VERSION="${BUILD_VERSION}" \
+    VUE_APP_VERSION="${BUILD_VERSION}" \
     SWE_COPY_SKYDATA="${INCLUDE_SKYDATA}" \
     npm run build
 )
