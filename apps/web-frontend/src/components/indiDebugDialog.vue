@@ -359,7 +359,7 @@ export default {
   margin: 0;   /* 去掉外边距 */
   line-height: 0.1;  /* 设置适当的行间距（小于默认值） */
   scroll-behavior: smooth;
-  font-family: 'Droid Sans Mono', 'monospace', monospace;
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   user-select: none;
   overflow-x: auto; /* 允许水平滚动 */
 }
@@ -386,7 +386,7 @@ export default {
   border-radius: 6px;
   outline: none;
   font-size: 13px;
-  font-family: 'Droid Sans Mono', 'monospace', monospace;
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
 .keyword-input::placeholder {
