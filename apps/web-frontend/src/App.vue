@@ -336,7 +336,22 @@
                   + '-select-'
                   + index
                 "
-              />
+              >
+                <template v-slot:selection="{ item: option }">
+                  <span :style="getConfigSelectOptionStyle(item, option)">
+                    {{ formatConfigSelectOptionText(option) }}
+                  </span>
+                </template>
+                <template v-slot:item="{ item: option, on, attrs }">
+                  <v-list-item v-on="on" v-bind="attrs">
+                    <v-list-item-content>
+                      <v-list-item-title :style="getConfigSelectOptionStyle(item, option)">
+                        {{ formatConfigSelectOptionText(option) }}
+                      </v-list-item-title>
+                    </v-list-item-content>
+                  </v-list-item>
+                </template>
+              </v-select>
 
               <!-- 开关类型 -->
               <v-switch
@@ -1219,6 +1234,8 @@ export default {
       ImageOffset: 0,
 
       ImageCFA: 'BG',
+      mainCameraDetectedCfa: 'null',
+      mainCameraCfaSource: 'SAVED',
 
       cameraBin: 1,   // 当前相机binning
 
@@ -4006,6 +4023,16 @@ export default {
                 }
                 break;
 
+              case 'MainCameraCFASource':
+                if (parts.length === 2) {
+                  const source = String(parts[1] || '').trim();
+                  this.mainCameraCfaSource = source || 'SAVED';
+                  if (source === 'SDK' || source === 'INDI') {
+                    this.mainCameraDetectedCfa = this.normalizeCfaPattern(this.ImageCFA);
+                  }
+                }
+                break;
+
               case 'CameraNotIdle':
                 this.callShowMessageBox('Camera is not idle', 'error');
                 this.$bus.$emit('MountOperationComplete', 'solve');
@@ -5463,6 +5490,38 @@ export default {
         return 'null';
       }
       return normalized;
+    },
+
+    formatConfigSelectOptionText(option) {
+      if (option && typeof option === 'object') {
+        if (option.label != null) return option.label;
+        if (option.text != null) return option.text;
+        if (option.value != null) return option.value;
+      }
+      return option == null ? '' : String(option);
+    },
+
+    getConfigSelectOptionValue(item, option) {
+      if (item && item.driverType === 'MainCamera' && item.label === 'ImageCFA') {
+        const rawValue = option && typeof option === 'object' && option.value != null ? option.value : option;
+        return this.normalizeCfaPattern(rawValue);
+      }
+      return option && typeof option === 'object' && option.value != null ? option.value : option;
+    },
+
+    isDeviceDerivedMainCameraCfaOption(item, option) {
+      if (!item || item.driverType !== 'MainCamera' || item.label !== 'ImageCFA') return false;
+      if (!(this.mainCameraCfaSource === 'SDK' || this.mainCameraCfaSource === 'INDI')) return false;
+      const optionValue = this.getConfigSelectOptionValue(item, option);
+      const deviceValue = this.normalizeCfaPattern(this.mainCameraDetectedCfa);
+      return deviceValue !== 'null' && optionValue === deviceValue;
+    },
+
+    getConfigSelectOptionStyle(item, option) {
+      if (this.isDeviceDerivedMainCameraCfaOption(item, option)) {
+        return { color: '#ffd54f' };
+      }
+      return {};
     },
 
     getBayerTopLeftColorName(pattern) {

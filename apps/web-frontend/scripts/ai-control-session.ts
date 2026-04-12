@@ -44,6 +44,16 @@ const SESSION_PAGE_INIT_TIMEOUT_MS = Number(process.env.E2E_AI_CONTROL_PAGE_INIT
 const SESSION_MIN_TEST_TIMEOUT_MS = 5 * 60_000
 
 type CliFlowParams = Record<string, unknown>
+type UnifiedLogEntry = {
+  sequence?: number | null
+  source?: string
+  level?: string
+  message?: string
+  timestamp?: string | null
+  deviceType?: string | null
+  operationKey?: string | null
+  rawMessage?: string | null
+}
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -76,6 +86,59 @@ function readBody(req: http.IncomingMessage): Promise<string> {
 function sendJson(res: http.ServerResponse, status: number, body: object) {
   res.writeHead(status, { 'Content-Type': 'application/json' })
   res.end(JSON.stringify(body))
+}
+
+function parsePositiveInt(value: string | null, fallback: number, max: number) {
+  const n = Number(value)
+  if (!Number.isFinite(n) || n <= 0) return fallback
+  return Math.min(Math.floor(n), max)
+}
+
+function parseCsvParam(value: string | null) {
+  if (!value) return []
+  return value
+    .split(',')
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean)
+}
+
+function textMatchesAll(text: string, tokens: string[]) {
+  if (tokens.length === 0) return true
+  const source = text.toLowerCase()
+  return tokens.every((token) => source.includes(token))
+}
+
+function logMatchesFilters(
+  entry: UnifiedLogEntry,
+  filters: {
+    sources: string[]
+    levels: string[]
+    deviceTypes: string[]
+    keywords: string[]
+    sessionId: string | null
+    frameId: string | null
+    sinceSeq: number | null
+    sinceTs: number | null
+  },
+) {
+  const sequence = Number(entry.sequence)
+  const source = String(entry.source ?? '').toLowerCase()
+  const level = String(entry.level ?? '').toLowerCase()
+  const deviceType = String(entry.deviceType ?? '').toLowerCase()
+  const message = String(entry.message ?? '')
+  const rawMessage = String(entry.rawMessage ?? '')
+  const haystack = `${message}\n${rawMessage}`.toLowerCase()
+  const timestampMs = entry.timestamp ? Date.parse(entry.timestamp) : NaN
+
+  if (filters.sinceSeq != null && (!Number.isFinite(sequence) || sequence <= filters.sinceSeq)) return false
+  if (filters.sinceTs != null && (!Number.isFinite(timestampMs) || timestampMs <= filters.sinceTs)) return false
+  if (filters.sources.length > 0 && !filters.sources.includes(source)) return false
+  if (filters.levels.length > 0 && !filters.levels.includes(level)) return false
+  if (filters.deviceTypes.length > 0 && !filters.deviceTypes.includes(deviceType)) return false
+  if (!textMatchesAll(haystack, filters.keywords)) return false
+  if (filters.sessionId && !haystack.includes(filters.sessionId.toLowerCase())) return false
+  if (filters.frameId && !haystack.includes(filters.frameId.toLowerCase())) return false
+  return true
 }
 
 /** 检测本机 host:port 是否已有进程在监听（临时 bind 探测）。 */
@@ -286,6 +349,20 @@ async function main() {
     await next
   }
 
+  async function getStatusSnapshot() {
+    const { evaluatePageStatus } = await import('../AI-Control/status/pageStatus')
+    return runQueue.then(() => evaluatePageStatus(page))
+  }
+
+  async function getRuntimeSnapshot() {
+    return runQueue.then(() =>
+      page.evaluate(() => {
+        const win = window as typeof window & { __QUARCS_UNIFIED_RUNTIME__?: unknown }
+        return win.__QUARCS_UNIFIED_RUNTIME__ || null
+      }),
+    )
+  }
+
   // HTTP 服务：供 MCP/AI 在同一页上执行命令
   const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && (req.url === '/' || req.url === '/health')) {
@@ -296,10 +373,9 @@ async function main() {
     // GET /status：通过 page.evaluate 读取当前页面状态；可选 ?command=xxx 规划命令步骤
     if (req.method === 'GET' && req.url?.startsWith('/status')) {
       try {
-        const { evaluatePageStatus } = await import('../AI-Control/status/pageStatus')
         const { getFlowCallsByCommand, CLI_COMMANDS } = await import('../AI-Control/scenario/cliFlows')
 
-        const status = await runQueue.then(() => evaluatePageStatus(page))
+        const status = await getStatusSnapshot()
         if (!status) {
           sendJson(res, 500, { ok: false, error: 'evaluatePageStatus 返回空，无法获取页面状态' })
           return
@@ -357,8 +433,96 @@ async function main() {
       return
     }
 
+    // GET /logs：读取统一运行时日志，并支持基础过滤，便于终端/MCP 闭环调试
+    if (req.method === 'GET' && req.url?.startsWith('/logs')) {
+      try {
+        const url = new URL(req.url, 'http://localhost')
+        const limit = parsePositiveInt(url.searchParams.get('limit'), 200, 500)
+        const sources = parseCsvParam(url.searchParams.get('source'))
+        const levels = parseCsvParam(url.searchParams.get('level'))
+        const deviceTypes = parseCsvParam(url.searchParams.get('deviceType'))
+        const keywords = parseCsvParam(url.searchParams.get('keyword'))
+        const sessionId = url.searchParams.get('sessionId')?.trim() || null
+        const frameId = url.searchParams.get('frameId')?.trim() || null
+        const sinceSeqRaw = url.searchParams.get('sinceSeq')
+        const sinceSeq = sinceSeqRaw != null && sinceSeqRaw !== ''
+          ? Math.max(0, Math.floor(Number(sinceSeqRaw)))
+          : null
+        const sinceTsRaw = url.searchParams.get('sinceTs')?.trim() || null
+        const parsedSinceTs = sinceTsRaw ? Date.parse(sinceTsRaw) : NaN
+        const sinceTs = Number.isFinite(parsedSinceTs) ? parsedSinceTs : null
+        const includeStatus = !['0', 'false', 'off', 'no'].includes(
+          (url.searchParams.get('includeStatus') || 'true').trim().toLowerCase(),
+        )
+
+        const [status, runtime] = await Promise.all([
+          includeStatus ? getStatusSnapshot() : Promise.resolve(null),
+          getRuntimeSnapshot(),
+        ])
+
+        const rawLogs = Array.isArray((runtime as Record<string, unknown> | null)?.logs)
+          ? ((runtime as Record<string, unknown>).logs as UnifiedLogEntry[])
+          : []
+
+        const filteredLogs = rawLogs
+          .filter((entry) =>
+            logMatchesFilters(entry, {
+              sources,
+              levels,
+              deviceTypes,
+              keywords,
+              sessionId,
+              frameId,
+              sinceSeq: Number.isFinite(sinceSeq) ? sinceSeq : null,
+              sinceTs,
+            }),
+          )
+          .slice(0, limit)
+
+        sendJson(res, 200, {
+          ok: true,
+          filters: {
+            source: sources,
+            level: levels,
+            deviceType: deviceTypes,
+            keyword: keywords,
+            sessionId,
+            frameId,
+            sinceSeq: Number.isFinite(sinceSeq) ? sinceSeq : null,
+            sinceTs: sinceTs != null ? new Date(sinceTs).toISOString() : null,
+            limit,
+            includeStatus,
+          },
+          totalLogsInBuffer: rawLogs.length,
+          matchedCount: filteredLogs.length,
+          capture: status
+            ? {
+                state: status.capture.state,
+                e2eExposureCompletedSeq: status.capture.e2eExposureCompletedSeq,
+                e2eTileGpmSeq: status.capture.e2eTileGpmSeq,
+                tileGenerationComplete: status.capture.tileGenerationComplete,
+                tileDownloadComplete: status.capture.tileDownloadComplete,
+                requiredTileCount: status.capture.requiredTileCount,
+                downloadedTileCount: status.capture.downloadedTileCount,
+                requiredTileKeys: status.capture.requiredTileKeys,
+                downloadedTileKeys: status.capture.downloadedTileKeys,
+              }
+            : null,
+          websocketState:
+            runtime && typeof (runtime as Record<string, unknown>).websocketState === 'string'
+              ? (runtime as Record<string, unknown>).websocketState
+              : 'unknown',
+          logs: filteredLogs,
+        })
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        sendJson(res, 500, { ok: false, error: message })
+      }
+      return
+    }
+
     if (req.method !== 'POST' || req.url !== '/run') {
-      sendJson(res, 404, { ok: false, error: 'GET /status or POST /run only' })
+      sendJson(res, 404, { ok: false, error: 'GET /status, GET /logs or POST /run only' })
       return
     }
     let body: { commandName?: string; flowParams?: CliFlowParams; runTimeoutMs?: number }
@@ -403,6 +567,7 @@ async function main() {
   console.log('Session HTTP server: http://127.0.0.1:' + sessionPort)
   console.log('  GET /status        - 读取当前页面状态')
   console.log('  GET /status?command=xxx - 状态 + 命令执行步骤规划')
+  console.log('  GET /logs          - 读取并过滤统一运行时日志')
   console.log('  POST /run          - 执行命令')
 
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout })

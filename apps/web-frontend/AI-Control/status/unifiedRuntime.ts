@@ -1,6 +1,7 @@
 export type UnifiedOperationStatus = 'idle' | 'running' | 'waiting' | 'succeeded' | 'failed' | 'cancelled' | 'unknown'
 
 export interface UnifiedLogEntry {
+  sequence?: number | null
   source: 'client' | 'server' | string
   level: string
   message: string
@@ -51,6 +52,7 @@ function normalizeLogEntry(raw: unknown): UnifiedLogEntry | null {
   if (!raw || typeof raw !== 'object') return null
   const entry = raw as Record<string, unknown>
   return {
+    sequence: typeof entry.sequence === 'number' && Number.isFinite(entry.sequence) ? entry.sequence : null,
     source: String(entry.source ?? 'server'),
     level: String(entry.level ?? 'info'),
     message: String(entry.message ?? ''),
