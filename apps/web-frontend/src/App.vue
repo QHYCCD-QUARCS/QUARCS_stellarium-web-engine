@@ -1153,6 +1153,9 @@ export default {
         { driverType: 'MainCamera', label: 'ImageCFA', value: 'null', inputType: 'select', selectValue: ['GR', 'GB', 'BG', 'RGGB', 'null'] },
         { driverType: 'MainCamera', label: 'ImageGainR', value: 1, inputType: 'number', min: 0.01, max: 3, step: 0.001, colorOnly: true },
         { driverType: 'MainCamera', label: 'ImageGainB', value: 1, inputType: 'number', min: 0.01, max: 3, step: 0.001, colorOnly: true },
+        { driverType: 'MainCamera', label: 'RefGainR', value: 1, inputType: 'tip', colorOnly: true },
+        { driverType: 'MainCamera', label: 'RefGainB', value: 1, inputType: 'tip', colorOnly: true },
+        { driverType: 'MainCamera', label: 'ApplyRefWhiteBalance', inputType: 'button', buttonText: 'ApplyRefWhiteBalance', colorOnly: true },
         { driverType: 'MainCamera', label: 'ROICalcMode', value: 'full', inputType: 'select', selectValue: ['full', 'roi'] },
         // 硬件处理参数
         // { driverType: 'MainCamera', label: 'Binning', value: '', inputType: 'slider', inputMin: 1, inputMax: 16, inputStep: 1 },
@@ -1224,12 +1227,14 @@ export default {
       histogram_max: 255,  // 直方图自动拉伸的最大值
 
       currentHistogramMin: 0,
-      currentHistogramMax: 255,
+      currentHistogramMax: 65535,
 
       ImageGainR: 1,
       ImageGainB: 1,
-      autoWhiteBalanceGainR: 1,
-      autoWhiteBalanceGainB: 1,
+      postGainR: 1,
+      postGainB: 1,
+      RefGainR: 1,
+      RefGainB: 1,
 
       ImageOffset: 0,
 
@@ -1337,8 +1342,8 @@ export default {
       lastVisibleAreaMessageKey: '', // 最近一次已发送的可视区消息快照，避免同值重复发送
       currentVisibleTiles: null,  // 当前可见的瓦片集合 Set<"z/x/y">
       tileHistogram: null,        // 当前会话直方图 { sessionId, bins, total, counts }
-      autoStretchBlackLevel: null, // 保存初始自动拉伸的黑点参数
-      autoStretchWhiteLevel: null, // 保存初始自动拉伸的白点参数
+      autoStretchBlackLevel: null, // 保存最近一次前端自动拉伸的黑点参数
+      autoStretchWhiteLevel: null, // 保存最近一次前端自动拉伸的白点参数
       // Live 模式 TileGPM 节流：避免高帧率下每条 TileGPM 都清缓存/abort，导致“永远拉不齐一帧”
       liveTileGpmThrottleMs: 250,   // 建议 200~400ms（对应 5~2.5fps）
       liveTileGpmLastHandledAt: 0,
@@ -1511,7 +1516,8 @@ export default {
       progressDescription: '', // 控制进度条显示内容
 
       calculateGain: true, // 控制是否计算白平衡增益
-      autoWhiteBalanceEnabled: true, // 彩色图像绘制时默认自动更新白平衡；手动修改增益后关闭
+      autoWhiteBalanceEnabled: false, // AW 长按点亮时自动进一步白平衡
+      autoHistogramEnabled: false, // A 长按点亮时自动拉伸
       lutCache: {
         lastParams: null, // 用于存储上次的参数
         lutR: null,
@@ -1597,8 +1603,14 @@ export default {
     this.$bus.$on('GetCurrentConnectedDevices', this.ReturnCurrentConnectedDevices);
     this.$bus.$on('CurrentCFWList', this.CurrentCFWList);
     this.$bus.$on('calcWhiteBalanceGains', this.calcWhiteBalanceGains);
+    this.$bus.$on('toggleAutoWhiteBalance', this.toggleAutoWhiteBalance);
     this.$bus.$on('RequestAutoWhiteBalanceState', () => {
       this.$bus.$emit('AutoWhiteBalanceState', !!this.autoWhiteBalanceEnabled);
+    });
+    this.$bus.$on('autoHistogram', this.autoHistogramOnce);
+    this.$bus.$on('toggleAutoHistogram', this.toggleAutoHistogram);
+    this.$bus.$on('RequestAutoHistogramState', () => {
+      this.$bus.$emit('AutoHistogramState', !!this.autoHistogramEnabled);
     });
     this.$bus.$on('SwitchOutPutPower', this.SwitchOutPutPower);
     this.$bus.$on('PolarAxisMode', this.PolarAxisMode);
@@ -1715,6 +1727,11 @@ export default {
       this.autoWhiteBalanceEnabled = normalized;
       this.$bus.$emit('AutoWhiteBalanceState', normalized);
     },
+    setAutoHistogramEnabled(enabled) {
+      const normalized = !!enabled;
+      this.autoHistogramEnabled = normalized;
+      this.$bus.$emit('AutoHistogramState', normalized);
+    },
     updateMainCameraWhiteBalanceConfig(gainR, gainB) {
       const GainRIndex = this.MainCameraConfigItems.findIndex(item => item.label === 'ImageGainR');
       if (GainRIndex !== -1) {
@@ -1725,32 +1742,218 @@ export default {
         this.MainCameraConfigItems[GainBIndex].value = gainB;
       }
     },
-    saveAutoWhiteBalanceGains(gainR, gainB) {
-      if (!Number.isFinite(gainR) || !Number.isFinite(gainB)) return;
-      this.autoWhiteBalanceGainR = gainR;
-      this.autoWhiteBalanceGainB = gainB;
-      this.logMainCameraImagePipeLine('App.vue', 'saveAutoWhiteBalanceGains', 'autoWhiteBalanceGainR', gainR);
-      this.logMainCameraImagePipeLine('App.vue', 'saveAutoWhiteBalanceGains', 'autoWhiteBalanceGainB', gainB);
-    },
-    applyStoredAutoWhiteBalance(options = {}) {
-      const { reprocess = true } = options;
-      const gainR = Number.isFinite(this.autoWhiteBalanceGainR) ? this.autoWhiteBalanceGainR : 1;
-      const gainB = Number.isFinite(this.autoWhiteBalanceGainB) ? this.autoWhiteBalanceGainB : 1;
-
-      this.ImageGainR = gainR;
-      this.ImageGainB = gainB;
-      this.updateMainCameraWhiteBalanceConfig(gainR, gainB);
-
-      if (this.tileGPM) {
-        const gainsChanged = this.tileGPM.gainR !== gainR || this.tileGPM.gainB !== gainB;
-        this.tileGPM.gainR = gainR;
-        this.tileGPM.gainB = gainB;
-        if (reprocess && gainsChanged) {
-          this.reprocessTilesWithNewGains();
-        }
-      } else if (reprocess && this.ImageArrayBuffer && this.ImageArrayBuffer.byteLength > 0) {
-        this.processImage(this.ImageArrayBuffer, this.currentHistogramMin, this.currentHistogramMax, { calculateHistogram: false });
+    updateReferenceWhiteBalanceConfig() {
+      const refGainRIndex = this.MainCameraConfigItems.findIndex(item => item.label === 'RefGainR');
+      if (refGainRIndex !== -1) {
+        this.MainCameraConfigItems[refGainRIndex].value = Number.isFinite(this.RefGainR) ? this.RefGainR.toFixed(3) : '1.000';
       }
+      const refGainBIndex = this.MainCameraConfigItems.findIndex(item => item.label === 'RefGainB');
+      if (refGainBIndex !== -1) {
+        this.MainCameraConfigItems[refGainBIndex].value = Number.isFinite(this.RefGainB) ? this.RefGainB.toFixed(3) : '1.000';
+      }
+    },
+    getPreWhiteBalanceGains() {
+      return {
+        gainR: Number.isFinite(this.ImageGainR) ? this.ImageGainR : 1,
+        gainB: Number.isFinite(this.ImageGainB) ? this.ImageGainB : 1,
+      };
+    },
+    getPostWhiteBalanceGains() {
+      return {
+        gainR: Number.isFinite(this.postGainR) ? this.postGainR : 1,
+        gainB: Number.isFinite(this.postGainB) ? this.postGainB : 1,
+      };
+    },
+    getFinalWhiteBalanceGains() {
+      const pre = this.getPreWhiteBalanceGains();
+      const post = this.getPostWhiteBalanceGains();
+      return {
+        gainR: Math.min(3, Math.max(0.01, pre.gainR * post.gainR)),
+        gainB: Math.min(3, Math.max(0.01, pre.gainB * post.gainB)),
+      };
+    },
+    setPostWhiteBalanceGains(gainR, gainB, options = {}) {
+      const { reprocess = true, updateReference = true } = options;
+      this.postGainR = Number.isFinite(gainR) ? gainR : 1;
+      this.postGainB = Number.isFinite(gainB) ? gainB : 1;
+      if (updateReference) {
+        const finalGains = this.getFinalWhiteBalanceGains();
+        this.RefGainR = finalGains.gainR;
+        this.RefGainB = finalGains.gainB;
+        this.updateReferenceWhiteBalanceConfig();
+      }
+      if (reprocess) {
+        this.reprocessTilesWithNewGains();
+      }
+    },
+    resetPostWhiteBalance(options = {}) {
+      this.setPostWhiteBalanceGains(1, 1, options);
+    },
+    applyReferenceWhiteBalance() {
+      if (!Number.isFinite(this.RefGainR) || !Number.isFinite(this.RefGainB)) {
+        this.SendConsoleLogMsg('没有可用的参考白平衡参数', 'warning');
+        return;
+      }
+      this.ImageGainR = this.RefGainR;
+      this.ImageGainB = this.RefGainB;
+      this.updateMainCameraWhiteBalanceConfig(this.ImageGainR, this.ImageGainB);
+      this.sendMessage('Vue_Command', 'ImageGainR:' + this.ImageGainR);
+      this.sendMessage('Vue_Command', 'ImageGainB:' + this.ImageGainB);
+      this.resetPostWhiteBalance({ reprocess: false, updateReference: false });
+      this.RefGainR = this.ImageGainR;
+      this.RefGainB = this.ImageGainB;
+      this.updateReferenceWhiteBalanceConfig();
+      this.reprocessTilesWithNewGains();
+      this.SendConsoleLogMsg(`已将参考白平衡固化为预白平衡: R=${this.ImageGainR.toFixed(3)}, B=${this.ImageGainB.toFixed(3)}`, 'success');
+    },
+    async ensureZ0TileRawData(options = {}) {
+      const sessionId = options.sessionId || this.tileSessionId;
+      const frameId = options.frameId != null ? options.frameId : this.tileFrameId;
+      const key = '0/0/0';
+      if (!sessionId) return null;
+      if (this.tileRawDataCache && this.tileRawDataCache.has(key)) {
+        return this.tileRawDataCache.get(key);
+      }
+      const base = (process.env.BASE_URL || '/').replace(/\/?$/, '/');
+      const frameQ = (frameId != null) ? `?f=${encodeURIComponent(String(frameId))}` : '';
+      const url = `${base}${this.TILE_PATH_SUFFIX}/${sessionId}/0/0/0.bin${frameQ}`;
+      const response = await fetch(url, { cache: 'no-store' });
+      if (!response.ok) {
+        throw new Error(`Failed to load Z=0 tile: ${response.status}`);
+      }
+      const buffer = await response.arrayBuffer();
+      const tileData = this.parseTileData(buffer);
+      if (!tileData) {
+        throw new Error('Invalid Z=0 tile payload');
+      }
+      if (sessionId !== this.tileSessionId || frameId !== this.tileFrameId) {
+        return null;
+      }
+      if (!this.tileRawDataCache) {
+        this.tileRawDataCache = new Map();
+      }
+      this.tileRawDataCache.set(key, tileData);
+      return tileData;
+    },
+    async withZ0Mat(taskName, runner) {
+      if (!this.tileGPM) {
+        this.SendConsoleLogMsg(`${taskName}: 当前没有可用图像`, 'warning');
+        return null;
+      }
+      const tileData = await this.ensureZ0TileRawData();
+      if (!tileData) return null;
+      const mat = new cv.Mat(tileData.height, tileData.width, cv.CV_16UC1);
+      try {
+        mat.data16U.set(tileData.data);
+        return await runner(mat, tileData);
+      } finally {
+        mat.delete();
+      }
+    },
+    async computeAutoWhiteBalanceFromZ0() {
+      return this.withZ0Mat('AW', async (mat) => {
+        const cfa = this.normalizeCfaPattern(this.tileGPM && this.tileGPM.cfa ? this.tileGPM.cfa : this.ImageCFA);
+        if (!cfa || cfa === 'null') {
+          this.SendConsoleLogMsg('当前图像不是彩色 Bayer 图，无法执行进一步白平衡', 'warning');
+          return null;
+        }
+        const result = this.analyzeImageStatistics(mat, 'bayer', cfa, { calculateGain: true, calculateHistogram: false });
+        if (!result || !result.whiteBalance) {
+          this.SendConsoleLogMsg('无法从 Z=0 计算进一步白平衡', 'warning');
+          return null;
+        }
+        const pre = this.getPreWhiteBalanceGains();
+        const totalR = Number.isFinite(result.whiteBalance.gainR) ? result.whiteBalance.gainR : 1;
+        const totalB = Number.isFinite(result.whiteBalance.gainB) ? result.whiteBalance.gainB : 1;
+        const postGainR = Math.min(3, Math.max(0.01, totalR / Math.max(pre.gainR, 0.01)));
+        const postGainB = Math.min(3, Math.max(0.01, totalB / Math.max(pre.gainB, 0.01)));
+        return {
+          postGainR,
+          postGainB,
+          refGainR: Math.min(3, Math.max(0.01, pre.gainR * postGainR)),
+          refGainB: Math.min(3, Math.max(0.01, pre.gainB * postGainB)),
+        };
+      });
+    },
+    async computeAutoHistogramFromZ0() {
+      return this.withZ0Mat('A', async (mat) => {
+        return this.GetAutoStretch(mat, 0);
+      });
+    },
+    async runAutoWhiteBalanceOnce(options = {}) {
+      const gains = await this.computeAutoWhiteBalanceFromZ0();
+      if (!gains) return false;
+      this.setPostWhiteBalanceGains(gains.postGainR, gains.postGainB, { reprocess: true, updateReference: false });
+      this.RefGainR = gains.refGainR;
+      this.RefGainB = gains.refGainB;
+      this.updateReferenceWhiteBalanceConfig();
+      if (options.enablePersistent === true) {
+        this.setAutoWhiteBalanceEnabled(true);
+      }
+      this.SendConsoleLogMsg(`进一步白平衡完成: postR=${gains.postGainR.toFixed(3)}, postB=${gains.postGainB.toFixed(3)}`, 'success');
+      return true;
+    },
+    async runAutoHistogramOnce(options = {}) {
+      const stretch = await this.computeAutoHistogramFromZ0();
+      if (!stretch) return false;
+      this.autoStretchBlackLevel = stretch.blackLevel;
+      this.autoStretchWhiteLevel = stretch.whiteLevel;
+      this.currentHistogramMin = stretch.blackLevel;
+      this.currentHistogramMax = stretch.whiteLevel;
+      if (this.showEffectiveRange !== true) {
+        this.$bus.$emit('HistogramRangeMode', true);
+      }
+      this.$bus.$emit('ChangeDialPosition', stretch.blackLevel, stretch.whiteLevel);
+      this.$bus.$emit('AutoHistogramNum', stretch.blackLevel, stretch.whiteLevel);
+      this.reloadTilesWithNewParams();
+      if (options.enablePersistent === true) {
+        this.setAutoHistogramEnabled(true);
+      }
+      this.SendConsoleLogMsg(`自动拉伸完成: black=${stretch.blackLevel}, white=${stretch.whiteLevel}`, 'success');
+      return true;
+    },
+    async applyFrameAutoOptimizations() {
+      if (!this.tileGPM) return;
+      if (this.autoWhiteBalanceEnabled) {
+        await this.runAutoWhiteBalanceOnce();
+      }
+      if (this.autoHistogramEnabled) {
+        await this.runAutoHistogramOnce();
+      }
+    },
+    async toggleAutoWhiteBalance() {
+      if (this.autoWhiteBalanceEnabled) {
+        this.setAutoWhiteBalanceEnabled(false);
+        this.resetPostWhiteBalance({ reprocess: true, updateReference: false });
+        this.RefGainR = this.ImageGainR;
+        this.RefGainB = this.ImageGainB;
+        this.updateReferenceWhiteBalanceConfig();
+        this.SendConsoleLogMsg('已关闭自动进一步白平衡', 'info');
+        return;
+      }
+      const ok = await this.runAutoWhiteBalanceOnce({ enablePersistent: true });
+      if (ok) {
+        this.SendConsoleLogMsg('已开启自动进一步白平衡', 'info');
+      }
+    },
+    async toggleAutoHistogram() {
+      if (this.autoHistogramEnabled) {
+        this.setAutoHistogramEnabled(false);
+        this.currentHistogramMin = 0;
+        this.currentHistogramMax = 65535;
+        this.$bus.$emit('ChangeDialPosition', this.currentHistogramMin, this.currentHistogramMax);
+        this.$bus.$emit('AutoHistogramNum', this.currentHistogramMin, this.currentHistogramMax);
+        this.reloadTilesWithNewParams();
+        this.SendConsoleLogMsg('已关闭自动拉伸', 'info');
+        return;
+      }
+      const ok = await this.runAutoHistogramOnce({ enablePersistent: true });
+      if (ok) {
+        this.SendConsoleLogMsg('已开启自动拉伸', 'info');
+      }
+    },
+    async autoHistogramOnce() {
+      await this.runAutoHistogramOnce();
     },
     // =========================
     // MainCamera / Guider 模式联动与锁定逻辑
@@ -1871,6 +2074,10 @@ export default {
       if (this.isCurrentDeviceUnbound) return;
       if (item && item.driverType === 'CFW' && item.isCfwMenuControl) {
         this.handleCfwMenuButtonClick(item);
+        return;
+      }
+      if (item && item.label === 'ApplyRefWhiteBalance') {
+        this.handleConfigChange(item.label, true, item.driverType);
         return;
       }
       // 禁用按钮
@@ -2619,15 +2826,7 @@ export default {
                 // 白平衡增益计算结果
                 // 格式: WhiteBalanceGains:{gainR}:{gainB}
                 if (parts.length >= 3) {
-                  const gainR = parseFloat(parts[1]);
-                  const gainB = parseFloat(parts[2]);
-                  
-                  console.log(`[WhiteBalanceGains] 收到白平衡增益: R=${gainR}, B=${gainB}`);
-                  this.SendConsoleLogMsg(`白平衡计算完成: R增益=${gainR.toFixed(3)}, B增益=${gainB.toFixed(3)}`, 'info');
-                  this.saveAutoWhiteBalanceGains(gainR, gainB);
-                  if (this.autoWhiteBalanceEnabled) {
-                    this.applyStoredAutoWhiteBalance({ reprocess: true });
-                  }
+                  this.SendConsoleLogMsg('忽略后端 WhiteBalanceGains：自动白平衡改由前端基于 Z=0 计算', 'warning');
                 }
                 break;
 
@@ -5382,16 +5581,8 @@ export default {
         if (counts && counts.length > 0) {
           this.$bus.$emit('showHistogram', counts);
           
-          // 如果有对应的GPM数据，同步更新拉伸参数
-          if (this.tileGPM && this.tileGPM.sessionId === sessionId) {
-            const blackLevel = this.tileGPM.blackLevel;
-            const whiteLevel = this.tileGPM.whiteLevel;
-            console.log(`[TileMode] 同步直方图参数: blackLevel=${blackLevel}, whiteLevel=${whiteLevel}`);
-            this.$bus.$emit('ChangeDialPosition', blackLevel, whiteLevel);
-            this.$bus.$emit('AutoHistogramNum', blackLevel, whiteLevel);
-          } else {
-            console.log('[TileMode] 直方图数据已加载，但GPM数据尚未到达，等待GPM数据同步');
-          }
+          this.$bus.$emit('ChangeDialPosition', this.currentHistogramMin, this.currentHistogramMax);
+          this.$bus.$emit('AutoHistogramNum', this.currentHistogramMin, this.currentHistogramMax);
         }
         
       } catch (error) {
@@ -5409,25 +5600,17 @@ export default {
         this.ImageGainR = doubleValue;
         this.SendConsoleLogMsg('ImageGainR is set to:' + doubleValue, 'info');
         this.sendMessage('Vue_Command', 'ImageGainR:' + doubleValue);
-        
-        // 同步更新瓦片GPM参数（不重新下载瓦片，只重新处理显示）
-        if (this.tileGPM) {
-          this.SendConsoleLogMsg(`更新瓦片ImageGainR参数: ${doubleValue}`, 'info');
-          this.tileGPM.gainR = doubleValue;
-          this.reprocessTilesWithNewGains();
-        }
+        this.RefGainR = this.getFinalWhiteBalanceGains().gainR;
+        this.updateReferenceWhiteBalanceConfig();
+        this.reprocessTilesWithNewGains();
       } else if (signal === 'ImageGainB') {
         // 处理 ImageGainB 信号
         this.ImageGainB = doubleValue;
         this.SendConsoleLogMsg('ImageGainB is set to:' + doubleValue, 'info');
         this.sendMessage('Vue_Command', 'ImageGainB:' + doubleValue);
-        
-        // 同步更新瓦片GPM参数（不重新下载瓦片，只重新处理显示）
-        if (this.tileGPM) {
-          this.SendConsoleLogMsg(`更新瓦片ImageGainB参数: ${doubleValue}`, 'info');
-          this.tileGPM.gainB = doubleValue;
-          this.reprocessTilesWithNewGains();
-        }
+        this.RefGainB = this.getFinalWhiteBalanceGains().gainB;
+        this.updateReferenceWhiteBalanceConfig();
+        this.reprocessTilesWithNewGains();
       }
     },
 
@@ -6387,7 +6570,7 @@ export default {
       // live 覆盖写帧节流：高帧率下若每条 TileGPM 都立即清缓存/abort，会导致前端持续“重启加载”，
       // 表现为跳帧、卡顿、瓦片大量失败、缩放后长时间不刷新。
       // 策略：仅对“同 session 下确实切到新 frame”的 live 覆盖写做节流。
-      // 对同一 frame 的 refined GPM（补发更精确 black/white）不应清缓存/abort。
+      // 对同一 frame 的重复 TileGPM 元数据更新不应清缓存/abort。
       const isLiveOverwriteFrame = (!isNewSession) && isLiveSession && !isSameFrameUpdate;
       if (isLiveOverwriteFrame) {
         const now = Date.now();
@@ -6436,13 +6619,7 @@ export default {
       this.showImageSizeX = gpm.imageWidth;
       this.showImageSizeY = gpm.imageHeight;
       this.ImageCFA = gpm.cfa || 'null';
-      this.ImageGainR = gpm.gainR || 1;
-      this.ImageGainB = gpm.gainB || 1;
       this.logMainCameraImagePipeLine('App.vue', 'handleTileGPM', 'ImageCFA', this.ImageCFA);
-      this.logMainCameraImagePipeLine('App.vue', 'handleTileGPM', 'ImageGainR', this.ImageGainR);
-      this.logMainCameraImagePipeLine('App.vue', 'handleTileGPM', 'ImageGainB', this.ImageGainB);
-      this.saveAutoWhiteBalanceGains(this.ImageGainR, this.ImageGainB);
-      this.updateMainCameraWhiteBalanceConfig(this.ImageGainR, this.ImageGainB);
       
       // 确保Map/Set已初始化
       if (!this.tileCache) {
@@ -6606,27 +6783,8 @@ export default {
       // 推送一次当前瓦片层级信息到 GUI（用于显示合并等级/分辨率）
       this.emitTileLevelInfo();
 
-      // 如果后端提供了黑白点，优先同步到直方图面板（复用既有绘制/拨盘逻辑）
-      if (Number.isFinite(gpm.blackLevel) && Number.isFinite(gpm.whiteLevel)) {
-        console.log(`[TileMode-GPM] 设置直方图区间参数: blackLevel=${gpm.blackLevel}, whiteLevel=${gpm.whiteLevel}`);
-        
-        // 保存“自动拉伸基准参数”：
-        // - 非 live 会话：仅在新会话/首次设置时保存（用于“恢复到本会话的自动拉伸”）
-        // - live 覆盖写帧：每帧都会产生新的推荐黑白点；若不刷新，则“自动拉伸”会一直恢复到旧帧参数，表现为用上一帧/更早的拉伸数据
-        const isLiveSession = (String(gpm.sessionId) === 'live');
-        if (isNewSession || this.autoStretchBlackLevel === null || this.autoStretchWhiteLevel === null || isLiveSession) {
-          this.autoStretchBlackLevel = gpm.blackLevel;
-          this.autoStretchWhiteLevel = gpm.whiteLevel;
-          console.log(`[TileMode-GPM] 保存初始自动拉伸参数: black=${this.autoStretchBlackLevel}, white=${this.autoStretchWhiteLevel}`);
-          this.logMainCameraImagePipeLine('App.vue', 'handleTileGPM', 'autoStretchBlackLevel', this.autoStretchBlackLevel);
-          this.logMainCameraImagePipeLine('App.vue', 'handleTileGPM', 'autoStretchWhiteLevel', this.autoStretchWhiteLevel);
-        }
-        
-        this.$bus.$emit('ChangeDialPosition', gpm.blackLevel, gpm.whiteLevel);
-        this.$bus.$emit('AutoHistogramNum', gpm.blackLevel, gpm.whiteLevel);
-      } else {
-        console.log('[TileMode-GPM] GPM未包含有效的黑白点参数');
-      }
+      this.$bus.$emit('ChangeDialPosition', this.currentHistogramMin, this.currentHistogramMax);
+      this.$bus.$emit('AutoHistogramNum', this.currentHistogramMin, this.currentHistogramMax);
       
       // 关键约束：
       // - 收到 TileGPM 只表示“本帧元数据已更新”，不表示瓦片已经允许下载
@@ -6637,6 +6795,7 @@ export default {
       } else {
         this.renderTiles();
       }
+      await this.applyFrameAutoOptimizations();
       this.ensureTileReadyFallbackPolling();
     },
 
@@ -6652,12 +6811,13 @@ export default {
 
     getTileRenderParamsSnapshot(sourceGpm = this.tileGPM) {
       if (!sourceGpm) return null;
+      const finalGains = this.getFinalWhiteBalanceGains();
       return {
         cfa: sourceGpm.cfa || 'null',
-        gainR: Number.isFinite(sourceGpm.gainR) ? sourceGpm.gainR : 1,
-        gainB: Number.isFinite(sourceGpm.gainB) ? sourceGpm.gainB : 1,
-        blackLevel: Number.isFinite(sourceGpm.blackLevel) ? sourceGpm.blackLevel : 0,
-        whiteLevel: Number.isFinite(sourceGpm.whiteLevel) ? sourceGpm.whiteLevel : 65535,
+        gainR: finalGains.gainR,
+        gainB: finalGains.gainB,
+        blackLevel: Number.isFinite(this.currentHistogramMin) ? this.currentHistogramMin : 0,
+        whiteLevel: Number.isFinite(this.currentHistogramMax) ? this.currentHistogramMax : 65535,
       };
     },
 
@@ -8119,8 +8279,7 @@ export default {
           isColorCamera = false;
         }
         console.log("当前拍摄参数:isColorCamera:", isColorCamera, "CFA:", CFA);
-        // 计算直方图；白平衡增益统一使用后端下发并缓存的值
-        const shouldAutoWhiteBalance = isColorCamera && this.autoWhiteBalanceEnabled;
+        const finalGains = this.getFinalWhiteBalanceGains();
 
         const analysis = await processAsync(() => {
           const result = isColorCamera
@@ -8128,11 +8287,9 @@ export default {
             : this.analyzeImageStatistics(mat, 'gray', { calculateGain: false, calculateHistogram: calculateHistogram });
 
           if (isColorCamera) {
-            const gainR = shouldAutoWhiteBalance ? this.autoWhiteBalanceGainR : this.ImageGainR;
-            const gainB = shouldAutoWhiteBalance ? this.autoWhiteBalanceGainB : this.ImageGainB;
             result.whiteBalance = {
-              gainR: Number.isFinite(gainR) ? gainR : 1,
-              gainB: Number.isFinite(gainB) ? gainB : 1,
+              gainR: Number.isFinite(finalGains.gainR) ? finalGains.gainR : 1,
+              gainB: Number.isFinite(finalGains.gainB) ? finalGains.gainB : 1,
             };
           }
 
@@ -8160,13 +8317,6 @@ export default {
           isColorCamera: isColorCamera,
         };
 
-        if (isColorCamera && analysis && analysis.whiteBalance) {
-          const gainR = analysis.whiteBalance.gainR;
-          const gainB = analysis.whiteBalance.gainB;
-          this.ImageGainR = gainR;
-          this.ImageGainB = gainB;
-          this.updateMainCameraWhiteBalanceConfig(gainR, gainB);
-        }
         this.calculateGain = false;
 
         // 使用增益和拉伸，并转化为8位图像
@@ -9376,59 +9526,16 @@ export default {
       
       // -1, -1 表示自动拉伸模式：使用初始保存的黑白点参数
       if (Min === -1 && Max === -1) {
-        console.log('[applyHistStretch] 自动拉伸模式：恢复到初始自动计算的黑白点');
-        if (this.tileGPM) {
-          // 检查是否有保存的初始自动拉伸参数
-          if (Number.isFinite(this.autoStretchBlackLevel) && Number.isFinite(this.autoStretchWhiteLevel) &&
-              this.autoStretchBlackLevel >= 0 && this.autoStretchWhiteLevel > this.autoStretchBlackLevel) {
-            console.log(`[applyHistStretch] 使用保存的初始自动拉伸参数: black=${this.autoStretchBlackLevel}, white=${this.autoStretchWhiteLevel}`);
-            
-            // 检查当前参数是否已经是初始参数，避免不必要的重新加载
-            if (this.tileGPM.blackLevel === this.autoStretchBlackLevel && 
-                this.tileGPM.whiteLevel === this.autoStretchWhiteLevel) {
-              console.log('[applyHistStretch] 当前已是自动拉伸参数，无需重新加载');
-              this.SendConsoleLogMsg('已处于自动拉伸状态', 'info');
-              // 更新拨盘位置
-              this.$bus.$emit('ChangeDialPosition', this.autoStretchBlackLevel, this.autoStretchWhiteLevel);
-              return;
-            }
-            
-            // 恢复到初始的自动拉伸参数
-            this.currentHistogramMin = this.autoStretchBlackLevel;
-            this.currentHistogramMax = this.autoStretchWhiteLevel;
-            this.tileGPM.blackLevel = this.autoStretchBlackLevel;
-            this.tileGPM.whiteLevel = this.autoStretchWhiteLevel;
-            this.logMainCameraImagePipeLine('App.vue', 'applyHistStretch', 'autoStretchApplied', `${this.autoStretchBlackLevel},${this.autoStretchWhiteLevel}`);
-            
-            this.SendConsoleLogMsg(`应用自动拉伸: black=${this.autoStretchBlackLevel}, white=${this.autoStretchWhiteLevel}`, 'info');
-            
-            // 更新拨盘位置
-            this.$bus.$emit('ChangeDialPosition', this.autoStretchBlackLevel, this.autoStretchWhiteLevel);
-            
-            // 重新加载瓦片以应用新参数
-            console.log('[applyHistStretch] 触发瓦片重新加载');
-            this.reloadTilesWithNewParams();
-            return;
-          } else {
-            console.log('[applyHistStretch] 没有保存的初始自动拉伸参数');
-            this.SendConsoleLogMsg('没有可用的自动拉伸参数', 'warning');
-            return;
-          }
-        } else {
-          console.log('[applyHistStretch] 瓦片模式未初始化，跳过自动拉伸');
-          return;
-        }
+        this.autoHistogramOnce();
+        return;
       }
       
       // 手动设置的拉伸参数
       this.currentHistogramMin = Min;
       this.currentHistogramMax = Max;
       
-      // 更新瓦片GPM参数并重新加载瓦片（完全使用瓦片模式）
       if (this.tileGPM) {
         this.SendConsoleLogMsg(`[瓦片模式] 更新直方图参数: blackLevel=${Min}, whiteLevel=${Max}`, 'info');
-        this.tileGPM.blackLevel = Min;
-        this.tileGPM.whiteLevel = Max;
         this.logMainCameraImagePipeLine('App.vue', 'applyHistStretch', 'manualStretchApplied', `${Min},${Max}`);
         console.log('[applyHistStretch] 触发瓦片重新加载');
         this.reloadTilesWithNewParams();
@@ -9443,19 +9550,7 @@ export default {
 
 
     calcWhiteBalanceGains() {
-      console.log('[calcWhiteBalanceGains] 应用已保存的自动白平衡增益');
-      this.setAutoWhiteBalanceEnabled(true);
-
-      if (!Number.isFinite(this.autoWhiteBalanceGainR) || !Number.isFinite(this.autoWhiteBalanceGainB)) {
-        this.SendConsoleLogMsg('没有可用的自动白平衡缓存值，无法应用', 'warning');
-        return;
-      }
-
-      this.applyStoredAutoWhiteBalance({ reprocess: true });
-      this.SendConsoleLogMsg(
-        `已应用自动白平衡缓存值: R=${this.autoWhiteBalanceGainR.toFixed(3)}, B=${this.autoWhiteBalanceGainB.toFixed(3)}`,
-        'info'
-      );
+      this.runAutoWhiteBalanceOnce();
     },
 
 
@@ -12147,14 +12242,15 @@ export default {
             let roiCfaSource = 'message';
             if (this.tileGPM) {
               const gpm = this.tileGPM;
+              const renderParams = this.getTileRenderParamsSnapshot(gpm);
               effectiveRoiCfa = this.normalizeCfaPattern(roiCfa || gpm.cfa);
               roiCfaSource = roiCfa ? 'message' : 'tileGPM';
               const isColorCamera = effectiveRoiCfa && effectiveRoiCfa !== '' && effectiveRoiCfa !== 'null';
               if (isColorCamera) {
-                const analysis = { whiteBalance: { gainR: gpm.gainR ?? 1, gainB: gpm.gainB ?? 1 } };
-                targetImg8 = this.applyStretchAndGain(src, analysis, 'bayer', effectiveRoiCfa, gpm.blackLevel, gpm.whiteLevel);
+                const analysis = { whiteBalance: { gainR: renderParams.gainR, gainB: renderParams.gainB } };
+                targetImg8 = this.applyStretchAndGain(src, analysis, 'bayer', effectiveRoiCfa, renderParams.blackLevel, renderParams.whiteLevel);
               } else {
-                targetImg8 = this.applyStretchAndGain(src, { gainR: 1, gainB: 1, offset: 0 }, 'gray', effectiveRoiCfa, gpm.blackLevel, gpm.whiteLevel);
+                targetImg8 = this.applyStretchAndGain(src, { gainR: 1, gainB: 1, offset: 0 }, 'gray', effectiveRoiCfa, renderParams.blackLevel, renderParams.whiteLevel);
               }
             } else {
               effectiveRoiCfa = this.normalizeCfaPattern(roiCfa || this.lastImageProcessParams.CFA);
@@ -12321,10 +12417,12 @@ export default {
           }
           if (parameter === 'ImageGainR') {
             this.ImageGainR = parseFloat(parameters[parameter]);
-            this.saveAutoWhiteBalanceGains(this.ImageGainR, this.autoWhiteBalanceGainB);
+            this.RefGainR = this.getFinalWhiteBalanceGains().gainR;
+            this.updateReferenceWhiteBalanceConfig();
           } else if (parameter === 'ImageGainB') {
             this.ImageGainB = parseFloat(parameters[parameter]);
-            this.saveAutoWhiteBalanceGains(this.autoWhiteBalanceGainR, this.ImageGainB);
+            this.RefGainB = this.getFinalWhiteBalanceGains().gainB;
+            this.updateReferenceWhiteBalanceConfig();
           }
         } else {
           if (parameter == 'RedBoxSize') {
@@ -12413,8 +12511,9 @@ export default {
         } else if (label === 'ImageCFA') {
           this.ImageCFASet(value);
         } else if (label === 'ImageGainR' || label === 'ImageGainB') {
-          this.setAutoWhiteBalanceEnabled(false);
           this.ImageGainSet(`${label}:${parseFloat(value)}`);
+        } else if (label === 'ApplyRefWhiteBalance') {
+          this.applyReferenceWhiteBalance();
         } else if (label === 'ROICalcMode') {
           const mode = String(value || 'full').toLowerCase();
           this.sendMessage('Vue_Command', 'ROICalcMode:' + (mode === 'roi' ? 'roi' : 'full'));

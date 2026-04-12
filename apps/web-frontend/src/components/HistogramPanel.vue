@@ -16,10 +16,15 @@
     <DialKnob class="dial-knob" data-testid="hp-dial-knob"/>
     <div class="buttons-container" data-testid="hp-buttons-container">
       <button
-        @click.stop.prevent="calcWhiteBalanceGains"
+        @mousedown.stop.prevent="beginButtonPress('whiteBalance')"
+        @mouseup.stop.prevent="endButtonPress('whiteBalance')"
+        @mouseleave.stop.prevent="cancelButtonPress('whiteBalance')"
+        @touchstart.stop.prevent="beginButtonPress('whiteBalance')"
+        @touchend.stop.prevent="endButtonPress('whiteBalance')"
+        @touchcancel.stop.prevent="cancelButtonPress('whiteBalance')"
         class="get-click btn-Reset btn-WhiteBalance"
         :class="{ 'active-white-balance': autoWhiteBalanceEnabled }"
-        :title="autoWhiteBalanceEnabled ? '自动白平衡已启用' : '自动白平衡已关闭'"
+        :title="autoWhiteBalanceEnabled ? '长按已启用持续进一步白平衡，短按可执行一次' : '短按执行一次进一步白平衡，长按切换持续模式'"
         :data-state="autoWhiteBalanceEnabled ? 'enabled' : 'disabled'"
         data-testid="hp-btn-white-balance"
       >
@@ -28,7 +33,19 @@
         </div>
       </button>
 
-      <button @click.stop.prevent="AutoHistogram" class="get-click btn-Auto" data-testid="hp-btn-auto"><v-icon data-testid="hp-icon-auto">mdi-alpha-a-circle-outline</v-icon></button>
+      <button
+        @mousedown.stop.prevent="beginButtonPress('autoHistogram')"
+        @mouseup.stop.prevent="endButtonPress('autoHistogram')"
+        @mouseleave.stop.prevent="cancelButtonPress('autoHistogram')"
+        @touchstart.stop.prevent="beginButtonPress('autoHistogram')"
+        @touchend.stop.prevent="endButtonPress('autoHistogram')"
+        @touchcancel.stop.prevent="cancelButtonPress('autoHistogram')"
+        class="get-click btn-Auto"
+        :class="{ 'active-auto-histogram': autoHistogramEnabled }"
+        :title="autoHistogramEnabled ? '长按已启用持续自动拉伸，短按可执行一次' : '短按执行一次自动拉伸，长按切换持续模式'"
+        :data-state="autoHistogramEnabled ? 'enabled' : 'disabled'"
+        data-testid="hp-btn-auto"
+      ><v-icon data-testid="hp-icon-auto">mdi-alpha-a-circle-outline</v-icon></button>
 
       <button @click.stop.prevent="ResetHistogram" class="get-click btn-Reset" data-testid="hp-btn-reset">
         <div style="display: flex; justify-content: center; align-items: center;">
@@ -67,6 +84,12 @@ export default {
       // true：只绘制有效区间；false：绘制全局直方图
       showEffectiveRange: true,
       autoWhiteBalanceEnabled: false,
+      autoHistogramEnabled: false,
+      longPressThresholdMs: 500,
+      buttonPressState: {
+        whiteBalance: { timer: null, longPressTriggered: false },
+        autoHistogram: { timer: null, longPressTriggered: false },
+      },
     };
   },
   components: {
@@ -76,16 +99,21 @@ export default {
   created() {
     this.$bus.$on('AutoHistogramNum', this.setAutoHistogramNum);
     this.$bus.$on('AutoWhiteBalanceState', this.setAutoWhiteBalanceState);
+    this.$bus.$on('AutoHistogramState', this.setAutoHistogramState);
   },
   mounted() {
     this.updatePosition(); // 初始化位置
     window.addEventListener('resize', this.updatePosition);
     this.$bus.$emit('RequestAutoWhiteBalanceState');
+    this.$bus.$emit('RequestAutoHistogramState');
   },
   beforeDestroy() {
     window.removeEventListener('resize', this.updatePosition);
+    this.cancelButtonPress('whiteBalance');
+    this.cancelButtonPress('autoHistogram');
     this.$bus.$off('AutoHistogramNum', this.setAutoHistogramNum);
     this.$bus.$off('AutoWhiteBalanceState', this.setAutoWhiteBalanceState);
+    this.$bus.$off('AutoHistogramState', this.setAutoHistogramState);
   },
   methods: {
     logMainCameraImagePipeLine(functionName, variableName, value) {
@@ -109,15 +137,15 @@ export default {
       // console.log('Update new width:', newWidth);
       this.$bus.$emit('updateHistogramWidth', newWidth);
     },
-    AutoHistogram() {
-      console.log('[HistogramPanel] 触发自动拉伸模式（使用后端计算的黑白点）');
-      this.logMainCameraImagePipeLine('AutoHistogram', 'requestMinMax', '-1,-1');
+    runAutoHistogramOnce() {
+      console.log('[HistogramPanel] 触发前端自动拉伸');
+      this.logMainCameraImagePipeLine('AutoHistogram', 'requestMinMax', '-1,-1(frontend-z0)');
       // 自动拉伸通常配合“区间模式”观察有效范围
       if (!this.showEffectiveRange) {
         this.showEffectiveRange = true;
         this.$bus.$emit('HistogramRangeMode', true);
       }
-      this.$bus.$emit('HandleHistogramNum', -1, -1);
+      this.$bus.$emit('autoHistogram');
     },
     ResetHistogram() {
       console.log('[HistogramPanel] 重置直方图到全范围 [0, 65535]');
@@ -148,9 +176,47 @@ export default {
     setAutoWhiteBalanceState(enabled) {
       this.autoWhiteBalanceEnabled = !!enabled;
     },
-    calcWhiteBalanceGains() {
-      console.log('[HistogramPanel] 触发白平衡计算');
+    setAutoHistogramState(enabled) {
+      this.autoHistogramEnabled = !!enabled;
+    },
+    runWhiteBalanceOnce() {
+      console.log('[HistogramPanel] 触发进一步白平衡计算');
       this.$bus.$emit('calcWhiteBalanceGains');
+    },
+    beginButtonPress(action) {
+      const state = this.buttonPressState[action];
+      if (!state) return;
+      this.cancelButtonPress(action);
+      state.longPressTriggered = false;
+      state.timer = window.setTimeout(() => {
+        state.longPressTriggered = true;
+        if (action === 'whiteBalance') {
+          this.$bus.$emit('toggleAutoWhiteBalance');
+        } else if (action === 'autoHistogram') {
+          this.$bus.$emit('toggleAutoHistogram');
+        }
+      }, this.longPressThresholdMs);
+    },
+    endButtonPress(action) {
+      const state = this.buttonPressState[action];
+      if (!state) return;
+      const wasLongPress = !!state.longPressTriggered;
+      this.cancelButtonPress(action);
+      if (wasLongPress) return;
+      if (action === 'whiteBalance') {
+        this.runWhiteBalanceOnce();
+      } else if (action === 'autoHistogram') {
+        this.runAutoHistogramOnce();
+      }
+    },
+    cancelButtonPress(action) {
+      const state = this.buttonPressState[action];
+      if (!state) return;
+      if (state.timer) {
+        clearTimeout(state.timer);
+        state.timer = null;
+      }
+      state.longPressTriggered = false;
     },
   }
 }
@@ -272,6 +338,11 @@ export default {
 .btn-WhiteBalance.active-white-balance {
   background-color: rgba(76, 175, 80, 0.78);
   box-shadow: 0 0 10px rgba(76, 175, 80, 0.45);
+}
+
+.btn-Auto.active-auto-histogram {
+  background-color: rgba(255, 152, 0, 0.82);
+  box-shadow: 0 0 10px rgba(255, 152, 0, 0.45);
 }
 
 .btn-Auto:active,
