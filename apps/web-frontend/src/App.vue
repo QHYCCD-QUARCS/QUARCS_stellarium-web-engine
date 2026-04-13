@@ -6560,15 +6560,36 @@ export default {
       return false;
     },
 
+    getMissingVisibleTileKeys() {
+      if (!this.currentVisibleTiles || this.currentVisibleTiles.size === 0) return [];
+      const missing = [];
+      for (const key of this.currentVisibleTiles) {
+        const hasRaw = !!(this.tileRawDataCache && this.tileRawDataCache.has(key));
+        if (hasRaw) continue;
+        const pending = !!(this.tilePendingLoads && this.tilePendingLoads.has(key));
+        if (pending) continue;
+        const allowed = this.isTileKeyDownloadAllowed(key);
+        if (!allowed) {
+          missing.push(key);
+        }
+      }
+      return missing;
+    },
+
     requestCurrentTileBatchReady() {
       if (!this.tileGPM || !this.tileSessionId || this.tileFrameId == null) return;
       const sessionId = String(this.tileSessionId || '');
       const frameId = String(this.tileFrameId);
       if (!sessionId || !frameId) return;
+      const missingKeys = this.getMissingVisibleTileKeys();
+      if (missingKeys.length === 0) {
+        this.tileReadyPollInFlight = false;
+        return;
+      }
       this.tileReadyPollInFlight = true;
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', `queryTileBatchReady:${sessionId}:${frameId}`);
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', `queryTileBatchReady:${sessionId}:${frameId}:${missingKeys.join(',')}`);
       if (this.TILE_DEBUG) {
-        console.log('[TileBatchReadyPoll] request', { sessionId, frameId });
+        console.log('[TileBatchReadyPoll] request', { sessionId, frameId, missingCount: missingKeys.length, missingKeys });
       }
       setTimeout(() => {
         this.tileReadyPollInFlight = false;
@@ -8071,10 +8092,6 @@ export default {
             this.markTileDirty(key);
             const isMergedPreviewTile = key === '0/0/0';
             let shouldTriggerMergedDetailLoad = false;
-            if (isMergedPreviewTile && !this.tileMergedPreviewReady) {
-              this.tileMergedPreviewReady = true;
-              shouldTriggerMergedDetailLoad = true;
-            }
             if (this.TILE_DEBUG) {
               console.log('[Tile] loadSingleTile ok', { key, rawSize: `${tileData.width}x${tileData.height}`, outSize: `${processedTile.width}x${processedTile.height}` });
             }
@@ -8085,7 +8102,17 @@ export default {
               expectedFrameId === this.tileFrameId &&
               this.currentVisibleTiles &&
               this.currentVisibleTiles.has(key);
-            if (shouldPatchRender) {
+            if (isMergedPreviewTile &&
+                !this.tileMergedPreviewReady &&
+                expectedSessionId === this.tileSessionId &&
+                expectedFrameId === this.tileFrameId) {
+              // 关键：Z0 必须先真正画到屏幕上，再切到“高层局部瓦片渐进替换”模式。
+              // 否则 currentVisibleTiles 可能先移除 0/0/0，导致首图实际显示成局部块状补齐。
+              this.tileForceFullRender = true;
+              this.renderTiles();
+              this.tileMergedPreviewReady = true;
+              shouldTriggerMergedDetailLoad = true;
+            } else if (shouldPatchRender) {
               this.scheduleIncrementalTileRender();
             }
             if (shouldTriggerMergedDetailLoad &&
