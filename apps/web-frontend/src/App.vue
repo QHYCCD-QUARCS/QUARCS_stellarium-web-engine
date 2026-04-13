@@ -1302,6 +1302,7 @@ export default {
       tileGenerationComplete: false, // 后端当前帧“全部生成完成”标志
       tileGenerationCompleteReadyCount: 0, // 后端完成时已生成的瓦片数量
       tileDownloadComplete: false, // 前端当前视口所需瓦片“全部下载完成”标志
+      tileFullCacheComplete: false, // 前端当前帧是否已把后端声明的全部瓦片下载到本地 raw 缓存
       tileE2ERequiredKeys: '[]', // E2E: 当前视口需要下载的瓦片 key 列表（JSON 字符串）
       tileE2EDownloadedKeys: '[]', // E2E: 当前视口已下载完成的瓦片 key 列表（JSON 字符串）
       tileE2ERequiredTileCount: 0, // E2E: 当前视口需要下载的瓦片数量
@@ -6750,6 +6751,13 @@ export default {
 
       let complete = false;
       const visibleCount = this.currentVisibleTiles ? this.currentVisibleTiles.size : 0;
+      const totalRawCount = this.tileRawDataCache ? this.tileRawDataCache.size : 0;
+      const expectedReadyCount = Number(this.tileGenerationCompleteReadyCount) || 0;
+      const fullCacheComplete = !!(
+        this.tileGenerationComplete &&
+        expectedReadyCount > 0 &&
+        totalRawCount >= expectedReadyCount
+      );
 
       if (this.tileGPM && this.tileSessionId && this.tileFrameId != null && visibleCount > 0) {
         complete = true;
@@ -6769,15 +6777,58 @@ export default {
         }
       }
 
+      const fullCacheChanged = this.tileFullCacheComplete !== fullCacheComplete;
+      this.tileFullCacheComplete = fullCacheComplete;
       const changed = this.tileDownloadComplete !== complete;
       this.tileDownloadComplete = complete;
-      if (changed) {
+      if (changed || fullCacheChanged) {
         this.emitTileDebugLog('TileDownloadComplete', {
           complete,
           visibleCount,
-          generationComplete: this.tileGenerationComplete
+          generationComplete: this.tileGenerationComplete,
+          fullCacheComplete,
+          totalRawCount,
+          expectedReadyCount
         }, 'info', { force: true });
       }
+      if (fullCacheChanged && fullCacheComplete) {
+        this.tileForceFullRender = true;
+        this.loadVisibleTiles();
+      }
+      if (this.tileGPM) {
+        this.emitTileLevelInfo();
+      }
+    },
+
+    enqueueBackgroundTileDownloads() {
+      if (!this.tileGenerationComplete || !this.tileReadyKeys || this.tileReadyKeys.size === 0) return;
+      if (this.tileFullCacheComplete) return;
+
+      const queued = new Set(
+        (this.tileLoadQueue || []).map(t => `${t.z}/${t.x}/${t.y}`)
+      );
+      const backgroundTiles = [];
+      for (const key of this.tileReadyKeys) {
+        if (!key || queued.has(key)) continue;
+        if (this.tileRawDataCache && this.tileRawDataCache.has(key)) continue;
+        if (this.tilePendingLoads && this.tilePendingLoads.has(key)) continue;
+        const parts = key.split('/');
+        if (parts.length !== 3) continue;
+        const z = Number(parts[0]);
+        const x = Number(parts[1]);
+        const y = Number(parts[2]);
+        if (!Number.isFinite(z) || !Number.isFinite(x) || !Number.isFinite(y)) continue;
+        backgroundTiles.push({ z, x, y, priority: 100000 + z, prefetchAll: true });
+      }
+      if (backgroundTiles.length === 0) return;
+
+      this.tileLoadQueue.push(...backgroundTiles);
+      this.emitTileDebugLog('enqueueBackgroundTileDownloads', {
+        count: backgroundTiles.length,
+        readyCount: this.tileReadyKeys.size,
+        rawCount: this.tileRawDataCache ? this.tileRawDataCache.size : 0
+      });
+      this.processLoadQueue();
     },
 
     emitTileDebugLog(event, details = {}, type = 'info', options = {}) {
@@ -6848,6 +6899,7 @@ export default {
         this.loadVisibleTiles();
       }
       this.updateTileDownloadCompletionState();
+      this.enqueueBackgroundTileDownloads();
       if (this.tileGPM) {
         this.$nextTick(() => {
           this.ensureTileReadyFallbackPolling();
@@ -6876,6 +6928,7 @@ export default {
         readyCount: this.tileGenerationCompleteReadyCount
       }, 'info', { force: true });
       this.updateTileDownloadCompletionState();
+      this.enqueueBackgroundTileDownloads();
       this.$nextTick(() => {
         this.ensureTileReadyFallbackPolling();
       });
@@ -7072,6 +7125,7 @@ export default {
         this.tileGenerationComplete = false;
         this.tileGenerationCompleteReadyCount = 0;
         this.tileDownloadComplete = false;
+        this.tileFullCacheComplete = false;
         this.tileE2ERequiredKeys = '[]';
         this.tileE2EDownloadedKeys = '[]';
         this.tileE2ERequiredTileCount = 0;
@@ -7336,6 +7390,16 @@ export default {
       return Math.min(this.calculateTileLevel(this.scale, gpm.maxZoomLevel, gpm), requestMaxZ);
     },
 
+    getCurrentDisplayTileZ(gpmOverride = null) {
+      const gpm = gpmOverride || this.tileGPM;
+      if (!gpm) return 0;
+      const requestMaxZ = this.getEffectiveRequestedTileMaxZ(gpm);
+      if (this.tileFullCacheComplete) {
+        return Math.max(0, requestMaxZ);
+      }
+      return this.getCurrentTargetTileZ(gpm);
+    },
+
     /**
      * 向 GUI 广播瓦片会话信息（含原图尺寸，供左上角显示）
      * - enabled=false：非瓦片模式（或瓦片元数据未就绪）
@@ -7348,10 +7412,26 @@ export default {
         return;
       }
       const maxZoomLevel = Number(gpm.maxZoomLevel);
-      const z = this.calculateTileLevel(this.scale, maxZoomLevel, gpm);
+      const z = this.getCurrentDisplayTileZ(gpm);
       const levelScale = Math.pow(2, maxZoomLevel - z);
       const levelWidth = Math.ceil(Number(gpm.imageWidth) / levelScale);
       const levelHeight = Math.ceil(Number(gpm.imageHeight) / levelScale);
+      const tileSize = Math.max(1, Number(gpm.tileSize) || 512);
+      const totalTilesX = Math.ceil(levelWidth / tileSize);
+      const totalTilesY = Math.ceil(levelHeight / tileSize);
+      const totalTileCount = Math.max(0, totalTilesX * totalTilesY);
+      let downloadedTileCount = 0;
+      if (this.tileRawDataCache && this.tileRawDataCache.size > 0) {
+        const prefix = `${z}/`;
+        for (const key of this.tileRawDataCache.keys()) {
+          if (typeof key === 'string' && key.startsWith(prefix)) {
+            downloadedTileCount++;
+          }
+        }
+      }
+      const progressPercent = totalTileCount > 0
+        ? Math.max(0, Math.min(100, (downloadedTileCount / totalTileCount) * 100))
+        : 0;
 
       // 记忆当前层级（供下一次拍摄复用；仅当 maxZoomLevel 相同才会恢复）
       this.preferredTileZ = z;
@@ -7366,6 +7446,10 @@ export default {
         levelScale,
         levelWidth,
         levelHeight,
+        levelTileCount: totalTileCount,
+        levelDownloadedTileCount: downloadedTileCount,
+        levelProgressPercent: progressPercent,
+        fullCacheComplete: !!this.tileFullCacheComplete,
         imageWidth: Number(gpm.imageWidth),
         imageHeight: Number(gpm.imageHeight),
         tileRasterScale: Number(this.tileRasterScale) > 0 ? Number(this.tileRasterScale) : 1,
@@ -7521,8 +7605,13 @@ export default {
             Math.max(0, currentZ - 1),
             currentZ,
           ])).sort((a, b) => a - b);
+      const fullyLocalHighResMode = !!this.tileFullCacheComplete;
+      const localOnlyZ = Math.max(0, requestMaxZ);
+      const effectiveRequestLevels = fullyLocalHighResMode
+        ? [localOnlyZ]
+        : requestLevels;
 
-      for (const z of requestLevels) {
+      for (const z of effectiveRequestLevels) {
         const useFullImage = (z === 0) || forceFullImageForCappedMode;
         const levelTiles = this.calculateVisibleTilesForLevel(
           z,
@@ -7544,7 +7633,8 @@ export default {
           currentZ,
           requestMaxZ,
           buildMode,
-          levels: requestLevels.join(','),
+          levels: effectiveRequestLevels.join(','),
+          fullyLocalHighResMode,
           count: tiles.length,
           sample: sample.join(', ') + more
         });
@@ -7600,7 +7690,7 @@ export default {
       });
       const batchId = ++this.tileLoadBatchSeq;
       this.activeTileLoadBatchId = batchId;
-      this.tileAllowIncrementalRender = true;
+      this.tileAllowIncrementalRender = false;
       this.resetIncrementalTileRenderBuffer();
 
       // 更新当前可见瓦片集合
@@ -7726,17 +7816,15 @@ export default {
       
       // 将瓦片添加到加载队列（插入到队列前面）
       this.tileLoadQueue.unshift(...tilesToLoad);
-      
-      // 先用已缓存的低层/高层瓦片立即重绘一遍，再等待后续下载逐步覆盖
-      this.renderTiles();
 
       // 开始处理加载队列
       this.processLoadQueue();
-
-      // 若当前批次没有新下载任务，主动触发一次收敛渲染，避免仅依赖异步补绘。
-      if (tilesToLoad.length === 0 && batchId === this.activeTileLoadBatchId) {
-        this.renderTiles();
+      const presentationKeys = Array.from(newVisibleTiles);
+      await this.waitForVisibleTilesReady(batchId, presentationKeys);
+      if (batchId !== this.activeTileLoadBatchId) {
+        return;
       }
+      this.commitVisibleTilePresentation(batchId, presentationKeys);
       this.emitCaptureTrace('frontend_load_visible_tiles_queued', {
         sessionId: this.tileSessionId,
         frameId: this.tileFrameId,
@@ -7815,7 +7903,7 @@ export default {
         if ((this.tileRawDataCache && this.tileRawDataCache.has(key)) ||
             (this.tileCache && this.tileCache.has(key)) ||
             this.tilePendingLoads.has(key) ||
-            !this.currentVisibleTiles.has(key) ||
+            (!tile.prefetchAll && !this.currentVisibleTiles.has(key)) ||
             !this.isTileKeyDownloadAllowed(key)) {
           continue;
         }
@@ -7973,6 +8061,83 @@ export default {
         }
       }
       return false;
+    },
+
+    hasCompleteVisibleTileCache(keys = null) {
+      const targetKeys = keys
+        || ((this.currentVisibleTiles && this.currentVisibleTiles.size > 0)
+          ? Array.from(this.currentVisibleTiles)
+          : []);
+      if (!targetKeys || targetKeys.length === 0) return false;
+      for (const key of targetKeys) {
+        const cached = this.tileCache && this.tileCache.get(key);
+        if (!(cached && cached.renderSource && cached.width && cached.height)) {
+          return false;
+        }
+      }
+      return true;
+    },
+
+    async waitForVisibleTilesReady(batchId, keys = null) {
+      const targetKeys = keys
+        || ((this.currentVisibleTiles && this.currentVisibleTiles.size > 0)
+          ? Array.from(this.currentVisibleTiles)
+          : []);
+      if (!targetKeys || targetKeys.length === 0) return false;
+      const maxWaitMs = Math.max(0, Number(this.tileBatchMaxWaitMs) || 0);
+      const deadline = Date.now() + maxWaitMs;
+
+      while (batchId === this.activeTileLoadBatchId) {
+        if (this.hasCompleteVisibleTileCache(targetKeys)) {
+          return true;
+        }
+        const remainingMs = deadline - Date.now();
+        if (remainingMs <= 0) {
+          return false;
+        }
+
+        const pendingWaiters = [];
+        let hasBlockedMissing = false;
+        for (const key of targetKeys) {
+          const cached = this.tileCache && this.tileCache.get(key);
+          if (cached && cached.renderSource && cached.width && cached.height) continue;
+          if (this.tilePendingLoads && this.tilePendingLoads.has(key)) {
+            pendingWaiters.push(this.waitForTileSettled(key));
+          } else {
+            hasBlockedMissing = true;
+          }
+        }
+
+        if (hasBlockedMissing && !this.tileReadyPollInFlight) {
+          this.requestCurrentTileBatchReady();
+        }
+
+        const waitMs = Math.max(16, Math.min(remainingMs, 120));
+        if (pendingWaiters.length > 0) {
+          await Promise.race([
+            Promise.allSettled(pendingWaiters),
+            new Promise(resolve => setTimeout(resolve, waitMs))
+          ]);
+        } else {
+          await new Promise(resolve => setTimeout(resolve, waitMs));
+        }
+      }
+
+      return false;
+    },
+
+    commitVisibleTilePresentation(batchId = this.activeTileLoadBatchId, keys = null) {
+      if (batchId !== this.activeTileLoadBatchId) return false;
+      const targetKeys = keys
+        || ((this.currentVisibleTiles && this.currentVisibleTiles.size > 0)
+          ? Array.from(this.currentVisibleTiles)
+          : []);
+      if (!this.hasCompleteVisibleTileCache(targetKeys)) return false;
+      this.tileForceFullRender = true;
+      this.tileAllowIncrementalRender = true;
+      this.resetIncrementalTileRenderBuffer();
+      this.renderTiles();
+      return true;
     },
 
     /**
@@ -8171,6 +8336,9 @@ export default {
             } else if (shouldPatchRender) {
               this.scheduleIncrementalTileRender();
             }
+            if (!this.tileAllowIncrementalRender) {
+              this.commitVisibleTilePresentation();
+            }
             if (shouldTriggerMergedDetailLoad &&
                 expectedSessionId === this.tileSessionId &&
                 expectedFrameId === this.tileFrameId) {
@@ -8225,6 +8393,7 @@ export default {
         // 无论成功/失败/取消，都要通知等待中的批次，避免“全齐再显示”屏障悬挂
         this.notifyTileSettled(key);
         this.updateTileDownloadCompletionState();
+        this.enqueueBackgroundTileDownloads();
       }
     },
 
@@ -9625,6 +9794,7 @@ export default {
       this.tileGenerationComplete = false;
       this.tileGenerationCompleteReadyCount = 0;
       this.tileDownloadComplete = false;
+      this.tileFullCacheComplete = false;
       this.pendingTileGenerationComplete = new Map();
       this.tileE2ERequiredKeys = '[]';
       this.tileE2EDownloadedKeys = '[]';

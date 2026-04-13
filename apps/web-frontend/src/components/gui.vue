@@ -218,13 +218,27 @@
         </button>
 
         <button
-          :disabled="loadingOriginalImage"
+          :disabled="loadingOriginalImage && !tileLevelEnabled"
           v-show="isCaptureMode"
-          @click="getOriginalImage"
+          @click="handleOriginalImageButtonClick"
           class="get-click btn-OriginalImage"
+          :class="{ 'btn-OriginalImage--tile-progress': tileLevelEnabled }"
           data-testid="gui-btn-get-original-image"
         >
-          <template v-if="!loadingOriginalImage">
+          <template v-if="tileLevelEnabled">
+            <div class="tile-level-progress">
+              <v-progress-circular
+                :value="tileLevelProgressPercent"
+                :width="3"
+                :size="26"
+                :color="tileLevelProgressColor"
+                :rotate="-90"
+              >
+                <span class="tile-level-progress__label">{{ tileLevelProgressLabel }}</span>
+              </v-progress-circular>
+            </div>
+          </template>
+          <template v-else-if="!loadingOriginalImage">
             <div style="display: flex; justify-content: center; align-items: center;">
               <img src="@/assets/images/svg/ui/OriginalImage.svg" height="20px"
                 style="min-height: 20px; pointer-events: none;"></img>
@@ -584,6 +598,11 @@ export default {
       tileLevelEnabled: false,
       tileFullImageWidth: 0,
       tileFullImageHeight: 0,
+      tileCurrentZ: 0,
+      tileLevelProgressPercent: 0,
+      tileLevelDownloadedCount: 0,
+      tileLevelTotalCount: 0,
+      tileFullCacheReady: false,
 
       showRedBox: false, // 控制小红框显示与隐藏
       isInitRedBox: true,
@@ -1022,11 +1041,28 @@ export default {
         this.tileLevelEnabled = false;
         this.tileFullImageWidth = 0;
         this.tileFullImageHeight = 0;
+        this.tileCurrentZ = 0;
+        this.tileLevelProgressPercent = 0;
+        this.tileLevelDownloadedCount = 0;
+        this.tileLevelTotalCount = 0;
+        this.tileFullCacheReady = false;
         return;
       }
       this.tileLevelEnabled = true;
       this.tileFullImageWidth = Math.max(0, Math.floor(Number(info.imageWidth) || 0));
       this.tileFullImageHeight = Math.max(0, Math.floor(Number(info.imageHeight) || 0));
+      this.tileCurrentZ = Math.max(0, Math.floor(Number(info.z) || 0));
+      this.tileLevelProgressPercent = Math.max(0, Math.min(100, Number(info.levelProgressPercent) || 0));
+      this.tileLevelDownloadedCount = Math.max(0, Math.floor(Number(info.levelDownloadedTileCount) || 0));
+      this.tileLevelTotalCount = Math.max(0, Math.floor(Number(info.levelTileCount) || 0));
+      this.tileFullCacheReady = !!info.fullCacheComplete;
+    },
+
+    handleOriginalImageButtonClick() {
+      if (this.tileLevelEnabled) {
+        return;
+      }
+      this.getOriginalImage();
     },
 
     FocalLengthSet(num) {
@@ -2057,6 +2093,12 @@ export default {
       }
       return 'Binning: ' + this.BinningNum + ', Size: [' + w + 'x' + h + ']';
     },
+    tileLevelProgressLabel() {
+      return 'Z' + this.tileCurrentZ;
+    },
+    tileLevelProgressColor() {
+      return this.tileFullCacheReady ? '#4caf50' : '#ffffff';
+    },
     pickerDate: {
       get: function () {
         const t = this.getLocalTime()
@@ -2700,6 +2742,34 @@ export default {
   width: 35px;
   height: 35px;
   margin: 0; /* 清除默认margin */
+}
+
+.btn-OriginalImage--tile-progress {
+  cursor: default !important;
+}
+
+.btn-OriginalImage--tile-progress:hover {
+  transform: none !important;
+  background-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+.btn-OriginalImage--tile-progress:active {
+  transform: none !important;
+  background-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+.tile-level-progress {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tile-level-progress__label {
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.96);
+  user-select: none;
 }
 </style>
 
