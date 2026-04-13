@@ -55,6 +55,30 @@ type UnifiedLogEntry = {
   rawMessage?: string | null
 }
 
+type DebugDialogLogEntry = {
+  msgtype?: string | null
+  msgtext?: string | null
+  msgfrom?: string | null
+}
+
+type RuntimeSnapshotPayload = {
+  unifiedRuntime: Record<string, unknown> | null
+  debugDialogLogs: DebugDialogLogEntry[]
+}
+
+type BrowserConsoleLogEntry = {
+  sequence: number
+  source: 'client'
+  level: string
+  message: string
+  timestamp: string
+  deviceType: string | null
+  operationKey: string | null
+  rawMessage: string
+}
+
+const MAX_BROWSER_CONSOLE_LOGS = 500
+
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
@@ -139,6 +163,63 @@ function logMatchesFilters(
   if (filters.sessionId && !haystack.includes(filters.sessionId.toLowerCase())) return false
   if (filters.frameId && !haystack.includes(filters.frameId.toLowerCase())) return false
   return true
+}
+
+function normalizeDebugDialogLog(entry: DebugDialogLogEntry, syntheticSequence: number): UnifiedLogEntry | null {
+  if (!entry || typeof entry !== 'object') return null
+  const rawMessage = String(entry.msgtext ?? '').trim()
+  if (!rawMessage) return null
+  const source = String(entry.msgfrom ?? '').toLowerCase() === 'server' ? 'server' : 'client'
+  const level = String(entry.msgtype ?? 'info').toLowerCase()
+  return {
+    sequence: syntheticSequence,
+    source,
+    level,
+    message: rawMessage,
+    timestamp: null,
+    deviceType: null,
+    operationKey: null,
+    rawMessage,
+  }
+}
+
+function mergeLogsWithDebugDialog(runtimeLogs: UnifiedLogEntry[], debugDialogLogs: DebugDialogLogEntry[]) {
+  const merged = runtimeLogs.slice()
+  const seen = new Set(
+    runtimeLogs.map((entry) => `${String(entry.source ?? '')}|${String(entry.level ?? '')}|${String(entry.rawMessage ?? entry.message ?? '')}`),
+  )
+  let syntheticSequence = runtimeLogs.reduce((max, entry) => {
+    const seq = typeof entry.sequence === 'number' && Number.isFinite(entry.sequence) ? entry.sequence : 0
+    return Math.max(max, seq)
+  }, 0)
+
+  for (let i = debugDialogLogs.length - 1; i >= 0; i -= 1) {
+    const normalized = normalizeDebugDialogLog(debugDialogLogs[i], ++syntheticSequence)
+    if (!normalized) continue
+    const dedupeKey = `${normalized.source}|${normalized.level}|${normalized.rawMessage || normalized.message || ''}`
+    if (seen.has(dedupeKey)) continue
+    seen.add(dedupeKey)
+    merged.unshift(normalized)
+  }
+
+  return merged
+}
+
+function mergeLogsWithBrowserConsole(runtimeLogs: UnifiedLogEntry[], browserConsoleLogs: BrowserConsoleLogEntry[]) {
+  const merged = runtimeLogs.slice()
+  const seen = new Set(
+    runtimeLogs.map((entry) => `${String(entry.source ?? '')}|${String(entry.level ?? '')}|${String(entry.rawMessage ?? entry.message ?? '')}`),
+  )
+
+  for (let i = browserConsoleLogs.length - 1; i >= 0; i -= 1) {
+    const entry = browserConsoleLogs[i]
+    const dedupeKey = `${entry.source}|${entry.level}|${entry.rawMessage || entry.message}`
+    if (seen.has(dedupeKey)) continue
+    seen.add(dedupeKey)
+    merged.unshift(entry)
+  }
+
+  return merged
 }
 
 /** 检测本机 host:port 是否已有进程在监听（临时 bind 探测）。 */
@@ -270,14 +351,40 @@ async function main() {
   } = aiControl
 
   const registry = makeAiControlRegistry()
+  let browserConsoleLogs: BrowserConsoleLogEntry[] = []
+  let browserConsoleSequence = 0
+
+  function attachPageConsoleListener(targetPage: typeof page) {
+    targetPage.on('console', (msg) => {
+      const text = msg.text()
+      if (!text) return
+      browserConsoleSequence += 1
+      browserConsoleLogs.unshift({
+        sequence: browserConsoleSequence,
+        source: 'client',
+        level: msg.type() || 'info',
+        message: text,
+        timestamp: new Date().toISOString(),
+        deviceType: null,
+        operationKey: null,
+        rawMessage: text,
+      })
+      if (browserConsoleLogs.length > MAX_BROWSER_CONSOLE_LOGS) {
+        browserConsoleLogs.length = MAX_BROWSER_CONSOLE_LOGS
+      }
+    })
+  }
+
   let context = await browser.newContext({ baseURL })
   let page = await context.newPage()
+  attachPageConsoleListener(page)
   await page.goto('/', { waitUntil: 'domcontentloaded', timeout: SESSION_PAGE_INIT_TIMEOUT_MS })
   let ctx = createFlowContextForSession(page, { minTestTimeoutMs: SESSION_MIN_TEST_TIMEOUT_MS })
 
   async function createSessionPage() {
     const nextContext = await browser.newContext({ baseURL })
     const nextPage = await nextContext.newPage()
+    attachPageConsoleListener(nextPage)
     await nextPage.goto('/', { waitUntil: 'domcontentloaded', timeout: SESSION_PAGE_INIT_TIMEOUT_MS })
     const nextCtx = createFlowContextForSession(nextPage, { minTestTimeoutMs: SESSION_MIN_TEST_TIMEOUT_MS })
     return { nextContext, nextPage, nextCtx }
@@ -357,8 +464,16 @@ async function main() {
   async function getRuntimeSnapshot() {
     return runQueue.then(() =>
       page.evaluate(() => {
-        const win = window as typeof window & { __QUARCS_UNIFIED_RUNTIME__?: unknown }
-        return win.__QUARCS_UNIFIED_RUNTIME__ || null
+        const win = window as typeof window & {
+          __QUARCS_UNIFIED_RUNTIME__?: unknown
+          __QUARCS_DEBUG_DIALOG_LOGS__?: unknown
+        }
+        return {
+          unifiedRuntime: (win.__QUARCS_UNIFIED_RUNTIME__ || null) as Record<string, unknown> | null,
+          debugDialogLogs: Array.isArray(win.__QUARCS_DEBUG_DIALOG_LOGS__)
+            ? (win.__QUARCS_DEBUG_DIALOG_LOGS__ as DebugDialogLogEntry[])
+            : [],
+        }
       }),
     )
   }
@@ -460,9 +575,18 @@ async function main() {
           getRuntimeSnapshot(),
         ])
 
-        const rawLogs = Array.isArray((runtime as Record<string, unknown> | null)?.logs)
-          ? ((runtime as Record<string, unknown>).logs as UnifiedLogEntry[])
+        const runtimePayload = runtime as RuntimeSnapshotPayload | null
+        const runtimeState = runtimePayload?.unifiedRuntime || null
+        const runtimeLogs = Array.isArray((runtimeState as Record<string, unknown> | null)?.logs)
+          ? ((runtimeState as Record<string, unknown>).logs as UnifiedLogEntry[])
           : []
+        const debugDialogLogs = Array.isArray(runtimePayload?.debugDialogLogs)
+          ? runtimePayload.debugDialogLogs
+          : []
+        const rawLogs = mergeLogsWithBrowserConsole(
+          mergeLogsWithDebugDialog(runtimeLogs, debugDialogLogs),
+          browserConsoleLogs,
+        )
 
         const filteredLogs = rawLogs
           .filter((entry) =>
@@ -509,8 +633,8 @@ async function main() {
               }
             : null,
           websocketState:
-            runtime && typeof (runtime as Record<string, unknown>).websocketState === 'string'
-              ? (runtime as Record<string, unknown>).websocketState
+            runtimeState && typeof (runtimeState as Record<string, unknown>).websocketState === 'string'
+              ? (runtimeState as Record<string, unknown>).websocketState
               : 'unknown',
           logs: filteredLogs,
         })

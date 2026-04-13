@@ -108,7 +108,7 @@ export function normalizeUnifiedRuntimeState(raw: unknown): UnifiedRuntimeState 
   const recentOperationResults = sortedOps.filter((op) => op.status === 'succeeded' || op.status === 'failed' || op.status === 'cancelled').slice(0, 20)
   const lastOperationError = sortedOps.find((op) => op.status === 'failed' || Boolean(op.error)) ?? null
   const recentLogs = Array.isArray(runtime.logs)
-    ? runtime.logs.map(normalizeLogEntry).filter(Boolean).slice(0, 50) as UnifiedLogEntry[]
+    ? runtime.logs.map(normalizeLogEntry).filter(Boolean).slice(0, 300) as UnifiedLogEntry[]
     : []
   return {
     version: typeof runtime.version === 'number' ? runtime.version : 1,

@@ -106,6 +106,13 @@
 <script>
 import Clipboard from 'clipboard';
 
+function syncDebugDialogLogs(messages) {
+  if (typeof window === 'undefined') return;
+  window.__QUARCS_DEBUG_DIALOG_LOGS__ = Array.isArray(messages)
+    ? messages.map((item) => ({ ...item }))
+    : [];
+}
+
 export default {
   name: 'indiDebugDialog',
   props: {
@@ -126,6 +133,7 @@ export default {
     };
   },
   created() {
+    syncDebugDialogLogs(this.AllMessages);
     this.$bus.$on('SendConsoleLog', this.InsertClientDebug);
     this.$bus.$on('SendDebugMessage', this.InsertServerDebug);
   },
@@ -150,6 +158,7 @@ export default {
 
       const msg = { msgtype: type, msgtext: `[Client] ${timestamp} | ${message}`, msgfrom: 'Client' };
       this.AllMessages.push(msg);
+      syncDebugDialogLogs(this.AllMessages);
     },
 
     InsertServerDebug(type, message) {
@@ -170,6 +179,7 @@ export default {
 
       const msg = { msgtype: type, msgtext: `[Server] ${timestamp} | ${message}`, msgfrom: 'Server' };
       this.AllMessages.push(msg);
+      syncDebugDialogLogs(this.AllMessages);
     },
 
     toggleClientDebug() {
@@ -186,6 +196,7 @@ export default {
 
     clearMessages() {
       this.AllMessages = [];  // 清空消息数组
+      syncDebugDialogLogs(this.AllMessages);
     },
 
     /** 复制当前列表中可见日志（受 Client/Server/仅错误 筛选影响） */

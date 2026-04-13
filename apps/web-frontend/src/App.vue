@@ -1286,8 +1286,9 @@ export default {
 
       // ========================= 瓦片金字塔相关 =========================
       TILE_PATH_SUFFIX: 'img/capture-tiles',  // 与 nginx location /img/capture-tiles/ 对应
-      TILE_DEBUG: true,  // 瓦片调试：默认关闭，避免高频日志拖慢主线程；排查问题时可临时打开
-      TILE_PERF: true, // 瓦片性能：为 true 时在控制台与界面日志中输出各阶段耗时（processTile / renderTiles / drawImageData 等）；仅排查卡顿时临时打开
+      TILE_DEBUG: false,  // 瓦片调试：默认关闭，避免高频日志拖慢主线程；排查问题时可临时打开
+      TILE_PERF: false, // 瓦片性能：为 true 时在控制台与界面日志中输出各阶段耗时（processTile / renderTiles / drawImageData 等）；仅排查卡顿时临时打开
+      imagePipelineHotPathDebug: false, // 图像热路径日志：默认关闭，避免每瓦片/每帧 stringify 与总线派发拖慢主线程
       tileGPM: null,              // 全局处理元数据
       tileSessionId: null,        // 当前瓦片会话ID
       tileFrameId: null,          // 当前瓦片帧ID（用于丢弃旧帧瓦片/防错帧拉伸）
@@ -1309,6 +1310,8 @@ export default {
       e2eTileGpmSeq: 0,
       // E2E：Qt 下发 ExposureCompleted 时自增（与 TileGPM 解耦；短曝光时 cp-status 可能来不及观测 busy）
       e2eExposureCompletedSeq: 0,
+      captureTraceKeyword: 'CaptureTrace',
+      captureTrace: null,
       tileCache: null,            // 瓦片缓存 Map<"z/x/y", ImageData> (在initCanvas中初始化)
       tileRawDataCache: null,     // 原始瓦片数据缓存 Map<"z/x/y", {width, height, type, data}> (在initCanvas中初始化)
       tilePendingLoads: null,     // 正在加载的瓦片集合 (在initCanvas中初始化)
@@ -1327,6 +1330,8 @@ export default {
       tileRenderRaf: null,        // 合并晚到瓦片的重绘请求，避免每片都立即重绘
       tileRenderBatchSize: 4,     // 增量补绘批次：累计这么多已完成瓦片后再触发一次重绘
       tileRenderBatchDelayMs: 80, // 增量补绘兜底延迟，避免最后零散瓦片长期不显示
+      tileReprocessChunkSize: 6,  // 可见 raw 瓦片重处理分批大小，避免参数变化时长时间阻塞主线程
+      tileReprocessYieldMs: 0,    // 批次之间让出主线程的延迟
       tileRenderBufferedCount: 0, // 当前批次中已完成但尚未触发重绘的瓦片数
       tileRenderBufferedTimer: null, // 增量补绘兜底定时器
       tileDirtyKeys: null,        // 待补绘的瓦片键集合 Set<"z/x/y">
@@ -1545,6 +1550,7 @@ export default {
   created() {
     ensureUnifiedRuntime();
     this.$bus.$on('AppSendMessage', this.sendMessage);
+    this.$bus.$on('CaptureTraceStart', this.startCaptureTrace);
     this.$bus.$on('AppUpdateDevices', this.updateDevices);
     this.$bus.$on('Switch-MainPage', this.handleButtonTestClick);
     this.$bus.$on('HandleHistogramNum', this.applyHistStretch);
@@ -1697,6 +1703,166 @@ export default {
       const message = `MainCameraImagePipeLine | ${fileName} | ${functionName} | ${variableName} = ${normalizedValue}`
       this.SendConsoleLogMsg(message, 'info')
     },
+    logImagePipelineHotPath(functionName, variableName, value) {
+      if (!this.imagePipelineHotPathDebug) return;
+      this.logMainCameraImagePipeLine('App.vue', functionName, variableName, value);
+    },
+    normalizeCaptureTraceValue(value) {
+      if (value == null) return '';
+      if (typeof value === 'number') {
+        return Number.isFinite(value) ? String(value) : '';
+      }
+      if (typeof value === 'boolean') {
+        return value ? 'true' : 'false';
+      }
+      if (typeof value === 'object') {
+        try {
+          return JSON.stringify(value);
+        } catch (error) {
+          return String(value);
+        }
+      }
+      return String(value);
+    },
+    sendCaptureTraceLog(parts, type = 'info') {
+      const cleaned = parts.filter(part => part !== '');
+      if (!cleaned.length) return;
+      this.SendConsoleLogMsg(cleaned.join(' | '), type);
+    },
+    startCaptureTrace(payload = {}) {
+      const traceId = String(payload.traceId || '').trim();
+      if (!traceId) return;
+      const perfNow = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+      this.captureTrace = {
+        traceId,
+        startedAtPerf: perfNow,
+        startedAtEpochMs: Date.now(),
+        mode: String(payload.mode || 'Single'),
+        exposureMs: Number(payload.exposureMs) || 0,
+        burstFrames: Math.max(1, Number(payload.burstFrames) || 1),
+        sessionId: null,
+        frameId: null,
+        lastBackendTileGpmSentAtMs: null,
+        z0FetchLogged: false,
+        z0RenderLogged: false,
+      };
+      this.sendCaptureTraceLog([
+        this.captureTraceKeyword,
+        `traceId=${traceId}`,
+        'stage=frontend_click',
+        'frontendElapsedMs=0',
+        `mode=${this.captureTrace.mode}`,
+        `exposureMs=${this.captureTrace.exposureMs}`,
+        `burstFrames=${this.captureTrace.burstFrames}`,
+      ]);
+    },
+    ensureCaptureTraceForCommand(message) {
+      if (this.captureTrace && this.captureTrace.traceId) return false;
+      if (typeof message !== 'string') return false;
+      const trimmed = message.trim();
+      if (!trimmed) return false;
+
+      let payload = null;
+      if (trimmed.startsWith('takeExposureBurst:')) {
+        const parts = trimmed.split(':');
+        if (parts.length >= 4) {
+          payload = {
+            traceId: parts[3],
+            mode: 'Burst',
+            exposureMs: Number(parts[1]) || 0,
+            burstFrames: Math.max(1, Number(parts[2]) || 1),
+          };
+        }
+      } else if (trimmed.startsWith('takeExposure:')) {
+        const parts = trimmed.split(':');
+        if (parts.length >= 3) {
+          payload = {
+            traceId: parts[2],
+            mode: 'Single',
+            exposureMs: Number(parts[1]) || 0,
+            burstFrames: 1,
+          };
+        }
+      }
+
+      if (!payload || !String(payload.traceId || '').trim()) return false;
+      this.startCaptureTrace(payload);
+      this.emitCaptureTrace('frontend_click_fallback', { command: trimmed });
+      return true;
+    },
+    emitCaptureTrace(stage, extra = {}, type = 'info') {
+      if (!this.captureTrace || !this.captureTrace.traceId) return;
+      const perfNow = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+      const elapsed = Math.max(0, perfNow - this.captureTrace.startedAtPerf);
+      const parts = [
+        this.captureTraceKeyword,
+        `traceId=${this.captureTrace.traceId}`,
+        `stage=${stage}`,
+        `frontendElapsedMs=${elapsed.toFixed(2)}`,
+      ];
+      Object.entries(extra || {}).forEach(([key, value]) => {
+        const normalized = this.normalizeCaptureTraceValue(value);
+        if (normalized !== '') {
+          parts.push(`${key}=${normalized}`);
+        }
+      });
+      this.sendCaptureTraceLog(parts, type);
+    },
+    handleBackendCaptureTrace(parts) {
+      if (!parts || parts.length < 3) return;
+      const traceId = String(parts[1] || '').trim();
+      const stage = String(parts[2] || '').trim();
+      const backendElapsedMs = parts.length >= 4 ? Number(parts[3]) : NaN;
+      const detail = parts.length >= 5 ? parts.slice(4).join(':') : '';
+      const detailMap = {};
+      if (detail) {
+        detail.split(',').forEach((segment) => {
+          const trimmed = String(segment || '').trim();
+          if (!trimmed) return;
+          const eqIdx = trimmed.indexOf('=');
+          if (eqIdx <= 0) return;
+          const key = trimmed.slice(0, eqIdx).trim();
+          const value = trimmed.slice(eqIdx + 1).trim();
+          if (key) detailMap[key] = value;
+        });
+      }
+      if (
+        this.captureTrace &&
+        this.captureTrace.traceId === traceId &&
+        stage === 'backend_tilegpm_sent' &&
+        Number.isFinite(Number(detailMap.serverNowMs))
+      ) {
+        this.captureTrace.lastBackendTileGpmSentAtMs = Number(detailMap.serverNowMs);
+      }
+      const extra = {};
+      if (Number.isFinite(backendElapsedMs)) {
+        extra.backendElapsedMs = backendElapsedMs;
+      }
+      if (detail) {
+        extra.detail = detail;
+      }
+      if (this.captureTrace && this.captureTrace.traceId === traceId) {
+        this.emitCaptureTrace(stage, extra);
+        return;
+      }
+      const partsToSend = [
+        this.captureTraceKeyword,
+        `traceId=${traceId || 'unknown'}`,
+        `stage=${stage || 'backend_unknown'}`,
+      ];
+      if (Number.isFinite(backendElapsedMs)) {
+        partsToSend.push(`backendElapsedMs=${backendElapsedMs}`);
+      }
+      if (detail) {
+        partsToSend.push(`detail=${detail}`);
+      }
+      this.sendCaptureTraceLog(partsToSend);
+    },
+    async yieldToMainThread(delayMs = 0) {
+      await new Promise(resolve => {
+        setTimeout(resolve, Math.max(0, Number(delayMs) || 0));
+      });
+    },
     // 每当“UI完成一帧刷新”的信号到来时调用，用于统计 UI 刷新 FPS
     // 说明：后端使用 ExposureCompleted 作为“刷新一帧”的信号，因此这里以 ExposureCompleted 作为 UI FPS 的统计触发。
     onLiveFramePresented () {
@@ -1812,11 +1978,22 @@ export default {
       const key = '0/0/0';
       if (!sessionId) return null;
       if (this.tileRawDataCache && this.tileRawDataCache.has(key)) {
+        this.emitCaptureTrace('frontend_z0_cache_hit', {
+          source: 'ensureZ0TileRawData',
+          sessionId,
+          frameId,
+        });
         return this.tileRawDataCache.get(key);
       }
       const base = (process.env.BASE_URL || '/').replace(/\/?$/, '/');
       const frameQ = (frameId != null) ? `?f=${encodeURIComponent(String(frameId))}` : '';
       const url = `${base}${this.TILE_PATH_SUFFIX}/${sessionId}/0/0/0.bin${frameQ}`;
+      const fetchStart = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+      this.emitCaptureTrace('frontend_z0_fetch_start', {
+        source: 'ensureZ0TileRawData',
+        sessionId,
+        frameId,
+      });
       const response = await fetch(url, { cache: 'no-store' });
       if (!response.ok) {
         throw new Error(`Failed to load Z=0 tile: ${response.status}`);
@@ -1833,6 +2010,14 @@ export default {
         this.tileRawDataCache = new Map();
       }
       this.tileRawDataCache.set(key, tileData);
+      const fetchDone = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+      this.emitCaptureTrace('frontend_z0_fetch_done', {
+        source: 'ensureZ0TileRawData',
+        sessionId,
+        frameId,
+        downloadMs: (fetchDone - fetchStart).toFixed(2),
+        bytes: buffer.byteLength,
+      });
       return tileData;
     },
     async withZ0Mat(taskName, runner) {
@@ -1881,21 +2066,52 @@ export default {
       });
     },
     async runAutoWhiteBalanceOnce(options = {}) {
+      const { enablePersistent = false, reprocess = true, notify = true } = options;
+      const startedAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
       const gains = await this.computeAutoWhiteBalanceFromZ0();
-      if (!gains) return false;
-      this.setPostWhiteBalanceGains(gains.postGainR, gains.postGainB, { reprocess: true, updateReference: false });
+      if (!gains) {
+        this.emitCaptureTrace('frontend_auto_white_balance_done', {
+          success: false,
+          reprocess,
+          notify,
+          totalMs: (((typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now()) - startedAt).toFixed(2),
+        }, 'warning');
+        return false;
+      }
+      this.setPostWhiteBalanceGains(gains.postGainR, gains.postGainB, { reprocess, updateReference: false });
       this.RefGainR = gains.refGainR;
       this.RefGainB = gains.refGainB;
       this.updateReferenceWhiteBalanceConfig();
-      if (options.enablePersistent === true) {
+      if (enablePersistent === true) {
         this.setAutoWhiteBalanceEnabled(true);
       }
-      this.SendConsoleLogMsg(`进一步白平衡完成: postR=${gains.postGainR.toFixed(3)}, postB=${gains.postGainB.toFixed(3)}`, 'success');
+      if (notify) {
+        this.SendConsoleLogMsg(`进一步白平衡完成: postR=${gains.postGainR.toFixed(3)}, postB=${gains.postGainB.toFixed(3)}`, 'success');
+      }
+      const finishedAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+      this.emitCaptureTrace('frontend_auto_white_balance_done', {
+        success: true,
+        reprocess,
+        notify,
+        totalMs: (finishedAt - startedAt).toFixed(2),
+        postGainR: gains.postGainR.toFixed(3),
+        postGainB: gains.postGainB.toFixed(3),
+      });
       return true;
     },
     async runAutoHistogramOnce(options = {}) {
+      const { enablePersistent = false, reprocess = true, notify = true } = options;
+      const startedAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
       const stretch = await this.computeAutoHistogramFromZ0();
-      if (!stretch) return false;
+      if (!stretch) {
+        this.emitCaptureTrace('frontend_auto_histogram_done', {
+          success: false,
+          reprocess,
+          notify,
+          totalMs: (((typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now()) - startedAt).toFixed(2),
+        }, 'warning');
+        return false;
+      }
       this.autoStretchBlackLevel = stretch.blackLevel;
       this.autoStretchWhiteLevel = stretch.whiteLevel;
       this.currentHistogramMin = stretch.blackLevel;
@@ -1905,12 +2121,57 @@ export default {
       }
       this.$bus.$emit('ChangeDialPosition', stretch.blackLevel, stretch.whiteLevel);
       this.$bus.$emit('AutoHistogramNum', stretch.blackLevel, stretch.whiteLevel);
-      this.reloadTilesWithNewParams();
-      if (options.enablePersistent === true) {
+      if (reprocess) {
+        this.reloadTilesWithNewParams();
+      }
+      if (enablePersistent === true) {
         this.setAutoHistogramEnabled(true);
       }
-      this.SendConsoleLogMsg(`自动拉伸完成: black=${stretch.blackLevel}, white=${stretch.whiteLevel}`, 'success');
+      if (notify) {
+        this.SendConsoleLogMsg(`自动拉伸完成: black=${stretch.blackLevel}, white=${stretch.whiteLevel}`, 'success');
+      }
+      const finishedAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+      this.emitCaptureTrace('frontend_auto_histogram_done', {
+        success: true,
+        reprocess,
+        notify,
+        totalMs: (finishedAt - startedAt).toFixed(2),
+        blackLevel: stretch.blackLevel,
+        whiteLevel: stretch.whiteLevel,
+      });
       return true;
+    },
+    async prepareFrameAutoOptimizations() {
+      if (!this.tileGPM) return;
+      const startedAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+      this.emitCaptureTrace('frontend_prepare_frame_auto_optimizations_start', {
+        sessionId: this.tileSessionId,
+        frameId: this.tileFrameId,
+        autoWhiteBalanceEnabled: this.autoWhiteBalanceEnabled,
+        autoHistogramEnabled: this.autoHistogramEnabled,
+      });
+      let awMs = 0;
+      let histMs = 0;
+      if (this.autoWhiteBalanceEnabled) {
+        const awStartedAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+        await this.runAutoWhiteBalanceOnce({ reprocess: false, notify: false });
+        const awFinishedAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+        awMs = awFinishedAt - awStartedAt;
+      }
+      if (this.autoHistogramEnabled) {
+        const histStartedAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+        await this.runAutoHistogramOnce({ reprocess: false, notify: false });
+        const histFinishedAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+        histMs = histFinishedAt - histStartedAt;
+      }
+      const finishedAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+      this.emitCaptureTrace('frontend_prepare_frame_auto_optimizations_done', {
+        sessionId: this.tileSessionId,
+        frameId: this.tileFrameId,
+        totalMs: (finishedAt - startedAt).toFixed(2),
+        autoWhiteBalanceMs: awMs.toFixed(2),
+        autoHistogramMs: histMs.toFixed(2),
+      });
     },
     async applyFrameAutoOptimizations() {
       if (!this.tileGPM) return;
@@ -2695,6 +2956,7 @@ export default {
 
               case 'ExposureCompleted':
                 this.e2eExposureCompletedSeq = (Number(this.e2eExposureCompletedSeq) || 0) + 1;
+                this.emitCaptureTrace('frontend_exposure_completed_rx');
                 this.$bus.$emit('ExposureCompleted');
                 // 以 ExposureCompleted 作为“UI刷新一帧”的信号，统计前端显示帧率
                 this.onLiveFramePresented();
@@ -2798,9 +3060,30 @@ export default {
                     frameId: (parts.length >= 15) ? parseInt(parts[14]) : null,
                     buildMode: (parts.length >= 16) ? parts[15] : 'pyramid',
                   };
+                  const tileGpmRxExtra = {
+                    sessionId: gpm.sessionId,
+                    frameId: gpm.frameId,
+                    width: gpm.imageWidth,
+                    height: gpm.imageHeight,
+                    clientNowMs: Date.now(),
+                  };
+                  if (
+                    this.captureTrace &&
+                    Number.isFinite(Number(this.captureTrace.lastBackendTileGpmSentAtMs))
+                  ) {
+                    tileGpmRxExtra.approxClientSinceServerTileGpmSentMs =
+                      Date.now() - Number(this.captureTrace.lastBackendTileGpmSentAtMs);
+                  }
+                  this.emitCaptureTrace('frontend_tilegpm_rx', {
+                    ...tileGpmRxExtra,
+                  });
                   this.logMainCameraImagePipeLine('App.vue', 'WebSocketOnMessage.TileGPM', 'gpmMessage', gpm);
                   this.handleTileGPM(gpm);
                 }
+                break;
+
+              case 'CaptureTrace':
+                this.handleBackendCaptureTrace(parts);
                 break;
 
               case 'TileHistogramFile':
@@ -4897,9 +5180,20 @@ export default {
       const messageJson = JSON.stringify(messageObj); // 将消息对象转换为 JSON 字符串
       const messageState = { msgid: messageId, text: messageJson, success: false }; // 创建包含消息和状态信息的对象
 
+      if (type === 'Vue_Command') {
+        this.ensureCaptureTraceForCommand(message);
+      }
       recordClientCommand(message);
       if (this.websocket.readyState === WebSocket.OPEN) {
         this.websocket.send(messageJson);
+        if (
+          type === 'Vue_Command' &&
+          this.captureTrace &&
+          typeof message === 'string' &&
+          (message.startsWith('takeExposure:') || message.startsWith('takeExposureBurst:'))
+        ) {
+          this.emitCaptureTrace('frontend_command_sent', { command: message });
+        }
         // messageState.success = true; // 设置消息为成功
       }
       this.sentMessages.push(messageState); // 添加消息对象到已发送的消息数组
@@ -6458,6 +6752,16 @@ export default {
       }
 
       const sample = payload.tiles.slice(0, 8);
+      const containsZ0 = payload.tiles.includes('0/0/0');
+      if (containsZ0) {
+        this.emitCaptureTrace('frontend_tilebatchready_rx', {
+          sessionId,
+          frameId,
+          count: payload.tiles.length,
+          added,
+          containsZ0: true,
+        });
+      }
       this.emitTileDebugLog('TileBatchReady', {
         payloadSessionId: sessionId,
         payloadFrameId: frameId,
@@ -6516,6 +6820,7 @@ export default {
       this.logMainCameraImagePipeLine('App.vue', 'handleTileGPM', 'incomingFrameId', gpm.frameId);
       this.logMainCameraImagePipeLine('App.vue', 'handleTileGPM', 'incomingBlackWhite', `${gpm.blackLevel},${gpm.whiteLevel}`);
       this.logMainCameraImagePipeLine('App.vue', 'handleTileGPM', 'incomingGainRB', `${gpm.gainR},${gpm.gainB}`);
+      const handleStartedAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
 
       // frameId：用于让“瓦片下载回包/缓存写入”与“当前 GPM”强绑定，避免错帧拉伸（尤其是 live 覆盖写 + 异步 fetch）
       const incomingFrameId = (typeof gpm.frameId === 'number' && isFinite(gpm.frameId)) ? gpm.frameId : null;
@@ -6572,6 +6877,15 @@ export default {
       // 策略：仅对“同 session 下确实切到新 frame”的 live 覆盖写做节流。
       // 对同一 frame 的重复 TileGPM 元数据更新不应清缓存/abort。
       const isLiveOverwriteFrame = (!isNewSession) && isLiveSession && !isSameFrameUpdate;
+      this.emitCaptureTrace('frontend_handle_tilegpm_start', {
+        sessionId: gpm.sessionId,
+        frameId: incomingFrameId,
+        isNewSession,
+        isLiveOverwriteFrame,
+        imageWidth: gpm.imageWidth,
+        imageHeight: gpm.imageHeight,
+        maxZoomLevel: gpm.maxZoomLevel,
+      });
       if (isLiveOverwriteFrame) {
         const now = Date.now();
         const throttleMs = Number(this.liveTileGpmThrottleMs) || 250;
@@ -6615,6 +6929,12 @@ export default {
       } else if (isNewSession || this.tileFrameId == null) {
         // 兼容：后端未提供 frameId 时，新会话必须生成新的本地帧号，避免沿用旧帧ID污染缓存/请求。
         this.tileFrameId = Date.now();
+      }
+      if (this.captureTrace) {
+        this.captureTrace.sessionId = gpm.sessionId;
+        this.captureTrace.frameId = this.tileFrameId;
+        this.captureTrace.z0FetchLogged = false;
+        this.captureTrace.z0RenderLogged = false;
       }
       this.showImageSizeX = gpm.imageWidth;
       this.showImageSizeY = gpm.imageHeight;
@@ -6783,6 +7103,10 @@ export default {
       // 推送一次当前瓦片层级信息到 GUI（用于显示合并等级/分辨率）
       this.emitTileLevelInfo();
 
+      // 关键优化：自动参数先基于本帧 Z=0 计算并写入状态，再开始可见瓦片处理，
+      // 避免“先用旧参数处理一遍，再按新参数整批重处理一遍”。
+      await this.prepareFrameAutoOptimizations();
+
       this.$bus.$emit('ChangeDialPosition', this.currentHistogramMin, this.currentHistogramMax);
       this.$bus.$emit('AutoHistogramNum', this.currentHistogramMin, this.currentHistogramMax);
       
@@ -6795,8 +7119,16 @@ export default {
       } else {
         this.renderTiles();
       }
-      await this.applyFrameAutoOptimizations();
       this.ensureTileReadyFallbackPolling();
+      const handleFinishedAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+      this.emitCaptureTrace('frontend_handle_tilegpm_done', {
+        sessionId: this.tileSessionId,
+        frameId: this.tileFrameId,
+        totalMs: (handleFinishedAt - handleStartedAt).toFixed(2),
+        readyCount: this.tileReadyKeys ? this.tileReadyKeys.size : 0,
+        generationComplete: this.tileGenerationComplete,
+        downloadComplete: this.tileDownloadComplete,
+      });
     },
 
     /**
@@ -7182,6 +7514,13 @@ export default {
       const tiles = this.calculateVisibleTiles();
       const gpm = this.tileGPM;
       const currentZ = this.getCurrentTargetTileZ(gpm);
+      this.emitCaptureTrace('frontend_load_visible_tiles_start', {
+        sessionId: this.tileSessionId,
+        frameId: this.tileFrameId,
+        currentZ,
+        visibleCount: tiles.length,
+        readyCount: this.tileReadyKeys ? this.tileReadyKeys.size : 0,
+      });
       const batchId = ++this.tileLoadBatchSeq;
       this.activeTileLoadBatchId = batchId;
       this.tileAllowIncrementalRender = true;
@@ -7223,41 +7562,15 @@ export default {
         this.tileForceFullRender = true;
       }
       
-      const paramsKey = this.getTileRenderParamsKey();
+      const paramsSnapshot = this.getTileRenderParamsSnapshot();
+      const paramsKey = paramsSnapshot
+        ? `${paramsSnapshot.cfa}|${paramsSnapshot.gainR}|${paramsSnapshot.gainB}|${paramsSnapshot.blackLevel}|${paramsSnapshot.whiteLevel}`
+        : 'no-gpm';
 
-      // 先对“已有原始数据”的可见瓦片做一次就地处理：
-      // - 若尚未处理过，生成处理后瓦片
-      // - 若处理参数已变化，按新参数重处理并覆盖
-      for (const t of tiles) {
-        const key = `${t.z}/${t.x}/${t.y}`;
-        const hasRaw = this.tileRawDataCache && this.tileRawDataCache.has(key);
-        if (!hasRaw) continue;
-        if (this.tileRetryTimers && this.tileRetryTimers.has(key)) {
-          clearTimeout(this.tileRetryTimers.get(key));
-          this.tileRetryTimers.delete(key);
-        }
-        if (this.tileRetryCounts) {
-          this.tileRetryCounts.delete(key);
-        }
-
-        const cached = this.tileCache && this.tileCache.get(key);
-        const needReprocess = !cached || cached.paramsKey !== paramsKey;
-
-        if (needReprocess) {
-          try {
-            const processedTile = this.processTile(this.tileRawDataCache.get(key));
-            const renderSource = this.createTileRenderSource(processedTile);
-            this.tileCache.set(key, {
-              renderSource,
-              width: processedTile.width,
-              height: processedTile.height,
-              paramsKey
-            });
-            this.tileDirtyKeys.add(key);
-          } catch (e) {
-            console.error(`Error processing cached raw tile ${key}:`, e);
-          }
-        }
+      // 先对“已有原始数据”的可见瓦片做分批就地处理，避免参数变化时长时间同步阻塞主线程。
+      const reprocessFinished = await this.reprocessVisibleRawTiles(tiles, paramsSnapshot, paramsKey, batchId);
+      if (!reprocessFinished || batchId !== this.activeTileLoadBatchId) {
+        return;
       }
 
       // 过滤需要“下载原始数据”的瓦片：只有 raw 不存在且不在加载中，才发起请求
@@ -7347,6 +7660,69 @@ export default {
       if (tilesToLoad.length === 0 && batchId === this.activeTileLoadBatchId) {
         this.renderTiles();
       }
+      this.emitCaptureTrace('frontend_load_visible_tiles_queued', {
+        sessionId: this.tileSessionId,
+        frameId: this.tileFrameId,
+        currentZ,
+        visibleCount: tiles.length,
+        toLoadCount: tilesToLoad.length,
+        blockedCount: blockedByReadyKeys.length,
+      });
+    },
+    async reprocessVisibleRawTiles(tiles, paramsSnapshot, paramsKey, batchId) {
+      if (!tiles || tiles.length === 0) return true;
+      const chunkSize = Math.max(1, Number(this.tileReprocessChunkSize) || 1);
+      const yieldMs = Math.max(0, Number(this.tileReprocessYieldMs) || 0);
+      let processedInChunk = 0;
+      let touchedDirtyTiles = false;
+
+      for (const t of tiles) {
+        if (batchId !== this.activeTileLoadBatchId) return false;
+        const key = `${t.z}/${t.x}/${t.y}`;
+        const hasRaw = this.tileRawDataCache && this.tileRawDataCache.has(key);
+        if (!hasRaw) continue;
+        if (this.tileRetryTimers && this.tileRetryTimers.has(key)) {
+          clearTimeout(this.tileRetryTimers.get(key));
+          this.tileRetryTimers.delete(key);
+        }
+        if (this.tileRetryCounts) {
+          this.tileRetryCounts.delete(key);
+        }
+
+        const cached = this.tileCache && this.tileCache.get(key);
+        const needReprocess = !cached || cached.paramsKey !== paramsKey;
+        if (!needReprocess) continue;
+
+        try {
+          const processedTile = this.processTile(this.tileRawDataCache.get(key), paramsSnapshot);
+          const renderSource = this.createTileRenderSource(processedTile);
+          this.tileCache.set(key, {
+            renderSource,
+            width: processedTile.width,
+            height: processedTile.height,
+            paramsKey
+          });
+          this.tileDirtyKeys.add(key);
+          touchedDirtyTiles = true;
+        } catch (e) {
+          console.error(`Error processing cached raw tile ${key}:`, e);
+        }
+
+        processedInChunk++;
+        if (processedInChunk >= chunkSize) {
+          processedInChunk = 0;
+          if (touchedDirtyTiles) {
+            this.scheduleIncrementalTileRender();
+            touchedDirtyTiles = false;
+          }
+          await this.yieldToMainThread(yieldMs);
+        }
+      }
+
+      if (touchedDirtyTiles) {
+        this.scheduleIncrementalTileRender();
+      }
+      return batchId === this.activeTileLoadBatchId;
     },
 
     /**
@@ -7562,10 +7938,29 @@ export default {
         });
       }
       try {
+        if (key === '0/0/0') {
+          this.emitCaptureTrace('frontend_z0_fetch_start', {
+            source: 'loadSingleTile',
+            sessionId: expectedSessionId,
+            frameId: expectedFrameId,
+          });
+        }
+        const fetchStart = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
         const response = await fetch(url, { 
           cache: 'no-store',
           signal: abortController.signal 
         });
+        if (key === '0/0/0') {
+          const headersReadyAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+          this.emitCaptureTrace('frontend_z0_fetch_response_headers', {
+            source: 'loadSingleTile',
+            sessionId: expectedSessionId,
+            frameId: expectedFrameId,
+            status: response.status,
+            headersMs: (headersReadyAt - fetchStart).toFixed(2),
+            contentLength: response.headers.get('content-length') || '',
+          });
+        }
         
         if (!response.ok) {
           if (this.TILE_DEBUG) {
@@ -7577,6 +7972,16 @@ export default {
         }
         
         const buffer = await response.arrayBuffer();
+        if (key === '0/0/0') {
+          const fetchDone = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+          this.emitCaptureTrace('frontend_z0_fetch_done', {
+            source: 'loadSingleTile',
+            sessionId: expectedSessionId,
+            frameId: expectedFrameId,
+            downloadMs: (fetchDone - fetchStart).toFixed(2),
+            bytes: buffer.byteLength,
+          });
+        }
 
         // 回包时校验：若期间已切换到新帧/新会话，直接丢弃，避免错帧拉伸/错帧缓存污染
         if (expectedSessionId !== this.tileSessionId || expectedFrameId !== this.tileFrameId) {
@@ -7594,7 +7999,20 @@ export default {
         }
         
         // 解析瓦片数据
+        const parseStartedAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
         const tileData = this.parseTileData(buffer);
+        if (key === '0/0/0' && tileData) {
+          const parseFinishedAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+          this.emitCaptureTrace('frontend_z0_parse_done', {
+            source: 'loadSingleTile',
+            sessionId: expectedSessionId,
+            frameId: expectedFrameId,
+            parseMs: (parseFinishedAt - parseStartedAt).toFixed(2),
+            rawWidth: tileData.width,
+            rawHeight: tileData.height,
+            rawType: tileData.type,
+          });
+        }
         if (tileData) {
           const paramsSnapshot = expectedRenderParams || this.getTileRenderParamsSnapshot();
           const paramsKey = paramsSnapshot
@@ -7611,6 +8029,7 @@ export default {
           }
           
           try {
+            const processStartedAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
             let processedTile;
             let renderSource;
             if (this.TILE_PERF && typeof performance !== 'undefined' && performance.now) {
@@ -7638,6 +8057,17 @@ export default {
               height: processedTile.height,
               paramsKey
             });
+            if (key === '0/0/0') {
+              const processFinishedAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+              this.emitCaptureTrace('frontend_z0_process_done', {
+                source: 'loadSingleTile',
+                sessionId: expectedSessionId,
+                frameId: expectedFrameId,
+                processMs: (processFinishedAt - processStartedAt).toFixed(2),
+                outWidth: processedTile.width,
+                outHeight: processedTile.height,
+              });
+            }
             this.markTileDirty(key);
             const isMergedPreviewTile = key === '0/0/0';
             let shouldTriggerMergedDetailLoad = false;
@@ -7774,7 +8204,7 @@ export default {
         if (isColorCamera) {
           // applyStretchAndGain() 期望 analysis.whiteBalance.gainR/gainB
           const analysis = { whiteBalance: { gainR: params.gainR, gainB: params.gainB } };
-          this.logMainCameraImagePipeLine('App.vue', 'processTile', 'tileColorParams', {
+          this.logImagePipelineHotPath('processTile', 'tileColorParams', {
             cfa: params.cfa,
             blackLevel: params.blackLevel,
             whiteLevel: params.whiteLevel,
@@ -7785,7 +8215,7 @@ export default {
           });
           resultImg = this.applyStretchAndGain(mat, analysis, 'bayer', params.cfa, params.blackLevel, params.whiteLevel);
         } else {
-          this.logMainCameraImagePipeLine('App.vue', 'processTile', 'tileGrayParams', {
+          this.logImagePipelineHotPath('processTile', 'tileGrayParams', {
             blackLevel: params.blackLevel,
             whiteLevel: params.whiteLevel,
             width,
@@ -7946,6 +8376,7 @@ export default {
 
       let drawnCount = 0;
       let skipNoCache = 0;
+      let drewZ0 = false;
       const drawDetails = this.TILE_DEBUG ? [] : null;
       let dirtyLeft = Infinity;
       let dirtyTop = Infinity;
@@ -7994,6 +8425,9 @@ export default {
         const srcHeight = destHeight < fullTilePxY ? (renderHeight * destHeight / fullTilePxY) : renderHeight;
 
         ctx.drawImage(renderSource, 0, 0, srcWidth, srcHeight, destX, destY, destWidth, destHeight);
+        if (key === '0/0/0') {
+          drewZ0 = true;
+        }
         dirtyLeft = Math.min(dirtyLeft, destX);
         dirtyTop = Math.min(dirtyTop, destY);
         dirtyRight = Math.max(dirtyRight, destX + destWidth);
@@ -8075,6 +8509,20 @@ export default {
         const tDisp0 = pn ? pn() : 0;
         this.drawImageData();
         const tDisp1 = pn ? pn() : 0;
+        if (drewZ0 && this.captureTrace && !this.captureTrace.z0RenderLogged) {
+          this.captureTrace.z0RenderLogged = true;
+          this.emitCaptureTrace('frontend_z0_rendered', {
+            sessionId: this.tileSessionId,
+            frameId: this.tileFrameId,
+            drawnTiles: drawnCount,
+            fullRender: needsFullRender,
+            tileCtxDrawLoopMs: pn ? (tDraw1 - tDraw0).toFixed(2) : '',
+            tileToBufferMs: pn ? (tBuf1 - tBuf0).toFixed(2) : '',
+            roiOverlayMs: pn ? (tRoi1 - tRoi0).toFixed(2) : '',
+            drawImageDataMs: pn ? (tDisp1 - tDisp0).toFixed(2) : '',
+            renderFrameMs: pn ? (tDisp1 - tDraw0).toFixed(2) : '',
+          });
+        }
 
         if (perf && pn) {
           const row = {
@@ -8578,18 +9026,6 @@ export default {
         return 0;
       };
 
-      // 安全掩码设置（setter）：OpenCV.js 设置像素需使用 ucharPtr 返回的视图再赋值
-      const safeSetMask = (mask, y, x, value) => {
-        if (y >= 0 && y < mask.rows && x >= 0 && x < mask.cols) {
-          try {
-            const ptr = mask.ucharPtr(y, x);
-            if (ptr && ptr.length > 0) ptr[0] = value;
-          } catch (e) {
-            console.error(`设置掩码错误: (${y},${x})`);
-          }
-        }
-      };
-
       if (imageType === 'gray') {
         if (calculateHistogram) {
           // 计算直方图
@@ -8614,11 +9050,6 @@ export default {
 
         const rows = img16.rows;
         const cols = img16.cols;
-
-        // 创建掩码 - 使用稀疏采样
-        const maskR = new cv.Mat(rows, cols, cv.CV_8UC1, new cv.Scalar(0));
-        const maskG = new cv.Mat(rows, cols, cv.CV_8UC1, new cv.Scalar(0));
-        const maskB = new cv.Mat(rows, cols, cv.CV_8UC1, new cv.Scalar(0));
 
         // 确定采样步长 - 大图像时采用更大步长
         const sampleStep = Math.max(2, Math.floor(Math.min(rows, cols) / 200) * 2);
@@ -8657,7 +9088,7 @@ export default {
         const gValues = [];
         const bValues = [];
 
-        // 采样设置掩码和收集采样数据
+        // 直接采样 Bayer 原始像素，用于后续增益估计。
         for (let y = 0; y < rows; y += sampleStep) {
           for (let x = 0; x < cols; x += sampleStep) {
             // 处理红色通道
@@ -8666,7 +9097,6 @@ export default {
               const px = x + pos.x;
               if (py < rows && px < cols && py >= 0 && px >= 0) {
                 try {
-                  safeSetMask(maskR, py, px, 255);
                   if (calculateGain && y % (sampleStep * 2) === 0 && x % (sampleStep * 2) === 0) {
                     rValues.push(safeUshortAt(img16, py, px));
                   }
@@ -8682,7 +9112,6 @@ export default {
               const px = x + pos.x;
               if (py < rows && px < cols && py >= 0 && px >= 0) {
                 try {
-                  safeSetMask(maskG, py, px, 255);
                   if (calculateGain && y % (sampleStep * 2) === 0 && x % (sampleStep * 2) === 0) {
                     gValues.push(safeUshortAt(img16, py, px));
                   }
@@ -8698,7 +9127,6 @@ export default {
               const px = x + pos.x;
               if (py < rows && px < cols && py >= 0 && px >= 0) {
                 try {
-                  safeSetMask(maskB, py, px, 255);
                   if (calculateGain && y % (sampleStep * 2) === 0 && x % (sampleStep * 2) === 0) {
                     bValues.push(safeUshortAt(img16, py, px));
                   }
@@ -8778,14 +9206,6 @@ export default {
           }
         }
 
-        // 释放资源
-        try {
-          maskR.delete();
-          maskG.delete();
-          maskB.delete();
-        } catch (e) {
-          console.error("释放资源错误", e);
-        }
       }
 
       return result;
@@ -8873,11 +9293,11 @@ export default {
       // 计算转换比例和偏移
       const scale = 255.0 / (whiteLevel - blackLevel);
       const offset = -blackLevel * scale;
-      this.logMainCameraImagePipeLine('App.vue', 'applyStretchAndGain', 'imageType', imageType);
-      this.logMainCameraImagePipeLine('App.vue', 'applyStretchAndGain', 'bayerPattern', bayerPattern);
-      this.logMainCameraImagePipeLine('App.vue', 'applyStretchAndGain', 'blackLevel', blackLevel);
-      this.logMainCameraImagePipeLine('App.vue', 'applyStretchAndGain', 'whiteLevel', whiteLevel);
-      this.logMainCameraImagePipeLine('App.vue', 'applyStretchAndGain', 'scaleOffset', `${scale},${offset}`);
+      this.logImagePipelineHotPath('applyStretchAndGain', 'imageType', imageType);
+      this.logImagePipelineHotPath('applyStretchAndGain', 'bayerPattern', bayerPattern);
+      this.logImagePipelineHotPath('applyStretchAndGain', 'blackLevel', blackLevel);
+      this.logImagePipelineHotPath('applyStretchAndGain', 'whiteLevel', whiteLevel);
+      this.logImagePipelineHotPath('applyStretchAndGain', 'scaleOffset', `${scale},${offset}`);
 
       if (imageType === 'gray') {
         // 单色相机 - 一步转换到8位RGBA
@@ -8896,8 +9316,8 @@ export default {
           gainR = analysis.whiteBalance.gainR;
           gainB = analysis.whiteBalance.gainB;
         }
-        this.logMainCameraImagePipeLine('App.vue', 'applyStretchAndGain', 'gainR', gainR);
-        this.logMainCameraImagePipeLine('App.vue', 'applyStretchAndGain', 'gainB', gainB);
+        this.logImagePipelineHotPath('applyStretchAndGain', 'gainR', gainR);
+        this.logImagePipelineHotPath('applyStretchAndGain', 'gainB', gainB);
 
         // 使用LUT优化白平衡和拉伸
         // 1. 创建三个LUT表

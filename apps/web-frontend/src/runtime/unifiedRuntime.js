@@ -343,6 +343,13 @@ export function recordServerRawMessage(rawMessage) {
   runtime.recentMessages = runtime.recentMessages.slice(0, 50)
 
   let op = null
+  if (raw.startsWith('CaptureTrace:')) {
+    appendLog(runtime, logEntry('server', 'info', raw, {
+      rawMessage: raw,
+      deviceType: 'MainCamera',
+    }))
+    return commit(runtime)
+  }
   if (raw.startsWith('SendDebugMessage|')) {
     const parts = raw.split('|')
     if (parts.length >= 3) {
