@@ -72,11 +72,17 @@ cd ~/workspace_origin/QUARCS_stellarium-web-engine
 # Fast frontend build: only rebuild the frontend bundle and skip skydata copy
 ./compile_frontend.sh
 
+# Fastest deploy-oriented build: default path skips source maps
+./compile_frontend.sh --skip-install
+
 # If the wasm / engine side changed, explicitly refresh engine artifacts first
 ./compile_frontend.sh --engine-update
 
 # Full frontend build: also copies skydata into dist/
 ./compile_frontend.sh --with-skydata
+
+# If you need production source maps for remote debugging, opt in explicitly
+./compile_frontend.sh --with-source-map
 
 # Fast deploy: push the fresh frontend bundle to the Raspberry Pi, but skip skydata
 ./deploy_to_pi.sh
@@ -92,6 +98,7 @@ Notes:
 
 - `compile_frontend.sh` outputs to `apps/web-frontend/dist`.
 - By default it does not rebuild the wasm engine; add `--engine-update` only when engine-side code changed.
+- By default it skips production source maps to reduce build time for deploy workflows; add `--with-source-map` when needed.
 - `deploy_to_pi.sh` reads Raspberry Pi connection info from the sibling `QUARCS_QT-SeverProgram/.env` by default.
 - If ETH / WiFi / ZeroTier all exist in env, `deploy_to_pi.sh` will automatically try them in order and use the first SSH-reachable host for deployment.
 - Both scripts default to the faster path because `skydata` is large and usually unchanged.

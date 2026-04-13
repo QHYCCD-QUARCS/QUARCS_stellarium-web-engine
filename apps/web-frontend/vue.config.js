@@ -18,6 +18,7 @@ const embeddedBuild = envBool('QUARCS_EMBEDDED_BUILD', false);
 const copyTiles = envBool('SWE_COPY_TILES', tilesMode === 'copy');
 const copySkydata = envBool('SWE_COPY_SKYDATA', embeddedBuild);
 const publicPath = process.env.QUARCS_PUBLIC_PATH || process.env.CDN_ENV || '/';
+const enableSourceMap = envBool('QUARCS_BUILD_SOURCE_MAP', process.env.NODE_ENV !== 'production');
 
 function resolveTilesPath() {
   const candidates = [];
@@ -54,7 +55,7 @@ function resolveSkydataPath() {
 module.exports = {
   runtimeCompiler: true,
   publicPath,
-  productionSourceMap: true,
+  productionSourceMap: enableSourceMap,
   css: {
     loaderOptions: {
       // 静音依赖（如 Vuetify）内部的 Dart Sass 弃用警告，避免刷屏。
@@ -127,7 +128,7 @@ module.exports = {
     optimization: {
       minimize: false
     },
-    devtool: 'source-map',
+    devtool: enableSourceMap ? 'source-map' : false,
     plugins: (() => {
       const patterns = [];
       if (copyTiles) {

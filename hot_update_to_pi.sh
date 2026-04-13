@@ -7,6 +7,7 @@ REPO_ROOT="${SCRIPT_DIR}"
 WITH_SKYDATA=0
 ENGINE_UPDATE=0
 SKIP_BUILD=0
+REMOTE_HOST_OVERRIDE=""
 SHOW_HELP=0
 
 usage() {
@@ -22,6 +23,7 @@ Options:
   --with-skydata   Include skydata in both build and deploy.
   --engine-update  Rebuild stellarium-web-engine.{js,wasm} before frontend build.
   --skip-build     Skip local build and deploy the existing dist/ directly.
+  --host <host>    Override Raspberry Pi host for the deploy step.
   -h, --help       Show this help message.
 
 Typical use:
@@ -50,6 +52,10 @@ while [[ $# -gt 0 ]]; do
       SKIP_BUILD=1
       shift
       ;;
+    --host)
+      REMOTE_HOST_OVERRIDE="$2"
+      shift 2
+      ;;
     -h|--help)
       SHOW_HELP=1
       shift
@@ -77,6 +83,10 @@ fi
 
 if [[ "${ENGINE_UPDATE}" -eq 1 ]]; then
   BUILD_ARGS+=(--engine-update)
+fi
+
+if [[ -n "${REMOTE_HOST_OVERRIDE}" ]]; then
+  DEPLOY_ARGS+=(--host "${REMOTE_HOST_OVERRIDE}")
 fi
 
 if [[ "${SKIP_BUILD}" -eq 0 ]]; then

@@ -35,6 +35,8 @@ make update-engine
 If you only changed the Vue/frontend code, you usually do not need to rebuild the engine again.
 From the repository root, `./compile_frontend.sh` reuses the existing engine artifacts and only rebuilds the frontend bundle.
 Use `./compile_frontend.sh --engine-update` only when the engine-side wasm/js outputs changed.
+For faster deploy-oriented builds, `./compile_frontend.sh` now skips production source maps by default;
+use `./compile_frontend.sh --with-source-map` only when you need those debug artifacts.
 
 ## Deploy to Raspberry Pi
 

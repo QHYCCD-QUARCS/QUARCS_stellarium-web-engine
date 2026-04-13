@@ -100,6 +100,7 @@ export default {
     this.$bus.$on('AutoHistogramNum', this.setAutoHistogramNum);
     this.$bus.$on('AutoWhiteBalanceState', this.setAutoWhiteBalanceState);
     this.$bus.$on('AutoHistogramState', this.setAutoHistogramState);
+    this.$bus.$on('HistogramRangeMode', this.setHistogramRangeMode);
   },
   mounted() {
     this.updatePosition(); // 初始化位置
@@ -114,6 +115,7 @@ export default {
     this.$bus.$off('AutoHistogramNum', this.setAutoHistogramNum);
     this.$bus.$off('AutoWhiteBalanceState', this.setAutoWhiteBalanceState);
     this.$bus.$off('AutoHistogramState', this.setAutoHistogramState);
+    this.$bus.$off('HistogramRangeMode', this.setHistogramRangeMode);
   },
   methods: {
     logMainCameraImagePipeLine(functionName, variableName, value) {
@@ -178,6 +180,9 @@ export default {
     },
     setAutoHistogramState(enabled) {
       this.autoHistogramEnabled = !!enabled;
+    },
+    setHistogramRangeMode(enabled) {
+      this.showEffectiveRange = !!enabled;
     },
     runWhiteBalanceOnce() {
       console.log('[HistogramPanel] 触发进一步白平衡计算');

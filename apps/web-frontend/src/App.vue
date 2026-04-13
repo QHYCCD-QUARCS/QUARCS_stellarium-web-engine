@@ -1347,6 +1347,7 @@ export default {
       lastVisibleAreaMessageKey: '', // 最近一次已发送的可视区消息快照，避免同值重复发送
       currentVisibleTiles: null,  // 当前可见的瓦片集合 Set<"z/x/y">
       tileHistogram: null,        // 当前会话直方图 { sessionId, bins, total, counts }
+      histogramRangeModeEnabled: true,
       autoStretchBlackLevel: null, // 保存最近一次前端自动拉伸的黑点参数
       autoStretchWhiteLevel: null, // 保存最近一次前端自动拉伸的白点参数
       // Live 模式 TileGPM 节流：避免高帧率下每条 TileGPM 都清缓存/abort，导致“永远拉不齐一帧”
@@ -1618,6 +1619,7 @@ export default {
     this.$bus.$on('RequestAutoHistogramState', () => {
       this.$bus.$emit('AutoHistogramState', !!this.autoHistogramEnabled);
     });
+    this.$bus.$on('HistogramRangeMode', this.setHistogramRangeMode);
     this.$bus.$on('SwitchOutPutPower', this.SwitchOutPutPower);
     this.$bus.$on('PolarAxisMode', this.PolarAxisMode);
     this.$bus.$on('SendConsoleLogMsg', this.SendConsoleLogMsg);
@@ -1898,6 +1900,9 @@ export default {
       this.autoHistogramEnabled = normalized;
       this.$bus.$emit('AutoHistogramState', normalized);
     },
+    setHistogramRangeMode(enabled) {
+      this.histogramRangeModeEnabled = !!enabled;
+    },
     updateMainCameraWhiteBalanceConfig(gainR, gainB) {
       const GainRIndex = this.MainCameraConfigItems.findIndex(item => item.label === 'ImageGainR');
       if (GainRIndex !== -1) {
@@ -2065,6 +2070,53 @@ export default {
         return this.GetAutoStretch(mat, 0);
       });
     },
+    buildHistogramSnapshotKey(sessionId = this.tileSessionId, frameId = this.tileFrameId) {
+      const sid = sessionId != null ? String(sessionId) : '';
+      const fid = frameId != null ? String(frameId) : '';
+      return sid && fid ? `${sid}::${fid}` : '';
+    },
+    cacheAndEmitHistogram(histogram, options = {}) {
+      if (!histogram) return false;
+      const sessionId = options.sessionId != null ? String(options.sessionId) : String(this.tileSessionId || '');
+      const frameId = options.frameId != null ? options.frameId : this.tileFrameId;
+      const snapshotKey = this.buildHistogramSnapshotKey(sessionId, frameId);
+      const isMultiChannel = Array.isArray(histogram[0]);
+      const bins = isMultiChannel
+        ? (Array.isArray(histogram[0]) ? histogram[0].length : 0)
+        : histogram.length;
+      this.tileHistogram = {
+        sessionId,
+        frameId,
+        snapshotKey,
+        bins,
+        total: options.total != null ? options.total : null,
+        counts: histogram,
+      };
+      this.$bus.$emit('showHistogram', histogram);
+      return true;
+    },
+    async refreshHistogramFromZ0(options = {}) {
+      if (!this.tileGPM) return false;
+      const sessionId = options.sessionId || this.tileSessionId;
+      const frameId = options.frameId != null ? options.frameId : this.tileFrameId;
+      const expectedKey = this.buildHistogramSnapshotKey(sessionId, frameId);
+      if (!expectedKey) return false;
+
+      const histogram = await this.withZ0Mat('Histogram', async (mat) => {
+        const cfa = this.normalizeCfaPattern(this.tileGPM && this.tileGPM.cfa ? this.tileGPM.cfa : this.ImageCFA);
+        const isColorRaw = !!cfa && cfa !== 'null';
+        const analysis = isColorRaw
+          ? this.analyzeImageStatistics(mat, 'bayer', cfa, { calculateGain: false, calculateHistogram: true })
+          : this.analyzeImageStatistics(mat, 'gray', cfa, { calculateGain: false, calculateHistogram: true });
+        return analysis && analysis.histogram ? analysis.histogram : null;
+      });
+
+      if (!histogram) return false;
+      if (expectedKey !== this.buildHistogramSnapshotKey()) {
+        return false;
+      }
+      return this.cacheAndEmitHistogram(histogram, { sessionId, frameId });
+    },
     async runAutoWhiteBalanceOnce(options = {}) {
       const { enablePersistent = false, reprocess = true, notify = true } = options;
       const startedAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
@@ -2116,7 +2168,7 @@ export default {
       this.autoStretchWhiteLevel = stretch.whiteLevel;
       this.currentHistogramMin = stretch.blackLevel;
       this.currentHistogramMax = stretch.whiteLevel;
-      if (this.showEffectiveRange !== true) {
+      if (!this.histogramRangeModeEnabled) {
         this.$bus.$emit('HistogramRangeMode', true);
       }
       this.$bus.$emit('ChangeDialPosition', stretch.blackLevel, stretch.whiteLevel);
@@ -5873,8 +5925,7 @@ export default {
         
         // 复用既有直方图绘制链路
         if (counts && counts.length > 0) {
-          this.$bus.$emit('showHistogram', counts);
-          
+          this.cacheAndEmitHistogram(counts, { sessionId, total: fileTotal });
           this.$bus.$emit('ChangeDialPosition', this.currentHistogramMin, this.currentHistogramMax);
           this.$bus.$emit('AutoHistogramNum', this.currentHistogramMin, this.currentHistogramMax);
         }
@@ -7035,6 +7086,7 @@ export default {
           // 清除旧会话的自动拉伸参数
           this.autoStretchBlackLevel = null;
           this.autoStretchWhiteLevel = null;
+          this.tileHistogram = null;
         }
       }
 
@@ -7127,6 +7179,10 @@ export default {
       // 关键优化：自动参数先基于本帧 Z=0 计算并写入状态，再开始可见瓦片处理，
       // 避免“先用旧参数处理一遍，再按新参数整批重处理一遍”。
       await this.prepareFrameAutoOptimizations();
+      await this.refreshHistogramFromZ0({
+        sessionId: this.tileSessionId,
+        frameId: this.tileFrameId,
+      });
 
       this.$bus.$emit('ChangeDialPosition', this.currentHistogramMin, this.currentHistogramMax);
       this.$bus.$emit('AutoHistogramNum', this.currentHistogramMin, this.currentHistogramMax);

@@ -12,6 +12,7 @@ BUILD_VERSION="${BUILD_VERSION:-${VUE_APP_VERSION:-$(date +%Y%m%d%H%M)}}"
 INCLUDE_SKYDATA=0
 INSTALL_MODE="auto"
 ENGINE_UPDATE=0
+SOURCE_MAP_MODE="auto"
 SHOW_HELP=0
 
 usage() {
@@ -26,6 +27,8 @@ Options:
   --engine-update    Rebuild and refresh stellarium-web-engine.{js,wasm} before frontend build.
   --install          Force npm dependency installation before build.
   --skip-install     Skip npm dependency installation even if node_modules is missing.
+  --with-source-map  Generate source maps for the production build (slower).
+  --skip-source-map  Skip source maps for the production build (faster deploy default).
   -h, --help         Show this help message.
 
 Notes:
@@ -33,6 +36,7 @@ Notes:
     in apps/web-frontend/src/assets/js.
   - Use --engine-update only when C/C++ engine or wasm outputs changed.
   - Fast build is usually enough when skydata has not changed and the device already has it.
+  - Source maps are skipped by default for faster deployment builds. Use --with-source-map when needed.
 EOF
 }
 
@@ -56,6 +60,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --skip-install)
       INSTALL_MODE="never"
+      shift
+      ;;
+    --with-source-map)
+      SOURCE_MAP_MODE="always"
+      shift
+      ;;
+    --skip-source-map)
+      SOURCE_MAP_MODE="never"
       shift
       ;;
     -h|--help)
@@ -91,6 +103,14 @@ if [[ ! -d "${FRONTEND_DIR}" ]]; then
 fi
 
 echo "Using frontend build version: ${BUILD_VERSION}"
+
+if [[ "${SOURCE_MAP_MODE}" = "always" ]]; then
+  BUILD_SOURCE_MAP=1
+elif [[ "${SOURCE_MAP_MODE}" = "never" ]]; then
+  BUILD_SOURCE_MAP=0
+else
+  BUILD_SOURCE_MAP=0
+fi
 
 if [[ "${ENGINE_UPDATE}" -eq 1 ]]; then
   require_cmd emcc
@@ -144,6 +164,12 @@ else
   echo "Building frontend without skydata copy"
 fi
 
+if [[ "${BUILD_SOURCE_MAP}" -eq 1 ]]; then
+  echo "Building frontend with source maps"
+else
+  echo "Building frontend without source maps"
+fi
+
 (
   cd "${FRONTEND_DIR}"
   env \
@@ -152,6 +178,7 @@ fi
     BUILD_VERSION="${BUILD_VERSION}" \
     VUE_APP_VERSION="${BUILD_VERSION}" \
     SWE_COPY_SKYDATA="${INCLUDE_SKYDATA}" \
+    QUARCS_BUILD_SOURCE_MAP="${BUILD_SOURCE_MAP}" \
     npm run build
 )
 

@@ -30,7 +30,7 @@ import { chromium } from '@playwright/test'
 
 const execFile = promisify(execFileCb)
 
-const baseURL = process.env.E2E_BASE_URL || 'http://192.168.1.113:8080'
+const baseURL = process.env.E2E_BASE_URL || 'http://172.24.217.51:8080'
 
 function resolveSessionPort(): number {
   const raw = process.env.E2E_AI_CONTROL_SESSION_PORT
