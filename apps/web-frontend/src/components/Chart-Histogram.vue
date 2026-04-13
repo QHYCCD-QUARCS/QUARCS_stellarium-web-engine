@@ -60,6 +60,83 @@ export default {
     }
   },
   methods: {
+    buildBaseChartOption(x_min, x_max, yAxisMax, series = []) {
+      const borderColor = 'rgba(210, 210, 210, 0.65)';
+      const showFullRangeGuides = !this.useEffectiveRange;
+
+      return {
+        grid: {
+          left: 0,
+          right: 0,
+          bottom: 0,
+          top: 0,
+          containLabel: false,
+          show: true,
+          borderColor,
+          borderWidth: 1
+        },
+        xAxis: {
+          type: 'value',
+          min: x_min,
+          max: x_max,
+          splitNumber: 5,
+          axisLine: {
+            show: false
+          },
+          axisTick: {
+            show: false
+          },
+          axisLabel: {
+            show: false
+          },
+          splitLine: {
+            show: showFullRangeGuides,
+            lineStyle: {
+              color: borderColor,
+              type: 'dashed',
+              width: 1
+            }
+          }
+        },
+        yAxis: {
+          type: 'value',
+          min: 0,
+          max: yAxisMax,
+          axisLine: {
+            show: false
+          },
+          axisTick: {
+            show: false
+          },
+          axisLabel: {
+            show: false
+          },
+          splitLine: {
+            show: false
+          }
+        },
+        series
+      };
+    },
+    buildExpandedDisplayRange(min, max) {
+      const safeMin = Number.isFinite(min) ? min : 0;
+      const safeMax = Number.isFinite(max) ? max : 65535;
+      const orderedMin = Math.max(0, Math.min(safeMin, safeMax));
+      const orderedMax = Math.min(65535, Math.max(safeMin, safeMax));
+      const span = orderedMax - orderedMin;
+      if (span <= 0) {
+        return {
+          min: orderedMin,
+          max: Math.min(65535, orderedMin + 1)
+        };
+      }
+
+      const padding = Math.round(span * 0.5);
+      return {
+        min: Math.max(0, orderedMin - padding),
+        max: Math.min(65535, orderedMax + padding)
+      };
+    },
     updateXAxisRange() {
       if (this.useEffectiveRange) {
         const autoMin = Number.isFinite(this.auto_min) ? this.auto_min : 0;
@@ -95,11 +172,13 @@ export default {
     },
     // 自动拉伸得到的固定显示范围（16bit：0-65535）
     setAutoRange(min, max) {
-      // 记录自动拉伸得到的“有效区间”总范围
-      this.auto_min = min;
-      this.auto_max = max;
+      const expandedRange = this.buildExpandedDisplayRange(min, max);
 
-      // 初始窗口与自动拉伸范围一致
+      // 区间模式下的显示范围：以自动拉伸区间为中心，左右各扩展 50% 区间宽度
+      this.auto_min = expandedRange.min;
+      this.auto_max = expandedRange.max;
+
+      // 当前窗口仍然保持真实的自动拉伸黑白点
       this.histogram_min = min;
       this.histogram_max = max;
 
@@ -167,67 +246,13 @@ export default {
       // 尚未初始化图表或没有数据，则退出
       if (!this.myChart) return;
       if (this.barData.length === 0) {
-        this.myChart.setOption({
-          xAxis: {
-            type: 'value',
-            min: x_min,
-            max: x_max,
-            axisLabel: null,
-            splitLine: { show: false }
-          },
-          yAxis: {
-            type: 'value',
-            min: 0,
-            max: 1,
-            axisLabel: null,
-            splitLine: { show: false }
-          },
-          series: []
-        }, true);
+        this.myChart.setOption(this.buildBaseChartOption(x_min, x_max, 1, []), true);
         return;
       }
       
       const flattened = this.barData.flatMap(channel => channel.map(item => item[1]));
       const yAxisMax = Math.max(1, ...flattened);
-      
-      const option = {
-        grid: {
-          left: '-1%',
-          right: '1%',
-          bottom: '0%',
-          top: '0%',
-          containLabel: true
-        },
-        xAxis: {
-          type: 'value',
-          min: x_min,
-          max: x_max,
-          axisLine: {
-            lineStyle: {
-              color: 'white'
-            }
-          },
-          axisLabel: null,
-          splitLine: {
-            show: false
-          }
-        },
-        yAxis: {
-          type: 'value',
-          min: 0,
-          max: yAxisMax,
-          axisLine: {
-            lineStyle: {
-              color: 'white'
-            }
-          },
-          axisLabel: null,
-          splitLine: {
-            show: false
-          }
-        },
-        series: []
-      };
+      const series = [];
 
       // 根据实际通道数量创建系列
       const colors = ['rgba(255,0,0,0.85)', 'rgba(51,218,121,0.85)', 'rgba(0,120,212,0.85)'];
@@ -235,7 +260,7 @@ export default {
       // 灰度图和彩色图使用不同的颜色方案
       if (this.barData.length === 1) {
         // 灰度图只有一个通道，使用白色
-        option.series.push({
+        series.push({
           data: this.barData[0],
           type: 'line',
           showSymbol: false,
@@ -251,7 +276,7 @@ export default {
       } else {
         // 彩色图有多个通道，使用标准RGB颜色
         for (let channel = 0; channel < this.barData.length; channel++) {
-          option.series.push({
+          series.push({
             data: this.barData[channel],
             type: 'line',
             showSymbol: false,
@@ -268,7 +293,7 @@ export default {
       }
 
       // 在两种模式下都添加最小和最大值的垂直线，标出当前窗口在 X 轴总范围中的位置
-      option.series.push({
+      series.push({
         data: [[this.histogram_min, 0], [this.histogram_min, yAxisMax]],
         type: 'line',
         lineStyle: {
@@ -279,7 +304,7 @@ export default {
         symbolSize: 0
       });
 
-      option.series.push({
+      series.push({
         data: [[this.histogram_max, 0], [this.histogram_max, yAxisMax]],
         type: 'line',
         lineStyle: {
@@ -290,6 +315,7 @@ export default {
         symbolSize: 0
       });
 
+      const option = this.buildBaseChartOption(x_min, x_max, yAxisMax, series);
       this.myChart.setOption(option, true);
     },
 

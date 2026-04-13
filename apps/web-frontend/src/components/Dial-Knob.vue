@@ -21,6 +21,7 @@ export default {
       height: 80, // 初始高度
 
       DialWidth: 1,
+      touchIndicatorWidth: 14,
       
       positionX: 0,
       dragging: false,
@@ -86,6 +87,25 @@ export default {
     window.removeEventListener("blur", this.stopSecondDrag);
   },
   methods: {
+    buildExpandedDisplayRange(min, max) {
+      const safeMin = Number.isFinite(min) ? min : 0;
+      const safeMax = Number.isFinite(max) ? max : 65535;
+      const orderedMin = Math.max(0, Math.min(safeMin, safeMax));
+      const orderedMax = Math.min(65535, Math.max(safeMin, safeMax));
+      const span = orderedMax - orderedMin;
+      if (span <= 0) {
+        return {
+          min: orderedMin,
+          max: Math.min(65535, orderedMin + 1)
+        };
+      }
+
+      const padding = Math.round(span * 0.5);
+      return {
+        min: Math.max(0, orderedMin - padding),
+        max: Math.min(65535, orderedMax + padding)
+      };
+    },
     setMaxWidth() {
       const Width = window.innerWidth;
       this.width = Math.min(Width - 350, 490);
@@ -286,9 +306,11 @@ export default {
 
     // 由自动拉伸结果设置固定区间
     setAutoRange(min, max) {
-      this.autoMin = min;
-      this.autoMax = max;
-      // 初始窗口与自动拉伸范围一致
+      const expandedRange = this.buildExpandedDisplayRange(min, max);
+
+      // 区间模式下刻度显示扩大，但窗口本身仍保持真实自动拉伸黑白点
+      this.autoMin = expandedRange.min;
+      this.autoMax = expandedRange.max;
       this.windowMin = min;
       this.windowMax = max;
       this.ChangeDialPosition(this.windowMin, this.windowMax);
@@ -331,13 +353,13 @@ export default {
 }
 
 .indicator {
-  width: 10px;
+  width: 14px;
   height: 80px;
   border-radius: 1px;
   position: absolute;
   top: 50%;
   left: var(--positionX);
-  transform: translate(-50%, -50%);
+  transform: translate(-100%, -50%);
   
   background-color: rgba(75, 155, 250, 0.5);
   border: 1px solid rgba(0, 0, 0, 0.1);
@@ -346,13 +368,13 @@ export default {
 }
 
 .second-indicator {
-  width: 10px;
+  width: 14px;
   height: 80px;
   border-radius: 1px;
   position: absolute;
   top: 50%;
   left: var(--secondPositionX);
-  transform: translate(-50%, -50%);
+  transform: translate(0, -50%);
   
   background-color: rgba(255, 0, 0, 0.5);
   border: 1px solid rgba(0, 0, 0, 0.1);
@@ -361,13 +383,13 @@ export default {
 }
 
 .indicator:active:active {
-  width: 2px;
+  width: 14px;
   height: 80px;
   border-radius: 1px;
   position: absolute;
   top: 50%;
   left: var(--positionX);
-  transform: translate(-50%, -50%);
+  transform: translate(-100%, -50%);
   
   background-color: rgba(75, 155, 250, 1);
   border: 1px solid rgba(0, 0, 0, 0.1);
@@ -377,13 +399,13 @@ export default {
 
 
 .second-indicator:active {
-  width: 2px;
+  width: 14px;
   height: 80px;
   border-radius: 1px;
   position: absolute;
   top: 50%;
   left: var(--secondPositionX);
-  transform: translate(-50%, -50%);
+  transform: translate(0, -50%);
   
   background-color: rgba(255, 0, 0, 1);
   border: 1px solid rgba(0, 0, 0, 0.1);
