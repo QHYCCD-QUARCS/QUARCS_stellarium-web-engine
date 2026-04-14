@@ -274,6 +274,7 @@ export default {
       manualCalibrationRightValue: null,
       savedMinLimit: null,
       savedMaxLimit: null,
+      calibrationPreviousMoveSpeed: null,
 
       // 自动对焦阶段拍摄进度（仅用于逻辑记录，不再在面板底部重复显示）
       autoFocusStage: '',
@@ -403,6 +404,10 @@ export default {
       else if (this.MoveSpeed === 3) this.MoveSpeed = 5;
       else if (this.MoveSpeed === 5) this.MoveSpeed = 1;
 
+      this.applyFocuserSpeed(this.MoveSpeed);
+    },
+    applyFocuserSpeed(speedValue) {
+      this.MoveSpeed = speedValue;
       console.log('QHYCCD | SpeedChange: ', this.MoveSpeed);
       this.$bus.$emit('SendConsoleLogMsg', 'SpeedChange:' + this.MoveSpeed, 'info');
       if (this.MoveSpeed === 1) {
@@ -711,6 +716,10 @@ export default {
 
         if (!this.manualCalibrationMode) {
           this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getFocuserParameters');
+          this.calibrationPreviousMoveSpeed = this.MoveSpeed;
+          if (this.MoveSpeed !== 5) {
+            this.applyFocuserSpeed(5);
+          }
           this.manualCalibrationMode = true;
           this.isCalibrating = true;
           this.calibrationState = 'running';
@@ -779,6 +788,10 @@ export default {
         this.calibrationState = 'idle';
         this.calibrationStep = 0;
         this.calibrationMessage = '';
+        if (this.calibrationPreviousMoveSpeed !== null) {
+          this.applyFocuserSpeed(this.calibrationPreviousMoveSpeed);
+          this.calibrationPreviousMoveSpeed = null;
+        }
         this.$bus.$emit('SendConsoleLogMsg', this.$t('Manual focuser calibration mode ended'), 'info');
         this.$bus.$emit('EndCalibration');
       } catch (error) {
