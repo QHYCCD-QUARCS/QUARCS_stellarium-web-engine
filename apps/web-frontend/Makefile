@@ -140,11 +140,15 @@ build-with-tiles:
 	if [ "$$TILES_MODE" = "copy" ]; then \
 		echo "[tiles] mode=copy (webpack 构建阶段复制到 dist/tiles)"; \
 		export TILES_SRC_DIR="$$TILES_SRC" SKYDATA_SRC_DIR="$$SKYDATA_SRC" SWE_TILES_MODE=copy; \
+		export VUE_APP_VERSION="$${VUE_APP_VERSION:-$$(date +%Y%m%d%H%M)}"; \
+		echo "[version] VUE_APP_VERSION=$$VUE_APP_VERSION"; \
 		$(WITH_NVM); \
 		npm run build; \
 	else \
 		echo "[tiles] mode=symlink (构建后建立 dist/tiles -> $$TILES_SRC)"; \
 		export TILES_SRC_DIR="$$TILES_SRC" SKYDATA_SRC_DIR="$$SKYDATA_SRC" SWE_TILES_MODE=none; \
+		export VUE_APP_VERSION="$${VUE_APP_VERSION:-$$(date +%Y%m%d%H%M)}"; \
+		echo "[version] VUE_APP_VERSION=$$VUE_APP_VERSION"; \
 		$(WITH_NVM); \
 		npm run build; \
 		mkdir -p dist; \

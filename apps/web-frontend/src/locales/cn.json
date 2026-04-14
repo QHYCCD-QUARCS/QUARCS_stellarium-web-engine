@@ -214,6 +214,8 @@
   "Messages copied to clipboard!": "日志消息已复制到剪贴板!",
   "Failed to copy messages!": "复制日志消息失败！",
   "Copy current logs": "复制当前日志",
+  "Filter logs by keyword": "按关键词过滤日志",
+  "Clear keyword filter": "清空关键词过滤",
   "AutoFocusFitResultFlatLine": "自动对焦拟合结果为一条水平线。",
   "AutoFocusFailed": "对焦失败!",
   "DeviceBusyWithFeatures": "设备 {device} 正在参与功能：{features}",

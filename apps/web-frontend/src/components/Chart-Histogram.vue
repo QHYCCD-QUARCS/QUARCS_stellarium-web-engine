@@ -13,7 +13,9 @@ export default {
   data() {
     return {
       containerMaxWidth: 190,
-      barData: [],  // 示例数据
+      barData: [],
+      rawHistogramData: null,
+      myChart: null,
       xAxis_min: 0,
       xAxis_max: 65535,
 
@@ -46,30 +48,147 @@ export default {
     // 与拨盘联动：切换“全图 / 区间”模式
     this.$bus.$on('HistogramRangeMode', this.setRangeMode);
   },
+  beforeDestroy() {
+    this.$bus.$off('showHistogram', this.addDataToChart);
+    this.$bus.$off('updateHistogramWidth', this.initChart);
+    this.$bus.$off('AutoHistogramNum', this.setAutoRange);
+    this.$bus.$off('ChangeDialPosition', this.setWindowRange);
+    this.$bus.$off('HistogramRangeMode', this.setRangeMode);
+    if (this.myChart) {
+      this.myChart.dispose();
+      this.myChart = null;
+    }
+  },
   methods: {
+    buildBaseChartOption(x_min, x_max, yAxisMax, series = []) {
+      const borderColor = 'rgba(210, 210, 210, 0.65)';
+      const showFullRangeGuides = !this.useEffectiveRange;
+
+      return {
+        grid: {
+          left: 0,
+          right: 0,
+          bottom: 0,
+          top: 0,
+          containLabel: false,
+          show: true,
+          borderColor,
+          borderWidth: 1
+        },
+        xAxis: {
+          type: 'value',
+          min: x_min,
+          max: x_max,
+          splitNumber: 5,
+          axisLine: {
+            show: false
+          },
+          axisTick: {
+            show: false
+          },
+          axisLabel: {
+            show: false
+          },
+          splitLine: {
+            show: showFullRangeGuides,
+            lineStyle: {
+              color: borderColor,
+              type: 'dashed',
+              width: 1
+            }
+          }
+        },
+        yAxis: {
+          type: 'value',
+          min: 0,
+          max: yAxisMax,
+          axisLine: {
+            show: false
+          },
+          axisTick: {
+            show: false
+          },
+          axisLabel: {
+            show: false
+          },
+          splitLine: {
+            show: false
+          }
+        },
+        series
+      };
+    },
+    buildExpandedDisplayRange(min, max) {
+      const safeMin = Number.isFinite(min) ? min : 0;
+      const safeMax = Number.isFinite(max) ? max : 65535;
+      const orderedMin = Math.max(0, Math.min(safeMin, safeMax));
+      const orderedMax = Math.min(65535, Math.max(safeMin, safeMax));
+      const span = orderedMax - orderedMin;
+      if (span <= 0) {
+        return {
+          min: orderedMin,
+          max: Math.min(65535, orderedMin + 1)
+        };
+      }
+
+      const padding = Math.round(span * 0.5);
+      return {
+        min: Math.max(0, orderedMin - padding),
+        max: Math.min(65535, orderedMax + padding)
+      };
+    },
+    updateXAxisRange() {
+      if (this.useEffectiveRange) {
+        const autoMin = Number.isFinite(this.auto_min) ? this.auto_min : 0;
+        const autoMax = Number.isFinite(this.auto_max) ? this.auto_max : 65535;
+        this.xAxis_min = autoMin;
+        this.xAxis_max = autoMax > autoMin ? autoMax : autoMin + 1;
+      } else {
+        this.xAxis_min = this.fullRange_min;
+        this.xAxis_max = this.fullRange_max;
+      }
+    },
+    buildSeriesData(channelData) {
+      if (!Array.isArray(channelData) || channelData.length === 0) return [];
+
+      let maxLogValue = 0;
+      const logValues = new Array(channelData.length);
+      for (let i = 0; i < channelData.length; i++) {
+        const count = Number(channelData[i]) || 0;
+        const logValue = Math.log1p(Math.max(0, count));
+        logValues[i] = logValue;
+        if (logValue > maxLogValue) maxLogValue = logValue;
+      }
+
+      const normalizationBase = maxLogValue > 0 ? maxLogValue : 1;
+      const formattedData = [];
+      for (let i = 0; i < logValues.length; i++) {
+        const normalizedValue = logValues[i] / normalizationBase;
+        if (normalizedValue > 0 || i % 16 === 0 || i === 0 || i === logValues.length - 1) {
+          formattedData.push([i, normalizedValue]);
+        }
+      }
+      return formattedData;
+    },
     // 自动拉伸得到的固定显示范围（16bit：0-65535）
     setAutoRange(min, max) {
-      // 记录自动拉伸得到的“有效区间”总范围
-      this.auto_min = min;
-      this.auto_max = max;
+      const expandedRange = this.buildExpandedDisplayRange(min, max);
 
-      // 初始窗口与自动拉伸范围一致
+      // 区间模式下的显示范围：以自动拉伸区间为中心，左右各扩展 50% 区间宽度
+      this.auto_min = expandedRange.min;
+      this.auto_max = expandedRange.max;
+
+      // 当前窗口仍然保持真实的自动拉伸黑白点
       this.histogram_min = min;
       this.histogram_max = max;
 
       // 按模式决定 X 轴总范围：
       // 区间模式（按钮显示“区”）：X 轴固定为自动拉伸区间 [auto_min, auto_max]
       // 全图模式（按钮显示“全”）：X 轴固定为完整 16bit 范围 [0, 65535]
-      if (this.useEffectiveRange) {
-        this.xAxis_min = this.auto_min;
-        this.xAxis_max = this.auto_max;
-      } else {
-        this.xAxis_min = this.fullRange_min;
-        this.xAxis_max = this.fullRange_max;
-      }
+      this.updateXAxisRange();
 
       // 已有图表和数据时，立即按新范围重绘，便于观察像素变化
-      if (this.myChart && this.barData.length > 0) {
+      if (this.myChart) {
         this.renderChart(this.xAxis_min, this.xAxis_max);
       }
     },
@@ -79,7 +198,7 @@ export default {
       this.histogram_min = min;
       this.histogram_max = max;
 
-      if (this.myChart && this.barData.length > 0) {
+      if (this.myChart) {
         this.renderChart(this.xAxis_min, this.xAxis_max);
       }
     },
@@ -87,16 +206,7 @@ export default {
     // 外部调用：切换“全范围 / 有效区间”显示模式
     toggleRangeMode() {
       this.useEffectiveRange = !this.useEffectiveRange;
-
-      if (this.useEffectiveRange) {
-        // 区间模式：X 轴固定为自动拉伸得到的有效区间 [auto_min, auto_max]
-        this.xAxis_min = this.auto_min;
-        this.xAxis_max = this.auto_max;
-      } else {
-        // 全图模式：始终显示完整 16bit 范围 [0, 65535]
-        this.xAxis_min = this.fullRange_min;
-        this.xAxis_max = this.fullRange_max;
-      }
+      this.updateXAxisRange();
 
       if (this.myChart && this.barData.length > 0) {
         this.renderChart(this.xAxis_min, this.xAxis_max);
@@ -106,20 +216,15 @@ export default {
     // 根据外部开关直接设置"全图 / 区间"模式（与拨盘和面板按钮联动）
     setRangeMode(flag) {
       this.useEffectiveRange = flag;
+      this.updateXAxisRange();
 
       if (this.useEffectiveRange) {
-        // 区间模式：X 轴固定为自动拉伸得到的有效区间 [auto_min, auto_max]
-        this.xAxis_min = this.auto_min;
-        this.xAxis_max = this.auto_max;
-        console.log(`[Chart-Histogram] 切换到区间模式: [${this.auto_min}, ${this.auto_max}]`);
+        console.log(`[Chart-Histogram] 切换到区间模式: [${this.xAxis_min}, ${this.xAxis_max}]`);
       } else {
-        // 全图模式：始终显示完整 0-65535 范围
-        this.xAxis_min = this.fullRange_min;
-        this.xAxis_max = this.fullRange_max;
-        console.log(`[Chart-Histogram] 切换到全图模式: [${this.fullRange_min}, ${this.fullRange_max}]`);
+        console.log(`[Chart-Histogram] 切换到全图模式: [${this.xAxis_min}, ${this.xAxis_max}]`);
       }
 
-      if (this.myChart && this.barData.length > 0) {
+      if (this.myChart) {
         this.renderChart(this.xAxis_min, this.xAxis_max);
       } else {
         console.log('[Chart-Histogram] 图表尚未初始化或无数据，延迟渲染');
@@ -130,6 +235,9 @@ export default {
       this.containerMaxWidth = Width - 10;
       const chartDom = this.$refs.barchart;
       chartDom.style.width = this.containerMaxWidth + 'px';
+      if (this.myChart) {
+        this.myChart.dispose();
+      }
       this.myChart = echarts.init(chartDom);
       this.renderChart(this.xAxis_min, this.xAxis_max);
     },
@@ -137,80 +245,55 @@ export default {
     renderChart(x_min, x_max) {
       // 尚未初始化图表或没有数据，则退出
       if (!this.myChart) return;
-      if (this.barData.length === 0) return;
+      if (this.barData.length === 0) {
+        this.myChart.setOption(this.buildBaseChartOption(x_min, x_max, 1, []), true);
+        return;
+      }
       
-      const yAxisMax = Math.max(...this.barData.flatMap(channel => 
-        channel.map(item => item[1])
-      ));  // 获取所有通道中的y轴最大值
-      
-      const option = {
-        grid: {
-          left: '-1%',
-          right: '1%',
-          bottom: '0%',
-          top: '0%',
-          containLabel: true
-        },
-        xAxis: {
-          type: 'value',
-          min: x_min,
-          max: x_max,
-          axisLine: {
-            lineStyle: {
-              color: 'white'
-            }
-          },
-          axisLabel: null,
-          splitLine: {
-            show: false
-          }
-        },
-        yAxis: {
-          type: 'value',
-          max: yAxisMax,
-          axisLine: {
-            lineStyle: {
-              color: 'white'
-            }
-          },
-          axisLabel: null,
-          splitLine: {
-            show: false
-          }
-        },
-        series: []
-      };
+      const flattened = this.barData.flatMap(channel => channel.map(item => item[1]));
+      const yAxisMax = Math.max(1, ...flattened);
+      const series = [];
 
       // 根据实际通道数量创建系列
-      const colors = ['rgba(0,120,212,0.7)', 'rgba(51,218,121,0.7)', 'rgba(255,0,0,0.7)'];
+      const colors = ['rgba(255,0,0,0.85)', 'rgba(51,218,121,0.85)', 'rgba(0,120,212,0.85)'];
       
       // 灰度图和彩色图使用不同的颜色方案
       if (this.barData.length === 1) {
         // 灰度图只有一个通道，使用白色
-        option.series.push({
+        series.push({
           data: this.barData[0],
           type: 'line',
+          showSymbol: false,
+          smooth: false,
           itemStyle: {
             color: 'rgba(255,255,255,0.7)'
+          },
+          lineStyle: {
+            width: 1.2
           },
           symbolSize: 0
         });
       } else {
         // 彩色图有多个通道，使用标准RGB颜色
         for (let channel = 0; channel < this.barData.length; channel++) {
-          option.series.push({
+          series.push({
             data: this.barData[channel],
             type: 'line',
+            showSymbol: false,
+            smooth: false,
             itemStyle: {
               color: colors[channel % colors.length]
             },
+            lineStyle: {
+              width: 1.1
+            },
             symbolSize: 0
           });
-      }
+        }
       }
 
       // 在两种模式下都添加最小和最大值的垂直线，标出当前窗口在 X 轴总范围中的位置
-      option.series.push({
+      series.push({
         data: [[this.histogram_min, 0], [this.histogram_min, yAxisMax]],
         type: 'line',
         lineStyle: {
@@ -221,7 +304,7 @@ export default {
         symbolSize: 0
       });
 
-      option.series.push({
+      series.push({
         data: [[this.histogram_max, 0], [this.histogram_max, yAxisMax]],
         type: 'line',
         lineStyle: {
@@ -232,45 +315,24 @@ export default {
         symbolSize: 0
       });
 
-      this.myChart.setOption(option);
+      const option = this.buildBaseChartOption(x_min, x_max, yAxisMax, series);
+      this.myChart.setOption(option, true);
     },
 
     addDataToChart(histogramData) {
-      this.clearBarData();
+      this.rawHistogramData = histogramData;
+      this.barData = [];
+      if (!Array.isArray(histogramData) || histogramData.length === 0) {
+        this.renderChart(this.xAxis_min, this.xAxis_max);
+        return;
+      }
       console.log("当前直方图数据长度:", histogramData.length);
-      
-      // 判断是灰度图还是彩色图
-      // 如果是简单数组(长度很大)，则为灰度图
-      // 如果是数组的数组(长度为3)，则为彩色图
-      
-      
-      // 处理灰度图 - 单一数组，长度很大
+
       if (!Array.isArray(histogramData[0])) {
-        const formattedData = [];
-        
-        // 转换为[index, value]格式，仅保留非零点和每16个点的采样点
-        for (let i = 0; i < histogramData.length; i++) {
-          if (histogramData[i] > 0 || i % 16 === 0) {
-            formattedData.push([i, histogramData[i]]);
-          }
-        }
-        
-        this.barData.push(formattedData);
-        
-      } else { // 处理彩色图 - 三通道数组
-        // 遍历RGB三个通道
+        this.barData.push(this.buildSeriesData(histogramData));
+      } else {
         for (let channel = 0; channel < histogramData.length; channel++) {
-          const channelData = histogramData[channel];
-          const formattedData = [];
-          
-          // 转换为[index, value]格式，仅保留非零点和每16个点的采样点
-          for (let i = 0; i < channelData.length; i++) {
-            if (channelData[i] > 0 || i % 16 === 0) {
-              formattedData.push([i, channelData[i]]);
-            }
-          }
-          
-          this.barData.push(formattedData);
+          this.barData.push(this.buildSeriesData(histogramData[channel]));
         }
       }
       
@@ -281,8 +343,9 @@ export default {
     },
 
     clearBarData() {
-      this.barData = [];  // 清空数据
-      this.renderChart(this.xAxis_min, this.xAxis_max);  // 重新渲染图表
+      this.rawHistogramData = null;
+      this.barData = [];
+      this.renderChart(this.xAxis_min, this.xAxis_max);
     }
   }
 }

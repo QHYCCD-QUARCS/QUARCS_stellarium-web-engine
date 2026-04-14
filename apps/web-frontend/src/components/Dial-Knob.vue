@@ -21,6 +21,7 @@ export default {
       height: 80, // 初始高度
 
       DialWidth: 1,
+      touchIndicatorWidth: 14,
       
       positionX: 0,
       dragging: false,
@@ -75,17 +76,36 @@ export default {
     this.dragging = false;
     this.secondDragging = false;
     document.removeEventListener("mousemove", this.onDrag);
-    document.removeEventListener("mouseup", this.stopDrag);
+    document.removeEventListener("mouseup", this.stopDrag, true);
     document.removeEventListener("touchmove", this.onDragMobile);
     document.removeEventListener("touchend", this.stopDragMobile);
     document.removeEventListener("mousemove", this.onSecondDrag);
-    document.removeEventListener("mouseup", this.stopSecondDrag);
+    document.removeEventListener("mouseup", this.stopSecondDrag, true);
     document.removeEventListener("touchmove", this.onSecondDragMobile);
     document.removeEventListener("touchend", this.stopSecondDragMobile);
     window.removeEventListener("blur", this.stopDrag);
     window.removeEventListener("blur", this.stopSecondDrag);
   },
   methods: {
+    buildExpandedDisplayRange(min, max) {
+      const safeMin = Number.isFinite(min) ? min : 0;
+      const safeMax = Number.isFinite(max) ? max : 65535;
+      const orderedMin = Math.max(0, Math.min(safeMin, safeMax));
+      const orderedMax = Math.min(65535, Math.max(safeMin, safeMax));
+      const span = orderedMax - orderedMin;
+      if (span <= 0) {
+        return {
+          min: orderedMin,
+          max: Math.min(65535, orderedMin + 1)
+        };
+      }
+
+      const padding = Math.round(span * 0.5);
+      return {
+        min: Math.max(0, orderedMin - padding),
+        max: Math.min(65535, orderedMax + padding)
+      };
+    },
     setMaxWidth() {
       const Width = window.innerWidth;
       this.width = Math.min(Width - 350, 490);
@@ -95,13 +115,18 @@ export default {
       this.dragging = true;
       this.startPositionX = event.clientX - this.positionX;
       document.addEventListener("mousemove", this.onDrag);
-      document.addEventListener("mouseup", this.stopDrag);
+      document.addEventListener("mouseup", this.stopDrag, true);
       // 关键：如果鼠标按住拖出浏览器/窗口外再松开，document 可能收不到 mouseup，
       // 这里监听 window blur 来强制结束拖拽，避免“粘鼠标”
       window.addEventListener("blur", this.stopDrag);
     },
     onDrag(event) {
       if (this.dragging) {
+        // 某些场景 mouseup 会被组件内部 stopPropagation 截住；一旦检测到左键已松开，立即结束拖拽
+        if (typeof event.buttons === 'number' && event.buttons === 0) {
+          this.stopDrag();
+          return;
+        }
         const clientX = event.touches ? event.touches[0].clientX : event.clientX;
         const newPositionX = clientX - this.startPositionX;
 
@@ -119,7 +144,7 @@ export default {
     stopDrag() {
       this.dragging = false;
       document.removeEventListener("mousemove", this.onDrag);
-      document.removeEventListener("mouseup", this.stopDrag);
+      document.removeEventListener("mouseup", this.stopDrag, true);
       window.removeEventListener("blur", this.stopDrag);
       
       const HistMin = this.mappedWidth(this.positionX);
@@ -169,12 +194,16 @@ export default {
       this.secondDragging = true;
       this.secondStartPositionX = event.clientX - this.secondPositionX;
       document.addEventListener("mousemove", this.onSecondDrag);
-      document.addEventListener("mouseup", this.stopSecondDrag);
+      document.addEventListener("mouseup", this.stopSecondDrag, true);
       // 同上：窗口失焦时强制结束，避免拖拽状态卡住
       window.addEventListener("blur", this.stopSecondDrag);
     },
     onSecondDrag(event) {
       if (this.secondDragging) {
+        if (typeof event.buttons === 'number' && event.buttons === 0) {
+          this.stopSecondDrag();
+          return;
+        }
         const clientX = event.touches ? event.touches[0].clientX : event.clientX;
         const newSecondPositionX = clientX - this.secondStartPositionX;
         
@@ -191,7 +220,7 @@ export default {
     stopSecondDrag() {
       this.secondDragging = false;
       document.removeEventListener("mousemove", this.onSecondDrag);
-      document.removeEventListener("mouseup", this.stopSecondDrag);
+      document.removeEventListener("mouseup", this.stopSecondDrag, true);
       window.removeEventListener("blur", this.stopSecondDrag);
       
       const HistMin = this.mappedWidth(this.positionX);
@@ -277,9 +306,11 @@ export default {
 
     // 由自动拉伸结果设置固定区间
     setAutoRange(min, max) {
-      this.autoMin = min;
-      this.autoMax = max;
-      // 初始窗口与自动拉伸范围一致
+      const expandedRange = this.buildExpandedDisplayRange(min, max);
+
+      // 区间模式下刻度显示扩大，但窗口本身仍保持真实自动拉伸黑白点
+      this.autoMin = expandedRange.min;
+      this.autoMax = expandedRange.max;
       this.windowMin = min;
       this.windowMax = max;
       this.ChangeDialPosition(this.windowMin, this.windowMax);
@@ -322,13 +353,13 @@ export default {
 }
 
 .indicator {
-  width: 10px;
+  width: 14px;
   height: 80px;
   border-radius: 1px;
   position: absolute;
   top: 50%;
   left: var(--positionX);
-  transform: translate(-50%, -50%);
+  transform: translate(-100%, -50%);
   
   background-color: rgba(75, 155, 250, 0.5);
   border: 1px solid rgba(0, 0, 0, 0.1);
@@ -337,13 +368,13 @@ export default {
 }
 
 .second-indicator {
-  width: 10px;
+  width: 14px;
   height: 80px;
   border-radius: 1px;
   position: absolute;
   top: 50%;
   left: var(--secondPositionX);
-  transform: translate(-50%, -50%);
+  transform: translate(0, -50%);
   
   background-color: rgba(255, 0, 0, 0.5);
   border: 1px solid rgba(0, 0, 0, 0.1);
@@ -352,13 +383,13 @@ export default {
 }
 
 .indicator:active:active {
-  width: 2px;
+  width: 14px;
   height: 80px;
   border-radius: 1px;
   position: absolute;
   top: 50%;
   left: var(--positionX);
-  transform: translate(-50%, -50%);
+  transform: translate(-100%, -50%);
   
   background-color: rgba(75, 155, 250, 1);
   border: 1px solid rgba(0, 0, 0, 0.1);
@@ -368,13 +399,13 @@ export default {
 
 
 .second-indicator:active {
-  width: 2px;
+  width: 14px;
   height: 80px;
   border-radius: 1px;
   position: absolute;
   top: 50%;
   left: var(--secondPositionX);
-  transform: translate(-50%, -50%);
+  transform: translate(0, -50%);
   
   background-color: rgba(255, 0, 0, 1);
   border: 1px solid rgba(0, 0, 0, 0.1);
@@ -382,4 +413,3 @@ export default {
   box-sizing: border-box;
 }
 </style>
-

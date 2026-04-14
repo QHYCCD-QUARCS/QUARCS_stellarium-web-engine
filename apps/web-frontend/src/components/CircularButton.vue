@@ -253,13 +253,22 @@ export default {
       }
 
       this.animationDuration = this.CaptureExpTime;
+      const traceId = `cap_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      this.$bus.$emit('CaptureTraceStart', {
+        traceId,
+        mode,
+        exposureMs: this.animationDuration,
+        burstFrames: mode === 'Burst'
+          ? Math.max(1, Math.min(1024, parseInt(this.burstFrames, 10) || 20))
+          : 1,
+      });
       this.$startFeature(['MainCamera'], 'Capture')
       if (mode === 'Burst') {
         const frames = Math.max(1, Math.min(1024, parseInt(this.burstFrames, 10) || 20));
-        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'takeExposureBurst:' + this.animationDuration + ':' + frames);
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'takeExposureBurst:' + this.animationDuration + ':' + frames + ':' + traceId);
         this.$bus.$emit('SendConsoleLogMsg', 'Take Exposure (Burst):' + this.animationDuration + 'ms x' + frames, 'info');
       } else {
-        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'takeExposure:' + this.animationDuration);
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'takeExposure:' + this.animationDuration + ':' + traceId);
         this.$bus.$emit('SendConsoleLogMsg', 'Take Exposure:' + this.animationDuration, 'info');
       }
       this.isClicked = true;
@@ -397,5 +406,4 @@ export default {
 }
 
 </style>
-
 

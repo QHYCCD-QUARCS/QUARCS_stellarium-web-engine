@@ -336,7 +336,22 @@
                   + '-select-'
                   + index
                 "
-              />
+              >
+                <template v-slot:selection="{ item: option }">
+                  <span :style="getConfigSelectOptionStyle(item, option)">
+                    {{ formatConfigSelectOptionText(option) }}
+                  </span>
+                </template>
+                <template v-slot:item="{ item: option, on, attrs }">
+                  <v-list-item v-on="on" v-bind="attrs">
+                    <v-list-item-content>
+                      <v-list-item-title :style="getConfigSelectOptionStyle(item, option)">
+                        {{ formatConfigSelectOptionText(option) }}
+                      </v-list-item-title>
+                    </v-list-item-content>
+                  </v-list-item>
+                </template>
+              </v-select>
 
               <!-- 开关类型 -->
               <v-switch
@@ -1048,8 +1063,7 @@ export default {
       networkDisconnected: false, // 添加网络连接状态
 
       QTClientVersion: 'Not connected',
-      // VueClientVersion: process.env.VUE_APP_VERSION,
-      VueClientVersion: '20260414', // 手动指定版本号
+      VueClientVersion: process.env.VUE_APP_VERSION || '—',
 
       // 全局总版本号（由 Qt 通过 WebSocket 从环境变量 QUARCS_TOTAL_VERSION 读取并发送）
       TotalVersion: '0.0.0',
@@ -1139,6 +1153,9 @@ export default {
         { driverType: 'MainCamera', label: 'ImageCFA', value: 'null', inputType: 'select', selectValue: ['GR', 'GB', 'BG', 'RGGB', 'null'] },
         { driverType: 'MainCamera', label: 'ImageGainR', value: 1, inputType: 'number', min: 0.01, max: 3, step: 0.001, colorOnly: true },
         { driverType: 'MainCamera', label: 'ImageGainB', value: 1, inputType: 'number', min: 0.01, max: 3, step: 0.001, colorOnly: true },
+        { driverType: 'MainCamera', label: 'RefGainR', value: 1, inputType: 'tip', colorOnly: true },
+        { driverType: 'MainCamera', label: 'RefGainB', value: 1, inputType: 'tip', colorOnly: true },
+        { driverType: 'MainCamera', label: 'ApplyRefWhiteBalance', inputType: 'button', buttonText: 'ApplyRefWhiteBalance', colorOnly: true },
         { driverType: 'MainCamera', label: 'ROICalcMode', value: 'full', inputType: 'select', selectValue: ['full', 'roi'] },
         // 硬件处理参数
         // { driverType: 'MainCamera', label: 'Binning', value: '', inputType: 'slider', inputMin: 1, inputMax: 16, inputStep: 1 },
@@ -1210,16 +1227,20 @@ export default {
       histogram_max: 255,  // 直方图自动拉伸的最大值
 
       currentHistogramMin: 0,
-      currentHistogramMax: 255,
+      currentHistogramMax: 65535,
 
       ImageGainR: 1,
       ImageGainB: 1,
-      autoWhiteBalanceGainR: 1,
-      autoWhiteBalanceGainB: 1,
+      postGainR: 1,
+      postGainB: 1,
+      RefGainR: 1,
+      RefGainB: 1,
 
       ImageOffset: 0,
 
       ImageCFA: 'BG',
+      mainCameraDetectedCfa: 'null',
+      mainCameraCfaSource: 'SAVED',
 
       cameraBin: 1,   // 当前相机binning
 
@@ -1265,8 +1286,9 @@ export default {
 
       // ========================= 瓦片金字塔相关 =========================
       TILE_PATH_SUFFIX: 'img/capture-tiles',  // 与 nginx location /img/capture-tiles/ 对应
-      TILE_DEBUG: true,  // 瓦片调试：默认关闭，避免高频日志拖慢主线程；排查问题时可临时打开
-      TILE_PERF: true, // 瓦片性能：为 true 时在控制台与界面日志中输出各阶段耗时（processTile / renderTiles / drawImageData 等）；仅排查卡顿时临时打开
+      TILE_DEBUG: false,  // 瓦片调试：默认关闭，避免高频日志拖慢主线程；排查问题时可临时打开
+      TILE_PERF: false, // 瓦片性能：为 true 时在控制台与界面日志中输出各阶段耗时（processTile / renderTiles / drawImageData 等）；仅排查卡顿时临时打开
+      imagePipelineHotPathDebug: false, // 图像热路径日志：默认关闭，避免每瓦片/每帧 stringify 与总线派发拖慢主线程
       tileGPM: null,              // 全局处理元数据
       tileSessionId: null,        // 当前瓦片会话ID
       tileFrameId: null,          // 当前瓦片帧ID（用于丢弃旧帧瓦片/防错帧拉伸）
@@ -1280,6 +1302,7 @@ export default {
       tileGenerationComplete: false, // 后端当前帧“全部生成完成”标志
       tileGenerationCompleteReadyCount: 0, // 后端完成时已生成的瓦片数量
       tileDownloadComplete: false, // 前端当前视口所需瓦片“全部下载完成”标志
+      tileFullCacheComplete: false, // 前端当前帧是否已把后端声明的全部瓦片下载到本地 raw 缓存
       tileE2ERequiredKeys: '[]', // E2E: 当前视口需要下载的瓦片 key 列表（JSON 字符串）
       tileE2EDownloadedKeys: '[]', // E2E: 当前视口已下载完成的瓦片 key 列表（JSON 字符串）
       tileE2ERequiredTileCount: 0, // E2E: 当前视口需要下载的瓦片数量
@@ -1288,6 +1311,8 @@ export default {
       e2eTileGpmSeq: 0,
       // E2E：Qt 下发 ExposureCompleted 时自增（与 TileGPM 解耦；短曝光时 cp-status 可能来不及观测 busy）
       e2eExposureCompletedSeq: 0,
+      captureTraceKeyword: 'CaptureTrace',
+      captureTrace: null,
       tileCache: null,            // 瓦片缓存 Map<"z/x/y", ImageData> (在initCanvas中初始化)
       tileRawDataCache: null,     // 原始瓦片数据缓存 Map<"z/x/y", {width, height, type, data}> (在initCanvas中初始化)
       tilePendingLoads: null,     // 正在加载的瓦片集合 (在initCanvas中初始化)
@@ -1306,6 +1331,8 @@ export default {
       tileRenderRaf: null,        // 合并晚到瓦片的重绘请求，避免每片都立即重绘
       tileRenderBatchSize: 4,     // 增量补绘批次：累计这么多已完成瓦片后再触发一次重绘
       tileRenderBatchDelayMs: 80, // 增量补绘兜底延迟，避免最后零散瓦片长期不显示
+      tileReprocessChunkSize: 6,  // 可见 raw 瓦片重处理分批大小，避免参数变化时长时间阻塞主线程
+      tileReprocessYieldMs: 0,    // 批次之间让出主线程的延迟
       tileRenderBufferedCount: 0, // 当前批次中已完成但尚未触发重绘的瓦片数
       tileRenderBufferedTimer: null, // 增量补绘兜底定时器
       tileDirtyKeys: null,        // 待补绘的瓦片键集合 Set<"z/x/y">
@@ -1321,14 +1348,17 @@ export default {
       lastVisibleAreaMessageKey: '', // 最近一次已发送的可视区消息快照，避免同值重复发送
       currentVisibleTiles: null,  // 当前可见的瓦片集合 Set<"z/x/y">
       tileHistogram: null,        // 当前会话直方图 { sessionId, bins, total, counts }
-      autoStretchBlackLevel: null, // 保存初始自动拉伸的黑点参数
-      autoStretchWhiteLevel: null, // 保存初始自动拉伸的白点参数
+      histogramRangeModeEnabled: true,
+      autoStretchBlackLevel: null, // 保存最近一次前端自动拉伸的黑点参数
+      autoStretchWhiteLevel: null, // 保存最近一次前端自动拉伸的白点参数
       // Live 模式 TileGPM 节流：避免高帧率下每条 TileGPM 都清缓存/abort，导致“永远拉不齐一帧”
       liveTileGpmThrottleMs: 250,   // 建议 200~400ms（对应 5~2.5fps）
       liveTileGpmLastHandledAt: 0,
       pendingLiveTileGpm: null,
       pendingLiveTileGpmTimer: null,
       // ========================= 瓦片金字塔相关结束 =========================
+      isFocuserPanelVisible: false,
+      focuserPanelTileZoomCap: 2,
 
       // 记忆瓦片层级：当再次拍摄（新 TileGPM 会话）时，若 maxZoomLevel 未变化则保持在此前层级
       preferredTileZ: null,
@@ -1493,7 +1523,8 @@ export default {
       progressDescription: '', // 控制进度条显示内容
 
       calculateGain: true, // 控制是否计算白平衡增益
-      autoWhiteBalanceEnabled: true, // 彩色图像绘制时默认自动更新白平衡；手动修改增益后关闭
+      autoWhiteBalanceEnabled: false, // AW 长按点亮时自动进一步白平衡
+      autoHistogramEnabled: false, // A 长按点亮时自动拉伸
       lutCache: {
         lastParams: null, // 用于存储上次的参数
         lutR: null,
@@ -1521,6 +1552,7 @@ export default {
   created() {
     ensureUnifiedRuntime();
     this.$bus.$on('AppSendMessage', this.sendMessage);
+    this.$bus.$on('CaptureTraceStart', this.startCaptureTrace);
     this.$bus.$on('AppUpdateDevices', this.updateDevices);
     this.$bus.$on('Switch-MainPage', this.handleButtonTestClick);
     this.$bus.$on('HandleHistogramNum', this.applyHistStretch);
@@ -1579,9 +1611,16 @@ export default {
     this.$bus.$on('GetCurrentConnectedDevices', this.ReturnCurrentConnectedDevices);
     this.$bus.$on('CurrentCFWList', this.CurrentCFWList);
     this.$bus.$on('calcWhiteBalanceGains', this.calcWhiteBalanceGains);
+    this.$bus.$on('toggleAutoWhiteBalance', this.toggleAutoWhiteBalance);
     this.$bus.$on('RequestAutoWhiteBalanceState', () => {
       this.$bus.$emit('AutoWhiteBalanceState', !!this.autoWhiteBalanceEnabled);
     });
+    this.$bus.$on('autoHistogram', this.autoHistogramOnce);
+    this.$bus.$on('toggleAutoHistogram', this.toggleAutoHistogram);
+    this.$bus.$on('RequestAutoHistogramState', () => {
+      this.$bus.$emit('AutoHistogramState', !!this.autoHistogramEnabled);
+    });
+    this.$bus.$on('HistogramRangeMode', this.setHistogramRangeMode);
     this.$bus.$on('SwitchOutPutPower', this.SwitchOutPutPower);
     this.$bus.$on('PolarAxisMode', this.PolarAxisMode);
     this.$bus.$on('SendConsoleLogMsg', this.SendConsoleLogMsg);
@@ -1610,6 +1649,7 @@ export default {
     this.$bus.$on('StartAutoFocus', this.startAutoFocusProcess);
     this.$bus.$on('UpdateAutoFocusStep', this.updateAutoFocusStep);
     this.$bus.$on('EndAutoFocus', this.endAutoFocus);
+    this.$bus.$on('FocuserPanelVisibilityChanged', this.handleFocuserPanelVisibilityChanged);
 
     // 曝光状态（页面刷新后由后端通知同步）
     this.$bus.$on('CameraInExposuring', (state) => {
@@ -1654,6 +1694,178 @@ export default {
 
   },
   methods: {
+    logMainCameraImagePipeLine(fileName, functionName, variableName, value) {
+      let normalizedValue = value
+      if (typeof value === 'object' && value !== null) {
+        try {
+          normalizedValue = JSON.stringify(value)
+        } catch (error) {
+          normalizedValue = String(value)
+        }
+      }
+      const message = `MainCameraImagePipeLine | ${fileName} | ${functionName} | ${variableName} = ${normalizedValue}`
+      this.SendConsoleLogMsg(message, 'info')
+    },
+    logImagePipelineHotPath(functionName, variableName, value) {
+      if (!this.imagePipelineHotPathDebug) return;
+      this.logMainCameraImagePipeLine('App.vue', functionName, variableName, value);
+    },
+    normalizeCaptureTraceValue(value) {
+      if (value == null) return '';
+      if (typeof value === 'number') {
+        return Number.isFinite(value) ? String(value) : '';
+      }
+      if (typeof value === 'boolean') {
+        return value ? 'true' : 'false';
+      }
+      if (typeof value === 'object') {
+        try {
+          return JSON.stringify(value);
+        } catch (error) {
+          return String(value);
+        }
+      }
+      return String(value);
+    },
+    sendCaptureTraceLog(parts, type = 'info') {
+      const cleaned = parts.filter(part => part !== '');
+      if (!cleaned.length) return;
+      this.SendConsoleLogMsg(cleaned.join(' | '), type);
+    },
+    startCaptureTrace(payload = {}) {
+      const traceId = String(payload.traceId || '').trim();
+      if (!traceId) return;
+      const perfNow = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+      this.captureTrace = {
+        traceId,
+        startedAtPerf: perfNow,
+        startedAtEpochMs: Date.now(),
+        mode: String(payload.mode || 'Single'),
+        exposureMs: Number(payload.exposureMs) || 0,
+        burstFrames: Math.max(1, Number(payload.burstFrames) || 1),
+        sessionId: null,
+        frameId: null,
+        lastBackendTileGpmSentAtMs: null,
+        z0FetchLogged: false,
+        z0RenderLogged: false,
+      };
+      this.sendCaptureTraceLog([
+        this.captureTraceKeyword,
+        `traceId=${traceId}`,
+        'stage=frontend_click',
+        'frontendElapsedMs=0',
+        `mode=${this.captureTrace.mode}`,
+        `exposureMs=${this.captureTrace.exposureMs}`,
+        `burstFrames=${this.captureTrace.burstFrames}`,
+      ]);
+    },
+    ensureCaptureTraceForCommand(message) {
+      if (this.captureTrace && this.captureTrace.traceId) return false;
+      if (typeof message !== 'string') return false;
+      const trimmed = message.trim();
+      if (!trimmed) return false;
+
+      let payload = null;
+      if (trimmed.startsWith('takeExposureBurst:')) {
+        const parts = trimmed.split(':');
+        if (parts.length >= 4) {
+          payload = {
+            traceId: parts[3],
+            mode: 'Burst',
+            exposureMs: Number(parts[1]) || 0,
+            burstFrames: Math.max(1, Number(parts[2]) || 1),
+          };
+        }
+      } else if (trimmed.startsWith('takeExposure:')) {
+        const parts = trimmed.split(':');
+        if (parts.length >= 3) {
+          payload = {
+            traceId: parts[2],
+            mode: 'Single',
+            exposureMs: Number(parts[1]) || 0,
+            burstFrames: 1,
+          };
+        }
+      }
+
+      if (!payload || !String(payload.traceId || '').trim()) return false;
+      this.startCaptureTrace(payload);
+      this.emitCaptureTrace('frontend_click_fallback', { command: trimmed });
+      return true;
+    },
+    emitCaptureTrace(stage, extra = {}, type = 'info') {
+      if (!this.captureTrace || !this.captureTrace.traceId) return;
+      const perfNow = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+      const elapsed = Math.max(0, perfNow - this.captureTrace.startedAtPerf);
+      const parts = [
+        this.captureTraceKeyword,
+        `traceId=${this.captureTrace.traceId}`,
+        `stage=${stage}`,
+        `frontendElapsedMs=${elapsed.toFixed(2)}`,
+      ];
+      Object.entries(extra || {}).forEach(([key, value]) => {
+        const normalized = this.normalizeCaptureTraceValue(value);
+        if (normalized !== '') {
+          parts.push(`${key}=${normalized}`);
+        }
+      });
+      this.sendCaptureTraceLog(parts, type);
+    },
+    handleBackendCaptureTrace(parts) {
+      if (!parts || parts.length < 3) return;
+      const traceId = String(parts[1] || '').trim();
+      const stage = String(parts[2] || '').trim();
+      const backendElapsedMs = parts.length >= 4 ? Number(parts[3]) : NaN;
+      const detail = parts.length >= 5 ? parts.slice(4).join(':') : '';
+      const detailMap = {};
+      if (detail) {
+        detail.split(',').forEach((segment) => {
+          const trimmed = String(segment || '').trim();
+          if (!trimmed) return;
+          const eqIdx = trimmed.indexOf('=');
+          if (eqIdx <= 0) return;
+          const key = trimmed.slice(0, eqIdx).trim();
+          const value = trimmed.slice(eqIdx + 1).trim();
+          if (key) detailMap[key] = value;
+        });
+      }
+      if (
+        this.captureTrace &&
+        this.captureTrace.traceId === traceId &&
+        stage === 'backend_tilegpm_sent' &&
+        Number.isFinite(Number(detailMap.serverNowMs))
+      ) {
+        this.captureTrace.lastBackendTileGpmSentAtMs = Number(detailMap.serverNowMs);
+      }
+      const extra = {};
+      if (Number.isFinite(backendElapsedMs)) {
+        extra.backendElapsedMs = backendElapsedMs;
+      }
+      if (detail) {
+        extra.detail = detail;
+      }
+      if (this.captureTrace && this.captureTrace.traceId === traceId) {
+        this.emitCaptureTrace(stage, extra);
+        return;
+      }
+      const partsToSend = [
+        this.captureTraceKeyword,
+        `traceId=${traceId || 'unknown'}`,
+        `stage=${stage || 'backend_unknown'}`,
+      ];
+      if (Number.isFinite(backendElapsedMs)) {
+        partsToSend.push(`backendElapsedMs=${backendElapsedMs}`);
+      }
+      if (detail) {
+        partsToSend.push(`detail=${detail}`);
+      }
+      this.sendCaptureTraceLog(partsToSend);
+    },
+    async yieldToMainThread(delayMs = 0) {
+      await new Promise(resolve => {
+        setTimeout(resolve, Math.max(0, Number(delayMs) || 0));
+      });
+    },
     // 每当“UI完成一帧刷新”的信号到来时调用，用于统计 UI 刷新 FPS
     // 说明：后端使用 ExposureCompleted 作为“刷新一帧”的信号，因此这里以 ExposureCompleted 作为 UI FPS 的统计触发。
     onLiveFramePresented () {
@@ -1684,6 +1896,14 @@ export default {
       this.autoWhiteBalanceEnabled = normalized;
       this.$bus.$emit('AutoWhiteBalanceState', normalized);
     },
+    setAutoHistogramEnabled(enabled) {
+      const normalized = !!enabled;
+      this.autoHistogramEnabled = normalized;
+      this.$bus.$emit('AutoHistogramState', normalized);
+    },
+    setHistogramRangeMode(enabled) {
+      this.histogramRangeModeEnabled = !!enabled;
+    },
     updateMainCameraWhiteBalanceConfig(gainR, gainB) {
       const GainRIndex = this.MainCameraConfigItems.findIndex(item => item.label === 'ImageGainR');
       if (GainRIndex !== -1) {
@@ -1694,30 +1914,360 @@ export default {
         this.MainCameraConfigItems[GainBIndex].value = gainB;
       }
     },
-    saveAutoWhiteBalanceGains(gainR, gainB) {
-      if (!Number.isFinite(gainR) || !Number.isFinite(gainB)) return;
-      this.autoWhiteBalanceGainR = gainR;
-      this.autoWhiteBalanceGainB = gainB;
-    },
-    applyStoredAutoWhiteBalance(options = {}) {
-      const { reprocess = true } = options;
-      const gainR = Number.isFinite(this.autoWhiteBalanceGainR) ? this.autoWhiteBalanceGainR : 1;
-      const gainB = Number.isFinite(this.autoWhiteBalanceGainB) ? this.autoWhiteBalanceGainB : 1;
-
-      this.ImageGainR = gainR;
-      this.ImageGainB = gainB;
-      this.updateMainCameraWhiteBalanceConfig(gainR, gainB);
-
-      if (this.tileGPM) {
-        const gainsChanged = this.tileGPM.gainR !== gainR || this.tileGPM.gainB !== gainB;
-        this.tileGPM.gainR = gainR;
-        this.tileGPM.gainB = gainB;
-        if (reprocess && gainsChanged) {
-          this.reprocessTilesWithNewGains();
-        }
-      } else if (reprocess && this.ImageArrayBuffer && this.ImageArrayBuffer.byteLength > 0) {
-        this.processImage(this.ImageArrayBuffer, this.currentHistogramMin, this.currentHistogramMax, { calculateHistogram: false });
+    updateReferenceWhiteBalanceConfig() {
+      const refGainRIndex = this.MainCameraConfigItems.findIndex(item => item.label === 'RefGainR');
+      if (refGainRIndex !== -1) {
+        this.MainCameraConfigItems[refGainRIndex].value = Number.isFinite(this.RefGainR) ? this.RefGainR.toFixed(3) : '1.000';
       }
+      const refGainBIndex = this.MainCameraConfigItems.findIndex(item => item.label === 'RefGainB');
+      if (refGainBIndex !== -1) {
+        this.MainCameraConfigItems[refGainBIndex].value = Number.isFinite(this.RefGainB) ? this.RefGainB.toFixed(3) : '1.000';
+      }
+    },
+    getPreWhiteBalanceGains() {
+      return {
+        gainR: Number.isFinite(this.ImageGainR) ? this.ImageGainR : 1,
+        gainB: Number.isFinite(this.ImageGainB) ? this.ImageGainB : 1,
+      };
+    },
+    getPostWhiteBalanceGains() {
+      return {
+        gainR: Number.isFinite(this.postGainR) ? this.postGainR : 1,
+        gainB: Number.isFinite(this.postGainB) ? this.postGainB : 1,
+      };
+    },
+    getFinalWhiteBalanceGains() {
+      const pre = this.getPreWhiteBalanceGains();
+      const post = this.getPostWhiteBalanceGains();
+      return {
+        gainR: Math.min(3, Math.max(0.01, pre.gainR * post.gainR)),
+        gainB: Math.min(3, Math.max(0.01, pre.gainB * post.gainB)),
+      };
+    },
+    setPostWhiteBalanceGains(gainR, gainB, options = {}) {
+      const { reprocess = true, updateReference = true } = options;
+      this.postGainR = Number.isFinite(gainR) ? gainR : 1;
+      this.postGainB = Number.isFinite(gainB) ? gainB : 1;
+      if (updateReference) {
+        const finalGains = this.getFinalWhiteBalanceGains();
+        this.RefGainR = finalGains.gainR;
+        this.RefGainB = finalGains.gainB;
+        this.updateReferenceWhiteBalanceConfig();
+      }
+      if (reprocess) {
+        this.reprocessTilesWithNewGains();
+      }
+    },
+    resetPostWhiteBalance(options = {}) {
+      this.setPostWhiteBalanceGains(1, 1, options);
+    },
+    applyReferenceWhiteBalance() {
+      if (!Number.isFinite(this.RefGainR) || !Number.isFinite(this.RefGainB)) {
+        this.SendConsoleLogMsg('没有可用的参考白平衡参数', 'warning');
+        return;
+      }
+      this.ImageGainR = this.RefGainR;
+      this.ImageGainB = this.RefGainB;
+      this.updateMainCameraWhiteBalanceConfig(this.ImageGainR, this.ImageGainB);
+      this.sendMessage('Vue_Command', 'ImageGainR:' + this.ImageGainR);
+      this.sendMessage('Vue_Command', 'ImageGainB:' + this.ImageGainB);
+      this.resetPostWhiteBalance({ reprocess: false, updateReference: false });
+      this.RefGainR = this.ImageGainR;
+      this.RefGainB = this.ImageGainB;
+      this.updateReferenceWhiteBalanceConfig();
+      this.reprocessTilesWithNewGains();
+      this.SendConsoleLogMsg(`已将参考白平衡固化为预白平衡: R=${this.ImageGainR.toFixed(3)}, B=${this.ImageGainB.toFixed(3)}`, 'success');
+    },
+    async ensureZ0TileRawData(options = {}) {
+      const sessionId = options.sessionId || this.tileSessionId;
+      const frameId = options.frameId != null ? options.frameId : this.tileFrameId;
+      const key = '0/0/0';
+      if (!sessionId) return null;
+      if (this.tileRawDataCache && this.tileRawDataCache.has(key)) {
+        this.emitCaptureTrace('frontend_z0_cache_hit', {
+          source: 'ensureZ0TileRawData',
+          sessionId,
+          frameId,
+        });
+        return this.tileRawDataCache.get(key);
+      }
+      const base = (process.env.BASE_URL || '/').replace(/\/?$/, '/');
+      const frameQ = (frameId != null) ? `?f=${encodeURIComponent(String(frameId))}` : '';
+      const url = `${base}${this.TILE_PATH_SUFFIX}/${sessionId}/0/0/0.bin${frameQ}`;
+      const fetchStart = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+      this.emitCaptureTrace('frontend_z0_fetch_start', {
+        source: 'ensureZ0TileRawData',
+        sessionId,
+        frameId,
+      });
+      const response = await fetch(url, { cache: 'no-store' });
+      if (!response.ok) {
+        throw new Error(`Failed to load Z=0 tile: ${response.status}`);
+      }
+      const buffer = await response.arrayBuffer();
+      const tileData = this.parseTileData(buffer);
+      if (!tileData) {
+        throw new Error('Invalid Z=0 tile payload');
+      }
+      if (sessionId !== this.tileSessionId || frameId !== this.tileFrameId) {
+        return null;
+      }
+      if (!this.tileRawDataCache) {
+        this.tileRawDataCache = new Map();
+      }
+      this.tileRawDataCache.set(key, tileData);
+      const fetchDone = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+      this.emitCaptureTrace('frontend_z0_fetch_done', {
+        source: 'ensureZ0TileRawData',
+        sessionId,
+        frameId,
+        downloadMs: (fetchDone - fetchStart).toFixed(2),
+        bytes: buffer.byteLength,
+      });
+      return tileData;
+    },
+    async withZ0Mat(taskName, runner) {
+      if (!this.tileGPM) {
+        this.SendConsoleLogMsg(`${taskName}: 当前没有可用图像`, 'warning');
+        return null;
+      }
+      const tileData = await this.ensureZ0TileRawData();
+      if (!tileData) return null;
+      const mat = new cv.Mat(tileData.height, tileData.width, cv.CV_16UC1);
+      try {
+        mat.data16U.set(tileData.data);
+        return await runner(mat, tileData);
+      } finally {
+        mat.delete();
+      }
+    },
+    async computeAutoWhiteBalanceFromZ0() {
+      return this.withZ0Mat('AW', async (mat) => {
+        const cfa = this.normalizeCfaPattern(this.tileGPM && this.tileGPM.cfa ? this.tileGPM.cfa : this.ImageCFA);
+        if (!cfa || cfa === 'null') {
+          this.SendConsoleLogMsg('当前图像不是彩色 Bayer 图，无法执行进一步白平衡', 'warning');
+          return null;
+        }
+        const result = this.analyzeImageStatistics(mat, 'bayer', cfa, { calculateGain: true, calculateHistogram: false });
+        if (!result || !result.whiteBalance) {
+          this.SendConsoleLogMsg('无法从 Z=0 计算进一步白平衡', 'warning');
+          return null;
+        }
+        const pre = this.getPreWhiteBalanceGains();
+        const totalR = Number.isFinite(result.whiteBalance.gainR) ? result.whiteBalance.gainR : 1;
+        const totalB = Number.isFinite(result.whiteBalance.gainB) ? result.whiteBalance.gainB : 1;
+        const postGainR = Math.min(3, Math.max(0.01, totalR / Math.max(pre.gainR, 0.01)));
+        const postGainB = Math.min(3, Math.max(0.01, totalB / Math.max(pre.gainB, 0.01)));
+        return {
+          postGainR,
+          postGainB,
+          refGainR: Math.min(3, Math.max(0.01, pre.gainR * postGainR)),
+          refGainB: Math.min(3, Math.max(0.01, pre.gainB * postGainB)),
+        };
+      });
+    },
+    async computeAutoHistogramFromZ0() {
+      return this.withZ0Mat('A', async (mat) => {
+        return this.GetAutoStretch(mat, 0);
+      });
+    },
+    buildHistogramSnapshotKey(sessionId = this.tileSessionId, frameId = this.tileFrameId) {
+      const sid = sessionId != null ? String(sessionId) : '';
+      const fid = frameId != null ? String(frameId) : '';
+      return sid && fid ? `${sid}::${fid}` : '';
+    },
+    cacheAndEmitHistogram(histogram, options = {}) {
+      if (!histogram) return false;
+      const sessionId = options.sessionId != null ? String(options.sessionId) : String(this.tileSessionId || '');
+      const frameId = options.frameId != null ? options.frameId : this.tileFrameId;
+      const snapshotKey = this.buildHistogramSnapshotKey(sessionId, frameId);
+      const isMultiChannel = Array.isArray(histogram[0]);
+      const bins = isMultiChannel
+        ? (Array.isArray(histogram[0]) ? histogram[0].length : 0)
+        : histogram.length;
+      this.tileHistogram = {
+        sessionId,
+        frameId,
+        snapshotKey,
+        bins,
+        total: options.total != null ? options.total : null,
+        counts: histogram,
+      };
+      this.$bus.$emit('showHistogram', histogram);
+      return true;
+    },
+    async refreshHistogramFromZ0(options = {}) {
+      if (!this.tileGPM) return false;
+      const sessionId = options.sessionId || this.tileSessionId;
+      const frameId = options.frameId != null ? options.frameId : this.tileFrameId;
+      const expectedKey = this.buildHistogramSnapshotKey(sessionId, frameId);
+      if (!expectedKey) return false;
+
+      const histogram = await this.withZ0Mat('Histogram', async (mat) => {
+        const cfa = this.normalizeCfaPattern(this.tileGPM && this.tileGPM.cfa ? this.tileGPM.cfa : this.ImageCFA);
+        const isColorRaw = !!cfa && cfa !== 'null';
+        const analysis = isColorRaw
+          ? this.analyzeImageStatistics(mat, 'bayer', cfa, { calculateGain: false, calculateHistogram: true })
+          : this.analyzeImageStatistics(mat, 'gray', cfa, { calculateGain: false, calculateHistogram: true });
+        return analysis && analysis.histogram ? analysis.histogram : null;
+      });
+
+      if (!histogram) return false;
+      if (expectedKey !== this.buildHistogramSnapshotKey()) {
+        return false;
+      }
+      return this.cacheAndEmitHistogram(histogram, { sessionId, frameId });
+    },
+    async runAutoWhiteBalanceOnce(options = {}) {
+      const { enablePersistent = false, reprocess = true, notify = true } = options;
+      const startedAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+      const gains = await this.computeAutoWhiteBalanceFromZ0();
+      if (!gains) {
+        this.emitCaptureTrace('frontend_auto_white_balance_done', {
+          success: false,
+          reprocess,
+          notify,
+          totalMs: (((typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now()) - startedAt).toFixed(2),
+        }, 'warning');
+        return false;
+      }
+      this.setPostWhiteBalanceGains(gains.postGainR, gains.postGainB, { reprocess, updateReference: false });
+      this.RefGainR = gains.refGainR;
+      this.RefGainB = gains.refGainB;
+      this.updateReferenceWhiteBalanceConfig();
+      if (enablePersistent === true) {
+        this.setAutoWhiteBalanceEnabled(true);
+      }
+      if (notify) {
+        this.SendConsoleLogMsg(`进一步白平衡完成: postR=${gains.postGainR.toFixed(3)}, postB=${gains.postGainB.toFixed(3)}`, 'success');
+      }
+      const finishedAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+      this.emitCaptureTrace('frontend_auto_white_balance_done', {
+        success: true,
+        reprocess,
+        notify,
+        totalMs: (finishedAt - startedAt).toFixed(2),
+        postGainR: gains.postGainR.toFixed(3),
+        postGainB: gains.postGainB.toFixed(3),
+      });
+      return true;
+    },
+    async runAutoHistogramOnce(options = {}) {
+      const { enablePersistent = false, reprocess = true, notify = true } = options;
+      const startedAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+      const stretch = await this.computeAutoHistogramFromZ0();
+      if (!stretch) {
+        this.emitCaptureTrace('frontend_auto_histogram_done', {
+          success: false,
+          reprocess,
+          notify,
+          totalMs: (((typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now()) - startedAt).toFixed(2),
+        }, 'warning');
+        return false;
+      }
+      this.autoStretchBlackLevel = stretch.blackLevel;
+      this.autoStretchWhiteLevel = stretch.whiteLevel;
+      this.currentHistogramMin = stretch.blackLevel;
+      this.currentHistogramMax = stretch.whiteLevel;
+      if (!this.histogramRangeModeEnabled) {
+        this.$bus.$emit('HistogramRangeMode', true);
+      }
+      this.$bus.$emit('ChangeDialPosition', stretch.blackLevel, stretch.whiteLevel);
+      this.$bus.$emit('AutoHistogramNum', stretch.blackLevel, stretch.whiteLevel);
+      if (reprocess) {
+        this.reloadTilesWithNewParams();
+      }
+      if (enablePersistent === true) {
+        this.setAutoHistogramEnabled(true);
+      }
+      if (notify) {
+        this.SendConsoleLogMsg(`自动拉伸完成: black=${stretch.blackLevel}, white=${stretch.whiteLevel}`, 'success');
+      }
+      const finishedAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+      this.emitCaptureTrace('frontend_auto_histogram_done', {
+        success: true,
+        reprocess,
+        notify,
+        totalMs: (finishedAt - startedAt).toFixed(2),
+        blackLevel: stretch.blackLevel,
+        whiteLevel: stretch.whiteLevel,
+      });
+      return true;
+    },
+    async prepareFrameAutoOptimizations() {
+      if (!this.tileGPM) return;
+      const startedAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+      this.emitCaptureTrace('frontend_prepare_frame_auto_optimizations_start', {
+        sessionId: this.tileSessionId,
+        frameId: this.tileFrameId,
+        autoWhiteBalanceEnabled: this.autoWhiteBalanceEnabled,
+        autoHistogramEnabled: this.autoHistogramEnabled,
+      });
+      let awMs = 0;
+      let histMs = 0;
+      if (this.autoWhiteBalanceEnabled) {
+        const awStartedAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+        await this.runAutoWhiteBalanceOnce({ reprocess: false, notify: false });
+        const awFinishedAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+        awMs = awFinishedAt - awStartedAt;
+      }
+      if (this.autoHistogramEnabled) {
+        const histStartedAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+        await this.runAutoHistogramOnce({ reprocess: false, notify: false });
+        const histFinishedAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+        histMs = histFinishedAt - histStartedAt;
+      }
+      const finishedAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+      this.emitCaptureTrace('frontend_prepare_frame_auto_optimizations_done', {
+        sessionId: this.tileSessionId,
+        frameId: this.tileFrameId,
+        totalMs: (finishedAt - startedAt).toFixed(2),
+        autoWhiteBalanceMs: awMs.toFixed(2),
+        autoHistogramMs: histMs.toFixed(2),
+      });
+    },
+    async applyFrameAutoOptimizations() {
+      if (!this.tileGPM) return;
+      if (this.autoWhiteBalanceEnabled) {
+        await this.runAutoWhiteBalanceOnce();
+      }
+      if (this.autoHistogramEnabled) {
+        await this.runAutoHistogramOnce();
+      }
+    },
+    async toggleAutoWhiteBalance() {
+      if (this.autoWhiteBalanceEnabled) {
+        this.setAutoWhiteBalanceEnabled(false);
+        this.resetPostWhiteBalance({ reprocess: true, updateReference: false });
+        this.RefGainR = this.ImageGainR;
+        this.RefGainB = this.ImageGainB;
+        this.updateReferenceWhiteBalanceConfig();
+        this.SendConsoleLogMsg('已关闭自动进一步白平衡', 'info');
+        return;
+      }
+      const ok = await this.runAutoWhiteBalanceOnce({ enablePersistent: true });
+      if (ok) {
+        this.SendConsoleLogMsg('已开启自动进一步白平衡', 'info');
+      }
+    },
+    async toggleAutoHistogram() {
+      if (this.autoHistogramEnabled) {
+        this.setAutoHistogramEnabled(false);
+        this.currentHistogramMin = 0;
+        this.currentHistogramMax = 65535;
+        this.$bus.$emit('ChangeDialPosition', this.currentHistogramMin, this.currentHistogramMax);
+        this.$bus.$emit('AutoHistogramNum', this.currentHistogramMin, this.currentHistogramMax);
+        this.reloadTilesWithNewParams();
+        this.SendConsoleLogMsg('已关闭自动拉伸', 'info');
+        return;
+      }
+      const ok = await this.runAutoHistogramOnce({ enablePersistent: true });
+      if (ok) {
+        this.SendConsoleLogMsg('已开启自动拉伸', 'info');
+      }
+    },
+    async autoHistogramOnce() {
+      await this.runAutoHistogramOnce();
     },
     // =========================
     // MainCamera / Guider 模式联动与锁定逻辑
@@ -1838,6 +2388,10 @@ export default {
       if (this.isCurrentDeviceUnbound) return;
       if (item && item.driverType === 'CFW' && item.isCfwMenuControl) {
         this.handleCfwMenuButtonClick(item);
+        return;
+      }
+      if (item && item.label === 'ApplyRefWhiteBalance') {
+        this.handleConfigChange(item.label, true, item.driverType);
         return;
       }
       // 禁用按钮
@@ -2290,9 +2844,9 @@ export default {
           if (data.message.startsWith('SendDebugMessage|')) {
             acceptMessage = true;
             const parts = data.message.split('|');
-            if (parts.length === 3) {
+            if (parts.length >= 3) {
               const type = parts[1];
-              const message = parts[2];
+              const message = parts.slice(2).join('|');
               this.$bus.$emit('SendDebugMessage', type, message);
             }
           }
@@ -2455,6 +3009,7 @@ export default {
 
               case 'ExposureCompleted':
                 this.e2eExposureCompletedSeq = (Number(this.e2eExposureCompletedSeq) || 0) + 1;
+                this.emitCaptureTrace('frontend_exposure_completed_rx');
                 this.$bus.$emit('ExposureCompleted');
                 // 以 ExposureCompleted 作为“UI刷新一帧”的信号，统计前端显示帧率
                 this.onLiveFramePresented();
@@ -2556,10 +3111,32 @@ export default {
                     previewHeight: (parts.length >= 14) ? parseInt(parts[12]) : null,
                     previewBinningFactor: (parts.length >= 14) ? parseInt(parts[13]) : null,
                     frameId: (parts.length >= 15) ? parseInt(parts[14]) : null,
-                    buildMode: (parts.length >= 16) ? parts[15] : 'merged_single_level',
+                    buildMode: (parts.length >= 16) ? parts[15] : 'pyramid',
                   };
+                  const tileGpmRxExtra = {
+                    sessionId: gpm.sessionId,
+                    frameId: gpm.frameId,
+                    width: gpm.imageWidth,
+                    height: gpm.imageHeight,
+                    clientNowMs: Date.now(),
+                  };
+                  if (
+                    this.captureTrace &&
+                    Number.isFinite(Number(this.captureTrace.lastBackendTileGpmSentAtMs))
+                  ) {
+                    tileGpmRxExtra.approxClientSinceServerTileGpmSentMs =
+                      Date.now() - Number(this.captureTrace.lastBackendTileGpmSentAtMs);
+                  }
+                  this.emitCaptureTrace('frontend_tilegpm_rx', {
+                    ...tileGpmRxExtra,
+                  });
+                  this.logMainCameraImagePipeLine('App.vue', 'WebSocketOnMessage.TileGPM', 'gpmMessage', gpm);
                   this.handleTileGPM(gpm);
                 }
+                break;
+
+              case 'CaptureTrace':
+                this.handleBackendCaptureTrace(parts);
                 break;
 
               case 'TileHistogramFile':
@@ -2585,15 +3162,7 @@ export default {
                 // 白平衡增益计算结果
                 // 格式: WhiteBalanceGains:{gainR}:{gainB}
                 if (parts.length >= 3) {
-                  const gainR = parseFloat(parts[1]);
-                  const gainB = parseFloat(parts[2]);
-                  
-                  console.log(`[WhiteBalanceGains] 收到白平衡增益: R=${gainR}, B=${gainB}`);
-                  this.SendConsoleLogMsg(`白平衡计算完成: R增益=${gainR.toFixed(3)}, B增益=${gainB.toFixed(3)}`, 'info');
-                  this.saveAutoWhiteBalanceGains(gainR, gainB);
-                  if (this.autoWhiteBalanceEnabled) {
-                    this.applyStoredAutoWhiteBalance({ reprocess: true });
-                  }
+                  this.SendConsoleLogMsg('忽略后端 WhiteBalanceGains：自动白平衡改由前端基于 Z=0 计算', 'warning');
                 }
                 break;
 
@@ -3979,6 +4548,16 @@ export default {
                 }
                 break;
 
+              case 'MainCameraCFASource':
+                if (parts.length === 2) {
+                  const source = String(parts[1] || '').trim();
+                  this.mainCameraCfaSource = source || 'SAVED';
+                  if (source === 'SDK' || source === 'INDI') {
+                    this.mainCameraDetectedCfa = this.normalizeCfaPattern(this.ImageCFA);
+                  }
+                }
+                break;
+
               case 'CameraNotIdle':
                 this.callShowMessageBox('Camera is not idle', 'error');
                 this.$bus.$emit('MountOperationComplete', 'solve');
@@ -4636,9 +5215,20 @@ export default {
       const messageJson = JSON.stringify(messageObj); // 将消息对象转换为 JSON 字符串
       const messageState = { msgid: messageId, text: messageJson, success: false }; // 创建包含消息和状态信息的对象
 
+      if (type === 'Vue_Command') {
+        this.ensureCaptureTraceForCommand(message);
+      }
       recordClientCommand(message);
       if (this.websocket.readyState === WebSocket.OPEN) {
         this.websocket.send(messageJson);
+        if (
+          type === 'Vue_Command' &&
+          this.captureTrace &&
+          typeof message === 'string' &&
+          (message.startsWith('takeExposure:') || message.startsWith('takeExposureBurst:'))
+        ) {
+          this.emitCaptureTrace('frontend_command_sent', { command: message });
+        }
         // messageState.success = true; // 设置消息为成功
       }
       this.sentMessages.push(messageState); // 添加消息对象到已发送的消息数组
@@ -5318,18 +5908,9 @@ export default {
         
         // 复用既有直方图绘制链路
         if (counts && counts.length > 0) {
-          this.$bus.$emit('showHistogram', counts);
-          
-          // 如果有对应的GPM数据，同步更新拉伸参数
-          if (this.tileGPM && this.tileGPM.sessionId === sessionId) {
-            const blackLevel = this.tileGPM.blackLevel;
-            const whiteLevel = this.tileGPM.whiteLevel;
-            console.log(`[TileMode] 同步直方图参数: blackLevel=${blackLevel}, whiteLevel=${whiteLevel}`);
-            this.$bus.$emit('ChangeDialPosition', blackLevel, whiteLevel);
-            this.$bus.$emit('AutoHistogramNum', blackLevel, whiteLevel);
-          } else {
-            console.log('[TileMode] 直方图数据已加载，但GPM数据尚未到达，等待GPM数据同步');
-          }
+          this.cacheAndEmitHistogram(counts, { sessionId, total: fileTotal });
+          this.$bus.$emit('ChangeDialPosition', this.currentHistogramMin, this.currentHistogramMax);
+          this.$bus.$emit('AutoHistogramNum', this.currentHistogramMin, this.currentHistogramMax);
         }
         
       } catch (error) {
@@ -5347,25 +5928,17 @@ export default {
         this.ImageGainR = doubleValue;
         this.SendConsoleLogMsg('ImageGainR is set to:' + doubleValue, 'info');
         this.sendMessage('Vue_Command', 'ImageGainR:' + doubleValue);
-        
-        // 同步更新瓦片GPM参数（不重新下载瓦片，只重新处理显示）
-        if (this.tileGPM) {
-          this.SendConsoleLogMsg(`更新瓦片ImageGainR参数: ${doubleValue}`, 'info');
-          this.tileGPM.gainR = doubleValue;
-          this.reprocessTilesWithNewGains();
-        }
+        this.RefGainR = this.getFinalWhiteBalanceGains().gainR;
+        this.updateReferenceWhiteBalanceConfig();
+        this.reprocessTilesWithNewGains();
       } else if (signal === 'ImageGainB') {
         // 处理 ImageGainB 信号
         this.ImageGainB = doubleValue;
         this.SendConsoleLogMsg('ImageGainB is set to:' + doubleValue, 'info');
         this.sendMessage('Vue_Command', 'ImageGainB:' + doubleValue);
-        
-        // 同步更新瓦片GPM参数（不重新下载瓦片，只重新处理显示）
-        if (this.tileGPM) {
-          this.SendConsoleLogMsg(`更新瓦片ImageGainB参数: ${doubleValue}`, 'info');
-          this.tileGPM.gainB = doubleValue;
-          this.reprocessTilesWithNewGains();
-        }
+        this.RefGainB = this.getFinalWhiteBalanceGains().gainB;
+        this.updateReferenceWhiteBalanceConfig();
+        this.reprocessTilesWithNewGains();
       }
     },
 
@@ -5428,6 +6001,38 @@ export default {
         return 'null';
       }
       return normalized;
+    },
+
+    formatConfigSelectOptionText(option) {
+      if (option && typeof option === 'object') {
+        if (option.label != null) return option.label;
+        if (option.text != null) return option.text;
+        if (option.value != null) return option.value;
+      }
+      return option == null ? '' : String(option);
+    },
+
+    getConfigSelectOptionValue(item, option) {
+      if (item && item.driverType === 'MainCamera' && item.label === 'ImageCFA') {
+        const rawValue = option && typeof option === 'object' && option.value != null ? option.value : option;
+        return this.normalizeCfaPattern(rawValue);
+      }
+      return option && typeof option === 'object' && option.value != null ? option.value : option;
+    },
+
+    isDeviceDerivedMainCameraCfaOption(item, option) {
+      if (!item || item.driverType !== 'MainCamera' || item.label !== 'ImageCFA') return false;
+      if (!(this.mainCameraCfaSource === 'SDK' || this.mainCameraCfaSource === 'INDI')) return false;
+      const optionValue = this.getConfigSelectOptionValue(item, option);
+      const deviceValue = this.normalizeCfaPattern(this.mainCameraDetectedCfa);
+      return deviceValue !== 'null' && optionValue === deviceValue;
+    },
+
+    getConfigSelectOptionStyle(item, option) {
+      if (this.isDeviceDerivedMainCameraCfaOption(item, option)) {
+        return { color: '#ffd54f' };
+      }
+      return {};
     },
 
     getBayerTopLeftColorName(pattern) {
@@ -5966,7 +6571,13 @@ export default {
 
     normalizeTileBuildModeValue(value) {
       const v = String(value || '').trim();
-      return v === 'pyramid' ? 'pyramid' : 'merged_single_level';
+      if (v && v !== 'pyramid') {
+        this.emitTileDebugLog('normalizeTileBuildModeValue', {
+          requested: v,
+          normalized: 'pyramid'
+        }, 'warning', { force: true });
+      }
+      return 'pyramid';
     },
 
     hasPendingVisibleTileDownloads() {
@@ -5983,15 +6594,36 @@ export default {
       return false;
     },
 
+    getMissingVisibleTileKeys() {
+      if (!this.currentVisibleTiles || this.currentVisibleTiles.size === 0) return [];
+      const missing = [];
+      for (const key of this.currentVisibleTiles) {
+        const hasRaw = !!(this.tileRawDataCache && this.tileRawDataCache.has(key));
+        if (hasRaw) continue;
+        const pending = !!(this.tilePendingLoads && this.tilePendingLoads.has(key));
+        if (pending) continue;
+        const allowed = this.isTileKeyDownloadAllowed(key);
+        if (!allowed) {
+          missing.push(key);
+        }
+      }
+      return missing;
+    },
+
     requestCurrentTileBatchReady() {
       if (!this.tileGPM || !this.tileSessionId || this.tileFrameId == null) return;
       const sessionId = String(this.tileSessionId || '');
       const frameId = String(this.tileFrameId);
       if (!sessionId || !frameId) return;
+      const missingKeys = this.getMissingVisibleTileKeys();
+      if (missingKeys.length === 0) {
+        this.tileReadyPollInFlight = false;
+        return;
+      }
       this.tileReadyPollInFlight = true;
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', `queryTileBatchReady:${sessionId}:${frameId}`);
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', `queryTileBatchReady:${sessionId}:${frameId}:${missingKeys.join(',')}`);
       if (this.TILE_DEBUG) {
-        console.log('[TileBatchReadyPoll] request', { sessionId, frameId });
+        console.log('[TileBatchReadyPoll] request', { sessionId, frameId, missingCount: missingKeys.length, missingKeys });
       }
       setTimeout(() => {
         this.tileReadyPollInFlight = false;
@@ -6101,6 +6733,13 @@ export default {
 
       let complete = false;
       const visibleCount = this.currentVisibleTiles ? this.currentVisibleTiles.size : 0;
+      const totalRawCount = this.tileRawDataCache ? this.tileRawDataCache.size : 0;
+      const expectedReadyCount = Number(this.tileGenerationCompleteReadyCount) || 0;
+      const fullCacheComplete = !!(
+        this.tileGenerationComplete &&
+        expectedReadyCount > 0 &&
+        totalRawCount >= expectedReadyCount
+      );
 
       if (this.tileGPM && this.tileSessionId && this.tileFrameId != null && visibleCount > 0) {
         complete = true;
@@ -6120,17 +6759,77 @@ export default {
         }
       }
 
+      const fullCacheChanged = this.tileFullCacheComplete !== fullCacheComplete;
+      this.tileFullCacheComplete = fullCacheComplete;
       const changed = this.tileDownloadComplete !== complete;
       this.tileDownloadComplete = complete;
-      if (changed) {
-        console.log('[TileDownloadComplete]', {
-          sessionId: this.tileSessionId,
-          frameId: this.tileFrameId,
+      if (changed || fullCacheChanged) {
+        this.emitTileDebugLog('TileDownloadComplete', {
           complete,
           visibleCount,
-          generationComplete: this.tileGenerationComplete
-        });
+          generationComplete: this.tileGenerationComplete,
+          fullCacheComplete,
+          totalRawCount,
+          expectedReadyCount
+        }, 'info', { force: true });
       }
+      if (fullCacheChanged && fullCacheComplete) {
+        this.tileForceFullRender = true;
+        this.loadVisibleTiles();
+      }
+      if (this.tileGPM) {
+        this.emitTileLevelInfo();
+      }
+    },
+
+    enqueueBackgroundTileDownloads() {
+      if (!this.tileGenerationComplete || !this.tileReadyKeys || this.tileReadyKeys.size === 0) return;
+      if (this.tileFullCacheComplete) return;
+
+      const queued = new Set(
+        (this.tileLoadQueue || []).map(t => `${t.z}/${t.x}/${t.y}`)
+      );
+      const backgroundTiles = [];
+      for (const key of this.tileReadyKeys) {
+        if (!key || queued.has(key)) continue;
+        if (this.tileRawDataCache && this.tileRawDataCache.has(key)) continue;
+        if (this.tilePendingLoads && this.tilePendingLoads.has(key)) continue;
+        const parts = key.split('/');
+        if (parts.length !== 3) continue;
+        const z = Number(parts[0]);
+        const x = Number(parts[1]);
+        const y = Number(parts[2]);
+        if (!Number.isFinite(z) || !Number.isFinite(x) || !Number.isFinite(y)) continue;
+        backgroundTiles.push({ z, x, y, priority: 100000 + z, prefetchAll: true });
+      }
+      if (backgroundTiles.length === 0) return;
+
+      this.tileLoadQueue.push(...backgroundTiles);
+      this.emitTileDebugLog('enqueueBackgroundTileDownloads', {
+        count: backgroundTiles.length,
+        readyCount: this.tileReadyKeys.size,
+        rawCount: this.tileRawDataCache ? this.tileRawDataCache.size : 0
+      });
+      this.processLoadQueue();
+    },
+
+    emitTileDebugLog(event, details = {}, type = 'info', options = {}) {
+      const force = !!options.force;
+      if (!force && !this.TILE_DEBUG && type === 'info') return;
+      const payload = {
+        sessionId: this.tileSessionId != null ? String(this.tileSessionId) : '',
+        frameId: this.tileFrameId != null ? String(this.tileFrameId) : '',
+        ...details,
+      };
+      const compact = Object.entries(payload)
+        .filter(([, value]) => value !== undefined && value !== null && value !== '')
+        .map(([key, value]) => {
+          if (Array.isArray(value)) return `${key}=${JSON.stringify(value)}`;
+          if (typeof value === 'object') return `${key}=${JSON.stringify(value)}`;
+          return `${key}=${String(value)}`;
+        })
+        .join(' ');
+      this.SendConsoleLogMsg(`[TileDebug] event=${event}${compact ? ' ' + compact : ''}`, type);
     },
 
     handleTileBatchReady(payload) {
@@ -6158,7 +6857,17 @@ export default {
       }
 
       const sample = payload.tiles.slice(0, 8);
-      console.log('[TileBatchReady] received', {
+      const containsZ0 = payload.tiles.includes('0/0/0');
+      if (containsZ0) {
+        this.emitCaptureTrace('frontend_tilebatchready_rx', {
+          sessionId,
+          frameId,
+          count: payload.tiles.length,
+          added,
+          containsZ0: true,
+        });
+      }
+      this.emitTileDebugLog('TileBatchReady', {
         payloadSessionId: sessionId,
         payloadFrameId: frameId,
         currentSessionId,
@@ -6166,12 +6875,13 @@ export default {
         count: payload.tiles.length,
         added,
         sample
-      });
+      }, 'info', { force: true });
 
       if (added > 0 && this.tileGPM) {
         this.loadVisibleTiles();
       }
       this.updateTileDownloadCompletionState();
+      this.enqueueBackgroundTileDownloads();
       if (this.tileGPM) {
         this.$nextTick(() => {
           this.ensureTileReadyFallbackPolling();
@@ -6194,12 +6904,13 @@ export default {
 
       this.tileGenerationComplete = true;
       this.tileGenerationCompleteReadyCount = Number(payload.readyCount) || 0;
-      console.log('[TileGenerationComplete] received', {
+      this.emitTileDebugLog('TileGenerationComplete', {
         sessionId,
         frameId,
         readyCount: this.tileGenerationCompleteReadyCount
-      });
+      }, 'info', { force: true });
       this.updateTileDownloadCompletionState();
+      this.enqueueBackgroundTileDownloads();
       this.$nextTick(() => {
         this.ensureTileReadyFallbackPolling();
       });
@@ -6212,6 +6923,11 @@ export default {
     async handleTileGPM(gpm) {
       gpm.buildMode = this.normalizeTileBuildModeValue(gpm.buildMode);
       this.SendConsoleLogMsg(`Received TileGPM: session=${gpm.sessionId}, size=${gpm.imageWidth}x${gpm.imageHeight}, maxZoom=${gpm.maxZoomLevel}`, 'info');
+      this.logMainCameraImagePipeLine('App.vue', 'handleTileGPM', 'incomingSessionId', gpm.sessionId);
+      this.logMainCameraImagePipeLine('App.vue', 'handleTileGPM', 'incomingFrameId', gpm.frameId);
+      this.logMainCameraImagePipeLine('App.vue', 'handleTileGPM', 'incomingBlackWhite', `${gpm.blackLevel},${gpm.whiteLevel}`);
+      this.logMainCameraImagePipeLine('App.vue', 'handleTileGPM', 'incomingGainRB', `${gpm.gainR},${gpm.gainB}`);
+      const handleStartedAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
 
       // frameId：用于让“瓦片下载回包/缓存写入”与“当前 GPM”强绑定，避免错帧拉伸（尤其是 live 覆盖写 + 异步 fetch）
       const incomingFrameId = (typeof gpm.frameId === 'number' && isFinite(gpm.frameId)) ? gpm.frameId : null;
@@ -6266,8 +6982,17 @@ export default {
       // live 覆盖写帧节流：高帧率下若每条 TileGPM 都立即清缓存/abort，会导致前端持续“重启加载”，
       // 表现为跳帧、卡顿、瓦片大量失败、缩放后长时间不刷新。
       // 策略：仅对“同 session 下确实切到新 frame”的 live 覆盖写做节流。
-      // 对同一 frame 的 refined GPM（补发更精确 black/white）不应清缓存/abort。
+      // 对同一 frame 的重复 TileGPM 元数据更新不应清缓存/abort。
       const isLiveOverwriteFrame = (!isNewSession) && isLiveSession && !isSameFrameUpdate;
+      this.emitCaptureTrace('frontend_handle_tilegpm_start', {
+        sessionId: gpm.sessionId,
+        frameId: incomingFrameId,
+        isNewSession,
+        isLiveOverwriteFrame,
+        imageWidth: gpm.imageWidth,
+        imageHeight: gpm.imageHeight,
+        maxZoomLevel: gpm.maxZoomLevel,
+      });
       if (isLiveOverwriteFrame) {
         const now = Date.now();
         const throttleMs = Number(this.liveTileGpmThrottleMs) || 250;
@@ -6312,13 +7037,16 @@ export default {
         // 兼容：后端未提供 frameId 时，新会话必须生成新的本地帧号，避免沿用旧帧ID污染缓存/请求。
         this.tileFrameId = Date.now();
       }
+      if (this.captureTrace) {
+        this.captureTrace.sessionId = gpm.sessionId;
+        this.captureTrace.frameId = this.tileFrameId;
+        this.captureTrace.z0FetchLogged = false;
+        this.captureTrace.z0RenderLogged = false;
+      }
       this.showImageSizeX = gpm.imageWidth;
       this.showImageSizeY = gpm.imageHeight;
       this.ImageCFA = gpm.cfa || 'null';
-      this.ImageGainR = gpm.gainR || 1;
-      this.ImageGainB = gpm.gainB || 1;
-      this.saveAutoWhiteBalanceGains(this.ImageGainR, this.ImageGainB);
-      this.updateMainCameraWhiteBalanceConfig(this.ImageGainR, this.ImageGainB);
+      this.logMainCameraImagePipeLine('App.vue', 'handleTileGPM', 'ImageCFA', this.ImageCFA);
       
       // 确保Map/Set已初始化
       if (!this.tileCache) {
@@ -6379,6 +7107,7 @@ export default {
         this.tileGenerationComplete = false;
         this.tileGenerationCompleteReadyCount = 0;
         this.tileDownloadComplete = false;
+        this.tileFullCacheComplete = false;
         this.tileE2ERequiredKeys = '[]';
         this.tileE2EDownloadedKeys = '[]';
         this.tileE2ERequiredTileCount = 0;
@@ -6393,6 +7122,7 @@ export default {
           // 清除旧会话的自动拉伸参数
           this.autoStretchBlackLevel = null;
           this.autoStretchWhiteLevel = null;
+          this.tileHistogram = null;
         }
       }
 
@@ -6451,12 +7181,12 @@ export default {
             this.scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, s));
           } else {
             const targetZ = Math.max(0, Math.min(maxZ, Number(this.preferredTileZ)));
-            this.scale = this.tileLevelToScale(targetZ, maxZ);
+            this.scale = this.tileLevelToScale(targetZ, maxZ, gpm);
           }
         } else {
           this.scale = 1;
           this.preferredTileMaxZoomLevel = maxZ;
-          this.preferredTileZ = this.calculateTileLevel(this.scale, maxZ);
+          this.preferredTileZ = this.calculateTileLevel(this.scale, maxZ, gpm);
           this.preferredTileScale = this.scale;
           // maxZoomLevel 变化：按需求重置位置记忆（回到中心）
           this.preferredTileCenterNormX = 0.5;
@@ -6482,25 +7212,16 @@ export default {
       // 推送一次当前瓦片层级信息到 GUI（用于显示合并等级/分辨率）
       this.emitTileLevelInfo();
 
-      // 如果后端提供了黑白点，优先同步到直方图面板（复用既有绘制/拨盘逻辑）
-      if (Number.isFinite(gpm.blackLevel) && Number.isFinite(gpm.whiteLevel)) {
-        console.log(`[TileMode-GPM] 设置直方图区间参数: blackLevel=${gpm.blackLevel}, whiteLevel=${gpm.whiteLevel}`);
-        
-        // 保存“自动拉伸基准参数”：
-        // - 非 live 会话：仅在新会话/首次设置时保存（用于“恢复到本会话的自动拉伸”）
-        // - live 覆盖写帧：每帧都会产生新的推荐黑白点；若不刷新，则“自动拉伸”会一直恢复到旧帧参数，表现为用上一帧/更早的拉伸数据
-        const isLiveSession = (String(gpm.sessionId) === 'live');
-        if (isNewSession || this.autoStretchBlackLevel === null || this.autoStretchWhiteLevel === null || isLiveSession) {
-          this.autoStretchBlackLevel = gpm.blackLevel;
-          this.autoStretchWhiteLevel = gpm.whiteLevel;
-          console.log(`[TileMode-GPM] 保存初始自动拉伸参数: black=${this.autoStretchBlackLevel}, white=${this.autoStretchWhiteLevel}`);
-        }
-        
-        this.$bus.$emit('ChangeDialPosition', gpm.blackLevel, gpm.whiteLevel);
-        this.$bus.$emit('AutoHistogramNum', gpm.blackLevel, gpm.whiteLevel);
-      } else {
-        console.log('[TileMode-GPM] GPM未包含有效的黑白点参数');
-      }
+      // 关键优化：自动参数先基于本帧 Z=0 计算并写入状态，再开始可见瓦片处理，
+      // 避免“先用旧参数处理一遍，再按新参数整批重处理一遍”。
+      await this.prepareFrameAutoOptimizations();
+      await this.refreshHistogramFromZ0({
+        sessionId: this.tileSessionId,
+        frameId: this.tileFrameId,
+      });
+
+      this.$bus.$emit('ChangeDialPosition', this.currentHistogramMin, this.currentHistogramMax);
+      this.$bus.$emit('AutoHistogramNum', this.currentHistogramMin, this.currentHistogramMax);
       
       // 关键约束：
       // - 收到 TileGPM 只表示“本帧元数据已更新”，不表示瓦片已经允许下载
@@ -6512,6 +7233,15 @@ export default {
         this.renderTiles();
       }
       this.ensureTileReadyFallbackPolling();
+      const handleFinishedAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+      this.emitCaptureTrace('frontend_handle_tilegpm_done', {
+        sessionId: this.tileSessionId,
+        frameId: this.tileFrameId,
+        totalMs: (handleFinishedAt - handleStartedAt).toFixed(2),
+        readyCount: this.tileReadyKeys ? this.tileReadyKeys.size : 0,
+        generationComplete: this.tileGenerationComplete,
+        downloadComplete: this.tileDownloadComplete,
+      });
     },
 
     /**
@@ -6526,40 +7256,84 @@ export default {
 
     getTileRenderParamsSnapshot(sourceGpm = this.tileGPM) {
       if (!sourceGpm) return null;
+      const finalGains = this.getFinalWhiteBalanceGains();
       return {
         cfa: sourceGpm.cfa || 'null',
-        gainR: Number.isFinite(sourceGpm.gainR) ? sourceGpm.gainR : 1,
-        gainB: Number.isFinite(sourceGpm.gainB) ? sourceGpm.gainB : 1,
-        blackLevel: Number.isFinite(sourceGpm.blackLevel) ? sourceGpm.blackLevel : 0,
-        whiteLevel: Number.isFinite(sourceGpm.whiteLevel) ? sourceGpm.whiteLevel : 65535,
+        gainR: finalGains.gainR,
+        gainB: finalGains.gainB,
+        blackLevel: Number.isFinite(this.currentHistogramMin) ? this.currentHistogramMin : 0,
+        whiteLevel: Number.isFinite(this.currentHistogramMax) ? this.currentHistogramMax : 65535,
       };
     },
 
+    getCurrentTileZoomCap() {
+      if (!this.isFocuserPanelVisible) return null;
+      const cap = Number(this.focuserPanelTileZoomCap);
+      if (!Number.isFinite(cap)) return 2;
+      return Math.max(0, Math.floor(cap));
+    },
+
+    getEffectiveRequestedTileMaxZ(gpm = this.tileGPM) {
+      const imageMeta = gpm || this.tileGPM;
+      const maxZ = Math.max(0, Number(imageMeta && imageMeta.maxZoomLevel) || 0);
+      const cap = this.getCurrentTileZoomCap();
+      if (cap == null) return maxZ;
+      return Math.max(0, Math.min(maxZ, cap));
+    },
+
+    handleFocuserPanelVisibilityChanged(visible) {
+      const nextVisible = !!visible;
+      if (this.isFocuserPanelVisible === nextVisible) return;
+      this.isFocuserPanelVisible = nextVisible;
+
+      if (!this.tileGPM) return;
+
+      // 对焦面板显隐会改变允许请求的最高瓦片层级。
+      // 这里强制清空一次合成缓冲，避免旧的高精/低精层残留在画面上。
+      this.tileCanvasNeedsClear = true;
+      this.tileForceFullRender = true;
+      this.scheduleVisibleAreaToBackend(true);
+      this.loadVisibleTiles();
+    },
+
     /**
-     * 根据缩放比例计算瓦片层级
+     * 根据当前屏幕显示密度计算最合适的瓦片层级
      * @param {Number} scale - 当前缩放比例
      * @param {Number} maxZoomLevel - 最大层级
+     * @param {Object|null} gpmOverride - 可选 GPM（新会话恢复时使用）
      * @returns {Number} 瓦片层级 (0-maxZoomLevel)
      */
-    calculateTileLevel(scale, maxZoomLevel) {
-      // 缩放范围：0.1 - 1.0，量化为 10 个离散级别进行映射
-      // 注意：本项目里 scale 越小表示越“放大”(视野越小)，因此瓦片层级需要反向映射：
-      // - scale=0.1 -> z=maxZoomLevel（最高精度，原图）
-      // - scale=1.0 -> z=0（最低精度，缩小层）
-      const MIN_SCALE = 0.1;
+    calculateTileLevel(scale, maxZoomLevel, gpmOverride = null) {
+      const maxZ = Math.max(0, Number(maxZoomLevel) || 0);
+      if (maxZ === 0) return 0;
+
+      const gpm = gpmOverride || this.tileGPM;
+      const imageWidth = Number(gpm && gpm.imageWidth);
+      const imageHeight = Number(gpm && gpm.imageHeight);
+      const canvasWidth = Math.max(1, Number(this.CanvasWidth) || 0);
+      const canvasHeight = Math.max(1, Number(this.CanvasHeight) || 0);
+      if (!Number.isFinite(imageWidth) || imageWidth <= 0 || !Number.isFinite(imageHeight) || imageHeight <= 0) {
+        return 0;
+      }
+
+      const MIN_SCALE = 0.01;
       const MAX_SCALE = 1.0;
-      const LEVELS = 10; // 0.1~1.0 共 10 档
+      const clampedScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, Number(scale) || 1));
+      const visibleWidth = imageWidth * clampedScale;
+      const imageAspect = imageWidth / imageHeight;
+      const canvasAspect = canvasWidth / canvasHeight;
+      const visibleHeight = canvasAspect > 0 ? (visibleWidth / canvasAspect) : (visibleWidth / imageAspect);
 
-      const clampedScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, Number(scale)));
-      const denom = (MAX_SCALE - MIN_SCALE) || 1;
-      const t = (clampedScale - MIN_SCALE) / denom; // 0..1
-
-      // 先映射到 10 档的索引，再反向，再投影到实际的 maxZoomLevel
-      const idx = Math.round(t * (LEVELS - 1)); // 0..9
-      const invIdx = (LEVELS - 1) - idx; // 9..0
-      const z = Math.round((invIdx / (LEVELS - 1)) * maxZoomLevel);
-
-      return Math.max(0, Math.min(maxZoomLevel, z));
+      const sourcePixelsPerScreenPixelX = visibleWidth / canvasWidth;
+      const sourcePixelsPerScreenPixelY = visibleHeight / canvasHeight;
+      const sourcePixelsPerScreenPixel = Math.max(
+        1e-6,
+        sourcePixelsPerScreenPixelX,
+        sourcePixelsPerScreenPixelY
+      );
+      const levelScale = Math.max(1, sourcePixelsPerScreenPixel);
+      const z = Math.round(maxZ - Math.log2(levelScale));
+      return Math.max(0, Math.min(maxZ, z));
     },
 
     /**
@@ -6568,20 +7342,44 @@ export default {
      * @param {Number} maxZoomLevel
      * @returns {Number} scale in [0.1, 1.0]
      */
-    tileLevelToScale(z, maxZoomLevel) {
-      const MIN_SCALE = 0.1;
+    tileLevelToScale(z, maxZoomLevel, gpmOverride = null) {
+      const MIN_SCALE = 0.01;
       const MAX_SCALE = 1.0;
-      const LEVELS = 10;
       const maxZ = Math.max(0, Number(maxZoomLevel) || 0);
-      if (maxZ === 0) return MAX_SCALE; // 只有一层时，固定为 z=0
+      const gpm = gpmOverride || this.tileGPM;
+      const imageWidth = Number(gpm && gpm.imageWidth);
+      const imageHeight = Number(gpm && gpm.imageHeight);
+      const canvasWidth = Math.max(1, Number(this.CanvasWidth) || 0);
+      const canvasHeight = Math.max(1, Number(this.CanvasHeight) || 0);
+      if (maxZ === 0 || !Number.isFinite(imageWidth) || imageWidth <= 0 || !Number.isFinite(imageHeight) || imageHeight <= 0) {
+        return MAX_SCALE;
+      }
 
       const targetZ = Math.max(0, Math.min(maxZ, Number(z) || 0));
-      // 反推 invIdx（0..9），再得到 idx（0..9）
-      const invIdx = Math.round((targetZ / maxZ) * (LEVELS - 1)); // 0..9
-      const idx = (LEVELS - 1) - invIdx; // 9..0
-      const t = idx / (LEVELS - 1); // 0..1
-      const scale = MIN_SCALE + t * (MAX_SCALE - MIN_SCALE);
+      const levelScale = Math.pow(2, maxZ - targetZ);
+      const visibleWidth = canvasWidth * levelScale;
+      const imageAspect = imageWidth / imageHeight;
+      const canvasAspect = canvasWidth / canvasHeight;
+      const visibleHeight = canvasAspect > 0 ? (visibleWidth / canvasAspect) : (visibleWidth / imageAspect);
+      const scale = Math.max(visibleWidth / imageWidth, visibleHeight / imageHeight);
       return Math.max(MIN_SCALE, Math.min(MAX_SCALE, scale));
+    },
+
+    getCurrentTargetTileZ(gpmOverride = null) {
+      const gpm = gpmOverride || this.tileGPM;
+      if (!gpm) return 0;
+      const requestMaxZ = this.getEffectiveRequestedTileMaxZ(gpm);
+      return Math.min(this.calculateTileLevel(this.scale, gpm.maxZoomLevel, gpm), requestMaxZ);
+    },
+
+    getCurrentDisplayTileZ(gpmOverride = null) {
+      const gpm = gpmOverride || this.tileGPM;
+      if (!gpm) return 0;
+      const requestMaxZ = this.getEffectiveRequestedTileMaxZ(gpm);
+      if (this.tileFullCacheComplete) {
+        return Math.max(0, requestMaxZ);
+      }
+      return this.getCurrentTargetTileZ(gpm);
     },
 
     /**
@@ -6596,10 +7394,26 @@ export default {
         return;
       }
       const maxZoomLevel = Number(gpm.maxZoomLevel);
-      const z = this.calculateTileLevel(this.scale, maxZoomLevel);
+      const z = this.getCurrentDisplayTileZ(gpm);
       const levelScale = Math.pow(2, maxZoomLevel - z);
       const levelWidth = Math.ceil(Number(gpm.imageWidth) / levelScale);
       const levelHeight = Math.ceil(Number(gpm.imageHeight) / levelScale);
+      const tileSize = Math.max(1, Number(gpm.tileSize) || 512);
+      const totalTilesX = Math.ceil(levelWidth / tileSize);
+      const totalTilesY = Math.ceil(levelHeight / tileSize);
+      const totalTileCount = Math.max(0, totalTilesX * totalTilesY);
+      let downloadedTileCount = 0;
+      if (this.tileRawDataCache && this.tileRawDataCache.size > 0) {
+        const prefix = `${z}/`;
+        for (const key of this.tileRawDataCache.keys()) {
+          if (typeof key === 'string' && key.startsWith(prefix)) {
+            downloadedTileCount++;
+          }
+        }
+      }
+      const progressPercent = totalTileCount > 0
+        ? Math.max(0, Math.min(100, (downloadedTileCount / totalTileCount) * 100))
+        : 0;
 
       // 记忆当前层级（供下一次拍摄复用；仅当 maxZoomLevel 相同才会恢复）
       this.preferredTileZ = z;
@@ -6614,6 +7428,10 @@ export default {
         levelScale,
         levelWidth,
         levelHeight,
+        levelTileCount: totalTileCount,
+        levelDownloadedTileCount: downloadedTileCount,
+        levelProgressPercent: progressPercent,
+        fullCacheComplete: !!this.tileFullCacheComplete,
         imageWidth: Number(gpm.imageWidth),
         imageHeight: Number(gpm.imageHeight),
         tileRasterScale: Number(this.tileRasterScale) > 0 ? Number(this.tileRasterScale) : 1,
@@ -6649,7 +7467,7 @@ export default {
       }
       const maxZ = Number(gpm.maxZoomLevel);
       if (Number.isFinite(maxZ)) {
-        this.preferredTileZ = this.calculateTileLevel(this.scale, maxZ);
+        this.preferredTileZ = this.calculateTileLevel(this.scale, maxZ, gpm);
         this.preferredTileMaxZoomLevel = maxZ;
       }
 
@@ -6702,10 +7520,6 @@ export default {
       if (!this.tileGPM) return [];
 
       const gpm = this.tileGPM;
-      const buildMode = this.normalizeTileBuildModeValue(gpm.buildMode);
-      if (buildMode === 'merged_single_level' && z === 0) {
-        return [{ z: 0, x: 0, y: 0 }];
-      }
       const rect = visibleRect || this.getCurrentVisibleRect();
       if (!rect) return [];
 
@@ -6743,8 +7557,10 @@ export default {
       if (!this.tileGPM) return [];
 
       const gpm = this.tileGPM;
-      const currentZ = this.calculateTileLevel(this.scale, gpm.maxZoomLevel);
-      const requestMaxZ = gpm.maxZoomLevel;
+      const zCap = this.getCurrentTileZoomCap();
+      const forceFullImageForCappedMode = zCap != null;
+      const requestMaxZ = this.getEffectiveRequestedTileMaxZ(gpm);
+      const currentZ = Math.min(this.getCurrentTargetTileZ(gpm), requestMaxZ);
       const buildMode = this.normalizeTileBuildModeValue(gpm.buildMode);
       const visibleRect = this.getCurrentVisibleRect();
       if (!visibleRect) return [];
@@ -6761,28 +7577,24 @@ export default {
         width: gpm.imageWidth,
         height: gpm.imageHeight,
       };
-      // merged_single_level：仅两层——z=0 压缩合并整图 + z=maxZ 原图视口
-      // 为避免首帧阶段 z=maxZ 还未生成就产生大量 404/重试，先等 0/0/0 就绪后再请求高精度层。
-      // pyramid：不再请求 0..maxZ 全层级，避免前端为“看不见/很快被覆盖”的中间层付出过高代价。
-      // 仅保留：
-      // - z=0：整图粗预览
-      // - currentZ：当前缩放真正需要的层级
-      // - currentZ-1：作为过渡兜底层，兼顾渐进式体验与性能
-      const requestLevels = (buildMode === 'merged_single_level')
-        ? (this.tileMergedPreviewReady
-            ? Array.from(new Set([0, requestMaxZ]))
-            : [0])
+      const requestLevels = this.tileMergedPreviewReady
+        ? Array.from(new Set([
+            Math.max(0, currentZ - 1),
+            currentZ,
+          ])).sort((a, b) => a - b)
         : Array.from(new Set([
             0,
             Math.max(0, currentZ - 1),
             currentZ,
           ])).sort((a, b) => a - b);
+      const fullyLocalHighResMode = !!this.tileFullCacheComplete;
+      const localOnlyZ = Math.max(0, requestMaxZ);
+      const effectiveRequestLevels = fullyLocalHighResMode
+        ? [localOnlyZ]
+        : requestLevels;
 
-      for (const z of requestLevels) {
-        // merged_single_level:
-        // - z=0 用整图单瓦片做预览
-        // - z=maxZ 只请求当前视口，并按中心距离渐进替换
-        const useFullImage = (z === 0);
+      for (const z of effectiveRequestLevels) {
+        const useFullImage = (z === 0) || forceFullImageForCappedMode;
         const levelTiles = this.calculateVisibleTilesForLevel(
           z,
           useFullImage ? fullImageRect : visibleRect
@@ -6798,15 +7610,33 @@ export default {
       if (this.TILE_DEBUG && tiles.length > 0) {
         const sample = tiles.slice(0, 6).map(t => `${t.z}/${t.x}/${t.y}`);
         const more = tiles.length > 6 ? ` ... +${tiles.length - 6} more` : '';
-        console.log('[Tile] calculateVisibleTiles', {
+        this.emitTileDebugLog('calculateVisibleTiles', {
           visibleRect: `(${Math.round(visibleRect.left)},${Math.round(visibleRect.top)})-${Math.round(visibleRect.width)}x${Math.round(visibleRect.height)}`,
           currentZ,
           requestMaxZ,
           buildMode,
-          levels: requestLevels.join(','),
+          levels: effectiveRequestLevels.join(','),
+          fullyLocalHighResMode,
           count: tiles.length,
           sample: sample.join(', ') + more
         });
+      }
+
+      if (zCap != null) {
+        const levelCounts = {};
+        for (const t of tiles) {
+          const key = String(t.z);
+          levelCounts[key] = (levelCounts[key] || 0) + 1;
+        }
+        this.emitTileDebugLog('FocusCapCalculateVisibleTiles', {
+          zCap,
+          requestMaxZ,
+          currentZ,
+          buildMode,
+          visibleRect: `(${Math.round(visibleRect.left)},${Math.round(visibleRect.top)})-${Math.round(visibleRect.width)}x${Math.round(visibleRect.height)}`,
+          total: tiles.length,
+          levelCounts,
+        }, 'info', { force: true });
       }
 
       if (tiles.length === 0 && gpm.imageWidth > 0 && gpm.imageHeight > 0) {
@@ -6832,11 +7662,17 @@ export default {
       
       const tiles = this.calculateVisibleTiles();
       const gpm = this.tileGPM;
-      const buildMode = this.normalizeTileBuildModeValue(gpm.buildMode);
-      const currentZ = this.calculateTileLevel(this.scale, gpm.maxZoomLevel);
+      const currentZ = this.getCurrentTargetTileZ(gpm);
+      this.emitCaptureTrace('frontend_load_visible_tiles_start', {
+        sessionId: this.tileSessionId,
+        frameId: this.tileFrameId,
+        currentZ,
+        visibleCount: tiles.length,
+        readyCount: this.tileReadyKeys ? this.tileReadyKeys.size : 0,
+      });
       const batchId = ++this.tileLoadBatchSeq;
       this.activeTileLoadBatchId = batchId;
-      this.tileAllowIncrementalRender = true;
+      this.tileAllowIncrementalRender = false;
       this.resetIncrementalTileRenderBuffer();
 
       // 更新当前可见瓦片集合
@@ -6865,42 +7701,21 @@ export default {
       });
       
       this.currentVisibleTiles = newVisibleTiles;
+      // 关键：仅平移视口时常见“无新下载瓦片”，但可见集合已变化。
+      // 若不强制整批重绘，renderTiles 可能因无 dirty key 直接跳过，导致高精区域显示停留在旧位置。
+      if (visibleTilesChanged) {
+        this.tileForceFullRender = true;
+      }
       
-      const paramsKey = this.getTileRenderParamsKey();
+      const paramsSnapshot = this.getTileRenderParamsSnapshot();
+      const paramsKey = paramsSnapshot
+        ? `${paramsSnapshot.cfa}|${paramsSnapshot.gainR}|${paramsSnapshot.gainB}|${paramsSnapshot.blackLevel}|${paramsSnapshot.whiteLevel}`
+        : 'no-gpm';
 
-      // 先对“已有原始数据”的可见瓦片做一次就地处理：
-      // - 若尚未处理过，生成处理后瓦片
-      // - 若处理参数已变化，按新参数重处理并覆盖
-      for (const t of tiles) {
-        const key = `${t.z}/${t.x}/${t.y}`;
-        const hasRaw = this.tileRawDataCache && this.tileRawDataCache.has(key);
-        if (!hasRaw) continue;
-        if (this.tileRetryTimers && this.tileRetryTimers.has(key)) {
-          clearTimeout(this.tileRetryTimers.get(key));
-          this.tileRetryTimers.delete(key);
-        }
-        if (this.tileRetryCounts) {
-          this.tileRetryCounts.delete(key);
-        }
-
-        const cached = this.tileCache && this.tileCache.get(key);
-        const needReprocess = !cached || cached.paramsKey !== paramsKey;
-
-        if (needReprocess) {
-          try {
-            const processedTile = this.processTile(this.tileRawDataCache.get(key));
-            const renderSource = this.createTileRenderSource(processedTile);
-            this.tileCache.set(key, {
-              renderSource,
-              width: processedTile.width,
-              height: processedTile.height,
-              paramsKey
-            });
-            this.tileDirtyKeys.add(key);
-          } catch (e) {
-            console.error(`Error processing cached raw tile ${key}:`, e);
-          }
-        }
+      // 先对“已有原始数据”的可见瓦片做分批就地处理，避免参数变化时长时间同步阻塞主线程。
+      const reprocessFinished = await this.reprocessVisibleRawTiles(tiles, paramsSnapshot, paramsKey, batchId);
+      if (!reprocessFinished || batchId !== this.activeTileLoadBatchId) {
+        return;
       }
 
       // 过滤需要“下载原始数据”的瓦片：只有 raw 不存在且不在加载中，才发起请求
@@ -6924,9 +7739,7 @@ export default {
           hasCache: !!(cached && cached.renderSource && cached.width && cached.height),
         };
       });
-      console.log('[TileLoad] loadVisibleTiles summary', {
-        sessionId: this.tileSessionId,
-        frameId: this.tileFrameId,
+      this.emitTileDebugLog('loadVisibleTilesSummary', {
         visibleCount: tiles.length,
         readyCount: this.tileReadyKeys ? this.tileReadyKeys.size : 0,
         generationComplete: this.tileGenerationComplete,
@@ -6962,26 +7775,15 @@ export default {
         const dy = tileCenterY - centerY;
         const distance = Math.sqrt(dx * dx + dy * dy);
         
-        // 交互体验优化：缩放/平移时优先显示高精瓦片。
-        // merged_single_level:
-        // - z=maxZ（原图层）优先
-        // - z=0（整图预览）最低优先级，仅兜底
-        // pyramid:
-        // - 当前层级 currentZ 优先
-        // - 再 currentZ-1
-        // - 最后 z=0 预览层
+        // 交互体验优化：当前层优先，其次过渡层，最后 z=0 首帧预览层。
         let levelPenalty = 0;
-        if (buildMode === 'merged_single_level') {
-          levelPenalty = (tile.z === gpm.maxZoomLevel) ? 0 : 100000;
+        const fallbackZ = Math.max(0, currentZ - 1);
+        if (tile.z === currentZ) {
+          levelPenalty = 0;
+        } else if (tile.z === fallbackZ) {
+          levelPenalty = 2000;
         } else {
-          const fallbackZ = Math.max(0, currentZ - 1);
-          if (tile.z === currentZ) {
-            levelPenalty = 0;
-          } else if (tile.z === fallbackZ) {
-            levelPenalty = 2000;
-          } else {
-            levelPenalty = 4000;
-          }
+          levelPenalty = 4000;
         }
         // 同层内优先离视口中心更近的瓦片
         tile.priority = levelPenalty + distance;
@@ -6992,17 +7794,78 @@ export default {
       
       // 将瓦片添加到加载队列（插入到队列前面）
       this.tileLoadQueue.unshift(...tilesToLoad);
-      
-      // 先用已缓存的低层/高层瓦片立即重绘一遍，再等待后续下载逐步覆盖
-      this.renderTiles();
 
       // 开始处理加载队列
       this.processLoadQueue();
-
-      // 若当前批次没有新下载任务，主动触发一次收敛渲染，避免仅依赖异步补绘。
-      if (tilesToLoad.length === 0 && batchId === this.activeTileLoadBatchId) {
-        this.renderTiles();
+      const presentationKeys = Array.from(newVisibleTiles);
+      await this.waitForVisibleTilesReady(batchId, presentationKeys);
+      if (batchId !== this.activeTileLoadBatchId) {
+        return;
       }
+      this.commitVisibleTilePresentation(batchId, presentationKeys);
+      this.emitCaptureTrace('frontend_load_visible_tiles_queued', {
+        sessionId: this.tileSessionId,
+        frameId: this.tileFrameId,
+        currentZ,
+        visibleCount: tiles.length,
+        toLoadCount: tilesToLoad.length,
+        blockedCount: blockedByReadyKeys.length,
+      });
+    },
+    async reprocessVisibleRawTiles(tiles, paramsSnapshot, paramsKey, batchId) {
+      if (!tiles || tiles.length === 0) return true;
+      const chunkSize = Math.max(1, Number(this.tileReprocessChunkSize) || 1);
+      const yieldMs = Math.max(0, Number(this.tileReprocessYieldMs) || 0);
+      let processedInChunk = 0;
+      let touchedDirtyTiles = false;
+
+      for (const t of tiles) {
+        if (batchId !== this.activeTileLoadBatchId) return false;
+        const key = `${t.z}/${t.x}/${t.y}`;
+        const hasRaw = this.tileRawDataCache && this.tileRawDataCache.has(key);
+        if (!hasRaw) continue;
+        if (this.tileRetryTimers && this.tileRetryTimers.has(key)) {
+          clearTimeout(this.tileRetryTimers.get(key));
+          this.tileRetryTimers.delete(key);
+        }
+        if (this.tileRetryCounts) {
+          this.tileRetryCounts.delete(key);
+        }
+
+        const cached = this.tileCache && this.tileCache.get(key);
+        const needReprocess = !cached || cached.paramsKey !== paramsKey;
+        if (!needReprocess) continue;
+
+        try {
+          const processedTile = this.processTile(this.tileRawDataCache.get(key), paramsSnapshot);
+          const renderSource = this.createTileRenderSource(processedTile);
+          this.tileCache.set(key, {
+            renderSource,
+            width: processedTile.width,
+            height: processedTile.height,
+            paramsKey
+          });
+          this.tileDirtyKeys.add(key);
+          touchedDirtyTiles = true;
+        } catch (e) {
+          console.error(`Error processing cached raw tile ${key}:`, e);
+        }
+
+        processedInChunk++;
+        if (processedInChunk >= chunkSize) {
+          processedInChunk = 0;
+          if (touchedDirtyTiles) {
+            this.scheduleIncrementalTileRender();
+            touchedDirtyTiles = false;
+          }
+          await this.yieldToMainThread(yieldMs);
+        }
+      }
+
+      if (touchedDirtyTiles) {
+        this.scheduleIncrementalTileRender();
+      }
+      return batchId === this.activeTileLoadBatchId;
     },
 
     /**
@@ -7018,7 +7881,7 @@ export default {
         if ((this.tileRawDataCache && this.tileRawDataCache.has(key)) ||
             (this.tileCache && this.tileCache.has(key)) ||
             this.tilePendingLoads.has(key) ||
-            !this.currentVisibleTiles.has(key) ||
+            (!tile.prefetchAll && !this.currentVisibleTiles.has(key)) ||
             !this.isTileKeyDownloadAllowed(key)) {
           continue;
         }
@@ -7178,6 +8041,83 @@ export default {
       return false;
     },
 
+    hasCompleteVisibleTileCache(keys = null) {
+      const targetKeys = keys
+        || ((this.currentVisibleTiles && this.currentVisibleTiles.size > 0)
+          ? Array.from(this.currentVisibleTiles)
+          : []);
+      if (!targetKeys || targetKeys.length === 0) return false;
+      for (const key of targetKeys) {
+        const cached = this.tileCache && this.tileCache.get(key);
+        if (!(cached && cached.renderSource && cached.width && cached.height)) {
+          return false;
+        }
+      }
+      return true;
+    },
+
+    async waitForVisibleTilesReady(batchId, keys = null) {
+      const targetKeys = keys
+        || ((this.currentVisibleTiles && this.currentVisibleTiles.size > 0)
+          ? Array.from(this.currentVisibleTiles)
+          : []);
+      if (!targetKeys || targetKeys.length === 0) return false;
+      const maxWaitMs = Math.max(0, Number(this.tileBatchMaxWaitMs) || 0);
+      const deadline = Date.now() + maxWaitMs;
+
+      while (batchId === this.activeTileLoadBatchId) {
+        if (this.hasCompleteVisibleTileCache(targetKeys)) {
+          return true;
+        }
+        const remainingMs = deadline - Date.now();
+        if (remainingMs <= 0) {
+          return false;
+        }
+
+        const pendingWaiters = [];
+        let hasBlockedMissing = false;
+        for (const key of targetKeys) {
+          const cached = this.tileCache && this.tileCache.get(key);
+          if (cached && cached.renderSource && cached.width && cached.height) continue;
+          if (this.tilePendingLoads && this.tilePendingLoads.has(key)) {
+            pendingWaiters.push(this.waitForTileSettled(key));
+          } else {
+            hasBlockedMissing = true;
+          }
+        }
+
+        if (hasBlockedMissing && !this.tileReadyPollInFlight) {
+          this.requestCurrentTileBatchReady();
+        }
+
+        const waitMs = Math.max(16, Math.min(remainingMs, 120));
+        if (pendingWaiters.length > 0) {
+          await Promise.race([
+            Promise.allSettled(pendingWaiters),
+            new Promise(resolve => setTimeout(resolve, waitMs))
+          ]);
+        } else {
+          await new Promise(resolve => setTimeout(resolve, waitMs));
+        }
+      }
+
+      return false;
+    },
+
+    commitVisibleTilePresentation(batchId = this.activeTileLoadBatchId, keys = null) {
+      if (batchId !== this.activeTileLoadBatchId) return false;
+      const targetKeys = keys
+        || ((this.currentVisibleTiles && this.currentVisibleTiles.size > 0)
+          ? Array.from(this.currentVisibleTiles)
+          : []);
+      if (!this.hasCompleteVisibleTileCache(targetKeys)) return false;
+      this.tileForceFullRender = true;
+      this.tileAllowIncrementalRender = true;
+      this.resetIncrementalTileRenderBuffer();
+      this.renderTiles();
+      return true;
+    },
+
     /**
      * 加载单个瓦片（支持取消）
      * @param {Object} tile - 瓦片信息 {z, x, y}
@@ -7196,10 +8136,10 @@ export default {
       const expectedFrameId = this.tileFrameId;
       const expectedRenderParams = this.getTileRenderParamsSnapshot();
       const allowedByBatchReady = this.isTileKeyDownloadAllowed(key);
-      console.log('[TileLoad] fetch start', {
+      this.emitTileDebugLog('loadSingleTileStart', {
         key,
-        sessionId: expectedSessionId,
-        frameId: expectedFrameId,
+        expectedSessionId,
+        expectedFrameId,
         allowedByBatchReady,
         url
       });
@@ -7218,10 +8158,29 @@ export default {
         });
       }
       try {
+        if (key === '0/0/0') {
+          this.emitCaptureTrace('frontend_z0_fetch_start', {
+            source: 'loadSingleTile',
+            sessionId: expectedSessionId,
+            frameId: expectedFrameId,
+          });
+        }
+        const fetchStart = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
         const response = await fetch(url, { 
           cache: 'no-store',
           signal: abortController.signal 
         });
+        if (key === '0/0/0') {
+          const headersReadyAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+          this.emitCaptureTrace('frontend_z0_fetch_response_headers', {
+            source: 'loadSingleTile',
+            sessionId: expectedSessionId,
+            frameId: expectedFrameId,
+            status: response.status,
+            headersMs: (headersReadyAt - fetchStart).toFixed(2),
+            contentLength: response.headers.get('content-length') || '',
+          });
+        }
         
         if (!response.ok) {
           if (this.TILE_DEBUG) {
@@ -7233,6 +8192,16 @@ export default {
         }
         
         const buffer = await response.arrayBuffer();
+        if (key === '0/0/0') {
+          const fetchDone = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+          this.emitCaptureTrace('frontend_z0_fetch_done', {
+            source: 'loadSingleTile',
+            sessionId: expectedSessionId,
+            frameId: expectedFrameId,
+            downloadMs: (fetchDone - fetchStart).toFixed(2),
+            bytes: buffer.byteLength,
+          });
+        }
 
         // 回包时校验：若期间已切换到新帧/新会话，直接丢弃，避免错帧拉伸/错帧缓存污染
         if (expectedSessionId !== this.tileSessionId || expectedFrameId !== this.tileFrameId) {
@@ -7250,7 +8219,20 @@ export default {
         }
         
         // 解析瓦片数据
+        const parseStartedAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
         const tileData = this.parseTileData(buffer);
+        if (key === '0/0/0' && tileData) {
+          const parseFinishedAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+          this.emitCaptureTrace('frontend_z0_parse_done', {
+            source: 'loadSingleTile',
+            sessionId: expectedSessionId,
+            frameId: expectedFrameId,
+            parseMs: (parseFinishedAt - parseStartedAt).toFixed(2),
+            rawWidth: tileData.width,
+            rawHeight: tileData.height,
+            rawType: tileData.type,
+          });
+        }
         if (tileData) {
           const paramsSnapshot = expectedRenderParams || this.getTileRenderParamsSnapshot();
           const paramsKey = paramsSnapshot
@@ -7267,6 +8249,7 @@ export default {
           }
           
           try {
+            const processStartedAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
             let processedTile;
             let renderSource;
             if (this.TILE_PERF && typeof performance !== 'undefined' && performance.now) {
@@ -7294,15 +8277,20 @@ export default {
               height: processedTile.height,
               paramsKey
             });
-            this.markTileDirty(key);
-            const isMergedPreviewTile =
-              this.normalizeTileBuildModeValue(this.tileGPM && this.tileGPM.buildMode) === 'merged_single_level'
-              && key === '0/0/0';
-            let shouldTriggerMergedDetailLoad = false;
-            if (isMergedPreviewTile && !this.tileMergedPreviewReady) {
-              this.tileMergedPreviewReady = true;
-              shouldTriggerMergedDetailLoad = true;
+            if (key === '0/0/0') {
+              const processFinishedAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+              this.emitCaptureTrace('frontend_z0_process_done', {
+                source: 'loadSingleTile',
+                sessionId: expectedSessionId,
+                frameId: expectedFrameId,
+                processMs: (processFinishedAt - processStartedAt).toFixed(2),
+                outWidth: processedTile.width,
+                outHeight: processedTile.height,
+              });
             }
+            this.markTileDirty(key);
+            const isMergedPreviewTile = key === '0/0/0';
+            let shouldTriggerMergedDetailLoad = false;
             if (this.TILE_DEBUG) {
               console.log('[Tile] loadSingleTile ok', { key, rawSize: `${tileData.width}x${tileData.height}`, outSize: `${processedTile.width}x${processedTile.height}` });
             }
@@ -7313,8 +8301,21 @@ export default {
               expectedFrameId === this.tileFrameId &&
               this.currentVisibleTiles &&
               this.currentVisibleTiles.has(key);
-            if (shouldPatchRender) {
+            if (isMergedPreviewTile &&
+                !this.tileMergedPreviewReady &&
+                expectedSessionId === this.tileSessionId &&
+                expectedFrameId === this.tileFrameId) {
+              // 关键：Z0 必须先真正画到屏幕上，再切到“高层局部瓦片渐进替换”模式。
+              // 否则 currentVisibleTiles 可能先移除 0/0/0，导致首图实际显示成局部块状补齐。
+              this.tileForceFullRender = true;
+              this.renderTiles();
+              this.tileMergedPreviewReady = true;
+              shouldTriggerMergedDetailLoad = true;
+            } else if (shouldPatchRender) {
               this.scheduleIncrementalTileRender();
+            }
+            if (!this.tileAllowIncrementalRender) {
+              this.commitVisibleTilePresentation();
             }
             if (shouldTriggerMergedDetailLoad &&
                 expectedSessionId === this.tileSessionId &&
@@ -7344,7 +8345,7 @@ export default {
         if (error.name === 'AbortError') {
           if (this.TILE_DEBUG) console.log('[Tile] loadSingleTile cancelled', { key });
         } else if (error && error.status === 404) {
-          console.warn('[Tile404]', {
+          this.emitTileDebugLog('Tile404', {
             key,
             expectedSessionId,
             expectedFrameId,
@@ -7352,13 +8353,16 @@ export default {
             currentFrameId: this.tileFrameId,
             allowedByBatchReady: this.isTileKeyDownloadAllowed(key),
             visible: !!(this.currentVisibleTiles && this.currentVisibleTiles.has(key))
-          });
+          }, 'warning', { force: true });
           this.scheduleTileRetry(tile, expectedSessionId, expectedFrameId);
           if (this.TILE_DEBUG) {
             console.log('[Tile] loadSingleTile 404, will retry', { key });
           }
         } else {
-          console.error('[Tile] loadSingleTile error', { key, error });
+          this.emitTileDebugLog('loadSingleTileError', {
+            key,
+            error: error && error.message ? error.message : String(error)
+          }, 'error', { force: true });
         }
         
         // 清理AbortController
@@ -7367,6 +8371,7 @@ export default {
         // 无论成功/失败/取消，都要通知等待中的批次，避免“全齐再显示”屏障悬挂
         this.notifyTileSettled(key);
         this.updateTileDownloadCompletionState();
+        this.enqueueBackgroundTileDownloads();
       }
     },
 
@@ -7429,8 +8434,23 @@ export default {
         if (isColorCamera) {
           // applyStretchAndGain() 期望 analysis.whiteBalance.gainR/gainB
           const analysis = { whiteBalance: { gainR: params.gainR, gainB: params.gainB } };
+          this.logImagePipelineHotPath('processTile', 'tileColorParams', {
+            cfa: params.cfa,
+            blackLevel: params.blackLevel,
+            whiteLevel: params.whiteLevel,
+            gainR: params.gainR,
+            gainB: params.gainB,
+            width,
+            height,
+          });
           resultImg = this.applyStretchAndGain(mat, analysis, 'bayer', params.cfa, params.blackLevel, params.whiteLevel);
         } else {
+          this.logImagePipelineHotPath('processTile', 'tileGrayParams', {
+            blackLevel: params.blackLevel,
+            whiteLevel: params.whiteLevel,
+            width,
+            height,
+          });
           resultImg = this.applyStretchAndGain(mat, {
             gainR: 1,
             gainB: 1,
@@ -7495,13 +8515,9 @@ export default {
       }
       
       // 获取当前应该显示的层级（反向金字塔）
-      const z = this.calculateTileLevel(this.scale, gpm.maxZoomLevel);
-      const buildMode = this.normalizeTileBuildModeValue(gpm.buildMode);
-      const isMergedSingleLevel = (buildMode === 'merged_single_level');
+      const z = this.calculateTileLevel(this.scale, gpm.maxZoomLevel, gpm);
 
       // 若缩放导致瓦片层级切换：清理“当前可视区域”，避免旧层级瓦片残留造成“看起来没有更新”的错觉
-      // merged_single_level 模式：不在此处清空视口，因 z=0 全图会先绘制并覆盖旧 currentZ，currentZ 再逐片叠加即可实现渐进覆盖
-      // pyramid 模式：需清空视口以移除旧层级瓦片
       if (this._tileLastRenderedZ === undefined) {
         this._tileLastRenderedZ = z;
       } else if (this._tileLastRenderedZ !== z) {
@@ -7526,8 +8542,7 @@ export default {
           // ignore logging errors
         }
 
-        // pyramid 模式：清空视口以移除旧层级；merged_single_level 跳过，由 z=0 全图重绘覆盖
-        if (!isMergedSingleLevel && w > 0 && h > 0) {
+        if (w > 0 && h > 0) {
           ctx.setTransform(s, 0, 0, s, 0, 0);
           ctx.clearRect(left, top, w, h);
         }
@@ -7591,6 +8606,7 @@ export default {
 
       let drawnCount = 0;
       let skipNoCache = 0;
+      let drewZ0 = false;
       const drawDetails = this.TILE_DEBUG ? [] : null;
       let dirtyLeft = Infinity;
       let dirtyTop = Infinity;
@@ -7618,7 +8634,7 @@ export default {
 
         const [tileZ, tileX, tileY] = key.split('/').map(Number);
         const tileLevelScale = Math.pow(2, gpm.maxZoomLevel - tileZ);
-        const singlePreviewTile = isMergedSingleLevel && tileZ === 0;
+        const singlePreviewTile = tileZ === 0;
 
         const destX = singlePreviewTile ? 0 : (tileX * T * tileLevelScale);
         const destY = singlePreviewTile ? 0 : (tileY * T * tileLevelScale);
@@ -7639,6 +8655,9 @@ export default {
         const srcHeight = destHeight < fullTilePxY ? (renderHeight * destHeight / fullTilePxY) : renderHeight;
 
         ctx.drawImage(renderSource, 0, 0, srcWidth, srcHeight, destX, destY, destWidth, destHeight);
+        if (key === '0/0/0') {
+          drewZ0 = true;
+        }
         dirtyLeft = Math.min(dirtyLeft, destX);
         dirtyTop = Math.min(dirtyTop, destY);
         dirtyRight = Math.max(dirtyRight, destX + destWidth);
@@ -7675,7 +8694,7 @@ export default {
       ctx.setTransform(1, 0, 0, 1, 0, 0);
 
       if (this.TILE_DEBUG && (drawnCount > 0 || skipNoCache > 0 || needsFullRender)) {
-        console.log('[Tile] renderTiles', {
+        this.emitTileDebugLog('renderTiles', {
           canvasSize: `${this.tileCanvas.width}x${this.tileCanvas.height}`,
           z,
           levelScale,
@@ -7720,6 +8739,20 @@ export default {
         const tDisp0 = pn ? pn() : 0;
         this.drawImageData();
         const tDisp1 = pn ? pn() : 0;
+        if (drewZ0 && this.captureTrace && !this.captureTrace.z0RenderLogged) {
+          this.captureTrace.z0RenderLogged = true;
+          this.emitCaptureTrace('frontend_z0_rendered', {
+            sessionId: this.tileSessionId,
+            frameId: this.tileFrameId,
+            drawnTiles: drawnCount,
+            fullRender: needsFullRender,
+            tileCtxDrawLoopMs: pn ? (tDraw1 - tDraw0).toFixed(2) : '',
+            tileToBufferMs: pn ? (tBuf1 - tBuf0).toFixed(2) : '',
+            roiOverlayMs: pn ? (tRoi1 - tRoi0).toFixed(2) : '',
+            drawImageDataMs: pn ? (tDisp1 - tDisp0).toFixed(2) : '',
+            renderFrameMs: pn ? (tDisp1 - tDraw0).toFixed(2) : '',
+          });
+        }
 
         if (perf && pn) {
           const row = {
@@ -7763,7 +8796,10 @@ export default {
       const x = Number.isFinite(this.visibleX) ? this.visibleX.toFixed(2) : 'nan';
       const y = Number.isFinite(this.visibleY) ? this.visibleY.toFixed(2) : 'nan';
       const s = Number.isFinite(this.scale) ? this.scale.toFixed(4) : 'nan';
-      return `${framePart}|${x}|${y}|${s}`;
+      const targetZ = this.tileGPM ? String(this.getCurrentTargetTileZ(this.tileGPM)) : 'notarget';
+      const zCap = this.getCurrentTileZoomCap();
+      const zCapPart = (zCap == null) ? 'default' : String(zCap);
+      return `${framePart}|${x}|${y}|${s}|${targetZ}|${zCapPart}`;
     },
 
     flushVisibleAreaToBackend() {
@@ -7775,7 +8811,13 @@ export default {
         return;
       }
       this.lastVisibleAreaMessageKey = messageKey;
-      if (this.tileFrameId != null) {
+      const targetZ = this.tileGPM ? this.getCurrentTargetTileZ(this.tileGPM) : null;
+      const zCap = this.getCurrentTileZoomCap();
+      if (this.tileFrameId != null && targetZ != null && zCap != null) {
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'sendVisibleArea:' + this.visibleX + ':' + this.visibleY + ':' + this.scale + ':' + this.tileFrameId + ':' + targetZ + ':' + zCap);
+      } else if (this.tileFrameId != null && targetZ != null) {
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'sendVisibleArea:' + this.visibleX + ':' + this.visibleY + ':' + this.scale + ':' + this.tileFrameId + ':' + targetZ);
+      } else if (this.tileFrameId != null) {
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'sendVisibleArea:' + this.visibleX + ':' + this.visibleY + ':' + this.scale + ':' + this.tileFrameId);
       } else {
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'sendVisibleArea:' + this.visibleX + ':' + this.visibleY + ':' + this.scale);
@@ -7915,8 +8957,7 @@ export default {
           isColorCamera = false;
         }
         console.log("当前拍摄参数:isColorCamera:", isColorCamera, "CFA:", CFA);
-        // 计算直方图；白平衡增益统一使用后端下发并缓存的值
-        const shouldAutoWhiteBalance = isColorCamera && this.autoWhiteBalanceEnabled;
+        const finalGains = this.getFinalWhiteBalanceGains();
 
         const analysis = await processAsync(() => {
           const result = isColorCamera
@@ -7924,11 +8965,9 @@ export default {
             : this.analyzeImageStatistics(mat, 'gray', { calculateGain: false, calculateHistogram: calculateHistogram });
 
           if (isColorCamera) {
-            const gainR = shouldAutoWhiteBalance ? this.autoWhiteBalanceGainR : this.ImageGainR;
-            const gainB = shouldAutoWhiteBalance ? this.autoWhiteBalanceGainB : this.ImageGainB;
             result.whiteBalance = {
-              gainR: Number.isFinite(gainR) ? gainR : 1,
-              gainB: Number.isFinite(gainB) ? gainB : 1,
+              gainR: Number.isFinite(finalGains.gainR) ? finalGains.gainR : 1,
+              gainB: Number.isFinite(finalGains.gainB) ? finalGains.gainB : 1,
             };
           }
 
@@ -7956,13 +8995,6 @@ export default {
           isColorCamera: isColorCamera,
         };
 
-        if (isColorCamera && analysis && analysis.whiteBalance) {
-          const gainR = analysis.whiteBalance.gainR;
-          const gainB = analysis.whiteBalance.gainB;
-          this.ImageGainR = gainR;
-          this.ImageGainB = gainB;
-          this.updateMainCameraWhiteBalanceConfig(gainR, gainB);
-        }
         this.calculateGain = false;
 
         // 使用增益和拉伸，并转化为8位图像
@@ -8224,18 +9256,6 @@ export default {
         return 0;
       };
 
-      // 安全掩码设置（setter）：OpenCV.js 设置像素需使用 ucharPtr 返回的视图再赋值
-      const safeSetMask = (mask, y, x, value) => {
-        if (y >= 0 && y < mask.rows && x >= 0 && x < mask.cols) {
-          try {
-            const ptr = mask.ucharPtr(y, x);
-            if (ptr && ptr.length > 0) ptr[0] = value;
-          } catch (e) {
-            console.error(`设置掩码错误: (${y},${x})`);
-          }
-        }
-      };
-
       if (imageType === 'gray') {
         if (calculateHistogram) {
           // 计算直方图
@@ -8260,11 +9280,6 @@ export default {
 
         const rows = img16.rows;
         const cols = img16.cols;
-
-        // 创建掩码 - 使用稀疏采样
-        const maskR = new cv.Mat(rows, cols, cv.CV_8UC1, new cv.Scalar(0));
-        const maskG = new cv.Mat(rows, cols, cv.CV_8UC1, new cv.Scalar(0));
-        const maskB = new cv.Mat(rows, cols, cv.CV_8UC1, new cv.Scalar(0));
 
         // 确定采样步长 - 大图像时采用更大步长
         const sampleStep = Math.max(2, Math.floor(Math.min(rows, cols) / 200) * 2);
@@ -8303,7 +9318,7 @@ export default {
         const gValues = [];
         const bValues = [];
 
-        // 采样设置掩码和收集采样数据
+        // 直接采样 Bayer 原始像素，用于后续增益估计。
         for (let y = 0; y < rows; y += sampleStep) {
           for (let x = 0; x < cols; x += sampleStep) {
             // 处理红色通道
@@ -8312,7 +9327,6 @@ export default {
               const px = x + pos.x;
               if (py < rows && px < cols && py >= 0 && px >= 0) {
                 try {
-                  safeSetMask(maskR, py, px, 255);
                   if (calculateGain && y % (sampleStep * 2) === 0 && x % (sampleStep * 2) === 0) {
                     rValues.push(safeUshortAt(img16, py, px));
                   }
@@ -8328,7 +9342,6 @@ export default {
               const px = x + pos.x;
               if (py < rows && px < cols && py >= 0 && px >= 0) {
                 try {
-                  safeSetMask(maskG, py, px, 255);
                   if (calculateGain && y % (sampleStep * 2) === 0 && x % (sampleStep * 2) === 0) {
                     gValues.push(safeUshortAt(img16, py, px));
                   }
@@ -8344,7 +9357,6 @@ export default {
               const px = x + pos.x;
               if (py < rows && px < cols && py >= 0 && px >= 0) {
                 try {
-                  safeSetMask(maskB, py, px, 255);
                   if (calculateGain && y % (sampleStep * 2) === 0 && x % (sampleStep * 2) === 0) {
                     bValues.push(safeUshortAt(img16, py, px));
                   }
@@ -8424,14 +9436,6 @@ export default {
           }
         }
 
-        // 释放资源
-        try {
-          maskR.delete();
-          maskG.delete();
-          maskB.delete();
-        } catch (e) {
-          console.error("释放资源错误", e);
-        }
       }
 
       return result;
@@ -8519,6 +9523,11 @@ export default {
       // 计算转换比例和偏移
       const scale = 255.0 / (whiteLevel - blackLevel);
       const offset = -blackLevel * scale;
+      this.logImagePipelineHotPath('applyStretchAndGain', 'imageType', imageType);
+      this.logImagePipelineHotPath('applyStretchAndGain', 'bayerPattern', bayerPattern);
+      this.logImagePipelineHotPath('applyStretchAndGain', 'blackLevel', blackLevel);
+      this.logImagePipelineHotPath('applyStretchAndGain', 'whiteLevel', whiteLevel);
+      this.logImagePipelineHotPath('applyStretchAndGain', 'scaleOffset', `${scale},${offset}`);
 
       if (imageType === 'gray') {
         // 单色相机 - 一步转换到8位RGBA
@@ -8537,6 +9546,8 @@ export default {
           gainR = analysis.whiteBalance.gainR;
           gainB = analysis.whiteBalance.gainB;
         }
+        this.logImagePipelineHotPath('applyStretchAndGain', 'gainR', gainR);
+        this.logImagePipelineHotPath('applyStretchAndGain', 'gainB', gainB);
 
         // 使用LUT优化白平衡和拉伸
         // 1. 创建三个LUT表
@@ -8761,6 +9772,7 @@ export default {
       this.tileGenerationComplete = false;
       this.tileGenerationCompleteReadyCount = 0;
       this.tileDownloadComplete = false;
+      this.tileFullCacheComplete = false;
       this.pendingTileGenerationComplete = new Map();
       this.tileE2ERequiredKeys = '[]';
       this.tileE2EDownloadedKeys = '[]';
@@ -9152,61 +10164,21 @@ export default {
 
     applyHistStretch(Min, Max) {
       console.log(`[applyHistStretch] 应用直方图拉伸: Min=${Min}, Max=${Max}`);
+      this.logMainCameraImagePipeLine('App.vue', 'applyHistStretch', 'requestMinMax', `${Min},${Max}`);
       
       // -1, -1 表示自动拉伸模式：使用初始保存的黑白点参数
       if (Min === -1 && Max === -1) {
-        console.log('[applyHistStretch] 自动拉伸模式：恢复到初始自动计算的黑白点');
-        if (this.tileGPM) {
-          // 检查是否有保存的初始自动拉伸参数
-          if (Number.isFinite(this.autoStretchBlackLevel) && Number.isFinite(this.autoStretchWhiteLevel) &&
-              this.autoStretchBlackLevel >= 0 && this.autoStretchWhiteLevel > this.autoStretchBlackLevel) {
-            console.log(`[applyHistStretch] 使用保存的初始自动拉伸参数: black=${this.autoStretchBlackLevel}, white=${this.autoStretchWhiteLevel}`);
-            
-            // 检查当前参数是否已经是初始参数，避免不必要的重新加载
-            if (this.tileGPM.blackLevel === this.autoStretchBlackLevel && 
-                this.tileGPM.whiteLevel === this.autoStretchWhiteLevel) {
-              console.log('[applyHistStretch] 当前已是自动拉伸参数，无需重新加载');
-              this.SendConsoleLogMsg('已处于自动拉伸状态', 'info');
-              // 更新拨盘位置
-              this.$bus.$emit('ChangeDialPosition', this.autoStretchBlackLevel, this.autoStretchWhiteLevel);
-              return;
-            }
-            
-            // 恢复到初始的自动拉伸参数
-            this.currentHistogramMin = this.autoStretchBlackLevel;
-            this.currentHistogramMax = this.autoStretchWhiteLevel;
-            this.tileGPM.blackLevel = this.autoStretchBlackLevel;
-            this.tileGPM.whiteLevel = this.autoStretchWhiteLevel;
-            
-            this.SendConsoleLogMsg(`应用自动拉伸: black=${this.autoStretchBlackLevel}, white=${this.autoStretchWhiteLevel}`, 'info');
-            
-            // 更新拨盘位置
-            this.$bus.$emit('ChangeDialPosition', this.autoStretchBlackLevel, this.autoStretchWhiteLevel);
-            
-            // 重新加载瓦片以应用新参数
-            console.log('[applyHistStretch] 触发瓦片重新加载');
-            this.reloadTilesWithNewParams();
-            return;
-          } else {
-            console.log('[applyHistStretch] 没有保存的初始自动拉伸参数');
-            this.SendConsoleLogMsg('没有可用的自动拉伸参数', 'warning');
-            return;
-          }
-        } else {
-          console.log('[applyHistStretch] 瓦片模式未初始化，跳过自动拉伸');
-          return;
-        }
+        this.autoHistogramOnce();
+        return;
       }
       
       // 手动设置的拉伸参数
       this.currentHistogramMin = Min;
       this.currentHistogramMax = Max;
       
-      // 更新瓦片GPM参数并重新加载瓦片（完全使用瓦片模式）
       if (this.tileGPM) {
         this.SendConsoleLogMsg(`[瓦片模式] 更新直方图参数: blackLevel=${Min}, whiteLevel=${Max}`, 'info');
-        this.tileGPM.blackLevel = Min;
-        this.tileGPM.whiteLevel = Max;
+        this.logMainCameraImagePipeLine('App.vue', 'applyHistStretch', 'manualStretchApplied', `${Min},${Max}`);
         console.log('[applyHistStretch] 触发瓦片重新加载');
         this.reloadTilesWithNewParams();
       } else {
@@ -9220,19 +10192,7 @@ export default {
 
 
     calcWhiteBalanceGains() {
-      console.log('[calcWhiteBalanceGains] 应用已保存的自动白平衡增益');
-      this.setAutoWhiteBalanceEnabled(true);
-
-      if (!Number.isFinite(this.autoWhiteBalanceGainR) || !Number.isFinite(this.autoWhiteBalanceGainB)) {
-        this.SendConsoleLogMsg('没有可用的自动白平衡缓存值，无法应用', 'warning');
-        return;
-      }
-
-      this.applyStoredAutoWhiteBalance({ reprocess: true });
-      this.SendConsoleLogMsg(
-        `已应用自动白平衡缓存值: R=${this.autoWhiteBalanceGainR.toFixed(3)}, B=${this.autoWhiteBalanceGainB.toFixed(3)}`,
-        'info'
-      );
+      this.runAutoWhiteBalanceOnce();
     },
 
 
@@ -11924,14 +12884,15 @@ export default {
             let roiCfaSource = 'message';
             if (this.tileGPM) {
               const gpm = this.tileGPM;
+              const renderParams = this.getTileRenderParamsSnapshot(gpm);
               effectiveRoiCfa = this.normalizeCfaPattern(roiCfa || gpm.cfa);
               roiCfaSource = roiCfa ? 'message' : 'tileGPM';
               const isColorCamera = effectiveRoiCfa && effectiveRoiCfa !== '' && effectiveRoiCfa !== 'null';
               if (isColorCamera) {
-                const analysis = { whiteBalance: { gainR: gpm.gainR ?? 1, gainB: gpm.gainB ?? 1 } };
-                targetImg8 = this.applyStretchAndGain(src, analysis, 'bayer', effectiveRoiCfa, gpm.blackLevel, gpm.whiteLevel);
+                const analysis = { whiteBalance: { gainR: renderParams.gainR, gainB: renderParams.gainB } };
+                targetImg8 = this.applyStretchAndGain(src, analysis, 'bayer', effectiveRoiCfa, renderParams.blackLevel, renderParams.whiteLevel);
               } else {
-                targetImg8 = this.applyStretchAndGain(src, { gainR: 1, gainB: 1, offset: 0 }, 'gray', effectiveRoiCfa, gpm.blackLevel, gpm.whiteLevel);
+                targetImg8 = this.applyStretchAndGain(src, { gainR: 1, gainB: 1, offset: 0 }, 'gray', effectiveRoiCfa, renderParams.blackLevel, renderParams.whiteLevel);
               }
             } else {
               effectiveRoiCfa = this.normalizeCfaPattern(roiCfa || this.lastImageProcessParams.CFA);
@@ -12098,10 +13059,12 @@ export default {
           }
           if (parameter === 'ImageGainR') {
             this.ImageGainR = parseFloat(parameters[parameter]);
-            this.saveAutoWhiteBalanceGains(this.ImageGainR, this.autoWhiteBalanceGainB);
+            this.RefGainR = this.getFinalWhiteBalanceGains().gainR;
+            this.updateReferenceWhiteBalanceConfig();
           } else if (parameter === 'ImageGainB') {
             this.ImageGainB = parseFloat(parameters[parameter]);
-            this.saveAutoWhiteBalanceGains(this.autoWhiteBalanceGainR, this.ImageGainB);
+            this.RefGainB = this.getFinalWhiteBalanceGains().gainB;
+            this.updateReferenceWhiteBalanceConfig();
           }
         } else {
           if (parameter == 'RedBoxSize') {
@@ -12190,8 +13153,9 @@ export default {
         } else if (label === 'ImageCFA') {
           this.ImageCFASet(value);
         } else if (label === 'ImageGainR' || label === 'ImageGainB') {
-          this.setAutoWhiteBalanceEnabled(false);
           this.ImageGainSet(`${label}:${parseFloat(value)}`);
+        } else if (label === 'ApplyRefWhiteBalance') {
+          this.applyReferenceWhiteBalance();
         } else if (label === 'ROICalcMode') {
           const mode = String(value || 'full').toLowerCase();
           this.sendMessage('Vue_Command', 'ROICalcMode:' + (mode === 'roi' ? 'roi' : 'full'));
@@ -12704,6 +13668,7 @@ export default {
   // 在组件销毁时移除
     beforeDestroy() {
     this.stopTileReadyFallbackPolling();
+    this.$bus.$off('FocuserPanelVisibilityChanged', this.handleFocuserPanelVisibilityChanged);
     document.removeEventListener('touchstart', this.preventDefault);
     document.removeEventListener('touchmove', this.preventDefault);
     document.removeEventListener('touchend', this.preventDefault);

@@ -30,7 +30,7 @@ import { chromium } from '@playwright/test'
 
 const execFile = promisify(execFileCb)
 
-const baseURL = process.env.E2E_BASE_URL || 'http://192.168.1.113:8080'
+const baseURL = process.env.E2E_BASE_URL || 'http://172.24.217.51:8080'
 
 function resolveSessionPort(): number {
   const raw = process.env.E2E_AI_CONTROL_SESSION_PORT
@@ -44,6 +44,40 @@ const SESSION_PAGE_INIT_TIMEOUT_MS = Number(process.env.E2E_AI_CONTROL_PAGE_INIT
 const SESSION_MIN_TEST_TIMEOUT_MS = 5 * 60_000
 
 type CliFlowParams = Record<string, unknown>
+type UnifiedLogEntry = {
+  sequence?: number | null
+  source?: string
+  level?: string
+  message?: string
+  timestamp?: string | null
+  deviceType?: string | null
+  operationKey?: string | null
+  rawMessage?: string | null
+}
+
+type DebugDialogLogEntry = {
+  msgtype?: string | null
+  msgtext?: string | null
+  msgfrom?: string | null
+}
+
+type RuntimeSnapshotPayload = {
+  unifiedRuntime: Record<string, unknown> | null
+  debugDialogLogs: DebugDialogLogEntry[]
+}
+
+type BrowserConsoleLogEntry = {
+  sequence: number
+  source: 'client'
+  level: string
+  message: string
+  timestamp: string
+  deviceType: string | null
+  operationKey: string | null
+  rawMessage: string
+}
+
+const MAX_BROWSER_CONSOLE_LOGS = 500
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -76,6 +110,116 @@ function readBody(req: http.IncomingMessage): Promise<string> {
 function sendJson(res: http.ServerResponse, status: number, body: object) {
   res.writeHead(status, { 'Content-Type': 'application/json' })
   res.end(JSON.stringify(body))
+}
+
+function parsePositiveInt(value: string | null, fallback: number, max: number) {
+  const n = Number(value)
+  if (!Number.isFinite(n) || n <= 0) return fallback
+  return Math.min(Math.floor(n), max)
+}
+
+function parseCsvParam(value: string | null) {
+  if (!value) return []
+  return value
+    .split(',')
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean)
+}
+
+function textMatchesAll(text: string, tokens: string[]) {
+  if (tokens.length === 0) return true
+  const source = text.toLowerCase()
+  return tokens.every((token) => source.includes(token))
+}
+
+function logMatchesFilters(
+  entry: UnifiedLogEntry,
+  filters: {
+    sources: string[]
+    levels: string[]
+    deviceTypes: string[]
+    keywords: string[]
+    sessionId: string | null
+    frameId: string | null
+    sinceSeq: number | null
+    sinceTs: number | null
+  },
+) {
+  const sequence = Number(entry.sequence)
+  const source = String(entry.source ?? '').toLowerCase()
+  const level = String(entry.level ?? '').toLowerCase()
+  const deviceType = String(entry.deviceType ?? '').toLowerCase()
+  const message = String(entry.message ?? '')
+  const rawMessage = String(entry.rawMessage ?? '')
+  const haystack = `${message}\n${rawMessage}`.toLowerCase()
+  const timestampMs = entry.timestamp ? Date.parse(entry.timestamp) : NaN
+
+  if (filters.sinceSeq != null && (!Number.isFinite(sequence) || sequence <= filters.sinceSeq)) return false
+  if (filters.sinceTs != null && (!Number.isFinite(timestampMs) || timestampMs <= filters.sinceTs)) return false
+  if (filters.sources.length > 0 && !filters.sources.includes(source)) return false
+  if (filters.levels.length > 0 && !filters.levels.includes(level)) return false
+  if (filters.deviceTypes.length > 0 && !filters.deviceTypes.includes(deviceType)) return false
+  if (!textMatchesAll(haystack, filters.keywords)) return false
+  if (filters.sessionId && !haystack.includes(filters.sessionId.toLowerCase())) return false
+  if (filters.frameId && !haystack.includes(filters.frameId.toLowerCase())) return false
+  return true
+}
+
+function normalizeDebugDialogLog(entry: DebugDialogLogEntry, syntheticSequence: number): UnifiedLogEntry | null {
+  if (!entry || typeof entry !== 'object') return null
+  const rawMessage = String(entry.msgtext ?? '').trim()
+  if (!rawMessage) return null
+  const source = String(entry.msgfrom ?? '').toLowerCase() === 'server' ? 'server' : 'client'
+  const level = String(entry.msgtype ?? 'info').toLowerCase()
+  return {
+    sequence: syntheticSequence,
+    source,
+    level,
+    message: rawMessage,
+    timestamp: null,
+    deviceType: null,
+    operationKey: null,
+    rawMessage,
+  }
+}
+
+function mergeLogsWithDebugDialog(runtimeLogs: UnifiedLogEntry[], debugDialogLogs: DebugDialogLogEntry[]) {
+  const merged = runtimeLogs.slice()
+  const seen = new Set(
+    runtimeLogs.map((entry) => `${String(entry.source ?? '')}|${String(entry.level ?? '')}|${String(entry.rawMessage ?? entry.message ?? '')}`),
+  )
+  let syntheticSequence = runtimeLogs.reduce((max, entry) => {
+    const seq = typeof entry.sequence === 'number' && Number.isFinite(entry.sequence) ? entry.sequence : 0
+    return Math.max(max, seq)
+  }, 0)
+
+  for (let i = debugDialogLogs.length - 1; i >= 0; i -= 1) {
+    const normalized = normalizeDebugDialogLog(debugDialogLogs[i], ++syntheticSequence)
+    if (!normalized) continue
+    const dedupeKey = `${normalized.source}|${normalized.level}|${normalized.rawMessage || normalized.message || ''}`
+    if (seen.has(dedupeKey)) continue
+    seen.add(dedupeKey)
+    merged.unshift(normalized)
+  }
+
+  return merged
+}
+
+function mergeLogsWithBrowserConsole(runtimeLogs: UnifiedLogEntry[], browserConsoleLogs: BrowserConsoleLogEntry[]) {
+  const merged = runtimeLogs.slice()
+  const seen = new Set(
+    runtimeLogs.map((entry) => `${String(entry.source ?? '')}|${String(entry.level ?? '')}|${String(entry.rawMessage ?? entry.message ?? '')}`),
+  )
+
+  for (let i = browserConsoleLogs.length - 1; i >= 0; i -= 1) {
+    const entry = browserConsoleLogs[i]
+    const dedupeKey = `${entry.source}|${entry.level}|${entry.rawMessage || entry.message}`
+    if (seen.has(dedupeKey)) continue
+    seen.add(dedupeKey)
+    merged.unshift(entry)
+  }
+
+  return merged
 }
 
 /** 检测本机 host:port 是否已有进程在监听（临时 bind 探测）。 */
@@ -207,14 +351,40 @@ async function main() {
   } = aiControl
 
   const registry = makeAiControlRegistry()
+  let browserConsoleLogs: BrowserConsoleLogEntry[] = []
+  let browserConsoleSequence = 0
+
+  function attachPageConsoleListener(targetPage: typeof page) {
+    targetPage.on('console', (msg) => {
+      const text = msg.text()
+      if (!text) return
+      browserConsoleSequence += 1
+      browserConsoleLogs.unshift({
+        sequence: browserConsoleSequence,
+        source: 'client',
+        level: msg.type() || 'info',
+        message: text,
+        timestamp: new Date().toISOString(),
+        deviceType: null,
+        operationKey: null,
+        rawMessage: text,
+      })
+      if (browserConsoleLogs.length > MAX_BROWSER_CONSOLE_LOGS) {
+        browserConsoleLogs.length = MAX_BROWSER_CONSOLE_LOGS
+      }
+    })
+  }
+
   let context = await browser.newContext({ baseURL })
   let page = await context.newPage()
+  attachPageConsoleListener(page)
   await page.goto('/', { waitUntil: 'domcontentloaded', timeout: SESSION_PAGE_INIT_TIMEOUT_MS })
   let ctx = createFlowContextForSession(page, { minTestTimeoutMs: SESSION_MIN_TEST_TIMEOUT_MS })
 
   async function createSessionPage() {
     const nextContext = await browser.newContext({ baseURL })
     const nextPage = await nextContext.newPage()
+    attachPageConsoleListener(nextPage)
     await nextPage.goto('/', { waitUntil: 'domcontentloaded', timeout: SESSION_PAGE_INIT_TIMEOUT_MS })
     const nextCtx = createFlowContextForSession(nextPage, { minTestTimeoutMs: SESSION_MIN_TEST_TIMEOUT_MS })
     return { nextContext, nextPage, nextCtx }
@@ -286,6 +456,28 @@ async function main() {
     await next
   }
 
+  async function getStatusSnapshot() {
+    const { evaluatePageStatus } = await import('../AI-Control/status/pageStatus')
+    return runQueue.then(() => evaluatePageStatus(page))
+  }
+
+  async function getRuntimeSnapshot() {
+    return runQueue.then(() =>
+      page.evaluate(() => {
+        const win = window as typeof window & {
+          __QUARCS_UNIFIED_RUNTIME__?: unknown
+          __QUARCS_DEBUG_DIALOG_LOGS__?: unknown
+        }
+        return {
+          unifiedRuntime: (win.__QUARCS_UNIFIED_RUNTIME__ || null) as Record<string, unknown> | null,
+          debugDialogLogs: Array.isArray(win.__QUARCS_DEBUG_DIALOG_LOGS__)
+            ? (win.__QUARCS_DEBUG_DIALOG_LOGS__ as DebugDialogLogEntry[])
+            : [],
+        }
+      }),
+    )
+  }
+
   // HTTP 服务：供 MCP/AI 在同一页上执行命令
   const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && (req.url === '/' || req.url === '/health')) {
@@ -296,10 +488,9 @@ async function main() {
     // GET /status：通过 page.evaluate 读取当前页面状态；可选 ?command=xxx 规划命令步骤
     if (req.method === 'GET' && req.url?.startsWith('/status')) {
       try {
-        const { evaluatePageStatus } = await import('../AI-Control/status/pageStatus')
         const { getFlowCallsByCommand, CLI_COMMANDS } = await import('../AI-Control/scenario/cliFlows')
 
-        const status = await runQueue.then(() => evaluatePageStatus(page))
+        const status = await getStatusSnapshot()
         if (!status) {
           sendJson(res, 500, { ok: false, error: 'evaluatePageStatus 返回空，无法获取页面状态' })
           return
@@ -357,8 +548,105 @@ async function main() {
       return
     }
 
+    // GET /logs：读取统一运行时日志，并支持基础过滤，便于终端/MCP 闭环调试
+    if (req.method === 'GET' && req.url?.startsWith('/logs')) {
+      try {
+        const url = new URL(req.url, 'http://localhost')
+        const limit = parsePositiveInt(url.searchParams.get('limit'), 200, 500)
+        const sources = parseCsvParam(url.searchParams.get('source'))
+        const levels = parseCsvParam(url.searchParams.get('level'))
+        const deviceTypes = parseCsvParam(url.searchParams.get('deviceType'))
+        const keywords = parseCsvParam(url.searchParams.get('keyword'))
+        const sessionId = url.searchParams.get('sessionId')?.trim() || null
+        const frameId = url.searchParams.get('frameId')?.trim() || null
+        const sinceSeqRaw = url.searchParams.get('sinceSeq')
+        const sinceSeq = sinceSeqRaw != null && sinceSeqRaw !== ''
+          ? Math.max(0, Math.floor(Number(sinceSeqRaw)))
+          : null
+        const sinceTsRaw = url.searchParams.get('sinceTs')?.trim() || null
+        const parsedSinceTs = sinceTsRaw ? Date.parse(sinceTsRaw) : NaN
+        const sinceTs = Number.isFinite(parsedSinceTs) ? parsedSinceTs : null
+        const includeStatus = !['0', 'false', 'off', 'no'].includes(
+          (url.searchParams.get('includeStatus') || 'true').trim().toLowerCase(),
+        )
+
+        const [status, runtime] = await Promise.all([
+          includeStatus ? getStatusSnapshot() : Promise.resolve(null),
+          getRuntimeSnapshot(),
+        ])
+
+        const runtimePayload = runtime as RuntimeSnapshotPayload | null
+        const runtimeState = runtimePayload?.unifiedRuntime || null
+        const runtimeLogs = Array.isArray((runtimeState as Record<string, unknown> | null)?.logs)
+          ? ((runtimeState as Record<string, unknown>).logs as UnifiedLogEntry[])
+          : []
+        const debugDialogLogs = Array.isArray(runtimePayload?.debugDialogLogs)
+          ? runtimePayload.debugDialogLogs
+          : []
+        const rawLogs = mergeLogsWithBrowserConsole(
+          mergeLogsWithDebugDialog(runtimeLogs, debugDialogLogs),
+          browserConsoleLogs,
+        )
+
+        const filteredLogs = rawLogs
+          .filter((entry) =>
+            logMatchesFilters(entry, {
+              sources,
+              levels,
+              deviceTypes,
+              keywords,
+              sessionId,
+              frameId,
+              sinceSeq: Number.isFinite(sinceSeq) ? sinceSeq : null,
+              sinceTs,
+            }),
+          )
+          .slice(0, limit)
+
+        sendJson(res, 200, {
+          ok: true,
+          filters: {
+            source: sources,
+            level: levels,
+            deviceType: deviceTypes,
+            keyword: keywords,
+            sessionId,
+            frameId,
+            sinceSeq: Number.isFinite(sinceSeq) ? sinceSeq : null,
+            sinceTs: sinceTs != null ? new Date(sinceTs).toISOString() : null,
+            limit,
+            includeStatus,
+          },
+          totalLogsInBuffer: rawLogs.length,
+          matchedCount: filteredLogs.length,
+          capture: status
+            ? {
+                state: status.capture.state,
+                e2eExposureCompletedSeq: status.capture.e2eExposureCompletedSeq,
+                e2eTileGpmSeq: status.capture.e2eTileGpmSeq,
+                tileGenerationComplete: status.capture.tileGenerationComplete,
+                tileDownloadComplete: status.capture.tileDownloadComplete,
+                requiredTileCount: status.capture.requiredTileCount,
+                downloadedTileCount: status.capture.downloadedTileCount,
+                requiredTileKeys: status.capture.requiredTileKeys,
+                downloadedTileKeys: status.capture.downloadedTileKeys,
+              }
+            : null,
+          websocketState:
+            runtimeState && typeof (runtimeState as Record<string, unknown>).websocketState === 'string'
+              ? (runtimeState as Record<string, unknown>).websocketState
+              : 'unknown',
+          logs: filteredLogs,
+        })
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        sendJson(res, 500, { ok: false, error: message })
+      }
+      return
+    }
+
     if (req.method !== 'POST' || req.url !== '/run') {
-      sendJson(res, 404, { ok: false, error: 'GET /status or POST /run only' })
+      sendJson(res, 404, { ok: false, error: 'GET /status, GET /logs or POST /run only' })
       return
     }
     let body: { commandName?: string; flowParams?: CliFlowParams; runTimeoutMs?: number }
@@ -403,6 +691,7 @@ async function main() {
   console.log('Session HTTP server: http://127.0.0.1:' + sessionPort)
   console.log('  GET /status        - 读取当前页面状态')
   console.log('  GET /status?command=xxx - 状态 + 命令执行步骤规划')
+  console.log('  GET /logs          - 读取并过滤统一运行时日志')
   console.log('  POST /run          - 执行命令')
 
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout })

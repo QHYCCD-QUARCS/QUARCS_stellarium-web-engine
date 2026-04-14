@@ -18,6 +18,7 @@ function defaultRuntime() {
   return {
     version: 1,
     sequence: 0,
+    logSequence: 0,
     updatedAt: nowIso(),
     websocketState: 'unknown',
     recentMessages: [],
@@ -166,6 +167,8 @@ function completeOperation(runtime, operationType, deviceType, status, patch = {
 }
 
 function appendLog(runtime, entry) {
+  runtime.logSequence = Number.isFinite(runtime.logSequence) ? runtime.logSequence + 1 : 1
+  entry.sequence = runtime.logSequence
   runtime.logs.unshift(entry)
   if (runtime.logs.length > MAX_LOGS) runtime.logs.length = MAX_LOGS
 }
@@ -340,6 +343,13 @@ export function recordServerRawMessage(rawMessage) {
   runtime.recentMessages = runtime.recentMessages.slice(0, 50)
 
   let op = null
+  if (raw.startsWith('CaptureTrace:')) {
+    appendLog(runtime, logEntry('server', 'info', raw, {
+      rawMessage: raw,
+      deviceType: 'MainCamera',
+    }))
+    return commit(runtime)
+  }
   if (raw.startsWith('SendDebugMessage|')) {
     const parts = raw.split('|')
     if (parts.length >= 3) {

@@ -6,6 +6,26 @@
       data-testid="ui-indi-debug-dialog-root"
       :data-state="isOpen ? 'open' : 'closed'"
     >
+      <div class="filter-bar">
+        <input
+          v-model.trim="keywordFilter"
+          type="text"
+          class="keyword-input"
+          :placeholder="$t('Filter logs by keyword')"
+          data-testid="ui-indi-debug-dialog-input-keyword-filter"
+        >
+        <button
+          v-if="keywordFilter"
+          type="button"
+          class="keyword-clear-button"
+          :title="$t('Clear keyword filter')"
+          @click="keywordFilter = ''"
+          data-testid="ui-indi-debug-dialog-btn-clear-keyword-filter"
+        >
+          <v-icon style="font-size: 16px;">mdi-close</v-icon>
+        </button>
+      </div>
+
       <div class="debug-messages" ref="messageContainer" @scroll="checkIfScrolledToBottom">
         <p v-for="(msg, index) in ShowMessages" :key="index" :style="getMsgStyle(msg.msgtype)">
           {{ msg.msgtext }}
@@ -86,6 +106,13 @@
 <script>
 import Clipboard from 'clipboard';
 
+function syncDebugDialogLogs(messages) {
+  if (typeof window === 'undefined') return;
+  window.__QUARCS_DEBUG_DIALOG_LOGS__ = Array.isArray(messages)
+    ? messages.map((item) => ({ ...item }))
+    : [];
+}
+
 export default {
   name: 'indiDebugDialog',
   props: {
@@ -102,9 +129,11 @@ export default {
       isServerDebugActive: true,  // 后端按钮激活状态
       isErrorDebugActive: false,
       isAtBottom: true,
+      keywordFilter: '',
     };
   },
   created() {
+    syncDebugDialogLogs(this.AllMessages);
     this.$bus.$on('SendConsoleLog', this.InsertClientDebug);
     this.$bus.$on('SendDebugMessage', this.InsertServerDebug);
   },
@@ -129,6 +158,7 @@ export default {
 
       const msg = { msgtype: type, msgtext: `[Client] ${timestamp} | ${message}`, msgfrom: 'Client' };
       this.AllMessages.push(msg);
+      syncDebugDialogLogs(this.AllMessages);
     },
 
     InsertServerDebug(type, message) {
@@ -149,6 +179,7 @@ export default {
 
       const msg = { msgtype: type, msgtext: `[Server] ${timestamp} | ${message}`, msgfrom: 'Server' };
       this.AllMessages.push(msg);
+      syncDebugDialogLogs(this.AllMessages);
     },
 
     toggleClientDebug() {
@@ -165,6 +196,7 @@ export default {
 
     clearMessages() {
       this.AllMessages = [];  // 清空消息数组
+      syncDebugDialogLogs(this.AllMessages);
     },
 
     /** 复制当前列表中可见日志（受 Client/Server/仅错误 筛选影响） */
@@ -232,6 +264,13 @@ export default {
       container.scrollTop = container.scrollHeight;
     },
 
+    messageMatchesKeyword(msg) {
+      if (!this.keywordFilter) {
+        return true;
+      }
+      return msg.msgtext.toLowerCase().includes(this.keywordFilter.toLowerCase());
+    },
+
   },
   computed: {
     ShowMessages() {
@@ -244,16 +283,14 @@ export default {
         if (this.isClientDebugActive && msg.msgfrom === 'Client') {
           if (this.isErrorDebugActive && msg.msgtype != 'error') {
             return false;
-          } else {
-            return true;
           }
+          return this.messageMatchesKeyword(msg);
         }
         if (this.isServerDebugActive && msg.msgfrom === 'Server') {
           if (this.isErrorDebugActive && msg.msgtype != 'error') {
             return false;
-          } else {
-            return true;
           }
+          return this.messageMatchesKeyword(msg);
         }
         return false;
       });
@@ -315,7 +352,7 @@ export default {
 
 .debug-messages {
   position:absolute;
-  top: 10px;
+  top: 52px;
   bottom: 10px;
   left: 55px;
   right: 55px;
@@ -333,9 +370,52 @@ export default {
   margin: 0;   /* 去掉外边距 */
   line-height: 0.1;  /* 设置适当的行间距（小于默认值） */
   scroll-behavior: smooth;
-  font-family: 'Droid Sans Mono', 'monospace', monospace;
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   user-select: none;
   overflow-x: auto; /* 允许水平滚动 */
+}
+
+.filter-bar {
+  position: absolute;
+  top: 10px;
+  left: 55px;
+  right: 55px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 1;
+}
+
+.keyword-input {
+  width: 100%;
+  height: 34px;
+  padding: 0 12px;
+  color: white;
+  background-color: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 6px;
+  outline: none;
+  font-size: 13px;
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+.keyword-input::placeholder {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.keyword-input:focus {
+  border-color: rgba(255, 255, 255, 0.42);
+}
+
+.keyword-clear-button {
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  color: white;
+  background-color: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 6px;
 }
 
 .debug-messages p {

@@ -13,7 +13,6 @@ REMOTE_PASSWORD="${REMOTE_PASSWORD:-}"
 REMOTE_HOST_SOURCE="explicit"
 
 INCLUDE_SKYDATA=0
-MAKE_BACKUP=1
 SHOW_HELP=0
 
 usage() {
@@ -25,7 +24,6 @@ Deploy the built web frontend from apps/web-frontend/dist to the Raspberry Pi we
 Options:
   --with-skydata         Sync dist/skydata as well. This is the slow path.
   --skip-skydata         Do not sync dist/skydata (default).
-  --no-backup            Skip creating a remote backup before deployment.
   --host <host>          Override remote host.
   --user <user>          Override remote user.
   --password <password>  Override remote password.
@@ -51,10 +49,6 @@ while [[ $# -gt 0 ]]; do
       ;;
     --skip-skydata)
       INCLUDE_SKYDATA=0
-      shift
-      ;;
-    --no-backup)
-      MAKE_BACKUP=0
       shift
       ;;
     --host)
@@ -165,9 +159,6 @@ SSH_OPTS=(
 )
 SSH_CMD=(sshpass -e ssh "${SSH_OPTS[@]}")
 RSYNC_RSH="sshpass -e ssh ${SSH_OPTS[*]}"
-TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
-BACKUP_PATH="${REMOTE_PATH}_backup_${TIMESTAMP}"
-
 HOST_CANDIDATES=()
 if [[ -n "${REMOTE_HOST}" ]]; then
   unique_append "${REMOTE_HOST}"
@@ -249,14 +240,6 @@ else
   echo "Mode: fast deploy (skips skydata)"
 fi
 
-if [[ "${MAKE_BACKUP}" -eq 1 ]]; then
-  echo "Creating backup: ${BACKUP_PATH}"
-  "${SSH_CMD[@]}" "${REMOTE}" \
-    "set -e; test -d '${REMOTE_PATH}'; cp -a '${REMOTE_PATH}' '${BACKUP_PATH}'; du -sh '${BACKUP_PATH}'"
-else
-  echo "Skipping remote backup"
-fi
-
 echo "Syncing root files"
 rsync_files \
   "${DIST_DIR}/index.html" \
@@ -317,9 +300,6 @@ if ! grep -q "^${LOCAL_CSS_SHA}[[:space:]]" <<<"${REMOTE_HASHES}"; then
 fi
 
 echo "Deployment completed successfully."
-if [[ "${MAKE_BACKUP}" -eq 1 ]]; then
-  echo "Backup: ${BACKUP_PATH}"
-fi
 if [[ "${#ACCESS_URLS[@]}" -gt 0 ]]; then
   echo "Access URLs:"
   printf '  - %s\n' "${ACCESS_URLS[@]}"
