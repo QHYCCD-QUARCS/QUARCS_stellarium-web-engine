@@ -1626,7 +1626,9 @@ export default {
         this.$bus.$emit('AppSendMessage', 'Process_Command_Return', this.ConfirmToDo);
         this.showUpdateDialog = true;
       } else if (this.ConfirmToDo === 'StartCalibration') {
-        this.$bus.$emit('StartCalibration');
+        // [停用 2026-04-14] 旧自动校准入口已停用，改为 FocuserPanel 内手动校准弹窗。
+        // this.$bus.$emit('StartCalibration');
+        this.$bus.$emit('showMsgBox', this.$t('Legacy auto focuser calibration flow has been disabled.'), 'warning');
       } else if (this.ConfirmToDo === 'startAutoFocus') {
         // 仅限制：自动对焦（主相机未绑定时禁止）
         if (!this.$store.getters['device/isDeviceBound']('MainCamera')) {

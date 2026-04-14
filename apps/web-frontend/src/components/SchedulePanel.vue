@@ -894,13 +894,19 @@ export default {
 
         // 回退：根据整体进度粗略推算当前步骤
         const totalSteps = nodeDefs.length;
-        let activeIndex = 0;
-        if (!realState) {
-          const approx = Math.floor((progress / 100) * totalSteps);
-          activeIndex = Math.min(Math.max(approx, 0), totalSteps - 1);
-      } else {
-          const idx = nodeDefs.findIndex(s => s.key === realState.currentStep);
-          activeIndex = idx >= 0 ? idx : 0;
+
+        // 关键修复：任务未开始（未运行、进度为 0、且无后端真实步骤）时，不应高亮任何步骤。
+        // 否则会出现首个节点（通常是 mount）被误显示为“正在执行”。
+        const isNotStarted = !this.isScheduleRunning && progress <= 0 && !realState;
+        let activeIndex = -1;
+        if (!isNotStarted) {
+          if (!realState) {
+            const approx = Math.floor((progress / 100) * totalSteps);
+            activeIndex = Math.min(Math.max(approx, 0), totalSteps - 1);
+          } else {
+            const idx = nodeDefs.findIndex(s => s.key === realState.currentStep);
+            activeIndex = idx >= 0 ? idx : 0;
+          }
         }
 
         const nodes = nodeDefs.map((step, index) => {
@@ -1017,8 +1023,8 @@ export default {
             key: step.key,
             label: this.$t(def.labelKey || def.key),
             value,
-            isDone: index < activeIndex || progress >= 100,
-            isActive: index === activeIndex && progress < 100,
+            isDone: (activeIndex >= 0 && index < activeIndex) || progress >= 100,
+            isActive: activeIndex >= 0 && index === activeIndex && progress < 100,
             loopTotal,
             loopDone,
             loopProgress,

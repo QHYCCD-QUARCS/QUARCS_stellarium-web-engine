@@ -1601,10 +1601,10 @@ export default {
     this.$bus.$on('DrawTargetPointCircle', this.drawTargetPointCircle);
     this.$bus.$on('DrawFakePolarAxisCircle', this.DrawFakePolarAxisCircle)
 
-    // 校准相关事件监听器
-    this.$bus.$on('StartCalibration', this.startCalibrationProcess);
-    this.$bus.$on('UpdateCalibrationInfo', this.updateCalibrationInfo);
-    this.$bus.$on('EndCalibration', this.endCalibration);
+    // [停用 2026-04-14] 旧自动电调校准事件链（StartCalibration/UpdateCalibrationInfo/EndCalibration）已停用。
+    // this.$bus.$on('StartCalibration', this.startCalibrationProcess);
+    // this.$bus.$on('UpdateCalibrationInfo', this.updateCalibrationInfo);
+    // this.$bus.$on('EndCalibration', this.endCalibration);
 
     // 自动对焦相关事件监听器 - [AUTO_FOCUS_UI_ENHANCEMENT]
     this.$bus.$on('StartAutoFocus', this.startAutoFocusProcess);
@@ -3783,23 +3783,13 @@ export default {
 
               case 'SetVisibleArea':
                 if (parts.length === 4) {
-                  const nextVisibleX = parseFloat(parts[1]);
-                  const nextVisibleY = parseFloat(parts[2]);
-                  const nextScale = parseFloat(parts[3]);
-                  if (!Number.isFinite(nextVisibleX) || !Number.isFinite(nextVisibleY) || !Number.isFinite(nextScale)) {
-                    break;
-                  }
-                  this.visibleX = nextVisibleX;
-                  this.visibleY = nextVisibleY;
-                  this.scale = nextScale;
+                  this.visibleX = parseFloat(parts[1]);
+                  this.visibleY = parseFloat(parts[2]);
+                  this.scale = parseFloat(parts[3]);
                   this.$bus.$emit('setScale', this.scale);
                   this.emitTileLevelInfo();
                   // SetVisibleArea 也代表一次视窗变化，记录位置以便下次拍摄恢复
                   this.rememberTileViewportState();
-                  // 关键：外部回推可见区后，需要立即触发重绘与可见瓦片重算，
-                  // 否则会出现高精瓦片仍按旧可见区下载/绘制的位置滞后。
-                  this.drawImageData();
-                  this.onViewportChange();
                   console.log('设置可见区域: ', this.visibleX, this.visibleY, this.scale);
                   this.SendConsoleLogMsg('update VisibleArea x=' + this.visibleX + ', y=' + this.visibleY + ', scale=' + this.scale, 'info');
                 }
@@ -4070,14 +4060,6 @@ export default {
                   this.callShowMessageBox(message, 'error');
                   this.$bus.$emit('focusMoveFailed', message);
                 }
-
-              case 'focusMoveFailed':
-                if (parts.length === 2) {
-                  const message = parts[1];
-                  this.callShowMessageBox(message, 'error');
-                  this.$bus.$emit('focusMoveFailed', message);
-                }
-                break;
 
               case 'MeridianETA_hms': {
                 if (parts.length >= 4) {
@@ -6858,11 +6840,7 @@ export default {
       this.resetIncrementalTileRenderBuffer();
 
       // 更新当前可见瓦片集合
-      const prevVisibleTiles = this.currentVisibleTiles instanceof Set ? this.currentVisibleTiles : new Set();
       const newVisibleTiles = new Set(tiles.map(t => `${t.z}/${t.x}/${t.y}`));
-      const visibleTilesChanged =
-        prevVisibleTiles.size !== newVisibleTiles.size ||
-        Array.from(newVisibleTiles).some(key => !prevVisibleTiles.has(key));
       
       // 取消不在可见范围内的加载请求
       for (const [key, controller] of this.tileAbortControllers.entries()) {
@@ -6887,11 +6865,6 @@ export default {
       });
       
       this.currentVisibleTiles = newVisibleTiles;
-      // 关键：仅平移视口时常见“无新下载瓦片”，但可见集合已变化。
-      // 若不强制整批重绘，renderTiles 可能因无 dirty key 直接跳过，导致高精区域显示停留在旧位置。
-      if (visibleTilesChanged) {
-        this.tileForceFullRender = true;
-      }
       
       const paramsKey = this.getTileRenderParamsKey();
 
@@ -8971,7 +8944,7 @@ export default {
 
       // 如果选择了星点，则根据选择位置，在ROI区域中绘制一个圆
       if (this.DrawSelectStarX != -1 && this.DrawSelectStarY != -1 && this.showSelectStar) {
-        let radius, canvasStarX, canvasStarY;
+        let radius, canvasStarX, canvasStarY, color;
         const roiPrevBin = this.tileGPM ? 1 : Math.max(1, this.effectiveRoiPreviewBinFactor());
         // 如果有星点
         if (this.DrawSelectStarHFR != -1) {
@@ -8979,11 +8952,13 @@ export default {
           if (radius <= 1) radius = 1;
           canvasStarX = (this.DrawSelectStarX / roiPrevBin + roiOriginX - visibleLeft) * ctx.canvas.width / newVisibleWidth;
           canvasStarY = (this.DrawSelectStarY / roiPrevBin + roiOriginY - visibleTop) * ctx.canvas.height / newVisibleHeight;
+          color = 'green'; // 有星点，绘制绿色的圆
         } else {
           // 否则，在选择的位置绘制一个圆
           radius = 10 / this.scale; // 你可以根据需要调整这个值
           canvasStarX = (this.DrawSelectStarX / roiPrevBin + roiOriginX - visibleLeft) * ctx.canvas.width / newVisibleWidth;
           canvasStarY = (this.DrawSelectStarY / roiPrevBin + roiOriginY - visibleTop) * ctx.canvas.height / newVisibleHeight;
+          color = 'red'; // 无星点，绘制红色的圆
         }
 
         // 获取绘制圆的位置的图像数据
@@ -8991,22 +8966,11 @@ export default {
         // 发送图像数据给显示框
         this.$bus.$emit('selectStarImage', imageData);
         console.log('绘制星点的位置和大小: x =', canvasStarX, 'y =', canvasStarY, 'radius =', radius);
-        const crossSize = Math.max(6, radius * 0.8);
-        ctx.strokeStyle = '#FFFFFF';
-        ctx.lineWidth = 2;
-
         // 在指定位置开始绘制圆
         ctx.beginPath();
         ctx.arc(canvasStarX, canvasStarY, radius, 0, 2 * Math.PI);
-        ctx.stroke();
-        ctx.closePath();
-
-        // 绘制白色十字线
-        ctx.beginPath();
-        ctx.moveTo(canvasStarX - crossSize, canvasStarY);
-        ctx.lineTo(canvasStarX + crossSize, canvasStarY);
-        ctx.moveTo(canvasStarX, canvasStarY - crossSize);
-        ctx.lineTo(canvasStarX, canvasStarY + crossSize);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 3;
         ctx.stroke();
         ctx.closePath();
       }
@@ -12295,7 +12259,8 @@ export default {
         this.SendConsoleLogMsg(label + 'is NULL', 'info');
       }
     },
-    // 校准相关方法
+    // [停用 2026-04-14] 旧自动电调校准展示逻辑，改为 FocuserPanel 手动边界设置流程；保留代码以便回溯。
+    /*
     startCalibrationProcess() {
       this.calibrationInfo.isCalibrating = true;
       this.calibrationInfo.calibrationState = 'running';
@@ -12307,7 +12272,6 @@ export default {
     updateCalibrationInfo(step, message, state) {
       try {
         this.calibrationInfo.calibrationStep = step;
-        // 如果消息是国际化键，则翻译它
         if (message && typeof message === 'string') {
           this.calibrationInfo.calibrationMessage = message;
         } else {
@@ -12331,7 +12295,9 @@ export default {
       this.calibrationInfo.calibrationStep = 0;
       this.calibrationInfo.calibrationMessage = '';
       console.log('App: Calibration ended');
-    },// 自动对焦相关方法 - [AUTO_FOCUS_UI_ENHANCEMENT]
+    },
+    */
+    // 自动对焦相关方法 - [AUTO_FOCUS_UI_ENHANCEMENT]
     startAutoFocusProcess() {
       this.autoFocusInfo.isRunning = true;
       this.autoFocusInfo.state = 'running';

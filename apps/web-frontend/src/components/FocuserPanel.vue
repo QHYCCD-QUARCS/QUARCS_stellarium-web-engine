@@ -7,7 +7,12 @@
 
       <div class="buttons-container" data-testid="fp-buttons-container">
 
-        <button @click="startCalibration" :class="{'btn-calibration': true, 'active-calibration': isCalibrating, 'complete-calibration': calibrationState === 'complete', 'error-calibration': calibrationState === 'error'}" class="get-click" data-testid="fp-btn-start-calibration">
+        <button
+          @click="startCalibration"
+          :title="manualCalibrationMode ? $t('End manual focuser calibration') : $t('Open manual focuser calibration dialog')"
+          :class="{'btn-calibration': true, 'active-calibration': isCalibrating, 'complete-calibration': calibrationState === 'complete', 'error-calibration': calibrationState === 'error'}"
+          class="get-click"
+          data-testid="fp-btn-start-calibration">
           <div style="display: flex; justify-content: center; align-items: center;">
             <img v-if="calibrationState === 'complete'" src="@/assets/images/svg/ui/CalibrationComplete.svg" height="25px"
               style="min-height: 25px; pointer-events: none;"></img>
@@ -19,7 +24,12 @@
           </div>
         </button>
 
-        <button @click="toggleLoopShooting" :class="{'btn-loop-shooting': true, 'active-loop': isLoopActive}" class="get-click" data-testid="fp-btn-toggle-loop-shooting">
+        <button
+          @click="toggleLoopShooting"
+          :disabled="manualCalibrationMode"
+          :class="{'btn-loop-shooting': true, 'active-loop': isLoopActive}"
+          class="get-click"
+          data-testid="fp-btn-toggle-loop-shooting">
           <div style="display: flex; justify-content: center; align-items: center;">
             <img :src="require(isLoopActive ? '@/assets/images/svg/ui/ROI-Capturing.svg' : '@/assets/images/svg/ui/ROI-Capture.svg')" height="25px"
               :class="{'rotate-animation': isLoopActive}"
@@ -28,7 +38,12 @@
         </button>
 
         <!-- <button  @click="SpeedChange" @touchend="active" class="get-click btn-Speed" data-testid="fp-btn-speed-change"><v-icon>mdi-run-fast</v-icon></button> -->
-        <button @click="SpeedChange" @touchend="active" class="get-click btn-Speed" data-testid="fp-btn-speed-change-2">
+        <button
+          @click="SpeedChange"
+          @touchend="active"
+          :disabled="manualCalibrationMode"
+          class="get-click btn-Speed"
+          data-testid="fp-btn-speed-change-2">
           <span v-if="MoveSpeed === 1">
             <div style="display: flex; justify-content: center; align-items: center;">
               <img src="@/assets/images/svg/ui/Speed-1.svg" height="25px"
@@ -49,7 +64,12 @@
           </span>
         </button>
 
-        <button @click="ROIChange" @touchend="active" class="get-click btn-ROI" data-testid="fp-btn-roichange">
+        <button
+          @click="ROIChange"
+          @touchend="active"
+          :disabled="manualCalibrationMode"
+          class="get-click btn-ROI"
+          data-testid="fp-btn-roichange">
         <span v-if="ROI_length === 100">
           <div style="display: flex; justify-content: center; align-items: center;">
             <img src="@/assets/images/svg/ui/ROI-100.svg" height="25px"
@@ -84,7 +104,12 @@
         </button>
 
         <!-- <button  @click="AutoFocus" @touchend="active" class="get-click btn-Auto" data-testid="fp-btn-auto-focus"><v-icon>mdi-focus-auto</v-icon></button> -->
-        <button @click="AutoFocus" @touchend="active" class="get-click btn-Auto" data-testid="fp-btn-auto-focus-2">
+        <button
+          @click="AutoFocus"
+          @touchend="active"
+          :disabled="manualCalibrationMode"
+          class="get-click btn-Auto"
+          data-testid="fp-btn-auto-focus-2">
           <span v-if="inAutoFocus">
             <div style="display: flex; justify-content: center; align-items: center;">
               <img src="@/assets/images/svg/ui/StopAutoFocus.svg" height="20px"
@@ -136,6 +161,36 @@
 
       <div class="Steps-Bar" :style="{ fontSize: '8px' }">
         {{ this.MoveSteps }}
+      </div>
+
+      <div
+        v-if="showManualCalibrationDialog"
+        class="manual-calibration-modal"
+        data-testid="fp-manual-calibration-dialog">
+        <div class="manual-calibration-title">{{ $t('Manual Focuser Calibration') }}</div>
+        <div class="manual-calibration-desc">{{ $t('Please use the left/right move buttons to move the focuser manually, then set the left and right boundaries.') }}</div>
+        <div class="manual-calibration-pos">{{ $t('Current Position') }}: {{ CurrentPosition }}</div>
+        <div class="manual-calibration-status">
+          {{ $t('Left boundary') }}:
+          <span>{{ manualCalibrationLeftSet ? manualCalibrationLeftValue : $t('Not set') }}</span>
+          |
+          {{ $t('Right boundary') }}:
+          <span>{{ manualCalibrationRightSet ? manualCalibrationRightValue : $t('Not set') }}</span>
+        </div>
+        <div class="manual-calibration-actions">
+          <button
+            class="manual-calibration-btn"
+            :title="$t('Set current position as left boundary (Min Limit)')"
+            @click="setManualLeftBoundary">
+            {{ $t('Set Left Boundary') }}
+          </button>
+          <button
+            class="manual-calibration-btn"
+            :title="$t('Set current position as right boundary (Max Limit)')"
+            @click="setManualRightBoundary">
+            {{ $t('Set Right Boundary') }}
+          </button>
+        </div>
       </div>
 
 
@@ -195,6 +250,12 @@ export default {
       calibrationStep: 0, // 校准步骤 (1-3)
       calibrationMessage: '', // 校准提示信息
       calibrationState: 'idle', // 校准状态: 'idle', 'running', 'complete'
+      manualCalibrationMode: false, // 手动校准模式（仅允许移动与设置边界）
+      showManualCalibrationDialog: false,
+      manualCalibrationLeftSet: false,
+      manualCalibrationRightSet: false,
+      manualCalibrationLeftValue: null,
+      manualCalibrationRightValue: null,
 
       // 自动对焦阶段拍摄进度（仅用于逻辑记录，不再在面板底部重复显示）
       autoFocusStage: '',
@@ -241,11 +302,11 @@ export default {
     this.$bus.$on('FocuserConnected', this.setFocuserIsConnected);
     this.$bus.$on('setRedBoxSideLength', this.setRedBoxSideLength);
     this.$bus.$on('syncROI_length', this.syncROI_length);
-    this.$bus.$on('StartCalibration', this.startCalibrationProcess);
+    // [停用 2026-04-14] 旧自动校准流程入口（StartCalibration -> 自动移动并设置行程）已停用，改为手动设置左右边界。
+    // this.$bus.$on('StartCalibration', this.startCalibrationProcess);
 
-
-
-    this.$bus.$on('focusSetTravelRangeSuccess', this.focusSetTravelRangeSuccess);
+    // [停用 2026-04-14] 旧自动校准完成回执已停用，保留历史代码以便回溯。
+    // this.$bus.$on('focusSetTravelRangeSuccess', this.focusSetTravelRangeSuccess);
     this.$bus.$on('focusMoveFailed', this.focusMoveFailed);
 
     this.$bus.$on('updateAutoFocuserState', this.updateAutoFocuserState);  // 更新自动对焦状态
@@ -274,6 +335,7 @@ export default {
       
     },
     AutoFocus() {
+      if (this.manualCalibrationMode) return;
       const check = this.$canUseDevice('Focuser', 'AutoFocus');
       if (!check.allowed) return;
       if (!this.FocuserIsConnected) {
@@ -311,6 +373,7 @@ export default {
     },
 
     SpeedChange() {
+      if (this.manualCalibrationMode) return;
       if (!this.FocuserIsConnected) {
         this.$bus.$emit('showMsgBox', 'Focuser is not connected!', 'warning');
         return;
@@ -329,6 +392,7 @@ export default {
     },
 
     ROIChange() {
+      if (this.manualCalibrationMode) return;
       if (this.ROI_length === 100) this.ROI_length = 300;
       else if (this.ROI_length === 300) this.ROI_length = 500;
       else if (this.ROI_length === 500) this.ROI_length = 100;
@@ -537,6 +601,7 @@ export default {
     active() { },
 
     toggleLoopShooting() {
+      if (this.manualCalibrationMode) return;
       // 视场 ROI 循环拍摄：互斥设备只占用主相机
       // 仅限制：ROI循环拍摄（主相机未绑定时禁止）
       if (!this.$store.getters['device/isDeviceBound']('MainCamera')) {
@@ -606,87 +671,84 @@ export default {
       }
     },
 
-    // 校准相关方法
+    // 校准相关方法（手动边界设置）
     startCalibration() {
       try {
         if (!this.FocuserIsConnected) {
           this.$bus.$emit('showMsgBox', 'Focuser is not connected!', 'warning');
           return;
         }
-        
-        if (this.calibrationState === 'complete') {
-          // 如果校准完成，点击按钮结束校准
-          this.endCalibration();
-        } else if (this.isCalibrating) {
-          // 如果正在校准，点击按钮进入下一步
-          this.nextCalibrationStep();
-        } else {
-                  // 开始校准，显示确认对话框
-        this.$bus.$emit('ShowConfirmDialog', 'Calibration', this.$t('Do you want to perform focuser travel calibration? Calibration will set the maximum and minimum positions of the focuser.'), 'StartCalibration');
+
+        if (!this.manualCalibrationMode) {
+          this.manualCalibrationMode = true;
+          this.isCalibrating = true;
+          this.calibrationState = 'running';
+          this.calibrationStep = 0;
+          this.calibrationMessage = this.$t('Please use the left/right move buttons to move the focuser manually, then set the left and right boundaries.');
+          this.manualCalibrationLeftSet = false;
+          this.manualCalibrationRightSet = false;
+          this.manualCalibrationLeftValue = null;
+          this.manualCalibrationRightValue = null;
+          this.showManualCalibrationDialog = true;
+          this.$bus.$emit('SendConsoleLogMsg', this.$t('Manual focuser calibration mode started'), 'info');
+          return;
         }
+
+        this.endCalibration();
       } catch (error) {
         console.error('Error in startCalibration:', error);
       }
     },
 
-    nextCalibrationStep() {
-      this.calibrationStep++;
-      console.log('Calibration step:', this.calibrationStep, 'State:', this.calibrationState);
-      
-      if (this.calibrationStep === 1) {
-        // 第一步：移动到最小位置并设置最小位置
-        this.calibrationMessage = this.$t('Please observe if the focuser has moved to the minimum position. If it has reached the position, click the calibration button to set the minimum position');
-        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'focusMoveToMin');
-        this.$bus.$emit('SendConsoleLogMsg', 'Calibration Step 1: Moving to minimum position', 'info');
-        // 通知App.vue更新校准信息
-        this.$bus.$emit('UpdateCalibrationInfo', this.calibrationStep, this.calibrationMessage);
-      } else if (this.calibrationStep === 2) {
-        // 第二步：移动到最大位置并设置最大位置
-        this.calibrationMessage = this.$t('Please observe if the focuser has moved to the maximum position. If it has reached the position, click the calibration button to set the maximum position');
-        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'focusMoveToMax');
-        this.$bus.$emit('SendConsoleLogMsg', 'Calibration Step 2: Moving to maximum position', 'info');
-        // 通知App.vue更新校准信息
-        this.$bus.$emit('UpdateCalibrationInfo', this.calibrationStep, this.calibrationMessage);
-      } else if (this.calibrationStep === 3) {
-        // 第三步：校准完成，设置行程范围
-        this.calibrationState = 'complete';
-        this.calibrationMessage = this.$t('Calibration completed! Focuser travel range has been set. Click the button to end calibration');
-        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'focusSetTravelRange');
-        this.$bus.$emit('SendConsoleLogMsg', 'Calibration Step 3: Travel range set successfully', 'success');
-        // 通知App.vue更新校准信息
-        this.$bus.$emit('UpdateCalibrationInfo', this.calibrationStep, this.calibrationMessage, 'complete');
+    setManualLeftBoundary() {
+      const currentPosition = parseInt(this.CurrentPosition, 10);
+      if (!Number.isFinite(currentPosition)) {
+        return;
+      }
+      if (this.manualCalibrationRightSet && currentPosition >= this.manualCalibrationRightValue) {
+        this.$bus.$emit('showMsgBox', this.$t('Left boundary must be smaller than right boundary.'), 'warning');
+        return;
+      }
+      this.manualCalibrationLeftSet = true;
+      this.manualCalibrationLeftValue = currentPosition;
+      this.$bus.$emit('Min Limit', 'Min Limit:' + currentPosition);
+      this.$bus.$emit('SendConsoleLogMsg', this.$t('Left boundary set to {0}', [currentPosition]), 'info');
+    },
+
+    setManualRightBoundary() {
+      const currentPosition = parseInt(this.CurrentPosition, 10);
+      if (!Number.isFinite(currentPosition)) {
+        return;
+      }
+      if (this.manualCalibrationLeftSet && currentPosition <= this.manualCalibrationLeftValue) {
+        this.$bus.$emit('showMsgBox', this.$t('Right boundary must be greater than left boundary.'), 'warning');
+        return;
+      }
+      this.manualCalibrationRightSet = true;
+      this.manualCalibrationRightValue = currentPosition;
+      this.$bus.$emit('Max Limit', 'Max Limit:' + currentPosition);
+      this.$bus.$emit('SendConsoleLogMsg', this.$t('Right boundary set to {0}', [currentPosition]), 'info');
+    },
+
+    openManualCalibrationDialog() {
+      if (this.manualCalibrationMode) {
+        this.showManualCalibrationDialog = true;
       }
     },
 
-    startCalibrationProcess() {
-      this.isCalibrating = true;
-      this.calibrationState = 'running';
-      this.calibrationStep = 0;
-      this.calibrationMessage = this.$t('Preparing to start focuser travel calibration...');
-      console.log('Calibration started:', this.isCalibrating, this.calibrationState);
-      this.$bus.$emit('SendConsoleLogMsg', 'Starting focuser travel range calibration', 'info');
-      
-      // 通知App.vue更新校准信息
-      this.$bus.$emit('UpdateCalibrationInfo', 0, 'Preparing to start focuser travel calibration...', 'running');
-      
-      // 延迟开始第一步
-      const self = this;
-      setTimeout(() => {
-        self.nextCalibrationStep();
-      }, 1000);
-    },
-
-
-
     endCalibration() {
       try {
-        console.log('Ending calibration, current state:', this.calibrationState);
+        if (this.manualCalibrationMode && (!this.manualCalibrationLeftSet || !this.manualCalibrationRightSet)) {
+          this.$bus.$emit('showMsgBox', this.$t('Manual calibration boundaries are incomplete; you can continue later or end now.'), 'warning');
+        }
+        console.log('Ending manual calibration, current state:', this.calibrationState);
+        this.manualCalibrationMode = false;
+        this.showManualCalibrationDialog = false;
         this.isCalibrating = false;
         this.calibrationState = 'idle';
         this.calibrationStep = 0;
         this.calibrationMessage = '';
-        this.$bus.$emit('SendConsoleLogMsg', 'Focuser travel range calibration ended', 'info');
-        // 通知App.vue结束校准
+        this.$bus.$emit('SendConsoleLogMsg', this.$t('Manual focuser calibration mode ended'), 'info');
         this.$bus.$emit('EndCalibration');
       } catch (error) {
         console.error('Error in endCalibration:', error);
@@ -706,21 +768,18 @@ export default {
       this.$bus.$emit('EndCalibration');
     },
 
-    // 处理设置行程范围成功
-    focusSetTravelRangeSuccess() {
-      console.log('Focus set travel range success');
-      this.$bus.$emit('SendConsoleLogMsg', 'Focuser travel range set successfully', 'success');
-      // 校准完成，重置状态
-      this.isCalibrating = false;
-      this.calibrationState = 'complete';
-      this.calibrationStep = 3;
-      this.calibrationMessage = this.$t('Calibration completed! Focuser travel range has been set. Click the button to end calibration');
-      // 通知App.vue更新校准信息
-      this.$bus.$emit('UpdateCalibrationInfo', this.calibrationStep, this.calibrationMessage, 'complete');
-      setTimeout(() => {
-        this.$bus.$emit('EndCalibration');
-      }, 1000);
+    // [停用 2026-04-14] 旧自动校准方法保留（注释），用于历史回溯：
+    /*
+    startCalibrationProcess() {
+      // 旧流程：StartCalibration -> nextCalibrationStep() -> focusMoveToMin/focusMoveToMax/focusSetTravelRange
     },
+    nextCalibrationStep() {
+      // 旧流程：自动推进 1/2/3 步
+    },
+    focusSetTravelRangeSuccess() {
+      // 旧流程：接收 focusSetTravelRangeSuccess 后自动完成
+    },
+    */
     updateAutoFocuserState(state) {
       this.inAutoFocus = state;
     },
@@ -825,6 +884,54 @@ export default {
   top: -39px;
   left: 5px;
   right: 5px;
+}
+
+.manual-calibration-modal {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 20;
+  width: 330px;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(20, 20, 20, 0.88);
+  color: #f8f8f8;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.35);
+}
+
+.manual-calibration-title {
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.manual-calibration-desc,
+.manual-calibration-pos,
+.manual-calibration-status {
+  font-size: 11px;
+  line-height: 1.35;
+  margin-bottom: 6px;
+}
+
+.manual-calibration-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.manual-calibration-btn {
+  font-size: 11px;
+  color: #fefefe;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  padding: 5px 8px;
+  cursor: pointer;
+}
+
+.manual-calibration-btn:hover {
+  background: rgba(255, 255, 255, 0.22);
 }
 
 /* 自动对焦进度文本与动画：位于按钮下方，靠右对齐 */
