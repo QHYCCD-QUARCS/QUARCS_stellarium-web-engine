@@ -178,10 +178,10 @@
         <div class="manual-calibration-pos">{{ $t('Current Position') }}: {{ CurrentPosition }}</div>
         <div class="manual-calibration-status">
           {{ $t('Saved Left boundary (Min Limit)') }}:
-          <span>{{ hasSavedLimitValue(savedMinLimit) ? savedMinLimit : $t('Unknown') }}</span>
+          <span>{{ hasSavedLimitValue(calibrationSnapshotMinLimit) ? calibrationSnapshotMinLimit : $t('Unknown') }}</span>
           |
           {{ $t('Saved Right boundary (Max Limit)') }}:
-          <span>{{ hasSavedLimitValue(savedMaxLimit) ? savedMaxLimit : $t('Unknown') }}</span>
+          <span>{{ hasSavedLimitValue(calibrationSnapshotMaxLimit) ? calibrationSnapshotMaxLimit : $t('Unknown') }}</span>
         </div>
         <div class="manual-calibration-status">
           {{ $t('Left boundary') }}:
@@ -193,15 +193,17 @@
         <div class="manual-calibration-actions">
           <button
             class="manual-calibration-btn"
+            :disabled="boundarySettingInProgress"
             :title="$t('Set current position as left boundary (Min Limit)')"
             @click="setManualLeftBoundary">
-            {{ $t('Set Left Boundary') }}
+            {{ boundarySettingInProgress && boundarySettingSide === 'left' ? $t('Setting...') : $t('Set Left Boundary') }}
           </button>
           <button
             class="manual-calibration-btn"
+            :disabled="boundarySettingInProgress"
             :title="$t('Set current position as right boundary (Max Limit)')"
             @click="setManualRightBoundary">
-            {{ $t('Set Right Boundary') }}
+            {{ boundarySettingInProgress && boundarySettingSide === 'right' ? $t('Setting...') : $t('Set Right Boundary') }}
           </button>
           <button class="manual-calibration-btn manual-calibration-end-btn" @click="endCalibration">
             {{ $t('End manual focuser calibration') }}
@@ -272,8 +274,13 @@ export default {
       manualCalibrationRightSet: false,
       manualCalibrationLeftValue: null,
       manualCalibrationRightValue: null,
+      boundarySettingInProgress: false,
+      boundarySettingSide: '',
+      boundarySettingTimeoutId: null,
       savedMinLimit: null,
       savedMaxLimit: null,
+      calibrationSnapshotMinLimit: null,
+      calibrationSnapshotMaxLimit: null,
       calibrationPreviousMoveSpeed: null,
 
       // 自动对焦阶段拍摄进度（仅用于逻辑记录，不再在面板底部重复显示）
@@ -341,6 +348,13 @@ export default {
   beforeDestroy() {
     window.removeEventListener('resize', this.updatePosition);
     this.removeLongPressCaptureListeners();
+    if (this.boundarySettingTimeoutId) {
+      clearTimeout(this.boundarySettingTimeoutId);
+      this.boundarySettingTimeoutId = null;
+    }
+    if (this.manualCalibrationMode) {
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'ManualFocuserCalibrationMode:false');
+    }
     this.$bus.$off('setFocusChartRange', this.syncSavedBoundaryRange);
   },
   methods: {
@@ -560,8 +574,28 @@ export default {
     syncSavedBoundaryRange(minLimit, maxLimit) {
       const min = parseInt(minLimit, 10);
       const max = parseInt(maxLimit, 10);
+      const pendingSide = this.boundarySettingSide;
       this.savedMinLimit = Number.isFinite(min) ? min : null;
       this.savedMaxLimit = Number.isFinite(max) ? max : null;
+      if (this.boundarySettingInProgress) {
+        this.boundarySettingInProgress = false;
+        this.boundarySettingSide = '';
+        if (this.boundarySettingTimeoutId) {
+          clearTimeout(this.boundarySettingTimeoutId);
+          this.boundarySettingTimeoutId = null;
+        }
+        if (pendingSide === 'left' && Number.isFinite(min)) {
+          // 边界设置完成后，以后端返回值覆盖弹窗中的“左边界”显示，避免保留点击瞬时值
+          this.manualCalibrationLeftSet = true;
+          this.manualCalibrationLeftValue = min;
+          this.$bus.$emit('SendConsoleLogMsg', this.$t('Left boundary set to {0}', [min]), 'info');
+        } else if (pendingSide === 'right' && Number.isFinite(max)) {
+          // 边界设置完成后，以后端返回值覆盖弹窗中的“右边界”显示，避免保留点击瞬时值
+          this.manualCalibrationRightSet = true;
+          this.manualCalibrationRightValue = max;
+          this.$bus.$emit('SendConsoleLogMsg', this.$t('Right boundary set to {0}', [max]), 'info');
+        }
+      }
     },
     hasSavedLimitValue(value) {
       return Number.isFinite(value) && value !== -1;
@@ -716,6 +750,8 @@ export default {
 
         if (!this.manualCalibrationMode) {
           this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getFocuserParameters');
+          this.calibrationSnapshotMinLimit = this.savedMinLimit;
+          this.calibrationSnapshotMaxLimit = this.savedMaxLimit;
           this.calibrationPreviousMoveSpeed = this.MoveSpeed;
           if (this.MoveSpeed !== 5) {
             this.applyFocuserSpeed(5);
@@ -730,6 +766,7 @@ export default {
           this.manualCalibrationLeftValue = null;
           this.manualCalibrationRightValue = null;
           this.showManualCalibrationDialog = true;
+          this.$bus.$emit('AppSendMessage', 'Vue_Command', 'ManualFocuserCalibrationMode:true');
           this.$bus.$emit('SendConsoleLogMsg', this.$t('Manual focuser calibration mode started'), 'info');
           return;
         }
@@ -741,6 +778,7 @@ export default {
     },
 
     setManualLeftBoundary() {
+      if (this.boundarySettingInProgress) return;
       const currentPosition = parseInt(this.CurrentPosition, 10);
       if (!Number.isFinite(currentPosition)) {
         return;
@@ -749,13 +787,21 @@ export default {
         this.$bus.$emit('showMsgBox', this.$t('Left boundary must be smaller than right boundary.'), 'warning');
         return;
       }
+      this.boundarySettingInProgress = true;
+      this.boundarySettingSide = 'left';
+      if (this.boundarySettingTimeoutId) clearTimeout(this.boundarySettingTimeoutId);
+      this.boundarySettingTimeoutId = setTimeout(() => {
+        this.boundarySettingInProgress = false;
+        this.boundarySettingSide = '';
+        this.boundarySettingTimeoutId = null;
+      }, 5000);
       this.manualCalibrationLeftSet = true;
       this.manualCalibrationLeftValue = currentPosition;
       this.$bus.$emit('Min Limit', 'Min Limit:' + currentPosition);
-      this.$bus.$emit('SendConsoleLogMsg', this.$t('Left boundary set to {0}', [currentPosition]), 'info');
     },
 
     setManualRightBoundary() {
+      if (this.boundarySettingInProgress) return;
       const currentPosition = parseInt(this.CurrentPosition, 10);
       if (!Number.isFinite(currentPosition)) {
         return;
@@ -764,10 +810,17 @@ export default {
         this.$bus.$emit('showMsgBox', this.$t('Right boundary must be greater than left boundary.'), 'warning');
         return;
       }
+      this.boundarySettingInProgress = true;
+      this.boundarySettingSide = 'right';
+      if (this.boundarySettingTimeoutId) clearTimeout(this.boundarySettingTimeoutId);
+      this.boundarySettingTimeoutId = setTimeout(() => {
+        this.boundarySettingInProgress = false;
+        this.boundarySettingSide = '';
+        this.boundarySettingTimeoutId = null;
+      }, 5000);
       this.manualCalibrationRightSet = true;
       this.manualCalibrationRightValue = currentPosition;
       this.$bus.$emit('Max Limit', 'Max Limit:' + currentPosition);
-      this.$bus.$emit('SendConsoleLogMsg', this.$t('Right boundary set to {0}', [currentPosition]), 'info');
     },
 
     openManualCalibrationDialog() {
@@ -782,6 +835,14 @@ export default {
           this.$bus.$emit('showMsgBox', this.$t('Manual calibration boundaries are incomplete; you can continue later or end now.'), 'warning');
         }
         console.log('Ending manual calibration, current state:', this.calibrationState);
+        this.boundarySettingInProgress = false;
+        this.boundarySettingSide = '';
+        if (this.boundarySettingTimeoutId) {
+          clearTimeout(this.boundarySettingTimeoutId);
+          this.boundarySettingTimeoutId = null;
+        }
+        this.calibrationSnapshotMinLimit = null;
+        this.calibrationSnapshotMaxLimit = null;
         this.manualCalibrationMode = false;
         this.showManualCalibrationDialog = false;
         this.isCalibrating = false;
@@ -792,6 +853,7 @@ export default {
           this.applyFocuserSpeed(this.calibrationPreviousMoveSpeed);
           this.calibrationPreviousMoveSpeed = null;
         }
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'ManualFocuserCalibrationMode:false');
         this.$bus.$emit('SendConsoleLogMsg', this.$t('Manual focuser calibration mode ended'), 'info');
         this.$bus.$emit('EndCalibration');
       } catch (error) {
@@ -802,6 +864,14 @@ export default {
     // 处理电调移动失败
     focusMoveFailed(errorMessage) {
       console.log('Focus move failed:', errorMessage);
+      if (this.boundarySettingInProgress) {
+        this.boundarySettingInProgress = false;
+        this.boundarySettingSide = '';
+        if (this.boundarySettingTimeoutId) {
+          clearTimeout(this.boundarySettingTimeoutId);
+          this.boundarySettingTimeoutId = null;
+        }
+      }
 
       // 重置校准状态
       this.isCalibrating = false;

@@ -1538,6 +1538,7 @@ export default {
       showNumberKeyboard: false,
       currentKeyboardItem: null, // 当前正在编辑的配置项
       keyboardInputValue: '', // 键盘输入的值
+      pageUnloadHandler: null, // 页面刷新/关闭兜底回调（用于通知后端退出校准模式）
     }
   },
   components: {
@@ -4269,6 +4270,17 @@ export default {
                 }
                 break;
 
+              case 'FocusCalibrationBoundaryShifted':
+                if (parts.length >= 4) {
+                  const edge = parts[1] === 'inner' ? 'inner' : 'outer';
+                  const minLimit = parts[2];
+                  const maxLimit = parts[3];
+                  const msg = `Calibration boundary shifted (${edge}). New range: [${minLimit}, ${maxLimit}]`;
+                  this.callShowMessageBox(msg, 'info');
+                  this.SendConsoleLogMsg(msg, 'info');
+                }
+                break;
+
               case 'startFocusLoopFailed':
                 if (parts.length === 2) {
                   const message = parts[1];
@@ -5232,6 +5244,18 @@ export default {
         // messageState.success = true; // 设置消息为成功
       }
       this.sentMessages.push(messageState); // 添加消息对象到已发送的消息数组
+    },
+
+    notifyExitManualCalibrationMode() {
+      // 刷新/关闭页面时兜底通知后端，避免手动校准模式残留
+      if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
+        const payload = JSON.stringify({
+          type: 'Vue_Command',
+          msgid: this.generateMessageId(),
+          message: 'ManualFocuserCalibrationMode:false'
+        });
+        this.websocket.send(payload);
+      }
     },
 
     generateMessageId() {
@@ -13664,6 +13688,12 @@ export default {
       this.SendConsoleLogMsg('DOM已加载完成', 'info');
     })
 
+    this.pageUnloadHandler = () => {
+      this.notifyExitManualCalibrationMode();
+    };
+    window.addEventListener('beforeunload', this.pageUnloadHandler);
+    window.addEventListener('pagehide', this.pageUnloadHandler);
+
   },
   // 在组件销毁时移除
     beforeDestroy() {
@@ -13706,6 +13736,13 @@ export default {
 
     // 停止视场更新定时器
     this.stopFieldUpdateTimer();
+
+    if (this.pageUnloadHandler) {
+      window.removeEventListener('beforeunload', this.pageUnloadHandler);
+      window.removeEventListener('pagehide', this.pageUnloadHandler);
+      this.pageUnloadHandler = null;
+    }
+    this.notifyExitManualCalibrationMode();
   },
 
 
