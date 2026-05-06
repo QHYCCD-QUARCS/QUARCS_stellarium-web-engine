@@ -35,4 +35,4 @@ export const TIMEOUT_MITIGATION_HINTS: readonly TimeoutMitigationHint[] = [
 ]
 
 /** 默认目标设备 baseURL 片段（与测试计划一致，可被 E2E_BASE_URL 覆盖） */
-export const DEFAULT_PLAN_TARGET_HOST = '192.168.1.104'
+export const DEFAULT_PLAN_TARGET_HOST = '192.168.1.103'

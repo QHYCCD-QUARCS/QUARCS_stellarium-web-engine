@@ -8,8 +8,8 @@
 
 <template>
   <div id="toolbar-image" data-testid="tb-root">
-    <v-toolbar height="40px" elevation="0" class="transparent" dense>
-      <v-app-bar-nav-icon @click="toggleNavigationDrawer" data-testid="tb-act-toggle-navigation-drawer"></v-app-bar-nav-icon>
+    <v-toolbar elevation="0" class="transparent" dense>
+      <v-app-bar-nav-icon @click="toggleNavigationDrawer($event)" data-testid="tb-act-toggle-navigation-drawer"></v-app-bar-nav-icon>
       <img class="tbtitle hidden-xs-only" id="stellarium-web-toolbar-logo" src="@/assets/images/logo.svg" width="33" height="33"  style="pointer-events: none;" alt="Stellarium Web Logo"/>
       <span class="tbtitle hidden-xs-only">Q U A R C S</span>
       <v-spacer></v-spacer>
@@ -374,7 +374,11 @@ export default {
 
   // },
   methods: {
-    toggleNavigationDrawer: function () {
+    toggleNavigationDrawer: function (event) {
+      const ts = Math.round((typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now())
+      const x = event && Number.isFinite(event.clientX) ? Math.round(event.clientX) : -1
+      const y = event && Number.isFinite(event.clientY) ? Math.round(event.clientY) : -1
+      this.$bus.$emit('SendConsoleLogMsg', `[DIAG][MENU_BTN_CLICK] t=${ts} x=${x} y=${y}`, 'warning')
       this.$store.commit('toggleBool', 'showNavigationDrawer')
       // this.$bus.$emit('AppSendMessage', 'Vue_Command', 'localMessage');
     },
@@ -556,7 +560,9 @@ export default {
   background: url("../assets/images/header.png") center;
   background-position-x: 55px;
   background-position-y: 0px;
-  height: 40px;
+  height: var(--quarcs-toolbar-total-height, 40px);
+  padding-top: var(--quarcs-safe-top, 0px);
+  box-sizing: border-box;
   z-index: 1;
   position: absolute;
   top: 0px;
@@ -564,6 +570,10 @@ export default {
   width: 100%;
   backdrop-filter: blur(5px);
   background-color: rgba(0, 0, 0, 0.1);
+}
+
+#toolbar-image .v-toolbar {
+  height: var(--quarcs-toolbar-height, 40px) !important;
 }
 
 #stellarium-web-toolbar-logo {

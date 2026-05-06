@@ -17,6 +17,7 @@ export type FlowContext = {
   testInfo: TestInfo
   uiTimeoutMs: number
   stepTimeoutMs: number
+  artifacts: Record<string, any>
 }
 
 /** 单步参数，键值对，由调用方与全局参数合并后传入 step.run */

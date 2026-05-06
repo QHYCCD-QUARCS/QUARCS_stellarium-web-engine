@@ -113,4 +113,24 @@ export default {
   overflow: hidden;
 }
 
+@media (orientation: landscape) and (max-height: 560px) {
+  .DevicePicker {
+    min-height: 72px;
+    padding: 8px 10px;
+  }
+
+  .picker-top {
+    margin-bottom: 6px;
+  }
+
+  .device-type {
+    font-size: 12px;
+  }
+
+  .device-state,
+  .device-name {
+    font-size: 11px;
+  }
+}
+
 </style>

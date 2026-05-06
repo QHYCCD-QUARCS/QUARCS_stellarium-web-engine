@@ -4,7 +4,6 @@ import { clickByTestId, sleep } from '../shared/interaction'
 
 export type PolarAxisInteractParams = {
   autoCalibration?: boolean
-  testSimulation?: boolean
   toggleCollapse?: boolean
   toggleTrajectory?: boolean
   minimize?: boolean
@@ -51,7 +50,6 @@ function needsPolarWidgetOpen(params: PolarAxisInteractParams) {
     params.toggleCollapse === true
     || params.toggleTrajectory === true
     || params.autoCalibration === true
-    || params.testSimulation === true
     || params.clearOldTrajectory === true
     || params.switchToWindowed === true
     || params.switchToFullscreen === true
@@ -102,11 +100,6 @@ export function makePolarAxisStepRegistry(): StepRegistry {
             timeout: Math.max(15_000, ctx.stepTimeoutMs),
           })
           .toBe('running')
-      }
-
-      if (params.testSimulation === true) {
-        await clickByTestId(ctx.page, 'pa-btn-test-simulation', ctx.stepTimeoutMs)
-        await sleep(250)
       }
 
       if (params.clearOldTrajectory === true) {

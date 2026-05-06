@@ -57,6 +57,7 @@ export async function ensureMenuDrawerOpen(page: Page, timeout = 10_000) {
   const state = await drawer.getAttribute('data-state')
   if (state === 'open') return
 
+  await tryRestoreMainUi(page, timeout)
   await dismissBlockingOverlay(page)
   await page.keyboard.press('Escape').catch(() => {})
   await sleep(300)

@@ -222,7 +222,7 @@ function parseClientCommand(runtime, command) {
   if (raw === 'focusMoveToMin') return upsertOperation(runtime, 'move-to-min', 'Focuser', { status: 'running', message: raw, completionEvidence: 'mixed' }, { rawMessage: raw })
   if (raw === 'focusMoveToMax') return upsertOperation(runtime, 'move-to-max', 'Focuser', { status: 'running', message: raw, completionEvidence: 'mixed' }, { rawMessage: raw })
   if (raw === 'focusSetTravelRange') return upsertOperation(runtime, 'travel-range', 'Focuser', { status: 'running', message: raw, completionEvidence: 'mixed' }, { rawMessage: raw })
-  if (raw === 'StartAutoPolarAlignment') return upsertOperation(runtime, 'polar-axis-calibration', 'Mount', { status: 'running', message: raw, completionEvidence: 'ws-message' }, { rawMessage: raw })
+  if (raw === 'StartAutoPolarAlignment' || raw.startsWith('StartAutoPolarAlignment:')) return upsertOperation(runtime, 'polar-axis-calibration', 'Mount', { status: 'running', message: raw, completionEvidence: 'ws-message' }, { rawMessage: raw })
   if (raw === 'StopAutoPolarAlignment') return upsertOperation(runtime, 'polar-axis-calibration', 'Mount', { status: 'cancelled', message: raw, completionEvidence: 'ws-message' }, { rawMessage: raw })
   if (raw === 'MountPark') return upsertOperation(runtime, 'park', 'Mount', { status: 'running', message: raw, completionEvidence: 'mixed' }, { rawMessage: raw })
   if (raw === 'MountTrack') return upsertOperation(runtime, 'track', 'Mount', { status: 'running', message: raw, completionEvidence: 'mixed' }, { rawMessage: raw })

@@ -16,7 +16,7 @@ const CONFIG_DOCS = {
     {
       key: 'baseUrl',
       env: 'E2E_BASE_URL',
-      default: 'http://192.168.1.113:8080',
+      default: 'http://192.168.1.106:8080',
       scope: 'playwright',
       descZh: '被测前端的 baseURL（Playwright use.baseURL）。MCP/CLI 都可通过此变量覆盖目标站点。',
     },
@@ -368,4 +368,3 @@ module.exports = {
   envString,
   resolveBoolWithPrecedence,
 }
-

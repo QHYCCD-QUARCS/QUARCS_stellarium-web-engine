@@ -48,7 +48,9 @@
             <li
               v-for="(device, index) in candidateDeviceList"
               :key="device.DeviceType + ':' + device.DeviceIndex"
-              @click="SelectedDeviceName(device)"
+              @touchstart.stop="onCandidateTouchStart(device, $event)"
+              @touchend.prevent.stop="onCandidateTouchEnd(device, $event)"
+              @click.stop="onCandidateClick(device, $event)"
               data-testid="dap-act-selected-device-name-2"
               :data-index="index"
               :class="{
@@ -108,6 +110,10 @@ export default {
       DeviceTypes: [],
 
       selectedCandidateKey: '',
+      // 移动端去重：同一设备 touchend 后短时间内到来的 click 视为同一次交互
+      lastCandidateTouchEndTs: 0,
+      lastCandidateTouchKey: '',
+      touchClickDedupWindowMs: 800,
     };
   },
   created() {
@@ -139,7 +145,35 @@ export default {
       }
     },
 
-    SelectedDeviceName(device) {
+    onCandidateTouchStart(device, event) {
+      this.logCandidateTouch('touchstart', device, event);
+    },
+    onCandidateTouchEnd(device, event) {
+      this.logCandidateTouch('touchend', device, event);
+      this.lastCandidateTouchEndTs = Date.now();
+      this.lastCandidateTouchKey = this.getDeviceKey(device);
+      this.SelectedDeviceName(device, event, 'touchend');
+    },
+    onCandidateClick(device, event) {
+      this.logCandidateTouch('click', device, event);
+      const key = this.getDeviceKey(device);
+      const delta = Date.now() - this.lastCandidateTouchEndTs;
+      if (
+        this.lastCandidateTouchEndTs > 0 &&
+        this.lastCandidateTouchKey === key &&
+        delta >= 0 &&
+        delta <= this.touchClickDedupWindowMs
+      ) {
+        this.$bus.$emit(
+          'SendConsoleLogMsg',
+          `[DIAG][DAP_CANDIDATE_CLICK_IGNORED] dt=${delta}ms dev=${key}`,
+          'warning'
+        );
+        return;
+      }
+      this.SelectedDeviceName(device, event, 'click');
+    },
+    SelectedDeviceName(device, event, source = 'click') {
       if (!device || !this.isAllocatableDeviceType(device.DeviceType)) return;
       // 若当前没有选中任何角色卡片，直接忽略（避免把选择写到未知槽位）
       const selectedRole = (this.DeviceTypes || []).find(t => t && t.isSelected);
@@ -168,7 +202,35 @@ export default {
       // 两步操作：先选槽位，再点右侧设备。点击后立即提交绑定/换绑。
       selectedRoleObj.DeviceName = device.DeviceName;
       selectedRoleObj.selectedDeviceIndex = device.DeviceIndex;
+      this.$bus.$emit(
+        'SendConsoleLogMsg',
+        `[DIAG][DAP_CANDIDATE_SELECT] source=${source} dev=${this.getDeviceKey(device)}`,
+        'warning'
+      );
       this.BindingDevice(selectedRoleIndex);
+    },
+    logCandidateTouch(phase, device, event) {
+      const ts = Math.round((typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now());
+      let x = -1;
+      let y = -1;
+      if (event && event.touches && event.touches.length > 0) {
+        x = Math.round(event.touches[0].clientX);
+        y = Math.round(event.touches[0].clientY);
+      } else if (event && event.changedTouches && event.changedTouches.length > 0) {
+        x = Math.round(event.changedTouches[0].clientX);
+        y = Math.round(event.changedTouches[0].clientY);
+      } else if (event && Number.isFinite(event.clientX) && Number.isFinite(event.clientY)) {
+        x = Math.round(event.clientX);
+        y = Math.round(event.clientY);
+      }
+      const type = device && device.DeviceType ? device.DeviceType : 'unknown';
+      const idx = (device && device.DeviceIndex !== undefined) ? device.DeviceIndex : 'unknown';
+      const name = device && device.DeviceName ? device.DeviceName : 'unknown';
+      this.$bus.$emit(
+        'SendConsoleLogMsg',
+        `[DIAG][DAP_CANDIDATE_${String(phase).toUpperCase()}] t=${ts} x=${x} y=${y} dev=${type}:${idx}:${name}`,
+        'warning'
+      );
     },
 
     AddDeviceType(DeviceType) {
@@ -199,9 +261,11 @@ export default {
 
       if (!this.isAllocatableDeviceType(deviceType)) return;
       if (!name || String(name).trim() === '') return;
+      const idxNum = Number(index);
+      const normalizedIndex = Number.isFinite(idxNum) ? idxNum : index;
 
       // 关键：必须区分设备类型，否则同名/同端口会造成错绑（例如电调/赤道仪）
-      const key = `${deviceType}:${index}`;
+      const key = `${deviceType}:${normalizedIndex}`;
       const exists1 = this.DeviceList.some(item => `${item.DeviceType}:${item.DeviceIndex}` === key);
       // 占用规则：
       // - CCD：全局占用（主相机/导星镜不能同时绑定同一台相机）
@@ -216,15 +280,15 @@ export default {
         this.$bus.$emit('SendConsoleLogMsg', 'Device already exists:' + index + ':' + name, 'info');
       } else {
         if (occupied) {
-          this.$bus.$emit('SendConsoleLogMsg', 'Device already exists:' + index + ':' + name, 'info');
-          this.DeviceList.push({DeviceType: deviceType, DeviceName: name, DeviceIndex: index, isBind: true });
+          this.$bus.$emit('SendConsoleLogMsg', 'Device already exists:' + normalizedIndex + ':' + name, 'info');
+          this.DeviceList.push({DeviceType: deviceType, DeviceName: name, DeviceIndex: normalizedIndex, isBind: true });
         } else {
-          this.$bus.$emit('SendConsoleLogMsg', 'Add Device To Be Allocated:' + index + ':' + name, 'info');
-          console.log('Add Device To Be Allocated:', index, name);
-          this.DeviceList.push({DeviceType: deviceType, DeviceName: name, DeviceIndex: index, isBind: false });
+          this.$bus.$emit('SendConsoleLogMsg', 'Add Device To Be Allocated:' + normalizedIndex + ':' + name, 'info');
+          console.log('Add Device To Be Allocated:', normalizedIndex, name);
+          this.DeviceList.push({DeviceType: deviceType, DeviceName: name, DeviceIndex: normalizedIndex, isBind: false });
         }
       }
-      this.syncRoleIndexesByDeviceName(deviceType, name, index);
+      this.syncRoleIndexesByDeviceName(deviceType, name, normalizedIndex);
     },
 
     DeviceConnectSuccess(type, DeviceName, DriverName, isBind = true) {
@@ -373,6 +437,16 @@ export default {
       if (!device) return '';
       return `${device.DeviceType}:${device.DeviceIndex}`;
     },
+    normalizeDeviceIndex(index) {
+      if (index === null || typeof index === 'undefined') return null;
+      const n = Number(index);
+      return Number.isFinite(n) ? n : index;
+    },
+    isSameDeviceIndex(a, b) {
+      const na = this.normalizeDeviceIndex(a);
+      const nb = this.normalizeDeviceIndex(b);
+      return na === nb;
+    },
     isSelectedCandidate(device) {
       return this.selectedCandidateKey !== '' && this.selectedCandidateKey === this.getDeviceKey(device);
     },
@@ -406,13 +480,16 @@ export default {
       return this.resolveDeviceIndexByNameLoose(deviceName);
     },
     findDeviceByIndexAndType(deviceIndex, deviceType) {
-      return (this.DeviceList || []).find(item => item && item.DeviceIndex === deviceIndex && item.DeviceType === deviceType) || null;
+      return (this.DeviceList || []).find(
+        item => item && this.isSameDeviceIndex(item.DeviceIndex, deviceIndex) && item.DeviceType === deviceType
+      ) || null;
     },
     getDeviceOccupant(device) {
       if (!device) return '';
       const matched = (this.DeviceTypes || []).find((item) => {
         if (!item || !item.isBind) return false;
-        return item.selectedDeviceIndex === device.DeviceIndex && this.roleCandidateType(item.DeviceType) === device.DeviceType;
+        return this.isSameDeviceIndex(item.selectedDeviceIndex, device.DeviceIndex) &&
+          this.roleCandidateType(item.DeviceType) === device.DeviceType;
       });
       return matched ? matched.DeviceType : '';
     },
@@ -488,6 +565,8 @@ export default {
       // 兼容两种入参：
       // - 旧：[{ [name]: index }, ...]
       // - 新：[{ DeviceType, DeviceName, DeviceIndex }, ...]
+      // 每次按后端完整快照重建，避免断开重连后残留旧设备条目。
+      this.DeviceList = [];
       (deviceObject || []).forEach((device) => {
         if (!device) return;
         if (typeof device.DeviceType !== 'undefined') {
@@ -562,6 +641,8 @@ export default {
   display: flex;
   flex-direction: column;
   padding: 14px;
+  max-width: calc(100vw - 20px);
+  max-height: calc(100vh - 20px);
 }
 
 @keyframes showPanelAnimation {
@@ -646,7 +727,7 @@ export default {
 .panel-body {
   display: flex;
   gap: 14px;
-  min-height: 250px;
+  min-height: 0;
   flex: 1;
 }
 
@@ -680,6 +761,7 @@ export default {
   gap: 10px;
   overflow-y: auto;
   padding-right: 2px;
+  min-height: 0;
 }
 
 .list-hint {
@@ -696,6 +778,7 @@ export default {
   background: rgba(7, 14, 27, 0.42);
   flex: 1;
   overflow-y: auto;
+  min-height: 0;
 }
 
 .device-list li {
@@ -782,12 +865,87 @@ export default {
 }
 
 @media (max-width: 820px) {
+  .DeviceAllocationPanel-panel {
+    padding: 12px;
+  }
   .panel-body {
     flex-direction: column;
   }
   .slot-column {
     width: 100%;
     min-width: 0;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 560px) {
+  .DeviceAllocationPanel-panel {
+    top: calc(var(--quarcs-toolbar-total-height, 40px) + 8px) !important;
+    bottom: 8px !important;
+    padding: 10px;
+    border-radius: 10px;
+  }
+
+  .panel-header {
+    margin-bottom: 8px;
+    gap: 8px;
+  }
+
+  .panel-title {
+    font-size: 15px;
+  }
+
+  .panel-subtitle {
+    font-size: 11px;
+    line-height: 1.2;
+  }
+
+  .panel-close {
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+
+  .panel-body {
+    gap: 10px;
+    flex-direction: row;
+  }
+
+  .slot-column {
+    width: 40%;
+    min-width: 0;
+    gap: 8px;
+  }
+
+  .candidate-column {
+    gap: 6px;
+  }
+
+  .column-title {
+    font-size: 11px;
+  }
+
+  .list-hint {
+    font-size: 11px;
+    line-height: 1.2;
+  }
+
+  .slot-list {
+    gap: 8px;
+  }
+
+  .device-list li {
+    padding: 7px 8px;
+    margin-bottom: 4px;
+  }
+
+  .device-name-text,
+  .device-meta {
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 820px) and (orientation: landscape) and (max-height: 560px) {
+  .panel-body {
+    flex-direction: row;
   }
 }
 </style>

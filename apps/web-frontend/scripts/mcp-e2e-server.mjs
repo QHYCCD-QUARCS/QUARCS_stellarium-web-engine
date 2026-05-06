@@ -33,11 +33,11 @@ const WEB_FRONTEND_ROOT = path.resolve(__dirname, '..')
 const QUARCS_ROOT = process.env.QUARCS_WORKSPACE_DIR || path.resolve(WEB_FRONTEND_ROOT, '../../..')
 
 // 统一的设备访问 IP / 端口（可通过环境变量覆盖），供 E2E 测试访问前端：
-// - 默认设备 IP: 192.168.1.113
-// - 默认前端端口: 8000
+// - 默认设备 IP: 192.168.1.106
+// - 默认前端端口: 8080
 // E2E 配置会通过 E2E_BASE_URL 作为 page.goto('/') 的基准地址。
-const DEFAULT_DEVICE_IP = process.env.QUARCS_DEVICE_IP || '192.168.1.113'
-const DEFAULT_E2E_PORT = process.env.QUARCS_E2E_PORT || '8000'
+const DEFAULT_DEVICE_IP = process.env.QUARCS_DEVICE_IP || '192.168.1.106'
+const DEFAULT_E2E_PORT = process.env.QUARCS_E2E_PORT || '8080'
 
 function readTestIdIndex() {
   const p = path.join(WEB_FRONTEND_ROOT, 'docs/e2e/E2E_TEST_IDS_INDEX.json')
@@ -583,7 +583,7 @@ mcp.registerTool(
 
     // 统一配置 E2E 访问前端的基准地址：
     // 优先使用外部已设置的 E2E_BASE_URL，否则使用统一的设备 IP / 端口，例如：
-    //   http://192.168.1.113:8000
+    //   http://192.168.1.106:8080
     env.E2E_BASE_URL = process.env.E2E_BASE_URL || `http://${DEFAULT_DEVICE_IP}:${DEFAULT_E2E_PORT}`
 
     // 运行脚本
@@ -706,4 +706,3 @@ main().catch((err) => {
   console.error('[mcp] server error:', err)
   process.exit(1)
 })
-

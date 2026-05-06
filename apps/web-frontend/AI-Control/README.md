@@ -903,7 +903,6 @@ bash quarcs-publish.sh 104 --vue --qt
 |--------|------|--------|------|
 | `gotoHome` | `boolean` | `false` | 是否先刷新页面。 |
 | `polarAxisInteract.autoCalibration` | `boolean` | `false` | 点击自动校准按钮，并等待 `pa-root` 进入 `running`。 |
-| `polarAxisInteract.testSimulation` | `boolean` | `false` | 点击测试模拟按钮。 |
 | `polarAxisInteract.toggleCollapse` | `boolean` | `false` | 折叠 / 展开主组件。 |
 | `polarAxisInteract.toggleTrajectory` | `boolean` | `false` | 显示 / 隐藏轨迹层。 |
 | `polarAxisInteract.minimize` | `boolean` | `false` | 最小化组件。 |

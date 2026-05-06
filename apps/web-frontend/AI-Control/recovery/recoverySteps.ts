@@ -163,6 +163,7 @@ export function makeRecoveryStepRegistry(): StepRegistry {
       const quitModeVisible = await quitModeBtn.isVisible().catch(() => false)
       if (!widgetVisible && !minimizedVisible && !quitModeVisible) return
 
+      await dismissBlockingOverlay(ctx, timeout)
       await stopPolarAxisIfRunning(ctx, timeout)
 
       const fullscreenOverlay = ctx.page.getByTestId('pa-trajectory-overlay-fullscreen').first()
@@ -183,10 +184,13 @@ export function makeRecoveryStepRegistry(): StepRegistry {
       }
 
       if (await quitModeBtn.isVisible().catch(() => false)) {
+        await dismissBlockingOverlay(ctx, timeout)
         await clickByTestId(ctx.page, 'gui-btn-quit-polar-axis-mode', timeout)
       } else if (widgetVisible && (await ctx.page.getByTestId('pa-btn-close').first().isVisible().catch(() => false))) {
+        await dismissBlockingOverlay(ctx, timeout)
         await clickByTestId(ctx.page, 'pa-btn-close', timeout)
       } else if (minimizedVisible && (await ctx.page.getByTestId('pa-btn-close-minimized').first().isVisible().catch(() => false))) {
+        await dismissBlockingOverlay(ctx, timeout)
         await clickByTestId(ctx.page, 'pa-btn-close-minimized', timeout)
       }
 

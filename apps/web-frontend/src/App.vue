@@ -517,7 +517,7 @@
             <v-list-item @click.stop="RestartRaspberryPi()" :style="{ height: '36px', marginBottom: '10px' }" data-testid="ui-app-power-page-restart">
               <v-list-item-icon style="margin-right: 10px;">
                 <div style="display: flex; justify-content: center; align-items: center;">
-                  <img src="@/assets/images/svg/ui/Reboot.svg" height="30px"
+                    <img src="@/assets/images/svg/ui/Reboot.svg" height="30px"
                     style="min-height: 30px; pointer-events: none;"></img>
                 </div>
               </v-list-item-icon>
@@ -529,7 +529,7 @@
             <v-list-item @click.stop="ShutdownRaspberryPi()" :style="{ height: '36px', marginBottom: '10px' }" data-testid="ui-app-power-page-shutdown">
               <v-list-item-icon style="margin-right: 10px;">
                 <div style="display: flex; justify-content: center; align-items: center;">
-                  <img src="@/assets/images/svg/ui/PowerOFF.svg" height="30px"
+                    <img src="@/assets/images/svg/ui/PowerOFF.svg" height="30px"
                     style="min-height: 30px; pointer-events: none;"></img>
                 </div>
               </v-list-item-icon>
@@ -541,7 +541,7 @@
             <v-list-item @click.stop="ForceUpdate()" :style="{ height: '36px', marginBottom: '10px' }" data-testid="ui-app-power-page-force-update">
               <v-list-item-icon style="margin-right: 10px;">
                 <div style="display: flex; justify-content: center; align-items: center;">
-                  <img src="@/assets/images/svg/ui/PowerOFF.svg" height="30px"
+                    <img src="@/assets/images/svg/ui/PowerOFF.svg" height="30px"
                     style="min-height: 30px; pointer-events: none;"></img>
                 </div>
               </v-list-item-icon>
@@ -564,6 +564,7 @@
       app
       :stateless="drawer_2"
       temporary
+      touchless
       :width="menuDrawerWidth"
       class="menu-navigation-drawer"
       data-testid="ui-app-menu-drawer"
@@ -865,7 +866,7 @@
     <div
       v-if="nav"
       class="menu-button-above-overlay"
-      @click.stop="$store.commit('toggleBool', 'showNavigationDrawer')"
+      @click.stop="handleOverlayMenuButtonClick($event)"
     >
       <v-btn
         icon
@@ -1126,7 +1127,7 @@ export default {
         { name: '导星镜', driverType: 'Guider', type: 'CCDs', ListNum: "1", isget: false, device: '', BaudRate: 9600, driverName: '', usbSerialPath: '', sdkVersion: '', supportSDK: false, connectionMode: 'INDI', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_Guider' },
         { name: '主相机', driverType: 'MainCamera', type: 'CCDs', ListNum: "20", isget: false, device: '', BaudRate: 9600, driverName: '', usbSerialPath: '', sdkVersion: '', supportSDK: false, connectionMode: 'INDI', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_MainCamera' },
         { name: '赤道仪', driverType: 'Mount', type: 'Telescopes', ListNum: "0", isget: false, device: '', BaudRate: 9600, driverName: '', usbSerialPath: '', sdkVersion: '', supportSDK: false, connectionMode: 'INDI', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_Mount' },
-        { name: '望远镜', driverType: 'Telescopes', device: '', isConnected: true },
+        // { name: '望远镜', driverType: 'Telescopes', device: '', isConnected: true },
         { name: '电动调焦器', driverType: 'Focuser', type: 'Focusers', ListNum: "22", isget: false, device: '', BaudRate: 9600, driverName: '', usbSerialPath: '', sdkVersion: '', supportSDK: false, connectionMode: 'INDI', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_Focuser' },
         { name: '电子极轴镜', driverType: 'PoleCamera', type: 'CCDs', ListNum: "2", isget: false, device: '', BaudRate: 9600, driverName: '', usbSerialPath: '', sdkVersion: '', supportSDK: false, connectionMode: 'INDI', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_PoleCamera' },
         { name: '滤镜轮', driverType: 'CFW', type: 'Filter Wheels', ListNum: "21", isget: false, device: '', BaudRate: 9600, driverName: '', usbSerialPath: '', sdkVersion: '', supportSDK: false, connectionMode: 'INDI', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_CFW' },
@@ -1149,6 +1150,7 @@ export default {
       ],
 
       MainCameraConfigItems: [
+        { driverType: 'MainCamera', num: 1, label: 'Main Camera Focal Length (mm)', value: '', inputType: 'number' },
         // vue处理参数
         { driverType: 'MainCamera', label: 'ImageCFA', value: 'null', inputType: 'select', selectValue: ['GR', 'GB', 'BG', 'RGGB', 'null'] },
         { driverType: 'MainCamera', label: 'ImageGainR', value: 1, inputType: 'number', min: 0.01, max: 3, step: 0.001, colorOnly: true },
@@ -1170,7 +1172,7 @@ export default {
         { driverType: 'MainCamera', label: 'Burst Frames', value: 20, inputType: 'number', min: 1, max: 1024, step: 1, qhyOnly: true },
 
         { driverType: 'MainCamera', num: 1, label: 'Self Exposure Time (ms)', value: 0, inputType: 'number' }, // 自曝光时间
-        
+
         { driverType: 'MainCamera', label: 'Auto Save', value: false, inputType: 'switch' }, // 自动保存
         { driverType: 'MainCamera', label: 'Save Failed Parse', value: false, inputType: 'switch' }, // 保存解析失败图片
         { driverType: 'MainCamera', label: 'Save Folder', value: 'local', inputType: 'select' ,selectValue: ['local']}, // 保存文件夹
@@ -1190,7 +1192,7 @@ export default {
 
 
       TelescopesConfigItems: [
-        { driverType: 'Telescopes', num: 1, label: 'Focal Length (mm)', value: '', inputType: 'number' },
+
       ],
 
       FocuserConfigItems: [
@@ -1569,6 +1571,7 @@ export default {
     // this.$bus.$on('MainCameraCFA', this.ImageCFASet);
     // this.$bus.$on('Temperature', this.CameraTemperatureSet);
     this.$bus.$on('Focal Length (mm)', this.FocalLengthSet);
+    this.$bus.$on('Main Camera Focal Length (mm)', this.FocalLengthSet);
     this.$bus.$on('Guider Focal Length (mm)', this.GuiderFocalLengthSet);
     this.$bus.$on('Multi Star Guider', this.MultiStarGuiderSet);
     this.$bus.$on('RA Single Guide Direction', this.GuiderRaSingleGuideDirSet);
@@ -2785,6 +2788,9 @@ export default {
             console.error('消息格式错误，无法分割:', data.message);
             return;
           }
+          const setGuiderItemValue = (label, value) => {
+            this.updateConfigItemValue(this.GuiderConfigItems, label, value, 'ConfigureRecovery');
+          };
           let acceptMessage = false;
           // ===== Network mode / ZeroTier integration (no ':' split) =====
           // NOTE: `data.message` contains ':' for JSON, so we must handle it BEFORE the big switch.
@@ -2975,6 +2981,11 @@ export default {
               case 'ConnectAllDeviceComplete':
                 // 全部连接完成，关闭进度条
                 this.loadingConnectAllDevice = false;
+                // 兜底：防止并发流程导致“单独连接”按钮残留执行态
+                if (this.isConnecting) {
+                  this.isConnecting = false;
+                  this.stopLoading();
+                }
                 break;
 
               case 'ScanFailed':
@@ -3004,8 +3015,23 @@ export default {
                 break;
 
               case 'ShowDeviceAllocationWindow':
-                this.$bus.$emit('toggleDeviceAllocationPanel');
-                this.nav = false;
+                // 幂等打开：后端可能重复下发 ShowDeviceAllocationWindow。
+                // 先显式关闭主/子菜单，再打开分配面板，避免 toggle 造成“开-关-开”抖动。
+                this.SendConsoleLogMsg(
+                  `[DIAG][ALLOC_POPUP_FLOW] stage=rx_show_alloc nav=${this.$store.state.showNavigationDrawer ? 1 : 0} submenu=${this.drawer_2 ? 1 : 0} devPage=${this.isOpenDevicePage ? 1 : 0}`,
+                  'warning'
+                );
+                this.$store.commit('setValue', { varName: 'showNavigationDrawer', newValue: false });
+                this.drawer_2 = false;
+                this.isOpenDevicePage = false;
+                this.$nextTick(() => {
+                  this.SendConsoleLogMsg(
+                    `[DIAG][ALLOC_POPUP_FLOW] stage=after_close_menu nav=${this.$store.state.showNavigationDrawer ? 1 : 0} submenu=${this.drawer_2 ? 1 : 0} devPage=${this.isOpenDevicePage ? 1 : 0}`,
+                    'warning'
+                  );
+                  this.$bus.$emit('openDeviceAllocationPanel');
+                  this.SendConsoleLogMsg('[DIAG][ALLOC_POPUP_FLOW] stage=emit_open_alloc', 'warning');
+                });
                 break;
 
               case 'ExposureCompleted':
@@ -3966,22 +3992,25 @@ export default {
                 if (parts.length === 3) {
                   const ConfigName = parts[1];
                   const ConfigValue = parts[2];
+                  const setMainFocalLengthValue = (value) => {
+                    this.updateConfigItemValue(this.MainCameraConfigItems, 'Main Camera Focal Length (mm)', value, 'ConfigureRecovery')
+                  }
                   console.log('Configure:', ConfigName, ',', ConfigValue);
                   this.SendConsoleLogMsg('Configure Recovery:' + parts[1] + ',' + parts[2], 'info');
                   this.$bus.$emit(ConfigName, ConfigValue);
 
-                  if (parts[1] === 'FocalLength') {
-                    this.TelescopesConfigItems[0].value = parts[2];
-                    for (const device of this.devices) {
-                      if (device.driverType === 'Telescopes') {
-                        if (parts[2] === '' || parts[2] === NaN) {
-                          device.device = '';
-                          device.isConnected = false;
-                        } else {
-                          device.device = parts[2] + ' mm';
-                          device.isConnected = true;
-                        }
-                      }
+                  if (parts[1] === 'MainCameraFocalLength') {
+                    setMainFocalLengthValue(parts[2]);
+                  }
+
+                  if (parts[1] === 'FocalLength' && !parts[2]) {
+                    setMainFocalLengthValue(parts[2]);
+                  }
+
+                  if (parts[1] === 'FocalLength' && parts[2]) {
+                    const currentMainFocal = this.MainCameraConfigItems.find(item => item.label === 'Main Camera Focal Length (mm)')
+                    if (!currentMainFocal || currentMainFocal.value === '' || currentMainFocal.value === null || currentMainFocal.value === undefined) {
+                      setMainFocalLengthValue(parts[2]);
                     }
                   }
 
@@ -4046,6 +4075,17 @@ export default {
                   const device = parts[1];
                   this.connectDriverSuccess(device);
                 }
+                break;
+
+              case 'ConnectDriverPendingAllocation':
+                // 设备已进入“待分配”阶段（不是失败），应结束单独连接按钮执行态，
+                // 由分配面板继续完成绑定。
+                if (parts.length >= 2) {
+                  const deviceType = parts[1];
+                  this.SendConsoleLogMsg(`ConnectDriverPendingAllocation:${deviceType}`, 'info');
+                }
+                this.isConnecting = false;
+                this.stopLoading();
                 break;
 
               case 'getDevicePort':
@@ -4147,10 +4187,11 @@ export default {
                   if (payload.length % 3 === 0) {
                     const list = [];
                     for (let i = 0; i < payload.length; i += 3) {
+                      const idxNum = Number(payload[i + 2]);
                       list.push({
                         DeviceType: (payload[i] || '').trim(),
                         DeviceName: (payload[i + 1] || '').trim(),
-                        DeviceIndex: payload[i + 2],
+                        DeviceIndex: Number.isFinite(idxNum) ? idxNum : payload[i + 2],
                       });
                     }
                     this.loadBindDeviceList(list);
@@ -4525,6 +4566,20 @@ export default {
                   const lon = parts[2];
                   const language = parts[3];
                   this.SendConsoleLogMsg('2------------获得参数设置localMessage: ' + lat + ',' + lon + ',' + language, 'info');
+                  const latNum = parseFloat(lat);
+                  const lonNum = parseFloat(lon);
+                  if (Number.isFinite(latNum) && Number.isFinite(lonNum) && !(latNum === 0 && lonNum === 0)) {
+                    const mutation = this.$store.state.useAutoLocation ? 'setAutoDetectedLocation' : 'setCurrentLocation';
+                    this.$store.commit(mutation, {
+                      short_name: 'Unknown',
+                      country: 'Unknown',
+                      lng: lonNum,
+                      lat: latNum,
+                      alt: 0,
+                      accuracy: 0,
+                      street_address: ''
+                    });
+                  }
                   if (language == 'zh') {
                     // 来自后端的语言更新（优先级：backend = 3）
                     this.$bus.$emit('ClientLanguage', 'cn', 'backend');
@@ -4616,12 +4671,14 @@ export default {
                   const targetdec = parseFloat(parts[12]);
                   const offsetra = parseFloat(parts[13]);
                   const offsetdec = parseFloat(parts[14]);
-                  const adjustmentra = parts[15];
-                  const adjustmentdec = parts[16];
+                  const adjustmentra = parseFloat(parts[15]);
+                  const adjustmentdec = parseFloat(parts[16]);
                   const fakePolarRA = parseFloat(parts[17]);
                   const fakePolarDEC = parseFloat(parts[18]);
                   const realPolarRA = parseFloat(parts[19]);
                   const realPolarDEC = parseFloat(parts[20]);
+                  const guideAz = Number.isFinite(adjustmentra) ? adjustmentra : offsetra;
+                  const guideAlt = Number.isFinite(adjustmentdec) ? adjustmentdec : offsetdec;
 
 
                   // console.log('自动对焦绘制数据: ', ra, dec, targetra, targetdec, fakePolarRA, fakePolarDEC, realPolarRA, realPolarDEC);
@@ -4631,7 +4688,7 @@ export default {
                   this.$bus.$emit('FieldDataUpdate', [ra, dec, ra0, dec0, ra1, dec1, ra2, dec2, ra3, dec3, targetra, targetdec, fakePolarRA, fakePolarDEC, realPolarRA, realPolarDEC]);
 
                   // console.log('自动对焦显示更新数据: ', offsetra, offsetdec, adjustmentra, adjustmentdec);
-                  this.$bus.$emit('updateCardInfo', ra, dec, targetra, targetdec, offsetra, offsetdec, adjustmentra, adjustmentdec, "deg");
+                  this.$bus.$emit('updateCardInfo', ra, dec, targetra, targetdec, guideAz, guideAlt, adjustmentra, adjustmentdec, "deg");
 
                 }
                 break;
@@ -5318,6 +5375,15 @@ export default {
       // this.sendMessage('SendConsoleLogMsg', '网络连接恢复，恢复当前状态!', 'warning');
       this.getQTClientVersion();                // 获取QTClient版本
       this.getTotalVersion();                   // 获取总版本号
+      // WiFi 页面初始化依赖 netStatus（用于判断 AP/AP+STA、STA SSID/IP、已保存配置等）
+      // 浏览器刷新或 WebSocket 重连后主动回拉一次，避免界面沿用默认值导致状态不更新。
+      this.sendMessage('Vue_Command', 'netStatus');
+      this.sendMessage('Vue_Command', 'getHotspotName');
+      // 页面刷新后，前端 devices[].isConnected 会回到初始值，需要主动向后端回拉
+      // 当前已选驱动/绑定关系/已连接设备列表，才能把设备连接态恢复到 UI。
+      this.sendMessage('Vue_Command', 'loadSelectedDriverList');
+      this.sendMessage('Vue_Command', 'loadBindDeviceList');
+      this.sendMessage('Vue_Command', 'loadBindDeviceTypeList');
       this.sendMessage('Vue_Command', 'getROIInfo'); // 获取ROI信息
       this.sendMessage('Vue_Command', 'localMessage'); // 获取位置信息
       this.sendMessage('Vue_Command', 'getLastSelectDevice'); // 获取上一次选择的设备
@@ -5779,6 +5845,14 @@ export default {
       this.nav = false;
     },
 
+    handleOverlayMenuButtonClick(event) {
+      const ts = Math.round((typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now());
+      const x = event && Number.isFinite(event.clientX) ? Math.round(event.clientX) : -1;
+      const y = event && Number.isFinite(event.clientY) ? Math.round(event.clientY) : -1;
+      this.SendConsoleLogMsg(`[DIAG][MENU_OVERLAY_BTN_CLICK] t=${ts} x=${x} y=${y}`, 'warning');
+      this.$store.commit('setValue', { varName: 'showNavigationDrawer', newValue: false });
+    },
+
     SendConsoleLogMsg(message, type) {
       recordClientLog(type || 'info', message);
       if (type == 'error') {
@@ -5840,7 +5914,7 @@ export default {
           // console.log(item.label, item.value);
           this.SendConsoleLogMsg(item.label + ':' + item.value, 'info');
           this.$bus.$emit(item.label, item.label + ':' + item.value);
-        } else if (item.value == '' && item.label === 'Focal Length (mm)') {
+        } else if (item.value == '' && (item.label === 'Focal Length (mm)' || item.label === 'Main Camera Focal Length (mm)')) {
           this.SendConsoleLogMsg(item.label + 'is NULL', 'info');
           this.$bus.$emit(item.label, item.label + ':');
         }
@@ -6148,24 +6222,21 @@ export default {
 
     FocalLengthSet(payload) {
       const [signal, value] = payload.split(':'); // 拆分信号和值
-
-      for (const device of this.devices) {
-        if (device.driverType === 'Telescopes') {
-
-          if (value === '' || value === NaN) {
-            device.device = '';
-            this.SendConsoleLogMsg('Focal Length is set to:' + 0, 'info');
-            this.$bus.$emit('SetFocalLengthNum', '');
-          } else {
-            const IntValue = parseInt(value); // 将值转换为 Int 类型
-            device.device = value + ' mm';
-            this.SendConsoleLogMsg('Focal Length is set to:' + IntValue, 'info');
-            this.$bus.$emit('SetFocalLengthNum', IntValue);
-          }
-        }
+      if (value === '' || value === NaN) {
+        this.SendConsoleLogMsg('Focal Length is set to:' + 0, 'info');
+        this.$bus.$emit('SetFocalLengthNum', '');
+        this.updateConfigItemValue(this.MainCameraConfigItems, 'Main Camera Focal Length (mm)', '', 'FocalLengthSet');
+      } else {
+        const IntValue = parseInt(value); // 将值转换为 Int 类型
+        this.SendConsoleLogMsg('Focal Length is set to:' + IntValue, 'info');
+        this.$bus.$emit('SetFocalLengthNum', IntValue);
+        this.updateConfigItemValue(this.MainCameraConfigItems, 'Main Camera Focal Length (mm)', IntValue, 'FocalLengthSet');
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'MainCameraFocalLength:' + IntValue);
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'saveToConfigFile:MainCameraFocalLength:' + IntValue);
+        // 兼容旧链路
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'FocalLength:' + IntValue);
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'saveToConfigFile:FocalLength:' + IntValue);
       }
-
-
     },
 
     GuiderFocalLengthSet(payload) {
@@ -7700,7 +7771,14 @@ export default {
       this.resetIncrementalTileRenderBuffer();
 
       // 更新当前可见瓦片集合
+      const prevVisibleTiles = this.currentVisibleTiles instanceof Set
+        ? this.currentVisibleTiles
+        : new Set();
       const newVisibleTiles = new Set(tiles.map(t => `${t.z}/${t.x}/${t.y}`));
+      const visibleTilesChanged = (
+        prevVisibleTiles.size !== newVisibleTiles.size ||
+        [...newVisibleTiles].some(key => !prevVisibleTiles.has(key))
+      );
       
       // 取消不在可见范围内的加载请求
       for (const [key, controller] of this.tileAbortControllers.entries()) {
@@ -10133,6 +10211,47 @@ export default {
         rect,
         x: rect.left + (pointX * rect.width / imageW),
         y: rect.top + (pointY * rect.height / imageH)
+      };
+    },
+
+    getMainCanvasDisplayRect() {
+      const canvas = this.$refs.mainCanvas;
+      const fallbackWidth = Math.max(1, window.innerWidth || 1);
+      const fallbackHeight = Math.max(1, window.innerHeight || 1);
+      if (!canvas || typeof canvas.getBoundingClientRect !== 'function') {
+        return { left: 0, top: 0, width: fallbackWidth, height: fallbackHeight };
+      }
+      const rect = canvas.getBoundingClientRect();
+      return {
+        left: Number.isFinite(rect.left) ? rect.left : 0,
+        top: Number.isFinite(rect.top) ? rect.top : 0,
+        width: Math.max(1, Number(rect.width) || Number(canvas.clientWidth) || fallbackWidth),
+        height: Math.max(1, Number(rect.height) || Number(canvas.clientHeight) || fallbackHeight)
+      };
+    },
+
+    mapMainImagePointToScreen(pointX, pointY, imageW, imageH) {
+      const rect = this.getMainCanvasDisplayRect();
+      const iw = Math.max(1, Number(imageW) || 1);
+      const ih = Math.max(1, Number(imageH) || 1);
+      const prop = this.ImageProportion || (this.CanvasWidth / this.CanvasHeight) || (iw / ih);
+
+      let centerX = Number.isFinite(this.visibleX) ? this.visibleX : iw / 2;
+      let centerY = Number.isFinite(this.visibleY) ? this.visibleY : ih / 2;
+      const scale = Number.isFinite(this.scale) ? this.scale : 1;
+      const visibleWidth = iw * scale;
+      const visibleHeight = visibleWidth / prop;
+
+      if (centerX - visibleWidth / 2 < 0) centerX = visibleWidth / 2;
+      else if (centerX + visibleWidth / 2 > iw) centerX = iw - visibleWidth / 2;
+      if (centerY - visibleHeight / 2 < 0) centerY = visibleHeight / 2;
+      else if (centerY + visibleHeight / 2 > ih) centerY = ih - visibleHeight / 2;
+
+      const visibleLeft = centerX - visibleWidth / 2;
+      const visibleTop = centerY - visibleHeight / 2;
+      return {
+        x: rect.left + ((pointX - visibleLeft) * rect.width / visibleWidth),
+        y: rect.top + ((pointY - visibleTop) * rect.height / visibleHeight)
       };
     },
 
@@ -13099,9 +13218,9 @@ export default {
           } else if (parameter == 'ROI_y') {
             this.ROI_y = parseFloat(parameters[parameter]);
           }else if (parameter == 'SelfExposureTime(ms)') {
-            item = this.MainCameraConfigItems.find(item => item.label === 'Self Exposure Time (ms)');
-            if (item) {
-              item.value = parseInt(parameters[parameter]);
+            const selfExposureItem = this.MainCameraConfigItems.find(item => item.label === 'Self Exposure Time (ms)');
+            if (selfExposureItem) {
+              selfExposureItem.value = parseInt(parameters[parameter]);
             }
             this.$bus.$emit('setSelfExposureTime',parseInt(parameters[parameter]));
           }
@@ -13173,6 +13292,12 @@ export default {
           this.sendMessage('Vue_Command', 'SetGuiderGain:' + parseInt(value));
         } else if (driverType === 'Guider' && label === 'Offset') {
           this.sendMessage('Vue_Command', 'SetGuiderOffset:' + parseInt(value));
+        } else if (label === 'Main Camera Focal Length (mm)') {
+          const IntValue = parseInt(value);
+          this.sendMessage('Vue_Command', 'MainCameraFocalLength:' + IntValue);
+          this.sendMessage('Vue_Command', 'saveToConfigFile:MainCameraFocalLength:' + IntValue);
+          this.sendMessage('Vue_Command', 'FocalLength:' + IntValue);
+          this.sendMessage('Vue_Command', 'saveToConfigFile:FocalLength:' + IntValue);
         // 主相机参数更改处理
         } else if (label === 'ImageCFA') {
           this.ImageCFASet(value);
@@ -13430,8 +13555,12 @@ export default {
       },
       set: function (v) {
         if (this.$store.state.showNavigationDrawer !== v) {
+          this.SendConsoleLogMsg(
+            `[DIAG][MENU_STATE_SETTER] from=${this.$store.state.showNavigationDrawer ? 1 : 0} to=${v ? 1 : 0}`,
+            'warning'
+          );
           console.log('nav:', this.$store.state.showNavigationDrawer);
-          this.$store.commit('toggleBool', 'showNavigationDrawer')
+          this.$store.commit('setValue', { varName: 'showNavigationDrawer', newValue: !!v })
         }
       }
     },
@@ -13518,6 +13647,10 @@ export default {
   watch: {
     /** 主菜单关闭时同步关闭子菜单状态，避免 E2E 再次打开主菜单时误判“子菜单已打开”而跳过点击 */
     '$store.state.showNavigationDrawer': function (isOpen) {
+      this.SendConsoleLogMsg(
+        `[DIAG][MENU_STATE_CHANGED] isOpen=${isOpen ? 1 : 0} submenu=${this.drawer_2 ? 1 : 0} devPage=${this.isOpenDevicePage ? 1 : 0}`,
+        'warning'
+      );
       if (!isOpen) {
         this.drawer_2 = false
         this.isOpenDevicePage = false
@@ -13750,6 +13883,12 @@ export default {
 </script>
 
 <style>
+:root {
+  --quarcs-toolbar-height: 40px;
+  --quarcs-safe-top: env(safe-area-inset-top, 0px);
+  --quarcs-toolbar-total-height: calc(var(--quarcs-toolbar-height) + var(--quarcs-safe-top));
+}
+
 /* 全局关闭 UI 毛玻璃模糊（backdrop-filter） */
 .no-backdrop-blur,
 .no-backdrop-blur * {

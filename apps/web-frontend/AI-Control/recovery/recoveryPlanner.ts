@@ -58,6 +58,19 @@ function dedupeCalls(calls: FlowStepCall[]): FlowStepCall[] {
   return result
 }
 
+function sortRecoveryPreSteps(calls: FlowStepCall[]): FlowStepCall[] {
+  const priority = new Map<string, number>([
+    ['app.dismissBlockingOverlay', 0],
+    ['menu.dialog.dismissConfirm', 1],
+  ])
+  return [...calls].sort((a, b) => {
+    const ap = priority.get(a.id) ?? 100
+    const bp = priority.get(b.id) ?? 100
+    if (ap !== bp) return ap - bp
+    return 0
+  })
+}
+
 function isDialogBlockerActive(status: PageStatus, kind: DialogBlockerKind): boolean {
   switch (kind) {
     case 'confirm':
@@ -188,7 +201,7 @@ export function planRecoverySteps(args: {
     commandName,
     requirement,
     blockers,
-    preSteps: dedupeCalls(preSteps),
+    preSteps: sortRecoveryPreSteps(dedupeCalls(preSteps)),
     targetSurface: requirement?.targetSurface ?? null,
     suggestions,
   }

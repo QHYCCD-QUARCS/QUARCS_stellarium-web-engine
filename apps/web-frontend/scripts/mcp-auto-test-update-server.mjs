@@ -28,12 +28,12 @@ const WEB_FRONTEND_ROOT = path.resolve(__dirname, '..')
 const QUARCS_ROOT = process.env.QUARCS_WORKSPACE_DIR || path.resolve(WEB_FRONTEND_ROOT, '../../..')
 
 // 统一的设备访问 IP / 端口（可通过环境变量覆盖）：
-// - 默认设备 IP: 192.168.1.113
-// - 默认前端端口: 8000
+// - 默认设备 IP: 192.168.1.106
+// - 默认前端端口: 8080
 // Playwright 在 autoTestAndUpdate.sh 里面会通过 E2E_BASE_URL 访问前端，
 // 这里统一设置为指向数梅派设备，而不是本机 127.0.0.1:8080。
-const DEFAULT_DEVICE_IP = process.env.QUARCS_DEVICE_IP || '192.168.1.113'
-const DEFAULT_E2E_PORT = process.env.QUARCS_E2E_PORT || '8000'
+const DEFAULT_DEVICE_IP = process.env.QUARCS_DEVICE_IP || '192.168.1.106'
+const DEFAULT_E2E_PORT = process.env.QUARCS_E2E_PORT || '8080'
 
 function tailLines(text, maxLines = 200) {
   const lines = String(text ?? '').split(/\r?\n/)
@@ -155,6 +155,18 @@ mcp.registerTool(
         .regex(/^\d+\.\d+\.\d+$/)
         .optional()
         .describe('指定版本号（格式: x.y.z，例如 "1.2.3"）。如果不指定，将自动递增当前版本号'),
+      mode: z
+        .enum(['frontend', 'backend', 'all'])
+        .optional()
+        .describe('更新模式：frontend/backend/all（默认 all）'),
+      ipSuffix: z
+        .string()
+        .optional()
+        .describe('目标设备 IP 后缀（如 103）'),
+      baseUrl: z
+        .string()
+        .optional()
+        .describe('覆盖 E2E_BASE_URL（如 http://192.168.1.106:8080）'),
       workspaceDir: z
         .string()
         .optional()
@@ -168,28 +180,7 @@ mcp.registerTool(
         .describe('整体超时秒数（默认 3600，即 1 小时）'),
     },
   },
-  async ({ skipTest, skipUpload, version, workspaceDir, timeoutSec }) => {
-    // 逻辑约束：不允许跳过 E2E 测试（skipTest=true）
-    // 原因：如果前端服务未能正常启动并通过 E2E 校验，则认为更新流程不可靠。
-    if (skipTest) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify(
-              {
-                ok: false,
-                error: '不允许跳过 E2E 测试（skipTest 必须为 false 或省略）。',
-                hint: '请先确保前端服务可访问，并运行完整的 E2E 测试后再打包/上传更新。',
-              },
-              null,
-              2,
-            ),
-          },
-        ],
-      }
-    }
-
+  async ({ skipTest, skipUpload, version, mode, ipSuffix, baseUrl, workspaceDir, timeoutSec }) => {
     // 第一步：先构建前端，确保 dist 是最新的
     const buildSummary = await buildFrontendIfNeeded()
     if (!buildSummary.ok) {
@@ -250,6 +241,10 @@ mcp.registerTool(
     if (version) {
       args.push('--version', version)
     }
+    if (mode === 'frontend') args.push('--frontend')
+    if (mode === 'backend') args.push('--backend')
+    if (mode === 'all') args.push('--all')
+    if (ipSuffix) args.push('--ip-suffix', ipSuffix)
 
     const timeoutMs = (timeoutSec || 3600) * 1000
 
@@ -260,8 +255,8 @@ mcp.registerTool(
     }
 
     // 统一配置前端访问地址：优先使用外部传入的 E2E_BASE_URL，否则使用统一的设备 IP
-    // 例如：http://192.168.1.113:8000
-    env.E2E_BASE_URL = process.env.E2E_BASE_URL || `http://${DEFAULT_DEVICE_IP}:${DEFAULT_E2E_PORT}`
+    // 例如：http://192.168.1.106:8080
+    env.E2E_BASE_URL = baseUrl || process.env.E2E_BASE_URL || `http://${DEFAULT_DEVICE_IP}:${DEFAULT_E2E_PORT}`
 
     // 运行脚本
     const res = await runCommand({

@@ -30,7 +30,7 @@ import { chromium } from '@playwright/test'
 
 const execFile = promisify(execFileCb)
 
-const baseURL = process.env.E2E_BASE_URL || 'http://172.24.217.51:8080'
+const baseURL = process.env.E2E_BASE_URL || 'http://192.168.1.106:8080'
 
 function resolveSessionPort(): number {
   const raw = process.env.E2E_AI_CONTROL_SESSION_PORT
@@ -420,11 +420,13 @@ async function main() {
     flowParams: CliFlowParams,
     options: { runTimeoutMs?: number } = {},
   ) => {
+    let runResult: Record<string, unknown> | null = null
     const next = runQueue.then(async () => {
       const runTimeoutMs = Math.max(1_000, options.runTimeoutMs ?? SESSION_RUN_TIMEOUT_MS)
       const resolved =
         commandName === 'general-settings' ? resolveFlowParamsFromEnv(flowParams ?? {}) : (flowParams ?? {})
       const runCtx = ctx
+      runCtx.artifacts = {}
       let timeoutHandle: ReturnType<typeof setTimeout> | undefined
       const commandStartedAt = Date.now()
       const runPromise = runFlowByCommand({ ctx: runCtx, registry, commandName, flowParams: resolved })
@@ -448,12 +450,16 @@ async function main() {
       } finally {
         if (timeoutHandle) clearTimeout(timeoutHandle)
       }
+      runResult = (runCtx.artifacts && runCtx.artifacts.aiControlResult && typeof runCtx.artifacts.aiControlResult === 'object')
+        ? { ...(runCtx.artifacts.aiControlResult as Record<string, unknown>) }
+        : null
       console.log(
         `[ai-control] commandTiming commandName=${commandName} elapsedMs=${Date.now() - commandStartedAt}`,
       )
     })
     runQueue = next.catch(() => {})
     await next
+    return runResult
   }
 
   async function getStatusSnapshot() {
@@ -668,10 +674,10 @@ async function main() {
     }
     const httpRunStarted = Date.now()
     try {
-      await runOnPage(commandName, body.flowParams ?? {}, {
+      const result = await runOnPage(commandName, body.flowParams ?? {}, {
         runTimeoutMs: typeof body.runTimeoutMs === 'number' ? body.runTimeoutMs : undefined,
       })
-      sendJson(res, 200, { ok: true, commandName, elapsedMs: Date.now() - httpRunStarted })
+      sendJson(res, 200, { ok: true, commandName, elapsedMs: Date.now() - httpRunStarted, result })
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       sendJson(res, 200, { ok: false, error: message, elapsedMs: Date.now() - httpRunStarted })

@@ -35,7 +35,7 @@ export function createFlowContext(
   page.setDefaultNavigationTimeout(stepTimeoutMs)
   testInfo.setTimeout(Math.max(testTimeoutMs, minTestTimeoutMs))
 
-  return { page, testInfo, uiTimeoutMs, stepTimeoutMs }
+  return { page, testInfo, uiTimeoutMs, stepTimeoutMs, artifacts: {} }
 }
 
 /**
