@@ -18,7 +18,10 @@ export default {
       xAxis_max: 4, 
       yAxis_min: -4,
       yAxis_max: 4, 
-      range: 4,
+      rangeMode: 'auto',
+      rangeModes: ['auto', 4, 2, 1],
+      axisMarginRatio: 0.15,
+      axisShrinkFactor: 0.92,
     };
   },
   mounted() {
@@ -28,8 +31,60 @@ export default {
     this.$bus.$on('AddScatterChartData', this.addData);
     this.$bus.$on('clearChartData', this.clearChartData);
     this.$bus.$on('ChartRangeSwitch', this.RangeSwitch);
+    this.$bus.$on('GuiderErrorUnitChanged', this.onGuiderErrorUnitChanged);
   },
   methods: {
+    getBaseRange() {
+      const fixedRange = this.getFixedRange();
+      return Number.isFinite(fixedRange) && fixedRange > 0 ? fixedRange : 4;
+    },
+    getFixedRange() {
+      return Number.isFinite(this.rangeMode) && this.rangeMode > 0 ? this.rangeMode : null;
+    },
+    getScatterMaxAbs() {
+      let maxAbs = 0;
+      const updateMaxAbs = (point) => {
+        if (!Array.isArray(point) || point.length < 2) return;
+        const x = Number(point[0]);
+        const y = Number(point[1]);
+        if (Number.isFinite(x)) maxAbs = Math.max(maxAbs, Math.abs(x));
+        if (Number.isFinite(y)) maxAbs = Math.max(maxAbs, Math.abs(y));
+      };
+      this.chartData.forEach(updateMaxAbs);
+      this.chartData_new.forEach(updateMaxAbs);
+      return maxAbs;
+    },
+    updateAxisRange() {
+      const fixedRange = this.getFixedRange();
+      if (Number.isFinite(fixedRange) && fixedRange > 0) {
+        this.xAxis_min = -fixedRange;
+        this.xAxis_max = fixedRange;
+        this.yAxis_min = -fixedRange;
+        this.yAxis_max = fixedRange;
+        return;
+      }
+
+      const baseRange = this.getBaseRange();
+      const dataMaxAbs = this.getScatterMaxAbs();
+      const paddedDataRange = dataMaxAbs > 0
+        ? Math.max(baseRange, Number((dataMaxAbs * (1 + this.axisMarginRatio)).toFixed(3)))
+        : baseRange;
+      const currentRange = Math.max(
+        baseRange,
+        Math.abs(Number(this.xAxis_min) || 0),
+        Math.abs(Number(this.xAxis_max) || 0),
+        Math.abs(Number(this.yAxis_min) || 0),
+        Math.abs(Number(this.yAxis_max) || 0)
+      );
+      const nextRange = dataMaxAbs > currentRange
+        ? paddedDataRange
+        : Math.max(baseRange, Number((Math.max(paddedDataRange, currentRange * this.axisShrinkFactor)).toFixed(3)));
+
+      this.xAxis_min = -nextRange;
+      this.xAxis_max = nextRange;
+      this.yAxis_min = -nextRange;
+      this.yAxis_max = nextRange;
+    },
     initChart() {
       const chartDom = this.$refs.scatterchart;
       this.myChart = echarts.init(chartDom);
@@ -37,6 +92,7 @@ export default {
       this.renderChart(this.xAxis_min, this.xAxis_max, this.yAxis_min, this.yAxis_max);
     },
     renderChart(x_min,x_max,y_min,y_max) {
+      if (!this.myChart) return;
       const option = {
         grid: {  // 设置 grid 以使其占满容器
           left: '0%',
@@ -114,35 +170,25 @@ export default {
       this.chartData_new.push(newDataPoint);
 
       // 更新图表
+      this.updateAxisRange();
       this.renderChart(this.xAxis_min, this.xAxis_max, this.yAxis_min, this.yAxis_max);
     },
     clearChartData() {
       this.chartData = [];
       this.chartData_new = [];
+      this.updateAxisRange();
       this.renderChart(this.xAxis_min, this.xAxis_max, this.yAxis_min, this.yAxis_max);
     },
     RangeSwitch() {
-      if(this.range === 4) {
-        this.range = 2;
-        this.xAxis_min = -2;
-        this.xAxis_max = 2;
-        this.yAxis_min = -2;
-        this.yAxis_max = 2;
-      }else if(this.range === 2) {
-        this.range = 1;
-        this.xAxis_min = -1;
-        this.xAxis_max = 1;
-        this.yAxis_min = -1;
-        this.yAxis_max = 1;
-      }else if(this.range === 1) {
-        this.range = 4;
-        this.xAxis_min = -4;
-        this.xAxis_max = 4;
-        this.yAxis_min = -4;
-        this.yAxis_max = 4;
-      }
+      const currentIndex = this.rangeModes.indexOf(this.rangeMode);
+      const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % this.rangeModes.length : 0;
+      this.rangeMode = this.rangeModes[nextIndex];
 
+      this.updateAxisRange();
       this.renderChart(this.xAxis_min, this.xAxis_max, this.yAxis_min, this.yAxis_max);
+    },
+    onGuiderErrorUnitChanged() {
+      this.clearChartData();
     }
   }
 }
@@ -170,4 +216,3 @@ export default {
   box-sizing: border-box;
 }
 </style>
-

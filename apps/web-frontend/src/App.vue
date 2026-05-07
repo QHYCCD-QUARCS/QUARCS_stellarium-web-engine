@@ -1137,7 +1137,7 @@ export default {
         { driverType: 'Guider', label: 'Guider Focal Length (mm)', value: '', inputType: 'text' },
         { driverType: 'Guider', label: 'Multi Star Guider', value: false, inputType: 'switch' },
         { driverType: 'Guider', label: 'RA Single Guide Direction', value: 'AUTO', inputType: 'select', selectValue: ['AUTO', 'WEST', 'EAST'] },
-        { driverType: 'Guider', label: 'DEC Single Guide Direction', value: 'AUTO', inputType: 'select', selectValue: ['AUTO', 'NORTH', 'SOUTH'] },
+        { driverType: 'Guider', label: 'DEC Single Guide Direction', value: 'BOTH', inputType: 'select', selectValue: ['BOTH', 'DEC+', 'DEC-'] },
         { driverType: 'Guider', label: 'Gain', value: 0, inputType: 'slider', inputMin: 0, inputMax: 0, inputStep: 1 },
         { driverType: 'Guider', label: 'Offset', value: 0, inputType: 'slider', inputMin: 0, inputMax: 0, inputStep: 1 },
         // { driverType: 'Guider', label: 'Guider Pixel size', value: '', inputType: 'text'},
@@ -1983,14 +1983,23 @@ export default {
       const sessionId = options.sessionId || this.tileSessionId;
       const frameId = options.frameId != null ? options.frameId : this.tileFrameId;
       const key = '0/0/0';
+      const expectedSnapshotKey = this.buildHistogramSnapshotKey(sessionId, frameId);
       if (!sessionId) return null;
       if (this.tileRawDataCache && this.tileRawDataCache.has(key)) {
+        const cachedTile = this.tileRawDataCache.get(key);
+        const cachedSnapshotKey = cachedTile && typeof cachedTile === 'object'
+          ? String(cachedTile.snapshotKey || '')
+          : '';
+        if (expectedSnapshotKey && cachedSnapshotKey && cachedSnapshotKey !== expectedSnapshotKey) {
+          this.tileRawDataCache.delete(key);
+        } else {
         this.emitCaptureTrace('frontend_z0_cache_hit', {
           source: 'ensureZ0TileRawData',
           sessionId,
           frameId,
         });
-        return this.tileRawDataCache.get(key);
+          return cachedTile;
+        }
       }
       const base = (process.env.BASE_URL || '/').replace(/\/?$/, '/');
       const frameQ = (frameId != null) ? `?f=${encodeURIComponent(String(frameId))}` : '';
@@ -2016,6 +2025,9 @@ export default {
       if (!this.tileRawDataCache) {
         this.tileRawDataCache = new Map();
       }
+      tileData.sessionId = sessionId;
+      tileData.frameId = frameId;
+      tileData.snapshotKey = expectedSnapshotKey;
       this.tileRawDataCache.set(key, tileData);
       const fetchDone = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
       this.emitCaptureTrace('frontend_z0_fetch_done', {
@@ -2059,11 +2071,25 @@ export default {
         const totalB = Number.isFinite(result.whiteBalance.gainB) ? result.whiteBalance.gainB : 1;
         const postGainR = Math.min(3, Math.max(0.01, totalR / Math.max(pre.gainR, 0.01)));
         const postGainB = Math.min(3, Math.max(0.01, totalB / Math.max(pre.gainB, 0.01)));
+        const refGainR = Math.min(3, Math.max(0.01, pre.gainR * postGainR));
+        const refGainB = Math.min(3, Math.max(0.01, pre.gainB * postGainB));
+        this.SendConsoleLogMsg(
+          `[AW-Z0] cfa=${cfa}, preR=${pre.gainR.toFixed(3)}, preB=${pre.gainB.toFixed(3)}, ` +
+          `totalR=${totalR.toFixed(3)}, totalB=${totalB.toFixed(3)}, ` +
+          `postR=${postGainR.toFixed(3)}, postB=${postGainB.toFixed(3)}, ` +
+          `finalR=${refGainR.toFixed(3)}, finalB=${refGainB.toFixed(3)}`,
+          'info'
+        );
         return {
           postGainR,
           postGainB,
-          refGainR: Math.min(3, Math.max(0.01, pre.gainR * postGainR)),
-          refGainB: Math.min(3, Math.max(0.01, pre.gainB * postGainB)),
+          refGainR,
+          refGainB,
+          preGainR: pre.gainR,
+          preGainB: pre.gainB,
+          totalGainR: totalR,
+          totalGainB: totalB,
+          cfa,
         };
       });
     },
@@ -2139,8 +2165,21 @@ export default {
       if (enablePersistent === true) {
         this.setAutoWhiteBalanceEnabled(true);
       }
+      const finalGains = this.getFinalWhiteBalanceGains();
+      this.SendConsoleLogMsg(
+        `[AW-Apply] cfa=${gains.cfa || this.normalizeCfaPattern(this.ImageCFA)}, ` +
+        `reprocess=${reprocess}, preR=${Number(gains.preGainR || 1).toFixed(3)}, preB=${Number(gains.preGainB || 1).toFixed(3)}, ` +
+        `postR=${gains.postGainR.toFixed(3)}, postB=${gains.postGainB.toFixed(3)}, ` +
+        `finalR=${finalGains.gainR.toFixed(3)}, finalB=${finalGains.gainB.toFixed(3)}`,
+        'info'
+      );
       if (notify) {
-        this.SendConsoleLogMsg(`进一步白平衡完成: postR=${gains.postGainR.toFixed(3)}, postB=${gains.postGainB.toFixed(3)}`, 'success');
+        this.SendConsoleLogMsg(
+          `进一步白平衡完成: preR=${Number(gains.preGainR || 1).toFixed(3)}, preB=${Number(gains.preGainB || 1).toFixed(3)}, ` +
+          `postR=${gains.postGainR.toFixed(3)}, postB=${gains.postGainB.toFixed(3)}, ` +
+          `finalR=${finalGains.gainR.toFixed(3)}, finalB=${finalGains.gainB.toFixed(3)}`,
+          'success'
+        );
       }
       const finishedAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
       this.emitCaptureTrace('frontend_auto_white_balance_done', {
@@ -2148,8 +2187,15 @@ export default {
         reprocess,
         notify,
         totalMs: (finishedAt - startedAt).toFixed(2),
+        cfa: gains.cfa || this.normalizeCfaPattern(this.ImageCFA),
+        preGainR: Number(gains.preGainR || 1).toFixed(3),
+        preGainB: Number(gains.preGainB || 1).toFixed(3),
+        totalGainR: Number(gains.totalGainR || 1).toFixed(3),
+        totalGainB: Number(gains.totalGainB || 1).toFixed(3),
         postGainR: gains.postGainR.toFixed(3),
         postGainB: gains.postGainB.toFixed(3),
+        finalGainR: finalGains.gainR.toFixed(3),
+        finalGainB: finalGains.gainB.toFixed(3),
       });
       return true;
     },
@@ -2734,6 +2780,30 @@ export default {
       this.WebSocketUrl = `${protocol}//${hostname}:${port}`;
       console.log('WebSocketUrl:', this.WebSocketUrl);
     },
+    getCurrentLocalDateTimeParts() {
+      const now = new Date();
+      const pad2 = (value) => String(value).padStart(2, '0');
+      return {
+        date: [
+          now.getFullYear(),
+          pad2(now.getMonth() + 1),
+          pad2(now.getDate())
+        ].join('-'),
+        time: [
+          pad2(now.getHours()),
+          pad2(now.getMinutes()),
+          pad2(now.getSeconds())
+        ].join(':')
+      };
+    },
+    syncCurrentBrowserTime(reason = 'unknown') {
+      const parts = this.getCurrentLocalDateTimeParts();
+      this.sendMessage('Vue_Command', 'SynchronizeTime:' + parts.time + ':' + parts.date);
+      this.SendConsoleLogMsg(
+        'Sync current browser time (' + reason + '): ' + parts.date + ' ' + parts.time,
+        'info'
+      );
+    },
     getQTClientVersion() {
       this.sendMessage('Vue_Command', 'getQTClientVersion');
     },
@@ -3212,6 +3282,14 @@ export default {
                   const total = Number(parts[3]);
                   if (!Number.isFinite(ra) || !Number.isFinite(dec) || !Number.isFinite(total)) break;
                   this.$bus.$emit('AddRMSErrorData', ra, dec, total);
+                }
+                break;
+
+              case 'GuiderErrorUnit':
+                if (parts.length >= 2) {
+                  const unit = parts[1] === 'arcsec' ? 'arcsec' : 'px';
+                  const scale = parts.length >= 3 ? Number(parts[2]) : 0;
+                  this.$bus.$emit('GuiderErrorUnitChanged', unit, Number.isFinite(scale) ? scale : 0);
                 }
                 break;
 
@@ -3990,6 +4068,11 @@ export default {
                     this.$bus.$emit('AppSendMessage', 'Vue_Command', 'GuiderFocalLength:' + parts[2]);
                   }
 
+                  if (parts[1] === 'GuiderPixelSize') {
+                    setGuiderItemValue('Guider Pixel size', parts[2]);
+                    this.$bus.$emit('AppSendMessage', 'Vue_Command', 'GuiderPixelSize:' + parts[2]);
+                  }
+
                   if (parts[1] === 'Coordinates') {
                     const [latStr, lngStr, isAutoStr] = parts[2].split(',').map(item => item.trim());
                     const lat = parseFloat(latStr);
@@ -4034,7 +4117,12 @@ export default {
                     this.$bus.$emit('AppSendMessage', 'Vue_Command', 'GuiderRaGuideDir:' + parts[2]);
                   }
                   if (parts[1] === 'GuiderDecGuideDir') {
-                    setGuiderItemValue('DEC Single Guide Direction', parts[2]);
+                    const rawDir = String(parts[2] || '').trim().toUpperCase();
+                    const uiDir = rawDir === 'NORTH' ? 'DEC+'
+                      : rawDir === 'SOUTH' ? 'DEC-'
+                      : rawDir === 'AUTO' ? 'BOTH'
+                      : rawDir;
+                    setGuiderItemValue('DEC Single Guide Direction', uiDir);
                     this.$bus.$emit('AppSendMessage', 'Vue_Command', 'GuiderDecGuideDir:' + parts[2]);
                   }
                 }
@@ -5077,6 +5165,29 @@ export default {
                   }
                 }
                 break;
+              case 'GuiderCoreError':
+                {
+                  const raw = parts.length >= 2 ? parts.slice(1).join(':') : '';
+                  if (raw) {
+                    let display = raw;
+                    if (/CalibrationFailed:LostStar/i.test(raw)) {
+                      display = '导星校准失败：校准过程中丢失星点';
+                    } else if (/RA Calibration Failed: star did not move enough/i.test(raw)) {
+                      display = '导星校准失败：RA 方向星点移动不足';
+                    } else if (/DEC Calibration Failed: star did not move enough/i.test(raw)) {
+                      display = '导星校准失败：DEC 方向星点移动不足';
+                    } else if (/Backlash Clearing Failed: star did not move enough/i.test(raw)) {
+                      display = '导星校准失败：DEC 回差清除阶段星点移动不足';
+                    } else if (/CalibrationQualityFailed:/i.test(raw)) {
+                      display = '导星校准失败：校准质量不达标，请检查导星速率、脉冲方向和赤道仪响应';
+                    } else if (/BeginCalibrationFailed:NoLock/i.test(raw)) {
+                      display = '导星校准失败：当前没有锁定星点';
+                    }
+                    this.callShowMessageBox(display, 'error');
+                    this.$bus.$emit('GuiderCoreError', raw);
+                  }
+                }
+                break;
               case 'GuiderCalibration':
                 // 形如：GuiderCalibration:cameraAngleDeg=...:orthoErrDeg=...:...
                 this.$bus.$emit('GuiderCalibration', data.message);
@@ -5316,6 +5427,7 @@ export default {
     // 状态恢复
     StatusRecovery() {
       // this.sendMessage('SendConsoleLogMsg', '网络连接恢复，恢复当前状态!', 'warning');
+      this.syncCurrentBrowserTime('status-recovery');
       this.getQTClientVersion();                // 获取QTClient版本
       this.getTotalVersion();                   // 获取总版本号
       this.sendMessage('Vue_Command', 'getROIInfo'); // 获取ROI信息
@@ -6205,19 +6317,13 @@ export default {
 
     GuiderDecSingleGuideDirSet(payload) {
       const [signal, value] = payload.split(':');
-      let dir = String(value || '').trim().toUpperCase();
-      // 如果包含括号，提取括号内的方向（用于显示），但发送时只发送 AUTO
-      if (dir.startsWith('AUTO')) {
-        // 保持 "AUTO" 或 "AUTO (SOUTH)" 格式
-        dir = dir; // 保持原样
-      } else if (dir !== 'NORTH' && dir !== 'SOUTH') {
+      const dir = String(value || '').trim().toUpperCase();
+      if (dir !== 'BOTH' && dir !== 'DEC+' && dir !== 'DEC-') {
         return;
       }
       this.SendConsoleLogMsg('DEC Single Guide Direction is set to:' + dir, 'info');
-      // 发送时，如果是 AUTO 格式，只发送 AUTO（不带括号）
-      const sendDir = dir.startsWith('AUTO') ? 'AUTO' : dir;
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'GuiderDecGuideDir:' + sendDir);
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'saveToConfigFile:GuiderDecGuideDir:' + sendDir);
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'GuiderDecGuideDir:' + dir);
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', 'saveToConfigFile:GuiderDecGuideDir:' + dir);
     },
 
     GuiderPixelSizeSet(payload) {
@@ -7002,16 +7108,22 @@ export default {
         incomingFrameId !== null &&
         prevFrameId !== null &&
         incomingFrameId === prevFrameId;
+      const isOverwriteFrame =
+        !isNewSession &&
+        incomingFrameId !== null &&
+        prevFrameId !== null &&
+        incomingFrameId !== prevFrameId;
 
       // live 覆盖写帧节流：高帧率下若每条 TileGPM 都立即清缓存/abort，会导致前端持续“重启加载”，
       // 表现为跳帧、卡顿、瓦片大量失败、缩放后长时间不刷新。
       // 策略：仅对“同 session 下确实切到新 frame”的 live 覆盖写做节流。
       // 对同一 frame 的重复 TileGPM 元数据更新不应清缓存/abort。
-      const isLiveOverwriteFrame = (!isNewSession) && isLiveSession && !isSameFrameUpdate;
+      const isLiveOverwriteFrame = isOverwriteFrame && isLiveSession;
       this.emitCaptureTrace('frontend_handle_tilegpm_start', {
         sessionId: gpm.sessionId,
         frameId: incomingFrameId,
         isNewSession,
+        isOverwriteFrame,
         isLiveOverwriteFrame,
         imageWidth: gpm.imageWidth,
         imageHeight: gpm.imageHeight,
@@ -7102,7 +7214,7 @@ export default {
       }
       
       // 重要：后端每张图使用独立目录（sessionId=live_<epoch>），新 GPM 即新会话；保留 isOverwriteLiveFrame 兼容旧后端 sessionId=live 覆盖写
-      const isOverwriteLiveFrame = isLiveOverwriteFrame;
+      const isOverwriteLiveFrame = isOverwriteFrame;
 
       if (isNewSession || isOverwriteLiveFrame) {
         // 新会话或 live 覆盖写帧：清空瓦片缓存与队列，避免旧帧残留/命中缓存导致不刷新
@@ -8262,6 +8374,9 @@ export default {
           const paramsKey = paramsSnapshot
             ? `${paramsSnapshot.cfa}|${paramsSnapshot.gainR}|${paramsSnapshot.gainB}|${paramsSnapshot.blackLevel}|${paramsSnapshot.whiteLevel}`
             : 'no-gpm';
+          tileData.sessionId = expectedSessionId;
+          tileData.frameId = expectedFrameId;
+          tileData.snapshotKey = this.buildHistogramSnapshotKey(expectedSessionId, expectedFrameId);
           // 保存原始瓦片数据（用于白平衡等参数变化时重新处理）
           this.tileRawDataCache.set(key, tileData);
           if (this.tileRetryTimers && this.tileRetryTimers.has(key)) {
@@ -9199,8 +9314,8 @@ export default {
       // 根据模式设置标准差倍数
       let a, b;
       switch (mode) {
-        case 0: a = 3; b = 5; break;
-        case 1: a = 2; b = 5; break;
+        case 0: a = 1; b = 5; break;
+        case 1: a = 1; b = 5; break;
         case 2: a = 3; b = 8; break;
         default: a = 2; b = 8;
       }
@@ -9475,17 +9590,14 @@ export default {
     truncatedMean(arr, lowerPercent = 5, upperPercent = 5) {
       if (arr.length === 0) return 0;
 
-      // 过滤极端黑点和过饱和点
-      const filtered = arr.filter(v => v > 100 && v < 65000);
-      if (filtered.length === 0) return arr.length > 0 ? arr[0] : 0;
-
-      // 对于特别大的数组，采样处理
-      let workingArray = filtered;
-      if (filtered.length > 10000) {
+      // AW 统计不再使用硬阈值，避免暗场/短曝图像被整体过滤掉。
+      // 这里直接对全样本做截断均值，只用上下百分位抑制极端值。
+      let workingArray = arr;
+      if (arr.length > 10000) {
         workingArray = [];
-        const step = Math.ceil(filtered.length / 5000);
-        for (let i = 0; i < filtered.length; i += step) {
-          workingArray.push(filtered[i]);
+        const step = Math.ceil(arr.length / 5000);
+        for (let i = 0; i < arr.length; i += step) {
+          workingArray.push(arr[i]);
         }
       }
 
@@ -10160,7 +10272,7 @@ export default {
       const StarStartX = mapped.x - StarWidth / 2;
       const StarStartY = mapped.y - StarHeight / 2;
 
-      this.$bus.$emit('PHD2MultiStarsPosition', StarStartX, StarStartY);
+      this.$bus.$emit('PHD2MultiStarsPosition', StarStartX, StarStartY, StarWidth, StarHeight);
     },
 
     calculateHistogram(imageData) {

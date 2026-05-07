@@ -119,6 +119,7 @@ fi
 
 for required_path in \
   "${DIST_DIR}/index.html" \
+  "${DIST_DIR}/guider-analysis.html" \
   "${DIST_DIR}/favicon.ico" \
   "${DIST_DIR}/opencv.js" \
   "${DIST_DIR}/css" \
@@ -243,6 +244,7 @@ fi
 echo "Syncing root files"
 rsync_files \
   "${DIST_DIR}/index.html" \
+  "${DIST_DIR}/guider-analysis.html" \
   "${DIST_DIR}/favicon.ico" \
   "${DIST_DIR}/opencv.js"
 
