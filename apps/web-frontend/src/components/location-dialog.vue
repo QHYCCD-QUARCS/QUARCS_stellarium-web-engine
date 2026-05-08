@@ -138,6 +138,33 @@ export default {
     this.$bus.$on('sendGetLocation', this.sendGetLocation);
   },
   methods: {
+    normalizeExternalDateTimeParts(rawTime) {
+      if (rawTime == null) return null;
+      const text = String(rawTime).trim();
+      if (!text) return null;
+
+      let candidate = text;
+      if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(candidate)) {
+        candidate = candidate.replace(' ', 'T');
+      }
+
+      const parsed = new Date(candidate);
+      if (Number.isNaN(parsed.getTime())) return null;
+
+      const pad2 = (value) => String(value).padStart(2, '0');
+      return {
+        date: [
+          parsed.getFullYear(),
+          pad2(parsed.getMonth() + 1),
+          pad2(parsed.getDate())
+        ].join('-'),
+        time: [
+          pad2(parsed.getHours()),
+          pad2(parsed.getMinutes()),
+          pad2(parsed.getSeconds())
+        ].join(':')
+      };
+    },
     callQt() {
       try {
         if (window.qtObj) {
@@ -155,6 +182,14 @@ export default {
           }
           this.$bus.$emit('appVersion', data.appversion);
           this.$bus.$emit('AppSendMessage', 'Vue_Command', 'localMessage:'+ data.lat + ':' + data.lon+':'+data.language +':'+data.wifiname);
+          const timeParts = this.normalizeExternalDateTimeParts(data.time);
+          if (timeParts) {
+            this.$bus.$emit(
+              'AppSendMessage',
+              'Vue_Command',
+              'SynchronizeTime:' + timeParts.time + ':' + timeParts.date
+            );
+          }
         } else {
           this.$bus.$emit('SendConsoleLogMsg', 'qtObj 不可用', 'error');
         }

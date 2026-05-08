@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Guider Analysis</title>
+  <style>
+    :root {
+      --bg: #ece5d8;
+      --panel: rgba(248, 245, 238, 0.96);
+      --line: #c7baa7;
+      --text: #1e1c18;
+      --muted: #73695d;
+      --accent: #1e6a6d;
+      --accent-soft: #d7ebe7;
+      --shadow: 0 20px 60px rgba(70, 48, 20, 0.12);
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; background:
+      radial-gradient(circle at top left, rgba(30,106,109,0.12), transparent 30%),
+      linear-gradient(180deg, #f5efe5 0%, #e7dece 100%);
+      color: var(--text);
+      font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    .app {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      min-height: 100vh;
+    }
+    .sidebar, .main {
+      padding: 20px;
+    }
+    .sidebar {
+      border-right: 1px solid rgba(80, 64, 48, 0.14);
+      background: rgba(255,255,255,0.38);
+      backdrop-filter: blur(12px);
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid rgba(130, 103, 74, 0.15);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+    }
+    .header {
+      padding: 16px 18px 10px;
+    }
+    .title {
+      margin: 0;
+      font-size: 28px;
+      line-height: 1;
+      letter-spacing: 0.02em;
+    }
+    .subtitle {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .section {
+      padding: 14px 18px 18px;
+      border-top: 1px solid rgba(130, 103, 74, 0.1);
+    }
+    label, .section-title {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    select {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: #fffefb;
+      color: var(--text);
+      font-size: 14px;
+    }
+    .frame-list {
+      display: grid;
+      gap: 8px;
+      max-height: calc(100vh - 260px);
+      overflow: auto;
+      padding-right: 2px;
+    }
+    .frame-btn {
+      width: 100%;
+      text-align: left;
+      border: 1px solid rgba(130, 103, 74, 0.14);
+      background: #fffcf7;
+      color: var(--text);
+      border-radius: 12px;
+      padding: 10px 12px;
+      cursor: pointer;
+      transition: 120ms ease;
+    }
+    .frame-btn:hover { transform: translateY(-1px); border-color: #9c866c; }
+    .frame-btn.active {
+      background: var(--accent-soft);
+      border-color: var(--accent);
+      color: #10393b;
+    }
+    .frame-name { font-weight: 700; font-size: 14px; }
+    .frame-meta { margin-top: 4px; font-size: 12px; color: var(--muted); }
+    .main {
+      display: grid;
+      gap: 16px;
+    }
+    .hero {
+      display: flex;
+      justify-content: space-between;
+      align-items: end;
+      gap: 16px;
+      padding: 8px 4px 0;
+    }
+    .hero h2 { margin: 0; font-size: 30px; }
+    .hero p { margin: 6px 0 0; color: var(--muted); }
+    .statbar {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    .pill {
+      padding: 8px 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.74);
+      border: 1px solid rgba(130, 103, 74, 0.14);
+      font-size: 13px;
+    }
+    .images {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+    .image-card {
+      overflow: hidden;
+    }
+    .image-card h3 {
+      margin: 0;
+      padding: 14px 16px 0;
+      font-size: 15px;
+    }
+    .image-wrap {
+      padding: 12px 16px 16px;
+    }
+    .image-wrap img {
+      width: 100%;
+      display: block;
+      border-radius: 12px;
+      border: 1px solid rgba(130, 103, 74, 0.16);
+      background: #1a1a1a;
+      cursor: zoom-in;
+    }
+    .toolbar {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      padding: 0 4px;
+    }
+    .toolbar label {
+      margin: 0;
+      font-size: 13px;
+      color: var(--muted);
+      font-weight: 700;
+      text-transform: none;
+      letter-spacing: 0;
+    }
+    .toolbar select {
+      width: auto;
+      min-width: 130px;
+    }
+    .action-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 40px;
+      padding: 0 14px;
+      border-radius: 12px;
+      border: 1px solid rgba(30,106,109,0.24);
+      background: #f9fffd;
+      color: #13484a;
+      font-size: 14px;
+      font-weight: 700;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .action-btn[aria-disabled="true"] {
+      opacity: 0.5;
+      pointer-events: none;
+    }
+    .info-grid {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 16px;
+    }
+    .info-card {
+      padding: 16px;
+    }
+    .kv {
+      display: grid;
+      grid-template-columns: 120px 1fr;
+      gap: 8px 12px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    .kv .k { color: var(--muted); }
+    .data-table-wrap {
+      max-height: 440px;
+      overflow: auto;
+      border-radius: 12px;
+      border: 1px solid rgba(130, 103, 74, 0.14);
+      background: #fffdfa;
+    }
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    .data-table th,
+    .data-table td {
+      padding: 9px 10px;
+      border-bottom: 1px solid rgba(130, 103, 74, 0.12);
+      text-align: left;
+      vertical-align: top;
+    }
+    .data-table th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      width: 34%;
+      background: #f4eee4;
+      color: var(--muted);
+      font-weight: 700;
+    }
+    .data-table td {
+      color: var(--text);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      word-break: break-word;
+    }
+    .star-table-wrap {
+      max-height: 420px;
+      overflow: auto;
+      border-radius: 12px;
+      border: 1px solid rgba(130, 103, 74, 0.14);
+      background: #fffdfa;
+    }
+    .star-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+    .star-table th,
+    .star-table td {
+      padding: 8px 10px;
+      border-bottom: 1px solid rgba(130, 103, 74, 0.12);
+      text-align: left;
+      vertical-align: top;
+    }
+    .star-table th {
+      position: sticky;
+      top: 0;
+      background: #f4eee4;
+      color: var(--muted);
+      font-weight: 700;
+      z-index: 1;
+    }
+    .star-table td {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    .hint {
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .empty {
+      padding: 20px;
+      color: var(--muted);
+    }
+    .lightbox {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: rgba(18, 15, 11, 0.88);
+      z-index: 9999;
+    }
+    .lightbox.open {
+      display: flex;
+    }
+    .lightbox-panel {
+      width: min(96vw, 1800px);
+      height: min(92vh, 1200px);
+      background: rgba(28, 24, 19, 0.98);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 18px;
+      box-shadow: 0 30px 80px rgba(0,0,0,0.45);
+      overflow: hidden;
+      display: grid;
+      grid-template-rows: auto 1fr;
+    }
+    .lightbox-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      color: #f3ece2;
+    }
+    .lightbox-title {
+      font-size: 15px;
+      font-weight: 700;
+    }
+    .lightbox-close {
+      min-width: 38px;
+      min-height: 38px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.16);
+      background: rgba(255,255,255,0.06);
+      color: #fff;
+      font-size: 18px;
+      cursor: pointer;
+    }
+    .lightbox-body {
+      overflow: auto;
+      padding: 18px;
+      background:
+        linear-gradient(45deg, rgba(255,255,255,0.03) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.03) 75%),
+        linear-gradient(45deg, rgba(255,255,255,0.03) 25%, transparent 25%, transparent 75%, rgba(255,255,255,0.03) 75%);
+      background-size: 24px 24px;
+      background-position: 0 0, 12px 12px;
+    }
+    .lightbox-body img {
+      display: block;
+      width: auto;
+      height: auto;
+      max-width: none;
+      max-height: none;
+      margin: 0 auto;
+      image-rendering: pixelated;
+    }
+    .lightbox-hint {
+      color: #cfc5b6;
+      font-size: 12px;
+      padding: 0 16px 14px;
+    }
+    @media (max-width: 1100px) {
+      .app { grid-template-columns: 1fr; }
+      .sidebar { border-right: 0; border-bottom: 1px solid rgba(80,64,48,0.14); }
+      .images, .info-grid { grid-template-columns: 1fr; }
+      .statbar { justify-content: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="panel">
+        <div class="header">
+          <h1 class="title">Guider Analysis</h1>
+          <p class="subtitle">业务机本地查看导星批次分析，不再手工拉回。</p>
+        </div>
+        <div class="section">
+          <label for="batchSelect">Batch</label>
+          <select id="batchSelect"></select>
+        </div>
+        <div class="section">
+          <div class="section-title">Frames</div>
+          <div id="frameList" class="frame-list"></div>
+        </div>
+      </div>
+    </aside>
+    <main class="main">
+      <section class="hero">
+        <div>
+          <h2 id="frameTitle">未选择帧</h2>
+          <p id="batchMeta">等待加载批次...</p>
+        </div>
+        <div class="statbar">
+          <div class="pill" id="pillValidated">validated -</div>
+          <div class="pill" id="pillRejected">rejected -</div>
+          <div class="pill" id="pillPrimary">primary -</div>
+          <div class="pill" id="pillSimplexy">simplexy -</div>
+        </div>
+      </section>
+      <section class="toolbar">
+        <a id="downloadFitsBtn" class="action-btn" href="#" download aria-disabled="true">下载当前 FITS</a>
+        <label for="simplexySortSelect">Simplexy Sort</label>
+        <select id="simplexySortSelect">
+          <option value="snr">sort by snr</option>
+          <option value="flux">sort by flux</option>
+        </select>
+      </section>
+      <section class="images">
+        <article class="panel image-card">
+          <h3>原始 JPG</h3>
+          <div class="image-wrap"><img id="imgRaw" alt="raw jpg" /></div>
+        </article>
+        <article class="panel image-card">
+          <h3>分析图 RAW</h3>
+          <div class="image-wrap"><img id="imgAnalysis" alt="analysis raw" /></div>
+        </article>
+        <article class="panel image-card">
+          <h3>分析图 MEDIAN x3</h3>
+          <div class="image-wrap"><img id="imgMedian" alt="analysis median" /></div>
+        </article>
+        <article class="panel image-card">
+          <h3>Simplexy</h3>
+          <div class="image-wrap"><img id="imgSimplexy" alt="simplexy analysis" /></div>
+        </article>
+      </section>
+      <section class="info-grid">
+        <article class="panel info-card">
+          <div class="section-title">Frame Info</div>
+          <div id="frameInfo" class="kv"></div>
+        </article>
+        <article class="panel info-card">
+          <div class="section-title">Analysis Table</div>
+          <div class="data-table-wrap">
+            <table class="data-table">
+              <tbody id="jsonTableBody"></tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+      <section class="panel info-card">
+        <div class="section-title">Simplexy Sources</div>
+        <div class="star-table-wrap">
+          <table class="star-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>SNR</th>
+                <th>FLUX</th>
+                <th>X</th>
+                <th>Y</th>
+              </tr>
+            </thead>
+            <tbody id="simplexySourceTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+      <div id="status" class="hint"></div>
+    </main>
+  </div>
+  <div id="lightbox" class="lightbox" aria-hidden="true">
+    <div class="lightbox-panel">
+      <div class="lightbox-head">
+        <div id="lightboxTitle" class="lightbox-title">图片预览</div>
+        <button id="lightboxClose" class="lightbox-close" type="button" aria-label="关闭">×</button>
+      </div>
+      <div id="lightboxBody" class="lightbox-body">
+        <img id="lightboxImg" alt="zoomed analysis" />
+      </div>
+      <div class="lightbox-hint">按 `Esc` 关闭。当前为 1:1 原始像素显示，可滚动查看细节。</div>
+    </div>
+  </div>
+
+  <script>
+    const indexUrl = '/img/GuiderDiagnostics/index.json';
+    let batches = [];
+    let currentSummary = null;
+    let currentBatch = null;
+    let currentSimplexySummary = null;
+    let currentFrameIndex = 0;
+    let currentSimplexySort = 'snr';
+
+    const els = {
+      batchSelect: document.getElementById('batchSelect'),
+      frameList: document.getElementById('frameList'),
+      frameTitle: document.getElementById('frameTitle'),
+      batchMeta: document.getElementById('batchMeta'),
+      pillValidated: document.getElementById('pillValidated'),
+      pillRejected: document.getElementById('pillRejected'),
+      pillPrimary: document.getElementById('pillPrimary'),
+      pillSimplexy: document.getElementById('pillSimplexy'),
+      imgRaw: document.getElementById('imgRaw'),
+      imgAnalysis: document.getElementById('imgAnalysis'),
+      imgMedian: document.getElementById('imgMedian'),
+      imgSimplexy: document.getElementById('imgSimplexy'),
+      downloadFitsBtn: document.getElementById('downloadFitsBtn'),
+      simplexySortSelect: document.getElementById('simplexySortSelect'),
+      frameInfo: document.getElementById('frameInfo'),
+      jsonTableBody: document.getElementById('jsonTableBody'),
+      simplexySourceTableBody: document.getElementById('simplexySourceTableBody'),
+      status: document.getElementById('status'),
+      lightbox: document.getElementById('lightbox'),
+      lightboxImg: document.getElementById('lightboxImg'),
+      lightboxTitle: document.getElementById('lightboxTitle'),
+      lightboxClose: document.getElementById('lightboxClose'),
+    };
+
+    function setStatus(text) {
+      els.status.textContent = text || '';
+    }
+
+    function withNoCache(url) {
+      if (!url) return '';
+      const sep = url.includes('?') ? '&' : '?';
+      return `${url}${sep}_ts=${Date.now()}`;
+    }
+
+    function normalizeAssetUrl(url) {
+      if (!url) return '';
+      return String(url)
+        .replace('/img/direct/GuiderDiagnostics/', '/img/GuiderDiagnostics/')
+        .replace('/img/direct/', '/img/');
+    }
+
+    async function fetchJson(url) {
+      const res = await fetch(withNoCache(url), { cache: 'no-store' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${url}`);
+      return res.json();
+    }
+
+    async function fetchJsonOptional(url) {
+      try {
+        return await fetchJson(url);
+      } catch (err) {
+        return null;
+      }
+    }
+
+    function deriveSimplexySummaryUrl(summaryUrl) {
+      return normalizeAssetUrl(String(summaryUrl || '').replace('/analysis/summary.json', '/simplexy_analysis/summary.json'));
+    }
+
+    function getSortedSimplexySources(frame, sortKey = currentSimplexySort) {
+      const list = [...((frame?.simplexy?.sourcesTop80) || (frame?.simplexy?.top20) || [])];
+      const key = sortKey === 'flux' ? 'flux' : 'snr';
+      list.sort((a, b) => {
+        const av = Number(a?.[key] ?? 0);
+        const bv = Number(b?.[key] ?? 0);
+        if (bv !== av) return bv - av;
+        return Number(b?.flux ?? 0) - Number(a?.flux ?? 0);
+      });
+      return list;
+    }
+
+    function setFitsDownload(url, frameName) {
+      const normalized = normalizeAssetUrl(url || '');
+      if (!normalized) {
+        els.downloadFitsBtn.setAttribute('aria-disabled', 'true');
+        els.downloadFitsBtn.href = '#';
+        els.downloadFitsBtn.removeAttribute('download');
+        return;
+      }
+      els.downloadFitsBtn.setAttribute('aria-disabled', 'false');
+      els.downloadFitsBtn.href = withNoCache(normalized);
+      els.downloadFitsBtn.download = `${frameName || 'guider-frame'}.fits`;
+    }
+
+    function openLightbox(title, url) {
+      const normalized = normalizeAssetUrl(url || '');
+      if (!normalized)
+        return;
+      els.lightboxTitle.textContent = title;
+      els.lightboxImg.src = withNoCache(normalized);
+      els.lightbox.classList.add('open');
+      els.lightbox.setAttribute('aria-hidden', 'false');
+    }
+
+    function closeLightbox() {
+      els.lightbox.classList.remove('open');
+      els.lightbox.setAttribute('aria-hidden', 'true');
+      els.lightboxImg.src = '';
+    }
+
+    function renderBatchOptions() {
+      els.batchSelect.innerHTML = '';
+      batches.forEach((batch, idx) => {
+        const opt = document.createElement('option');
+        opt.value = String(idx);
+        opt.textContent = `${batch.batchName} (${batch.frameCount} frames)`;
+        els.batchSelect.appendChild(opt);
+      });
+    }
+
+    function renderFrameList(frames) {
+      els.frameList.innerHTML = '';
+      frames.forEach((frame, idx) => {
+        const btn = document.createElement('button');
+        btn.className = 'frame-btn';
+        btn.innerHTML = `
+          <div class="frame-name">${frame.frame}</div>
+          <div class="frame-meta">validated ${frame.validatedCount} · rejected ${frame.rejectedCount} · simplexy ${frame.simplexyCount ?? '-'}</div>
+        `;
+        btn.addEventListener('click', () => selectFrame(idx));
+        btn.dataset.index = String(idx);
+        els.frameList.appendChild(btn);
+      });
+    }
+
+    function renderFrameInfo(frame) {
+      const primary = frame.primary || {};
+      const pairs = [
+        ['尺寸', `${frame.width} x ${frame.height}`],
+        ['validated', String(frame.validatedCount ?? '-')],
+        ['rejected', String(frame.rejectedCount ?? '-')],
+        ['simplexy.count', String(frame.simplexyCount ?? '-')],
+        ['primary.x', primary.x != null ? primary.x.toFixed(2) : '-'],
+        ['primary.y', primary.y != null ? primary.y.toFixed(2) : '-'],
+        ['primary.snr', primary.snr != null ? primary.snr.toFixed(2) : '-'],
+        ['primary.hfd', primary.hfd != null ? primary.hfd.toFixed(2) : '-'],
+        ['primary.peakADU', primary.peakADU != null ? String(primary.peakADU) : '-'],
+      ];
+      if (frame.simplexyTop1) {
+        pairs.push(['simplexy.top1.x', frame.simplexyTop1.x.toFixed(2)]);
+        pairs.push(['simplexy.top1.y', frame.simplexyTop1.y.toFixed(2)]);
+        pairs.push(['simplexy.top1.snr', frame.simplexyTop1.snr != null ? frame.simplexyTop1.snr.toFixed(2) : '-']);
+        pairs.push(['simplexy.top1.flux', frame.simplexyTop1.flux.toFixed(1)]);
+      }
+      els.frameInfo.innerHTML = pairs.map(([k, v]) => `<div class="k">${k}</div><div>${v}</div>`).join('');
+    }
+
+    function renderSimplexySourceTable(frame) {
+      const rows = getSortedSimplexySources(frame);
+      if (!rows.length) {
+        els.simplexySourceTableBody.innerHTML = '<tr><td colspan="5">暂无 simplexy 源列表</td></tr>';
+        return;
+      }
+      els.simplexySourceTableBody.innerHTML = rows.map((row, index) => `
+        <tr>
+          <td>${index + 1}</td>
+          <td>${row.snr != null ? Number(row.snr).toFixed(2) : '-'}</td>
+          <td>${row.flux != null ? Number(row.flux).toFixed(1) : '-'}</td>
+          <td>${row.x != null ? Number(row.x).toFixed(2) : '-'}</td>
+          <td>${row.y != null ? Number(row.y).toFixed(2) : '-'}</td>
+        </tr>
+      `).join('');
+    }
+
+    function flattenFrameData(value, prefix = '', depth = 0, rows = []) {
+      if (value == null) {
+        rows.push([prefix || 'value', '-']);
+        return rows;
+      }
+      if (Array.isArray(value)) {
+        rows.push([prefix || 'array', `Array(${value.length})`]);
+        if (depth < 1) {
+          value.slice(0, 5).forEach((item, index) => {
+            flattenFrameData(item, `${prefix}[${index}]`, depth + 1, rows);
+          });
+        }
+        return rows;
+      }
+      if (typeof value === 'object') {
+        const entries = Object.entries(value);
+        if (!entries.length) {
+          rows.push([prefix || 'object', '{}']);
+          return rows;
+        }
+        for (const [key, item] of entries) {
+          const nextKey = prefix ? `${prefix}.${key}` : key;
+          if (item != null && typeof item === 'object' && depth < 1) {
+            flattenFrameData(item, nextKey, depth + 1, rows);
+          } else if (Array.isArray(item)) {
+            flattenFrameData(item, nextKey, depth + 1, rows);
+          } else {
+            rows.push([nextKey, item == null ? '-' : String(item)]);
+          }
+        }
+        return rows;
+      }
+      rows.push([prefix || 'value', String(value)]);
+      return rows;
+    }
+
+    function renderFrameTable(frame) {
+      const rows = flattenFrameData(frame);
+      els.jsonTableBody.innerHTML = rows.map(([k, v]) => `<tr><th>${k}</th><td>${v}</td></tr>`).join('');
+    }
+
+    function mergeSimplexySummary(frames, simplexySummary) {
+      const merged = [...(frames || [])];
+      const byName = new Map((simplexySummary?.frames || []).map((frame) => [frame.frame, frame]));
+      for (const frame of merged) {
+        const sx = byName.get(frame.frame);
+        if (!sx)
+          continue;
+        frame.simplexy = sx;
+        frame.simplexyCount = sx.count;
+        frame.simplexyImageWebPath = sx.imageWebPath;
+        const sorted = getSortedSimplexySources({ simplexy: sx }, currentSimplexySort);
+        frame.simplexyTop1 = sorted.length ? sorted[0] : null;
+      }
+      return merged;
+    }
+
+    function setActiveFrameButton(index) {
+      [...els.frameList.querySelectorAll('.frame-btn')].forEach((btn) => {
+        btn.classList.toggle('active', Number(btn.dataset.index) === index);
+      });
+    }
+
+    function selectFrame(index) {
+      const frame = currentSummary.frames[index];
+      if (!frame) return;
+      currentFrameIndex = index;
+      setActiveFrameButton(index);
+      els.frameTitle.textContent = frame.frame;
+      els.batchMeta.textContent = `${currentBatch.batchName} · ${currentBatch.lastModified || ''}`;
+      els.pillValidated.textContent = `validated ${frame.validatedCount}`;
+      els.pillRejected.textContent = `rejected ${frame.rejectedCount}`;
+      els.pillPrimary.textContent = frame.primary ? `primary SNR ${frame.primary.snr.toFixed(1)}` : 'primary none';
+      els.pillSimplexy.textContent = frame.simplexyCount != null ? `simplexy ${frame.simplexyCount}` : 'simplexy none';
+      const rawUrl = normalizeAssetUrl(frame.rawJpgWebPath || '');
+      const analysisUrl = normalizeAssetUrl(frame.analysisImageWebPath || '');
+      const medianUrl = normalizeAssetUrl(frame.analysisMedianImageWebPath || '');
+      const simplexyUrl = normalizeAssetUrl(frame.simplexyImageWebPath || '');
+      els.imgRaw.src = withNoCache(rawUrl);
+      els.imgAnalysis.src = withNoCache(analysisUrl);
+      els.imgMedian.src = withNoCache(medianUrl);
+      els.imgSimplexy.src = simplexyUrl ? withNoCache(simplexyUrl) : '';
+      els.imgRaw.onclick = () => openLightbox(`${frame.frame} · 原始 JPG`, rawUrl);
+      els.imgAnalysis.onclick = () => openLightbox(`${frame.frame} · 分析图 RAW`, analysisUrl);
+      els.imgMedian.onclick = () => openLightbox(`${frame.frame} · 分析图 MEDIAN x3`, medianUrl);
+      els.imgSimplexy.onclick = () => openLightbox(`${frame.frame} · Simplexy`, simplexyUrl);
+      setFitsDownload(frame.fitsWebPath, frame.frame);
+      const sortedSources = getSortedSimplexySources(frame);
+      frame.simplexyTop1 = sortedSources.length ? sortedSources[0] : null;
+      renderFrameInfo(frame);
+      renderSimplexySourceTable(frame);
+      renderFrameTable(frame);
+    }
+
+    async function loadBatch(batchIndex) {
+      currentBatch = batches[batchIndex];
+      if (!currentBatch) return;
+      setStatus(`正在加载 ${currentBatch.batchName} ...`);
+      currentSummary = await fetchJson(normalizeAssetUrl(currentBatch.summaryWebPath));
+      currentSimplexySummary = await fetchJsonOptional(deriveSimplexySummaryUrl(currentBatch.summaryWebPath));
+      currentSummary.frames = mergeSimplexySummary(currentSummary.frames || [], currentSimplexySummary);
+      renderFrameList(currentSummary.frames || []);
+      if (currentSummary.frames && currentSummary.frames.length) {
+        selectFrame(0);
+      } else {
+        els.frameTitle.textContent = '该批次没有帧';
+        els.frameList.innerHTML = '<div class="empty">没有可显示的分析帧。</div>';
+      }
+      setStatus(`已加载 ${currentBatch.batchName}`);
+    }
+
+    async function boot() {
+      try {
+        setStatus('正在加载批次索引...');
+        const index = await fetchJson(indexUrl);
+        batches = index.batches || [];
+        if (!batches.length) {
+          els.frameList.innerHTML = '<div class="empty">还没有可用的分析批次。先在业务机上运行 guiding_batch_analyzer。</div>';
+          setStatus('未找到分析批次');
+          return;
+        }
+        renderBatchOptions();
+        els.batchSelect.addEventListener('change', (e) => loadBatch(Number(e.target.value)));
+        await loadBatch(0);
+      } catch (err) {
+        console.error(err);
+        els.frameList.innerHTML = `<div class="empty">加载失败：${err.message}</div>`;
+        setStatus('加载失败');
+      }
+    }
+
+    els.lightbox.addEventListener('click', (e) => {
+      if (e.target === els.lightbox) {
+        closeLightbox();
+      }
+    });
+    els.lightboxClose.addEventListener('click', closeLightbox);
+    els.simplexySortSelect.addEventListener('change', (e) => {
+      currentSimplexySort = e.target.value || 'snr';
+      if (currentSummary?.frames?.length) {
+        currentSummary.frames = mergeSimplexySummary(currentSummary.frames, currentSimplexySummary);
+        renderFrameList(currentSummary.frames || []);
+        selectFrame(currentFrameIndex);
+      }
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && els.lightbox.classList.contains('open')) {
+        closeLightbox();
+      }
+    });
+
+    boot();
+  </script>
+</body>
+</html>

@@ -30,7 +30,7 @@
       :style="{ top: PHD2Cross_Y + 'px', left: 0 + 'px', width: PHD2Cross_Width + 'px', height: 1 + 'px' }"></div>
 
     <div v-show="showPHD2BoxAndCross && PHD2CrossView" class="PHD2CircleClass" v-for="(Star, index) in PHD2MultiStars"
-      :key="index" :style="{ top: Star.Y + 'px', left: Star.X + 'px' }"></div>
+      :key="index" :style="{ top: Star.Y + 'px', left: Star.X + 'px', width: Star.Width + 'px', height: Star.Height + 'px', borderRadius: (Math.min(Star.Width, Star.Height) / 2) + 'px' }"></div>
 
     <message-box v-for="(msg, index) in messageList" :key="msg.id" :message="msg.message" :type="msg.type"
       :Pos="msg.Pos" @close="removeMessage(index)"></message-box>
@@ -1092,8 +1092,8 @@ export default {
       this.PHD2Cross_Height = window.innerHeight;
     },
 
-    PHD2MultiStarsPosition(StarStartX, StarStartY) {
-      this.PHD2MultiStars.push({ X: StarStartX, Y: StarStartY });
+    PHD2MultiStarsPosition(StarStartX, StarStartY, StarWidth = 12, StarHeight = 12) {
+      this.PHD2MultiStars.push({ X: StarStartX, Y: StarStartY, Width: StarWidth, Height: StarHeight });
     },
 
     ClearPHD2MultiStars() {

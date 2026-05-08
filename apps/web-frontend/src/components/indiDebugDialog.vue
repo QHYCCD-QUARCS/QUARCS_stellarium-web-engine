@@ -2,7 +2,7 @@
   <transition name="dialog">
     <div
       class="indiDebugDialog"
-      :style="{ bottom: bottom + 'px', top: top + 'px'}"
+      :style="{ bottom, top }"
       data-testid="ui-indi-debug-dialog-root"
       :data-state="isOpen ? 'open' : 'closed'"
     >
@@ -121,8 +121,9 @@ export default {
   },
   data() {
     return {
-      bottom: 50,
-      top: 50,
+      // 原高度为 calc(100vh - 100px)，这里将其收缩到 80%，并保持近似居中
+      top: 'calc(10vh + 40px)',
+      bottom: 'calc(10vh + 40px)',
       AllMessages: [],  // 保存消息的数组
       maxMessages: 500,  // 限制保存的消息数量
       isClientDebugActive: true,  // 前端按钮激活状态

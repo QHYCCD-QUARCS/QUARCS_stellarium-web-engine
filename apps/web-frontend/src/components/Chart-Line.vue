@@ -19,6 +19,8 @@ export default {
       pulseDataRa: [], // [x, signedPulseMs]
       pulseDataDec: [], // [x, signedPulseMs]
       lastX: null,
+      pulseXOffsetRa: -0.18,
+      pulseXOffsetDec: 0.18,
       // 脉冲柱状条 y 轴范围（ms）
       // 之前设为 800ms 会导致常见 20~80ms 的导星脉冲几乎不可见，看起来像“高度条没显示”。
       // 这里用更贴近实际的默认值，并在 onGuiderPulse 中做自适应伸缩。
@@ -28,11 +30,15 @@ export default {
       xWindowSize: 50,
       chartHistoryPadding: 10,
       yAxis_min: -4,
-      yAxis_max: 4,  
-      range: 4,
+      yAxis_max: 4,
+      rangeMode: 'auto',
+      rangeModes: ['auto', 4, 2, 1],
+      yAxisMarginRatio: 0.15,
+      yAxisShrinkFactor: 0.92,
       
       // 新增数据
       resolution: '1920x1080',  // 分辨率
+      errorUnit: 'px',
       // PHD2 风格 Rolling RMS（默认窗口 60）
       rmsWindow: 60,
       rmsRa: '0.000',
@@ -62,17 +68,24 @@ export default {
     this.$bus.$on('GuideSize', this.updateResolution);
     this.$bus.$on('GuiderPulse', this.onGuiderPulse);
     this.$bus.$on('AddRMSErrorData', this.onBackendRms);
+    this.$bus.$on('GuiderErrorUnitChanged', this.onGuiderErrorUnitChanged);
   },
   methods: {
     isCompactLegend() {
       return window.innerWidth <= 768;
     },
+    getErrorUnitLabel() {
+      return this.errorUnit === 'arcsec' ? 'arcsec' : 'px';
+    },
+    getErrorUnitSuffix() {
+      return this.errorUnit === 'arcsec' ? '"' : 'px';
+    },
     formatLegendLabel(name) {
       const compact = this.isCompactLegend();
       if (name === 'RES') return compact ? `RES:${this.resolution}` : `分辨率: ${this.resolution}`;
-      if (name === 'RA') return compact ? `RA:${this.rmsRa}` : `RA RMS: ${this.rmsRa}`;
-      if (name === 'DEC') return compact ? `DEC:${this.rmsDec}` : `DEC RMS: ${this.rmsDec}`;
-      if (name === 'TOTAL') return compact ? `TOT:${this.rmsTotal}` : `Total RMS: ${this.rmsTotal}`;
+      if (name === 'RA') return compact ? `RA:${this.rmsRa}${this.getErrorUnitSuffix()}` : `RA RMS (${this.getErrorUnitLabel()}): ${this.rmsRa}`;
+      if (name === 'DEC') return compact ? `DEC:${this.rmsDec}${this.getErrorUnitSuffix()}` : `DEC RMS (${this.getErrorUnitLabel()}): ${this.rmsDec}`;
+      if (name === 'TOTAL') return compact ? `TOT:${this.rmsTotal}${this.getErrorUnitSuffix()}` : `Total RMS (${this.getErrorUnitLabel()}): ${this.rmsTotal}`;
       return name;
     },
     // PHD2：RA RMS = sqrt(mean(ra^2)), DEC RMS = sqrt(mean(dec^2)),
@@ -120,6 +133,7 @@ export default {
       this.renderChart(this.xAxis_min, this.xAxis_max, this.yAxis_min, this.yAxis_max);
     },
     renderChart(x_min,x_max,y_min,y_max) {
+      if (!this.myChart) return;
       const compactLegend = this.isCompactLegend();
       const option = {
         grid: {  
@@ -280,12 +294,70 @@ export default {
       };
       this.myChart.setOption(option);
     },
+    onGuiderErrorUnitChanged(unit) {
+      const nextUnit = unit === 'arcsec' ? 'arcsec' : 'px';
+      if (this.errorUnit === nextUnit) {
+        this.renderChart(this.xAxis_min, this.xAxis_max, this.yAxis_min, this.yAxis_max);
+        return;
+      }
+      this.errorUnit = nextUnit;
+      this.clearChartData();
+    },
     updateAutoScrollWindow(latestX) {
       if (!Number.isFinite(latestX)) return;
       const windowSize = Math.max(1, this.xWindowSize);
       const nextMax = Math.max(windowSize, latestX);
       this.xAxis_max = nextMax;
       this.xAxis_min = Math.max(0, nextMax - windowSize);
+    },
+    getBaseRange() {
+      const fixedRange = this.getFixedRange();
+      return Number.isFinite(fixedRange) && fixedRange > 0 ? fixedRange : 4;
+    },
+    getFixedRange() {
+      return Number.isFinite(this.rangeMode) && this.rangeMode > 0 ? this.rangeMode : null;
+    },
+    getCurrentGuideErrorMaxAbs() {
+      let maxAbs = 0;
+      const updateMaxAbs = (point) => {
+        if (!Array.isArray(point) || point.length < 2) return;
+        const y = Number(point[1]);
+        if (Number.isFinite(y)) {
+          maxAbs = Math.max(maxAbs, Math.abs(y));
+        }
+      };
+      this.chartData1.forEach(updateMaxAbs);
+      this.chartData2.forEach(updateMaxAbs);
+      return maxAbs;
+    },
+    updateYAxisRange() {
+      const fixedRange = this.getFixedRange();
+      if (Number.isFinite(fixedRange) && fixedRange > 0) {
+        this.yAxis_min = -fixedRange;
+        this.yAxis_max = fixedRange;
+        return;
+      }
+
+      const baseRange = this.getBaseRange();
+      const dataMaxAbs = this.getCurrentGuideErrorMaxAbs();
+      const paddedDataRange = dataMaxAbs > 0
+        ? Math.max(baseRange, Number((dataMaxAbs * (1 + this.yAxisMarginRatio)).toFixed(3)))
+        : baseRange;
+      const currentRange = Math.max(
+        baseRange,
+        Math.abs(Number(this.yAxis_min) || 0),
+        Math.abs(Number(this.yAxis_max) || 0)
+      );
+      const nextRange = dataMaxAbs > currentRange
+        ? paddedDataRange
+        : Math.max(baseRange, Number((Math.max(paddedDataRange, currentRange * this.yAxisShrinkFactor)).toFixed(3)));
+
+      this.yAxis_min = -nextRange;
+      this.yAxis_max = nextRange;
+    },
+    getPulseX(baseX, isRa) {
+      if (!Number.isFinite(baseX)) return baseX;
+      return baseX + (isRa ? this.pulseXOffsetRa : this.pulseXOffsetDec);
     },
     pruneOldChartData() {
       const keepAfterX = this.xAxis_min - this.chartHistoryPadding;
@@ -303,8 +375,8 @@ export default {
       if (newDataPoint1 && newDataPoint1.length > 1) {
         this.lastX = newDataPoint1[0];
         // 默认补 0（没有脉冲时）
-        this.pulseDataRa.push([this.lastX, 0]);
-        this.pulseDataDec.push([this.lastX, 0]);
+        this.pulseDataRa.push([this.getPulseX(this.lastX, true), 0]);
+        this.pulseDataDec.push([this.getPulseX(this.lastX, false), 0]);
         this.updateAutoScrollWindow(this.lastX);
         this.pruneOldChartData();
       }
@@ -327,7 +399,8 @@ export default {
           }
         }
       }
-      
+
+      this.updateYAxisRange();
       this.renderChart(this.xAxis_min, this.xAxis_max, this.yAxis_min, this.yAxis_max);
     },
     onGuiderPulse(message) {
@@ -373,8 +446,8 @@ export default {
       // 写入最后一个点的柱高（与最新误差点对齐）
       const idx = this.pulseDataRa.length - 1;
       if (idx < 0) return;
-      if (isRa) this.pulseDataRa[idx] = [this.lastX, signedMs];
-      if (isDec) this.pulseDataDec[idx] = [this.lastX, signedMs];
+      if (isRa) this.pulseDataRa[idx] = [this.getPulseX(this.lastX, true), signedMs];
+      if (isDec) this.pulseDataDec[idx] = [this.getPulseX(this.lastX, false), signedMs];
 
       // 动态调整脉冲 y 轴范围，避免柱状条被截断（但保持相对稳定）
       const absMs = Math.abs(signedMs);
@@ -407,24 +480,16 @@ export default {
       this.rmsTotal = '0.000';
       this.rmsBufRa = [];
       this.rmsBufDec = [];
+      this.updateYAxisRange();
       this.changeRange(0, 50);
       this.renderChart(0, 50, this.yAxis_min, this.yAxis_max);
     },
     RangeSwitch() {
-      if(this.range === 4) {
-        this.range = 2;
-        this.yAxis_min = -2;
-        this.yAxis_max = 2;
-      }else if(this.range === 2) {
-        this.range = 1;
-        this.yAxis_min = -1;
-        this.yAxis_max = 1;
-      }else if(this.range === 1) {
-        this.range = 4;
-        this.yAxis_min = -4;
-        this.yAxis_max = 4;
-      }
+      const currentIndex = this.rangeModes.indexOf(this.rangeMode);
+      const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % this.rangeModes.length : 0;
+      this.rangeMode = this.rangeModes[nextIndex];
 
+      this.updateYAxisRange();
       this.renderChart(this.xAxis_min, this.xAxis_max, this.yAxis_min, this.yAxis_max);
     },
     
@@ -445,4 +510,3 @@ export default {
   box-sizing: border-box;
 }
 </style>
-
