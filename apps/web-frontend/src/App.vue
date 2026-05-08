@@ -3274,7 +3274,9 @@ export default {
               case 'SaveGuiderImageSuccess':
                 if (parts.length === 2) {
                   const fileName = parts[1];
-                  this.loadAndDisplayImage('img/' + fileName);
+                  if (this.currentcanvas === 'GuiderCamera') {
+                    this.loadAndDisplayImage('img/' + fileName);
+                  }
                 }
                 break;
               case 'GuideSize':
