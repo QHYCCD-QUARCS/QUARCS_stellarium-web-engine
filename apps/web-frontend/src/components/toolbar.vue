@@ -375,10 +375,6 @@ export default {
   // },
   methods: {
     toggleNavigationDrawer: function (event) {
-      const ts = Math.round((typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now())
-      const x = event && Number.isFinite(event.clientX) ? Math.round(event.clientX) : -1
-      const y = event && Number.isFinite(event.clientY) ? Math.round(event.clientY) : -1
-      this.$bus.$emit('SendConsoleLogMsg', `[DIAG][MENU_BTN_CLICK] t=${ts} x=${x} y=${y}`, 'warning')
       this.$store.commit('toggleBool', 'showNavigationDrawer')
       // this.$bus.$emit('AppSendMessage', 'Vue_Command', 'localMessage');
     },

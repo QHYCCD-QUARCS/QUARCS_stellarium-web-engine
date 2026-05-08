@@ -27,14 +27,6 @@
         <div class="minimized-controls" data-testid="pa-minimized-controls">
           <button
             class="minimized-btn"
-            @click="closeInterface"
-            :title="$t('Close')"
-            data-testid="pa-btn-close-minimized"
-          >
-            <v-icon data-testid="pa-icon-close-minimized">mdi-close</v-icon>
-          </button>
-          <button
-            class="minimized-btn"
             @click="toggleMinimize"
             :title="$t('Expand')"
             data-testid="pa-btn-expand-from-minimized"
@@ -65,6 +57,9 @@
       :style="{
         left: position.x + 'px',
         top: position.y + 'px',
+        '--pa-ui-scale': uiScale,
+        '--pa-x-scale': widthScale,
+        '--pa-y-scale': heightScale,
         pointerEvents: (showTrajectoryOverlay && overlayMode === 'fullscreen' ? 'none' : 'auto')
       }"
       data-testid="pa-widget"
@@ -93,14 +88,6 @@
         </div>
 
         <div class="header-controls" data-testid="pa-header-controls">
-          <button
-            class="header-btn"
-            @click="closeInterface"
-            :title="$t('Close')"
-            data-testid="pa-btn-close"
-          >
-            <v-icon data-testid="pa-icon-close">mdi-close</v-icon>
-          </button>
           <button
             class="header-btn"
             @click="toggleCollapse"
@@ -646,7 +633,7 @@ const PROGRESS_THRESHOLDS = {
 const DIMENSIONS = {
   MINIMIZED: { width: 250, height: 80 },
   COLLAPSED: { width: 300, height: 120 },
-  EXPANDED: { width: 350, height: 400 }
+  EXPANDED: { width: 960, height: 430 }
 }
 
 const LOG_LIMIT = 100
@@ -728,6 +715,9 @@ export default {
       // 界面状态
       isMinimized: false,
       isCollapsed: false,
+      uiScale: 1,
+      widthScale: 1,
+      heightScale: 1,
 
       // === 新增：性能优化 ===
       // 缓存尺寸计算结果
@@ -893,7 +883,11 @@ export default {
   },
 
   watch: {
-    visible(newVal) {
+  visible(newVal) {
+      if (newVal) {
+        this.updateUiScale()
+        this.$nextTick(this.constrainPanelToViewport)
+      }
       if (newVal && this.autoStart) {
         this.startAutoCalibration()
       }
@@ -957,6 +951,7 @@ export default {
 
       // 初始化缓存的尺寸信息
       this.updateCachedDimensions()
+      this.updateUiScale()
 
       // 监听信号总线事件
       this.$bus.$on('showPolarAlignment', this.showInterface)
@@ -992,6 +987,9 @@ export default {
 
       // 启动定期内存清理（每5分钟清理一次）
       this.startMemoryCleanup()
+
+      window.addEventListener('resize', this.handleViewportResize)
+      window.visualViewport?.addEventListener?.('resize', this.handleViewportResize)
     },
 
     beforeDestroy() {
@@ -1011,6 +1009,8 @@ export default {
 
       // 清理拖动事件监听
       this.cleanupDragListeners()
+      window.removeEventListener('resize', this.handleViewportResize)
+      window.visualViewport?.removeEventListener?.('resize', this.handleViewportResize)
 
       // 清理缓存数据
       this.clearCachedData()
@@ -1346,6 +1346,10 @@ export default {
       // 拖动控制方法
       // ========================================
       startDrag(event) {
+        if (!this.isMinimized && !this.isCollapsed) {
+          return
+        }
+
         if (event.target.closest('.header-controls, .minimized-controls, .header-btn, .minimized-btn')) {
           return
         }
@@ -1420,6 +1424,17 @@ export default {
 
       // 新增：更新缓存的尺寸信息
       updateCachedDimensions() {
+        const widgetEl = this.$el?.querySelector?.(
+          this.isMinimized ? '.polar-alignment-minimized' : '.polar-alignment-widget'
+        )
+        if (widgetEl) {
+          const rect = widgetEl.getBoundingClientRect()
+          if (rect.width > 0 && rect.height > 0) {
+            this.cachedDimensions = { width: rect.width, height: rect.height }
+            return
+          }
+        }
+
         if (this.isMinimized) {
           this.cachedDimensions = { ...DIMENSIONS.MINIMIZED }
         } else if (this.isCollapsed) {
@@ -1428,6 +1443,45 @@ export default {
           // 展开状态，使用基础尺寸
           this.cachedDimensions = { ...DIMENSIONS.EXPANDED }
         }
+      },
+
+      updateUiScale() {
+        if (this.isCollapsed || this.isMinimized) {
+          this.uiScale = 1
+          this.widthScale = 1
+          this.heightScale = 1
+          return
+        }
+
+        const viewport = window.visualViewport || window
+        const width = Number(viewport.width || window.innerWidth)
+        const height = Number(viewport.height || window.innerHeight)
+        const contentWidth = Math.max(1, width)
+        const xScale = Math.max(0.52, Math.min(1, contentWidth / 760))
+        const yScale = Math.max(0.52, Math.min(1, height / 600))
+
+        this.widthScale = Number(xScale.toFixed(3))
+        this.heightScale = Number(yScale.toFixed(3))
+        this.uiScale = this.heightScale
+      },
+
+      handleViewportResize() {
+        this.updateUiScale()
+        this.constrainPanelToViewport()
+      },
+
+      constrainPanelToViewport() {
+        this.$nextTick(() => {
+          this.updateUiScale()
+          this.updateCachedDimensions()
+          const margin = window.innerHeight <= 340 ? 6 : 0
+          const maxX = Math.max(margin, window.innerWidth - this.cachedDimensions.width - margin)
+          const maxY = Math.max(margin, window.innerHeight - this.cachedDimensions.height - margin)
+          this.position = {
+            x: Math.max(margin, Math.min(this.position.x, maxX)),
+            y: Math.max(margin, Math.min(this.position.y, maxY))
+          }
+        })
       },
 
       // 获取组件高度（优化版本）
@@ -1457,19 +1511,15 @@ export default {
       toggleMinimize() {
         this.isMinimized = !this.isMinimized
         this.isCollapsed = false
+        this.updateUiScale()
         // 更新缓存的尺寸信息
         this.updateCachedDimensions()
         this.addLog(this.isMinimized ? this.$t('Interface Minimized') : this.$t('Interface Expanded'), 'info')
       },
 
-      closeInterface() {
-        this.showTrajectoryOverlay = false
-        this.disableOverlayEventCapture()
-        this.hideInterface()
-      },
-
       toggleCollapse() {
         this.isCollapsed = !this.isCollapsed
+        this.updateUiScale()
         // 更新缓存的尺寸信息
         this.updateCachedDimensions()
         this.addLog(this.isCollapsed ? this.$t('Interface Collapsed') : this.$t('Interface Expanded'), 'info')
@@ -4153,8 +4203,8 @@ export default {
 /* === 完整控件样式 === */
 .polar-alignment-widget {
   position: fixed;
-  width: 350px;
-  max-width: 90vw;
+  width: clamp(350px, 88vw, 980px);
+  max-width: calc(100vw - 24px);
   /* 让头部 + 内容以列布局撑开，并允许内容区在低高度下内部滚动 */
   display: flex;
   flex-direction: column;
@@ -4198,6 +4248,22 @@ export default {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
 }
 
+.polar-alignment-widget:not(.collapsed) {
+  left: 0 !important;
+  top: 0 !important;
+  width: 100vw;
+  height: 100vh;
+  max-width: 100vw;
+  max-height: 100vh;
+  border-radius: 0;
+  box-sizing: border-box;
+  cursor: default;
+}
+
+.polar-alignment-widget:not(.collapsed) .header-drag-area {
+  cursor: default;
+}
+
 .polar-alignment-widget.collapsed {
   width: 300px;
   max-width: 85vw;
@@ -4208,7 +4274,7 @@ export default {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
+  padding: clamp(calc(6px * var(--pa-y-scale, 1)), calc(20px * var(--pa-y-scale, 1)), 20px) clamp(calc(10px * var(--pa-x-scale, 1)), calc(28px * var(--pa-x-scale, 1)), 28px);
   background: rgba(60, 60, 70, 0.9);
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
@@ -4238,19 +4304,23 @@ export default {
 .header-left {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: clamp(calc(6px * var(--pa-x-scale, 1)), calc(14px * var(--pa-x-scale, 1)), 14px);
   flex: 1;
+  min-width: 0;
 }
 
 .header-icon {
   color: #64b5f6;
-  font-size: 18px;
+  font-size: clamp(calc(16px * var(--pa-y-scale, 1)), calc(26px * var(--pa-y-scale, 1)), 26px);
 }
 
 .header-title {
-  font-size: 14px;
+  font-size: clamp(calc(13px * var(--pa-y-scale, 1)), calc(22px * var(--pa-y-scale, 1)), 22px);
   font-weight: 600;
   color: #ffffff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .connection-indicator {
@@ -4259,8 +4329,8 @@ export default {
 }
 
 .status-dot {
-  width: 8px;
-  height: 8px;
+  width: clamp(calc(8px * var(--pa-y-scale, 1)), calc(14px * var(--pa-y-scale, 1)), 14px);
+  height: clamp(calc(8px * var(--pa-y-scale, 1)), calc(14px * var(--pa-y-scale, 1)), 14px);
   border-radius: 50%;
   background: #f44336;
   transition: all 0.3s ease;
@@ -4273,7 +4343,7 @@ export default {
 
 .header-controls {
   display: flex;
-  gap: 4px;
+  gap: clamp(calc(6px * var(--pa-x-scale, 1)), calc(14px * var(--pa-x-scale, 1)), 14px);
   /* 确保控制区域可以接收事件 */
   position: relative;
   z-index: 20;
@@ -4281,8 +4351,8 @@ export default {
 }
 
 .header-btn {
-  width: 28px;
-  height: 28px;
+  width: clamp(calc(24px * var(--pa-x-scale, 1)), calc(44px * var(--pa-x-scale, 1)), 44px);
+  height: clamp(calc(24px * var(--pa-y-scale, 1)), calc(44px * var(--pa-y-scale, 1)), 44px);
   border: none;
   background: rgba(255, 255, 255, 0.1);
   border-radius: 4px;
@@ -4311,10 +4381,6 @@ export default {
   transform: scale(0.95);
 }
 
-.header-btn.close-btn:hover {
-  background: #f44336;
-}
-
 /* === 控件内容样式 === */
 .widget-content {
   transition: all 0.3s ease;
@@ -4336,18 +4402,17 @@ export default {
 }
 
 .widget-content.expanded {
-  padding: 16px;
-  /* 在控件列布局中占据剩余空间，并在空间不足时内部滚动 */
+  --pa-content-padding-y: clamp(calc(8px * var(--pa-y-scale, 1)), calc(24px * var(--pa-y-scale, 1)), 24px);
+  --pa-content-padding-x: clamp(calc(8px * var(--pa-x-scale, 1)), calc(24px * var(--pa-x-scale, 1)), 24px);
+  --pa-bottom-safe-space: clamp(10px, 3.5vh, 24px);
+  padding: var(--pa-content-padding-y) var(--pa-content-padding-x) calc(var(--pa-content-padding-y) + var(--pa-bottom-safe-space) + env(safe-area-inset-bottom, 0px));
   flex: 1 1 auto;
   min-height: 0;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
+  overflow: hidden;
   touch-action: pan-y;
-  /* 优化内容布局，充分利用空间 */
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: clamp(calc(8px * var(--pa-y-scale, 1)), calc(20px * var(--pa-y-scale, 1)), 20px);
 }
 
 /* === 收缩状态样式 === */
@@ -4420,17 +4485,28 @@ export default {
 
 /* === 展开状态样式 === */
 .content-sections {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(calc(220px * var(--pa-x-scale, 1)), 0.92fr);
+  grid-template-areas:
+    "progress log"
+    "position adjustment"
+    "control control";
+  row-gap: clamp(calc(8px * var(--pa-y-scale, 1)), calc(20px * var(--pa-y-scale, 1)), 20px);
+  column-gap: clamp(calc(8px * var(--pa-x-scale, 1)), calc(20px * var(--pa-x-scale, 1)), 20px);
   /* 优化布局，充分利用可用空间 */
   width: 100%;
   min-height: 0;
+  align-items: stretch;
 }
 
 /* === 校准步骤进度条样式 === */
 .calibration-progress {
-  margin-bottom: 16px;
+  grid-area: progress;
+  margin-bottom: 0;
+  padding: clamp(calc(8px * var(--pa-y-scale, 1)), calc(20px * var(--pa-y-scale, 1)), 20px) clamp(calc(10px * var(--pa-x-scale, 1)), calc(24px * var(--pa-x-scale, 1)), 24px) clamp(calc(18px * var(--pa-y-scale, 1)), calc(34px * var(--pa-y-scale, 1)), 34px);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
 }
 
 .progress-header {
@@ -4441,13 +4517,13 @@ export default {
 }
 
 .progress-title {
-  font-size: 12px;
+  font-size: clamp(calc(10px * var(--pa-y-scale, 1)), calc(16px * var(--pa-y-scale, 1)), 16px);
   font-weight: 600;
   color: #ffffff;
 }
 
 .calibration-loop-info {
-  font-size: 10px;
+  font-size: clamp(calc(8px * var(--pa-y-scale, 1)), calc(10px * var(--pa-y-scale, 1)), 10px);
   color: #ff9800;
   font-weight: 500;
   padding: 2px 6px;
@@ -4471,7 +4547,7 @@ export default {
 .progress-bar {
   position: relative;
   width: 100%;
-  height: 8px;
+  height: clamp(calc(5px * var(--pa-y-scale, 1)), calc(12px * var(--pa-y-scale, 1)), 12px);
   background: rgba(255, 255, 255, 0.1);
   border-radius: 4px;
   overflow: visible;
@@ -4503,15 +4579,15 @@ export default {
 }
 
 .node-circle {
-  width: 20px;
-  height: 20px;
+  width: clamp(calc(15px * var(--pa-y-scale, 1)), calc(36px * var(--pa-y-scale, 1)), 36px);
+  height: clamp(calc(15px * var(--pa-y-scale, 1)), calc(36px * var(--pa-y-scale, 1)), 36px);
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.2);
   border: 2px solid rgba(255, 255, 255, 0.3);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 10px;
+  font-size: clamp(calc(8px * var(--pa-y-scale, 1)), calc(16px * var(--pa-y-scale, 1)), 16px);
   font-weight: bold;
   color: #ffffff;
   transition: all 0.3s ease;
@@ -4602,10 +4678,10 @@ export default {
   top: 100%;
   left: 50%;
   transform: translateX(-50%);
-  font-size: 9px;
+  font-size: clamp(calc(7px * var(--pa-y-scale, 1)), calc(14px * var(--pa-y-scale, 1)), 14px);
   color: rgba(255, 255, 255, 0.7);
   font-weight: 500;
-  margin-top: 4px;
+  margin-top: clamp(calc(1px * var(--pa-y-scale, 1)), calc(8px * var(--pa-y-scale, 1)), 8px);
   white-space: nowrap;
   text-align: center;
 }
@@ -4616,29 +4692,33 @@ export default {
 
 /* === 位置信息样式 === */
 .position-section {
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  grid-area: position;
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
 }
 
 .position-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   grid-template-rows: 1fr 1fr;
-  gap: 8px;
+  row-gap: clamp(calc(6px * var(--pa-y-scale, 1)), calc(12px * var(--pa-y-scale, 1)), 12px);
+  column-gap: clamp(calc(6px * var(--pa-x-scale, 1)), calc(12px * var(--pa-x-scale, 1)), 12px);
   background: rgba(255, 255, 255, 0.05);
   border-radius: 6px;
-  padding: 12px;
+  padding: clamp(calc(8px * var(--pa-y-scale, 1)), calc(18px * var(--pa-y-scale, 1)), 18px) clamp(calc(8px * var(--pa-x-scale, 1)), calc(18px * var(--pa-x-scale, 1)), 18px);
+  height: 100%;
 }
 
 .position-cell {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  padding: 8px;
+  gap: clamp(calc(2px * var(--pa-y-scale, 1)), calc(8px * var(--pa-y-scale, 1)), 8px);
+  padding: clamp(calc(6px * var(--pa-y-scale, 1)), calc(18px * var(--pa-y-scale, 1)), 18px) clamp(calc(6px * var(--pa-x-scale, 1)), calc(18px * var(--pa-x-scale, 1)), 18px);
   border-radius: 4px;
   transition: all 0.3s ease;
+  min-width: 0;
 }
 
 .position-cell.current {
@@ -4652,42 +4732,54 @@ export default {
 }
 
 .cell-label {
-  font-size: 10px;
+  font-size: clamp(calc(9px * var(--pa-y-scale, 1)), calc(14px * var(--pa-y-scale, 1)), 14px);
   color: rgba(255, 255, 255, 0.7);
   font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .cell-value {
-  font-size: 11px;
+  font-size: clamp(calc(13px * var(--pa-y-scale, 1)), calc(22px * var(--pa-y-scale, 1)), 22px);
   color: #ffffff;
   font-family: monospace;
   font-weight: 600;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* === 调整指导样式 === */
 .adjustment-section {
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  grid-area: adjustment;
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
 }
 
 .adjustment-instructions {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: clamp(calc(6px * var(--pa-y-scale, 1)), calc(16px * var(--pa-y-scale, 1)), 16px);
+  height: 100%;
 }
 
 .adjustment-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px;
+  gap: clamp(calc(8px * var(--pa-x-scale, 1)), calc(12px * var(--pa-x-scale, 1)), 12px);
+  padding: clamp(calc(7px * var(--pa-y-scale, 1)), calc(18px * var(--pa-y-scale, 1)), 18px) clamp(calc(9px * var(--pa-x-scale, 1)), calc(18px * var(--pa-x-scale, 1)), 18px);
   background: rgba(255, 255, 255, 0.05);
   border-radius: 6px;
   transition: all 0.3s ease;
   border: 1px solid transparent;
+  min-height: clamp(calc(52px * var(--pa-y-scale, 1)), calc(96px * var(--pa-y-scale, 1)), 96px);
+  flex: 1;
 }
 
 .adjustment-item.active {
@@ -4696,14 +4788,14 @@ export default {
 }
 
 .adjustment-icon {
-  width: 28px;
-  height: 28px;
+  width: clamp(calc(28px * var(--pa-y-scale, 1)), calc(54px * var(--pa-y-scale, 1)), 54px);
+  height: clamp(calc(28px * var(--pa-y-scale, 1)), calc(54px * var(--pa-y-scale, 1)), 54px);
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.1);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: clamp(calc(15px * var(--pa-y-scale, 1)), calc(24px * var(--pa-y-scale, 1)), 24px);
   color: #ffffff;
   flex-shrink: 0;
 }
@@ -4717,6 +4809,7 @@ export default {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
 }
 
 .adjustment-header {
@@ -4726,24 +4819,27 @@ export default {
 }
 
 .adjustment-type {
-  font-size: 12px;
+  font-size: clamp(calc(12px * var(--pa-y-scale, 1)), calc(20px * var(--pa-y-scale, 1)), 20px);
   color: #ffffff;
   font-weight: 500;
 }
 
 .adjustment-value {
-  font-size: 18px;
+  font-size: clamp(calc(16px * var(--pa-y-scale, 1)), calc(32px * var(--pa-y-scale, 1)), 32px);
   color: #ffffff;
   font-family: monospace;
   font-weight: 700;
   text-shadow: 0 0 4px rgba(255, 255, 255, 0.3);
-  letter-spacing: 1px;
+  letter-spacing: 0;
 }
 
 .adjustment-action {
-  font-size: 10px;
+  font-size: clamp(calc(10px * var(--pa-y-scale, 1)), calc(16px * var(--pa-y-scale, 1)), 16px);
   color: rgba(255, 255, 255, 0.7);
   font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .adjustment-item.active .adjustment-action {
@@ -4752,34 +4848,43 @@ export default {
 
 /* === 操作按钮样式 === */
 .control-section {
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  grid-area: control;
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
 }
 
 .action-buttons {
   display: flex;
   flex-direction: row;
-  gap: 10px;
+  gap: clamp(calc(7px * var(--pa-x-scale, 1)), calc(10px * var(--pa-x-scale, 1)), 10px);
 }
 
 .action-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 12px 16px;
+  gap: 7px;
+  padding: clamp(calc(7px * var(--pa-y-scale, 1)), calc(22px * var(--pa-y-scale, 1)), 22px) clamp(calc(12px * var(--pa-x-scale, 1)), calc(28px * var(--pa-x-scale, 1)), 28px);
   border: none;
   border-radius: 6px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: clamp(calc(14px * var(--pa-y-scale, 1)), calc(24px * var(--pa-y-scale, 1)), 24px);
   font-weight: 500;
   transition: all 0.3s ease;
   pointer-events: auto;
-  min-height: 40px;
+  min-height: clamp(calc(38px * var(--pa-y-scale, 1)), calc(78px * var(--pa-y-scale, 1)), 78px);
   touch-action: manipulation;
   position: relative;
   flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.action-btn span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .action-btn.primary {
@@ -4838,26 +4943,33 @@ export default {
 
 /* === 日志显示样式 === */
 .log-section {
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  grid-area: log;
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
 }
 
 .log-display {
   background: rgba(255, 255, 255, 0.05);
   border-radius: 6px;
-  padding: 10px;
+  padding: clamp(calc(7px * var(--pa-y-scale, 1)), calc(20px * var(--pa-y-scale, 1)), 20px) clamp(calc(7px * var(--pa-x-scale, 1)), calc(20px * var(--pa-x-scale, 1)), 20px);
+  height: 100%;
+  min-height: clamp(calc(56px * var(--pa-y-scale, 1)), calc(128px * var(--pa-y-scale, 1)), 128px);
+  display: flex;
+  align-items: center;
 }
 
 .latest-log {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
+  gap: clamp(calc(7px * var(--pa-x-scale, 1)), calc(18px * var(--pa-x-scale, 1)), 18px);
+  padding: clamp(calc(6px * var(--pa-y-scale, 1)), calc(16px * var(--pa-y-scale, 1)), 16px) clamp(calc(8px * var(--pa-x-scale, 1)), calc(20px * var(--pa-x-scale, 1)), 20px);
   border-radius: 4px;
-  font-size: 11px;
+  font-size: clamp(calc(10px * var(--pa-y-scale, 1)), calc(20px * var(--pa-y-scale, 1)), 20px);
   background: rgba(255, 255, 255, 0.05);
   border-left: 3px solid transparent;
+  width: 100%;
+  min-width: 0;
 }
 
 .latest-log.info {
@@ -4879,15 +4991,22 @@ export default {
 .log-timestamp {
   color: rgba(255, 255, 255, 0.6);
   font-family: monospace;
-  font-size: 10px;
-  min-width: 65px;
+  font-size: clamp(calc(9px * var(--pa-y-scale, 1)), calc(18px * var(--pa-y-scale, 1)), 18px);
+  min-width: clamp(calc(58px * var(--pa-x-scale, 1)), calc(112px * var(--pa-x-scale, 1)), 112px);
   flex-shrink: 0;
+  text-align: center;
+  padding-right: clamp(calc(7px * var(--pa-x-scale, 1)), calc(18px * var(--pa-x-scale, 1)), 18px);
+  border-right: 1px solid rgba(255, 255, 255, 0.18);
 }
 
 .log-message {
   color: rgba(255, 255, 255, 0.9);
   flex: 1;
   line-height: 1.4;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .log-empty {
@@ -4898,205 +5017,15 @@ export default {
   font-style: italic;
 }
 
-/* === 响应式设计 === */
-@media (max-width: 768px) {
-  .polar-alignment-widget {
-    width: 320px;
-    max-width: 95vw;
-  }
-
-  .polar-alignment-widget.collapsed {
-    width: 280px;
-    max-width: 90vw;
-  }
-
-  .polar-alignment-minimized {
-    width: 240px;
-  }
-
-  .widget-header {
-    padding: 10px 12px;
-  }
-
-  .header-title {
-    font-size: 12px;
-  }
-
-  .widget-content.expanded {
-    padding: 12px;
-    max-height: 500px;
-  }
-
-  .widget-content.collapsed {
-    padding: 8px;
-  }
-
-  .action-btn {
-    padding: 10px 12px;
-    font-size: 12px;
-    min-height: 36px;
-  }
-
-  .adjustment-value {
-    font-size: 16px;
-  }
-
-  .progress-circle {
-    width: 50px;
-    height: 50px;
-  }
-
-  .progress-text {
-    font-size: 10px;
-  }
-
-  .node-label {
-    font-size: 8px;
-    margin-top: 2px;
-  }
-
-  .node-circle {
-    width: 16px;
-    height: 16px;
-    font-size: 8px;
-  }
-
-  .progress-header {
-    margin-bottom: 6px;
-  }
-
-  .progress-title {
-    font-size: 11px;
-  }
-
-  .calibration-loop-info {
-    font-size: 9px;
-    padding: 1px 4px;
-  }
-}
-
 /* 移动端触摸优化 */
 @media (hover: none) and (pointer: coarse) {
-  .action-btn {
-    min-height: 48px;
-    padding: 14px 18px;
-    font-size: 14px;
-  }
-
-  .widget-header {
-    padding: 16px 20px;
-  }
-
   .minimized-header {
     padding: 12px 16px;
-  }
-
-  .header-btn {
-    width: 32px;
-    height: 32px;
   }
 
   .minimized-btn {
     width: 28px;
     height: 28px;
-  }
-}
-
-@media (max-width: 480px) {
-  .polar-alignment-widget {
-    width: 280px;
-    max-width: 98vw;
-  }
-
-  .polar-alignment-widget.collapsed {
-    width: 240px;
-    max-width: 95vw;
-  }
-
-  .polar-alignment-minimized {
-    width: 200px;
-  }
-
-  .widget-header {
-    padding: 8px 10px;
-  }
-
-  .header-title {
-    font-size: 11px;
-  }
-
-  .header-btn {
-    width: 20px;
-    height: 20px;
-  }
-
-  .widget-content.expanded {
-    padding: 10px;
-    max-height: 400px;
-  }
-
-  .widget-content.collapsed {
-    padding: 6px;
-  }
-
-  .action-btn {
-    padding: 8px 10px;
-    font-size: 11px;
-    min-height: 32px;
-  }
-
-  .adjustment-value {
-    font-size: 14px;
-  }
-
-  .progress-circle {
-    width: 40px;
-    height: 40px;
-  }
-
-  .progress-text {
-    font-size: 9px;
-  }
-
-  .minimized-header {
-    padding: 6px 8px;
-  }
-
-  .minimized-title {
-    font-size: 10px;
-  }
-
-  .minimized-btn {
-    width: 16px;
-    height: 16px;
-  }
-
-  .node-label {
-    font-size: 7px;
-    margin-top: 1px;
-  }
-
-  .node-circle {
-    width: 14px;
-    height: 14px;
-    font-size: 7px;
-  }
-
-  .progress-nodes {
-    gap: 2px;
-  }
-
-  .progress-header {
-    margin-bottom: 4px;
-  }
-
-  .progress-title {
-    font-size: 10px;
-  }
-
-  .calibration-loop-info {
-    font-size: 8px;
-    padding: 1px 3px;
   }
 }
 
@@ -5182,148 +5111,6 @@ export default {
 
 
 
-
-/* === 响应式设计 === */
-@media (max-width: 1200px) {
-  .info-panel {
-    flex: 0 0 350px;
-  }
-}
-
-@media (max-width: 768px) {
-  .polar-alignment-interface {
-    font-size: 12px;
-  }
-
-  .main-layout {
-    flex-direction: column;
-    gap: 8px;
-    padding: 8px;
-  }
-
-  .display-panel {
-    flex: 1;
-    min-height: 300px;
-    padding: 12px;
-  }
-
-  .info-panel {
-    flex: 0 0 auto;
-    max-height: 50vh;
-    overflow-y: auto;
-    padding: 12px;
-  }
-
-  /* 状态相关样式已删除 */
-
-  .calibration-progress {
-    margin-bottom: 12px;
-  }
-
-  .progress-bar {
-    height: 6px;
-  }
-
-  .node-circle {
-    width: 16px;
-    height: 16px;
-    font-size: 8px;
-  }
-
-  .position-section {
-    margin-top: 12px;
-    padding-top: 12px;
-  }
-
-  .position-grid {
-    gap: 6px;
-    padding: 8px;
-  }
-
-  .position-cell {
-    padding: 6px;
-  }
-
-  .adjustment-section {
-    margin-top: 12px;
-    padding-top: 12px;
-  }
-
-  .adjustment-item {
-    padding: 8px;
-  }
-
-  .adjustment-icon {
-    width: 24px;
-    height: 24px;
-  }
-
-  .control-section {
-    margin-top: 12px;
-    padding-top: 12px;
-  }
-
-  .action-btn {
-    padding: 10px 12px;
-    font-size: 12px;
-    min-height: 36px;
-    flex: 1;
-  }
-
-  .log-section {
-    margin-top: 12px;
-    padding-top: 12px;
-  }
-
-  .log-display {
-    padding: 8px;
-  }
-
-  .panel-header {
-    margin-bottom: 8px;
-    padding-bottom: 8px;
-  }
-
-  .interface-title {
-    font-size: 14px;
-  }
-
-  .connection-status {
-    font-size: 10px;
-  }
-
-  .card-header {
-    padding: 8px 12px;
-  }
-
-  .card-header span {
-    font-size: 12px;
-  }
-
-  .card-content {
-    padding: 12px;
-  }
-
-
-
-  .node-circle {
-    width: 14px;
-    height: 14px;
-    font-size: 7px;
-  }
-
-  .log-display {
-    padding: 6px;
-  }
-
-  .latest-log {
-    font-size: 10px;
-  }
-
-  .log-timestamp {
-    min-width: 50px;
-  }
-}
 
 /* 指导调整阶段循环进度条样式 - 独立于控制面板，位于最高层 */
 .guidance-progress-indicator {
@@ -5592,143 +5379,6 @@ export default {
   text-overflow: ellipsis;
   width: 100%;
   max-width: 100%;
-}
-
-@media (max-width: 480px) {
-  .polar-alignment-interface {
-    font-size: 10px;
-  }
-
-  .main-layout {
-    flex-direction: column;
-    gap: 6px;
-    padding: 6px;
-  }
-
-  .display-panel {
-    flex: 1;
-    min-height: 250px;
-    padding: 8px;
-  }
-
-  .info-panel {
-    flex: 0 0 auto;
-    max-height: 45vh;
-    overflow-y: auto;
-    padding: 8px;
-  }
-
-  .card-header {
-    padding: 8px 12px;
-  }
-
-  .card-header span {
-    font-size: 11px;
-  }
-
-  .card-content {
-    padding: 12px;
-  }
-
-  /* 状态相关样式已删除 */
-
-  .calibration-progress {
-    margin-bottom: 8px;
-  }
-
-  .progress-bar {
-    height: 4px;
-  }
-
-  .node-circle {
-    width: 14px;
-    height: 14px;
-    font-size: 7px;
-  }
-
-  .position-section {
-    margin-top: 8px;
-    padding-top: 8px;
-  }
-
-  .position-grid {
-    gap: 4px;
-    padding: 6px;
-  }
-
-  .position-cell {
-    padding: 4px;
-  }
-
-  .cell-label {
-    font-size: 8px;
-  }
-
-  .cell-value {
-    font-size: 9px;
-  }
-
-  .adjustment-section {
-    margin-top: 8px;
-    padding-top: 8px;
-  }
-
-  .adjustment-item {
-    padding: 6px;
-  }
-
-  .adjustment-icon {
-    width: 20px;
-    height: 20px;
-  }
-
-  .adjustment-type {
-    font-size: 10px;
-  }
-
-  .adjustment-value {
-    font-size: 10px;
-  }
-
-  .adjustment-action {
-    font-size: 8px;
-  }
-
-  .control-section {
-    margin-top: 8px;
-    padding-top: 8px;
-  }
-
-  .action-btn {
-    padding: 8px 10px;
-    font-size: 10px;
-    min-height: 32px;
-    flex: 1;
-  }
-
-  .log-section {
-    margin-top: 8px;
-    padding-top: 8px;
-  }
-
-  .log-display {
-    padding: 6px;
-  }
-
-  .latest-log {
-    font-size: 9px;
-  }
-
-  .log-timestamp {
-    font-size: 8px;
-    min-width: 45px;
-  }
-
-  .panel-header {
-    margin-bottom: 6px;
-    padding-bottom: 6px;
-  }
-
 }
 
 /* === 触摸优化 === */

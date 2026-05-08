@@ -1062,6 +1062,10 @@ export default {
       messageCounter: 0, // 用于生成唯一的消息ID
       websocketState: 'disconnected', // 添加WebSocket连接状态
       networkDisconnected: false, // 添加网络连接状态
+      websocketReconnectTimeout: null,
+      onlineHandler: null,
+      offlineHandler: null,
+      visibilityChangeHandler: null,
 
       QTClientVersion: 'Not connected',
       VueClientVersion: process.env.VUE_APP_VERSION || '—',
@@ -1526,7 +1530,7 @@ export default {
 
       calculateGain: true, // 控制是否计算白平衡增益
       autoWhiteBalanceEnabled: false, // AW 长按点亮时自动进一步白平衡
-      autoHistogramEnabled: false, // A 长按点亮时自动拉伸
+      autoHistogramEnabled: true, // 默认启动自动拉伸；A 长按可关闭/开启持续自动拉伸
       lutCache: {
         lastParams: null, // 用于存储上次的参数
         lutR: null,
@@ -2749,6 +2753,10 @@ export default {
       this.$bus.$emit('SystemVersion', this.TotalVersion, this.QTClientVersion, this.VueClientVersion);
     },
     connect() {
+      this.getLocationHostName();
+      if (this.websocket && (this.websocket.readyState === WebSocket.OPEN || this.websocket.readyState === WebSocket.CONNECTING)) {
+        return;
+      }
       // 替换为你的 WebSocket 服务器地址
       // this.websocket = new WebSocket('ws://192.168.2.31:8600');  // process.env.VUE_APP_WEBSOCKET
       // this.websocket = new WebSocket(process.env.VUE_APP_WEBSOCKET);
@@ -5238,10 +5246,18 @@ export default {
 
     // 自动重连
     reconnectWebSocket() {
-      setTimeout(() => {
-        console.log('QHYCCD | WebSocket reconnected');
+      if (this.websocketReconnectTimeout) {
+        clearTimeout(this.websocketReconnectTimeout);
+      }
+      this.websocketReconnectTimeout = setTimeout(() => {
+        this.websocketReconnectTimeout = null;
+        this.getLocationHostName();
+        if (this.websocket && (this.websocket.readyState === WebSocket.OPEN || this.websocket.readyState === WebSocket.CONNECTING)) {
+          return;
+        }
+        console.log('QHYCCD | WebSocket reconnecting');
         setUnifiedWebSocketState('reconnecting', 'WebSocket reconnect scheduled');
-        this.SendConsoleLogMsg('WebSocket reconnected.', 'info');
+        this.SendConsoleLogMsg('WebSocket reconnecting: ' + this.WebSocketUrl, 'info');
         this.connect();
       }, 2000); // 2秒后尝试重新连接
     },
@@ -5249,7 +5265,7 @@ export default {
 
     //监听网络连接状态
     setupNetworkStatusListener() {
-      window.addEventListener('online', () => {
+      this.onlineHandler = () => {
         // 检查断开连接的定时器是否已经触发
         if (this.disconnectTimeoutTriggered) {
           this.callShowMessageBox('WebSocket connected', 'success');
@@ -5259,9 +5275,9 @@ export default {
         this.$bus.$emit('ShowNetStatus', 'true');
         this.StatusRecovery();
         this.reconnectWebSocket(); // 网络恢复后自动重连WebSocket
-      });
+      };
 
-      window.addEventListener('offline', () => {
+      this.offlineHandler = () => {
         this.networkDisconnected = true; // 网络断开时设置网络连接状态
         this.$bus.$emit('ShowNetStatus', 'false');
         this.disconnectTimeoutTriggered = false; // 初始化断开连接定时器触发标志
@@ -5272,7 +5288,17 @@ export default {
             this.callShowMessageBox('WebSocket disconnected', 'error');
           }
         }, 1000); // 1秒后执行
-      });
+      };
+
+      this.visibilityChangeHandler = () => {
+        if (document.visibilityState === 'visible' && this.networkDisconnected) {
+          this.reconnectWebSocket();
+        }
+      };
+
+      window.addEventListener('online', this.onlineHandler);
+      window.addEventListener('offline', this.offlineHandler);
+      document.addEventListener('visibilitychange', this.visibilityChangeHandler);
     },
     //监听网络连接状态
 
@@ -5846,10 +5872,6 @@ export default {
     },
 
     handleOverlayMenuButtonClick(event) {
-      const ts = Math.round((typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now());
-      const x = event && Number.isFinite(event.clientX) ? Math.round(event.clientX) : -1;
-      const y = event && Number.isFinite(event.clientY) ? Math.round(event.clientY) : -1;
-      this.SendConsoleLogMsg(`[DIAG][MENU_OVERLAY_BTN_CLICK] t=${ts} x=${x} y=${y}`, 'warning');
       this.$store.commit('setValue', { varName: 'showNavigationDrawer', newValue: false });
     },
 
@@ -13550,16 +13572,10 @@ export default {
     },
     nav: {
       get: function () {
-        console.log('nav:', this.$store.state.showNavigationDrawer);
         return this.$store.state.showNavigationDrawer
       },
       set: function (v) {
         if (this.$store.state.showNavigationDrawer !== v) {
-          this.SendConsoleLogMsg(
-            `[DIAG][MENU_STATE_SETTER] from=${this.$store.state.showNavigationDrawer ? 1 : 0} to=${v ? 1 : 0}`,
-            'warning'
-          );
-          console.log('nav:', this.$store.state.showNavigationDrawer);
           this.$store.commit('setValue', { varName: 'showNavigationDrawer', newValue: !!v })
         }
       }
@@ -13647,10 +13663,6 @@ export default {
   watch: {
     /** 主菜单关闭时同步关闭子菜单状态，避免 E2E 再次打开主菜单时误判“子菜单已打开”而跳过点击 */
     '$store.state.showNavigationDrawer': function (isOpen) {
-      this.SendConsoleLogMsg(
-        `[DIAG][MENU_STATE_CHANGED] isOpen=${isOpen ? 1 : 0} submenu=${this.drawer_2 ? 1 : 0} devPage=${this.isOpenDevicePage ? 1 : 0}`,
-        'warning'
-      );
       if (!isOpen) {
         this.drawer_2 = false
         this.isOpenDevicePage = false
@@ -13874,6 +13886,22 @@ export default {
       window.removeEventListener('beforeunload', this.pageUnloadHandler);
       window.removeEventListener('pagehide', this.pageUnloadHandler);
       this.pageUnloadHandler = null;
+    }
+    if (this.onlineHandler) {
+      window.removeEventListener('online', this.onlineHandler);
+      this.onlineHandler = null;
+    }
+    if (this.offlineHandler) {
+      window.removeEventListener('offline', this.offlineHandler);
+      this.offlineHandler = null;
+    }
+    if (this.visibilityChangeHandler) {
+      document.removeEventListener('visibilitychange', this.visibilityChangeHandler);
+      this.visibilityChangeHandler = null;
+    }
+    if (this.websocketReconnectTimeout) {
+      clearTimeout(this.websocketReconnectTimeout);
+      this.websocketReconnectTimeout = null;
     }
     this.notifyExitManualCalibrationMode();
   },

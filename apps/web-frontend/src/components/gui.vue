@@ -94,7 +94,7 @@
     <div>
       <transition name="RightBtn">
         <button
-          v-show="showMountSwitch"
+          v-show="showMountSwitch && !showFloatingBox"
           @click="toggleFloatingBox"
           class="get-click btn-MountPanelSwitch"
           data-testid="gui-btn-toggle-mount-panel"
@@ -747,7 +747,7 @@ export default {
     // this.$bus.$on('cfw-selected', this.handleCFWSelected);
     this.$bus.$on('toggleSchedulePanel', this.toggleSchedulePanel);
     this.$bus.$on('closeScheduleAndDateTimePicker', this.closeScheduleAndDateTimePicker);
-    this.$bus.$on('MountPanelClose', this.toggleFloatingBox);
+    this.$bus.$on('MountPanelClose', this.closeFloatingBox);
     this.$bus.$on('toggleHistogramPanel', this.toggleHistogramPanel);
     this.$bus.$on('toggleFocuserPanel', this.toggleFocuserPanel);
     this.$bus.$on('ImageManagerPanelClose', this.closeImageManagerPanel);
@@ -833,6 +833,9 @@ export default {
   methods: {
     toggleFloatingBox() {
       this.showFloatingBox = !this.showFloatingBox; // 切换显示状态
+    },
+    closeFloatingBox() {
+      this.showFloatingBox = false;
     },
     toggleChartsPanel() {
       this.showChartsPanel = !this.showChartsPanel;

@@ -1,43 +1,50 @@
 <template>
   <transition name="panel">
     <div class="mount-control-panel"
-      :style="{ top: top + 'px', right: right + 'px', width: width + 'px', height: height + 'px' }"
+      :style="panelStyle"
       data-testid="mcp-panel">
       <div class="display-text-container" data-testid="mcp-display">
-        <!-- 修改：使用紧凑的水平布局和缩写 -->
-        <div class="combined-text" data-testid="mcp-combined-text">
-          <div class="pier-side-text" data-testid="mcp-pier-side-text">{{ abbreviatedPierSide }}</div>
-          <div class="separator" data-testid="mcp-separator">|</div>
+        <div class="mount-summary-row" data-testid="mcp-summary-row">
+          <span v-if="isIDLE" class="status-dot status-dot-idle" data-testid="mcp-status-indicator-idle" data-state="idle"></span>
+          <span v-else class="status-dot status-dot-busy" data-testid="mcp-status-indicator-busy" data-state="busy"></span>
+          <span class="pier-side-text" data-testid="mcp-pier-side-text">{{ $t('Mount Facing') }} {{ abbreviatedPierSide || '-' }}</span>
+        </div>
+        <div class="mount-coordinate-row" data-testid="mcp-coordinate-row">
+          <v-icon class="coordinate-icon" data-testid="mcp-coordinate-icon">mdi-map-marker</v-icon>
           <div class="radec-text" data-testid="mcp-radec-text">
-            <span class="ra-line" data-testid="mcp-value-ra" :data-value="currentLatitude">{{ currentLatitude }}</span>
-            <span class="dec-line" data-testid="mcp-value-dec" :data-value="currentLongitude">{{ currentLongitude }}</span>
+            <span class="ra-line" data-testid="mcp-value-ra" :data-value="currentLatitude">{{ currentLatitude || '--:--:--' }}</span>
+            <span class="dec-line" data-testid="mcp-value-dec" :data-value="currentLongitude">{{ currentLongitude || '--°--\'--\"' }}</span>
           </div>
         </div>
       </div>
 
       <div class="Direction-Btn" data-testid="mcp-direction-controls">
-        <button class="ra-plus no-select" @touchstart.stop.prevent="handleMouseDownRA('plus')" @touchend.stop.prevent="stopRA('plus')"
+        <button class="ra-plus no-select" :class="{ 'direction-pressed': activeDirectionButton === 'ra-plus' }"
+          @touchstart.stop.prevent="handleMouseDownRA('plus')" @touchend.stop.prevent="stopRA('plus')" @touchcancel.stop.prevent="stopRA('plus')"
           @mousedown="handleMouseDownRA('plus')" @mouseup="stopRA('plus')" data-testid="mcp-btn-ra-plus">
           <div style="display: flex; justify-content: center; align-items: center;">
             <img src="@/assets/images/svg/ui/RA+.svg" height="40px"
               style="min-height: 40px; pointer-events: none;" data-testid="mcp-img-ra-plus"></img>
           </div>
         </button>
-        <button class="ra-minus no-select" @touchstart.stop.prevent="handleMouseDownRA('minus')" @touchend.stop.prevent="stopRA('minus')"
+        <button class="ra-minus no-select" :class="{ 'direction-pressed': activeDirectionButton === 'ra-minus' }"
+          @touchstart.stop.prevent="handleMouseDownRA('minus')" @touchend.stop.prevent="stopRA('minus')" @touchcancel.stop.prevent="stopRA('minus')"
           @mousedown="handleMouseDownRA('minus')" @mouseup="stopRA('minus')" data-testid="mcp-btn-ra-minus">
           <div style="display: flex; justify-content: center; align-items: center;">
             <img src="@/assets/images/svg/ui/RA-.svg" height="40px"
               style="min-height: 40px; pointer-events: none;" data-testid="mcp-img-ra-minus"></img>
           </div>
         </button>
-        <button class="dec-plus no-select" @touchstart.stop.prevent="handleMouseDownDEC('plus')" @touchend.stop.prevent="stopDEC('plus')"
+        <button class="dec-plus no-select" :class="{ 'direction-pressed': activeDirectionButton === 'dec-plus' }"
+          @touchstart.stop.prevent="handleMouseDownDEC('plus')" @touchend.stop.prevent="stopDEC('plus')" @touchcancel.stop.prevent="stopDEC('plus')"
           @mousedown="handleMouseDownDEC('plus')" @mouseup="stopDEC('plus')" data-testid="mcp-btn-dec-plus">
           <div style="display: flex; justify-content: center; align-items: center;">
             <img src="@/assets/images/svg/ui/DEC+.svg" height="40px"
               style="min-height: 40px; pointer-events: none;" data-testid="mcp-img-dec-plus"></img>
           </div>
         </button>
-        <button class="dec-minus no-select" @touchstart.stop.prevent="handleMouseDownDEC('minus')" @touchend.stop.prevent="stopDEC('minus')"
+        <button class="dec-minus no-select" :class="{ 'direction-pressed': activeDirectionButton === 'dec-minus' }"
+          @touchstart.stop.prevent="handleMouseDownDEC('minus')" @touchend.stop.prevent="stopDEC('minus')" @touchcancel.stop.prevent="stopDEC('minus')"
           @mousedown="handleMouseDownDEC('minus')" @mouseup="stopDEC('minus')" data-testid="mcp-btn-dec-minus">
           <div style="display: flex; justify-content: center; align-items: center;">
             <img src="@/assets/images/svg/ui/DEC-.svg" height="40px"
@@ -95,21 +102,6 @@
         </button>
       </div>
 
-      <div data-testid="mcp-status">
-        <span v-if="isIDLE" class="icon-container" data-testid="mcp-status-indicator-idle" data-state="idle">
-          <div style="display: flex; justify-content: center; align-items: center;">
-            <img src="@/assets/images/svg/ui/Status-idle.svg" height="15px"
-              style="min-height: 15px; pointer-events: none;" data-testid="mcp-img-status-idle"></img>
-          </div>
-        </span>
-        <span v-else class="icon-container" data-testid="mcp-status-indicator-busy" data-state="busy">
-          <div style="display: flex; justify-content: center; align-items: center;">
-            <img src="@/assets/images/svg/ui/Status-busy.svg" height="15px"
-              style="min-height: 15px; pointer-events: none;" data-testid="mcp-img-status-busy"></img>
-          </div>
-        </span>
-      </div>
-
       <div data-testid="mcp-close-container">
         <button class="btn-close no-select" @click="PanelClose" data-testid="mcp-btn-close">
           <div style="display: flex; justify-content: center; align-items: center;">
@@ -134,6 +126,7 @@ export default {
       startY: 0,
       width: 150,
       height: 240,
+      panelScale: 1,
 
       isExpanded: true,
       showButtons: true,
@@ -175,9 +168,55 @@ export default {
       isErrorHome: false,
       isErrorSync: false,
       isErrorSolve: false,
+      activeDirectionButton: null,
     };
   },
   computed: {
+    panelStyle() {
+      const scale = this.panelScale;
+      return {
+        top: `${this.top}px`, // 面板距离窗口顶部的位置
+        right: `${this.right}px`, // 面板距离窗口右侧的位置
+        width: `${this.width}px`, // 面板整体宽度
+        height: `${this.height}px`, // 面板整体高度
+        '--mcp-border-width': `${Math.max(2, 4 * scale)}px`, // 面板边框宽度
+        '--mcp-border-radius': `${10 * scale}px`, // 面板圆角大小
+        '--mcp-dir-size': `${120 * scale}px`, // 方向控制圆盘整体尺寸
+        '--mcp-dir-top': `${42 * scale}px`, // 方向控制圆盘顶部位置
+        '--mcp-dir-left': `${11 * scale}px`, // 方向控制圆盘左侧位置
+        '--mcp-dir-piece-size': `${57.5 * scale}px`, // 单个方向按钮扇区尺寸
+        '--mcp-dir-piece-offset': `${62.5 * scale}px`, // 下方方向按钮扇区偏移量
+        '--mcp-mask-center': `${60 * scale}px`, // 方向按钮遮罩圆心坐标
+        '--mcp-mask-negative-center': `${-2.5 * scale}px`, // 方向按钮反向遮罩圆心坐标
+        '--mcp-mask-radius': `${35 * scale}px`, // 方向按钮中心镂空半径
+        '--mcp-dir-icon-size': `${40 * scale}px`, // RA/DEC 方向图标大小
+        '--mcp-stop-size': `${60 * scale}px`, // 中央停止按钮尺寸
+        '--mcp-stop-top': `${72 * scale}px`, // 中央停止按钮顶部位置
+        '--mcp-stop-left': `${41 * scale}px`, // 中央停止按钮左侧位置
+        '--mcp-small-btn-size': `${35 * scale}px`, // 底部小功能按钮尺寸
+        '--mcp-small-btn-bottom-top': `${55 * scale}px`, // 第一排小功能按钮底部位置
+        '--mcp-small-btn-bottom-bottom': `${10 * scale}px`, // 第二排小功能按钮底部位置
+        '--mcp-small-btn-side-gap': `${10 * scale}px`, // 小功能按钮左右边距
+        '--mcp-small-btn-half': `${17.5 * scale}px`, // 小功能按钮半宽，用于水平居中
+        '--mcp-icon-large': `${25 * scale}px`, // 较大功能图标尺寸
+        '--mcp-icon-medium': `${20 * scale}px`, // 中等功能图标尺寸
+        '--mcp-v-icon-size': `${24 * scale}px`, // Vuetify 图标尺寸
+        '--mcp-speed-font-size': `${14 * scale}px`, // 速度数字字体大小
+        '--mcp-status-icon': `${15 * scale}px`, // 状态图标尺寸
+        '--mcp-close-icon': `${12 * scale}px`, // 关闭按钮内部图标尺寸
+        '--mcp-close-size': `${25 * scale}px`, // 关闭按钮尺寸
+        '--mcp-close-offset': `${3 * scale}px`, // 关闭按钮距离面板边缘的偏移
+        '--mcp-display-top': `${4 * scale}px`, // 顶部文本区域顶部位置
+        '--mcp-display-left': `${8 * scale}px`, // 顶部文本区域左侧位置
+        '--mcp-display-right': `${30 * scale}px`, // 顶部文本区域右侧预留位置
+        '--mcp-display-height': `${38 * scale}px`, // 顶部文本区域高度
+        '--mcp-status-dot-size': `${10 * scale}px`, // 状态圆点尺寸
+        '--mcp-pier-font-size': `${Math.max(7, 8.5 * scale)}px`, // 朝向文本字体大小
+        '--mcp-radec-font-size': `${Math.max(7, 9 * scale)}px`, // RA/DEC 坐标字体大小
+        '--mcp-coordinate-icon-size': `${15 * scale}px`, // 坐标行图标尺寸
+        '--mcp-text-gap': `${Math.max(1, scale)}px`, // 顶部文本与图标间距
+      };
+    },
     // 新增：子午面信息缩写
     abbreviatedPierSide() {
       if (!this.MountPierSide) return '';
@@ -242,15 +281,34 @@ export default {
     // 移除自动启动定时器的代码
     // this.startDisplayTimer();
   },
+  mounted() {
+    this.updatePanelSize();
+    window.addEventListener('resize', this.updatePanelSize);
+  },
   beforeDestroy() {
     // 移除定时器清理代码
     // if (this.displayTimer) {
     //   clearInterval(this.displayTimer);
     //   this.displayTimer = null;
     // }
+    window.removeEventListener('resize', this.updatePanelSize);
+    this.activeDirectionButton = null;
   },
   methods: {
+    updatePanelSize() {
+      const viewportWidth = window.innerWidth || 1280;
+      const viewportHeight = window.innerHeight || 720;
+      const rawScale = Math.min(viewportWidth / 1280, viewportHeight / 720);
+      const scale = Math.min(3, Math.max(1, rawScale));
+
+      this.panelScale = scale;
+      this.width = Math.round(150 * scale);
+      this.height = Math.round(270 * scale);
+      this.right = Math.round(Math.min(18, Math.max(8, viewportWidth * 0.012)));
+      this.top = Math.round(Math.min(80, Math.max(42, viewportHeight * 0.07)));
+    },
     handleMouseDownRA(direction) {
+      this.activeDirectionButton = `ra-${direction}`;
       if (!this.isMountConnected) {
         this.$bus.$emit('showMsgBox', '赤道仪未连接，无法执行操作', 'error');
         return;
@@ -266,6 +324,7 @@ export default {
       }
     },
     handleMouseDownDEC(direction) {
+      this.activeDirectionButton = `dec-${direction}`;
       if (!this.isMountConnected) {
         this.$bus.$emit('showMsgBox', '赤道仪未连接，无法执行操作', 'error');
         return;
@@ -292,6 +351,7 @@ export default {
     },
 
     stopRA(direction) {
+      this.activeDirectionButton = null;
       if (!this.isMountConnected) {
         this.$bus.$emit('showMsgBox', '赤道仪未连接，无法执行操作', 'error');
         return;
@@ -302,6 +362,7 @@ export default {
     },
 
     stopDEC(direction) {
+      this.activeDirectionButton = null;
       if (!this.isMountConnected) {
         this.$bus.$emit('showMsgBox', '赤道仪未连接，无法执行操作', 'error');
         return;
@@ -509,8 +570,6 @@ export default {
     formatDecDegrees(degrees) {
       if (degrees === null || degrees === undefined || isNaN(degrees)) return '';
       
-      // 处理正负号
-      const sign = degrees >= 0 ? '+' : '-';
       const absDegrees = Math.abs(degrees);
       
       // 转换为度分秒
@@ -520,7 +579,7 @@ export default {
       const s = Math.floor((remainingMinutes - m) * 60);
       
       // 更紧凑的格式显示
-      return `${sign}${d.toString().padStart(2, '0')}°${m.toString().padStart(2, '0')}'${s.toString().padStart(2, '0')}"`;
+      return `${d.toString().padStart(2, '0')}°${m.toString().padStart(2, '0')}'${s.toString().padStart(2, '0')}"`;
     },
     
     // 移除定时器相关方法
@@ -647,29 +706,29 @@ export default {
   position: fixed;
   background-color: rgba(64, 64, 64, 0.5);
   backdrop-filter: blur(5px);
-  border-radius: 10px;
-  border: 4px solid rgba(128, 128, 128, 0.5);
+  border-radius: var(--mcp-border-radius);
+  border: var(--mcp-border-width) solid rgba(128, 128, 128, 0.5);
   box-sizing: border-box;
   /* overflow: hidden; */
 }
 
 @keyframes showPanelAnimation {
   from {
-    right: -150px;
+    transform: translateX(calc(100% + 24px));
   }
 
   to {
-    right: 10px;
+    transform: translateX(0);
   }
 }
 
 @keyframes hidePanelAnimation {
   from {
-    right: 10px;
+    transform: translateX(0);
   }
 
   to {
-    right: -150px;
+    transform: translateX(calc(100% + 24px));
   }
 }
 
@@ -690,10 +749,10 @@ export default {
 }
 
 .Direction-Btn {
-  width: 120px;
-  height: 120px;
-  top: 15px;
-  left: 11px;
+  width: var(--mcp-dir-size);
+  height: var(--mcp-dir-size);
+  top: var(--mcp-dir-top);
+  left: var(--mcp-dir-left);
 
   border-radius: 50%;
   overflow: hidden;
@@ -704,8 +763,8 @@ export default {
   /* clip-path: polygon(0 0, 100% 0, 100% 59%, 90% 60%, 80% 64%, 70% 71%, 60% 75%, 50% 50%, 42% 60%, 36% 70%, 32% 80%, 30% 90%, 29% 100%, 0 100%); */
 
   position: absolute;
-  width: 57.5px;
-  height: 57.5px;
+  width: var(--mcp-dir-piece-size);
+  height: var(--mcp-dir-piece-size);
   top: 0px;
   left: 0px;
 
@@ -714,15 +773,15 @@ export default {
   backdrop-filter: blur(5px);
   box-sizing: border-box;
   border: none;
-  mask-image: radial-gradient(circle at 60px 60px, transparent 35px, black 35px);
+  mask-image: radial-gradient(circle at var(--mcp-mask-center) var(--mcp-mask-center), transparent var(--mcp-mask-radius), black var(--mcp-mask-radius));
 }
 
 .ra-minus {
   /* clip-path: polygon(100% 0, 0 0, 0 29%, 10% 30%, 20% 32%, 30% 36%, 40% 42%, 50% 50%, 58% 60%, 64% 70%, 68% 80%, 70% 90%, 71% 100%, 100% 100%); */
 
   position: absolute;
-  width: 57.5px;
-  height: 57.5px;
+  width: var(--mcp-dir-piece-size);
+  height: var(--mcp-dir-piece-size);
   top: 0px;
   right: 0px;
 
@@ -731,16 +790,16 @@ export default {
   backdrop-filter: blur(5px);
   box-sizing: border-box;
   border: none;
-  mask-image: radial-gradient(circle at -2.5px 60px, transparent 35px, black 35px);
+  mask-image: radial-gradient(circle at var(--mcp-mask-negative-center) var(--mcp-mask-center), transparent var(--mcp-mask-radius), black var(--mcp-mask-radius));
 }
 
 .dec-plus {
   /* clip-path: polygon(0 100%, 100% 100%, 100% 71%, 90% 70%, 80% 68%, 70% 64%, 60% 58%, 50% 50%, 42% 40%, 36% 30%, 32% 20%, 30% 10%, 29% 0, 0 0); */
 
   position: absolute;
-  width: 57.5px;
-  height: 57.5px;
-  top: 62.5px;
+  width: var(--mcp-dir-piece-size);
+  height: var(--mcp-dir-piece-size);
+  top: var(--mcp-dir-piece-offset);
   left: 0px;
 
   user-select: none;
@@ -748,16 +807,16 @@ export default {
   backdrop-filter: blur(5px);
   box-sizing: border-box;
   border: none;
-  mask-image: radial-gradient(circle at 60px -2.5px, transparent 35px, black 35px);
+  mask-image: radial-gradient(circle at var(--mcp-mask-center) var(--mcp-mask-negative-center), transparent var(--mcp-mask-radius), black var(--mcp-mask-radius));
 }
 
 .dec-minus {
   /* clip-path: polygon(100% 100%, 0 100%, 0 71%, 10% 70%, 20% 68%, 30% 64%, 40% 58%, 50% 50%, 58% 40%, 64% 30%, 68% 20%, 70% 10%, 71% 0, 100% 0); */
 
   position: absolute;
-  width: 57.5px;
-  height: 57.5px;
-  top: 62.5px;
+  width: var(--mcp-dir-piece-size);
+  height: var(--mcp-dir-piece-size);
+  top: var(--mcp-dir-piece-offset);
   right: 0px;
 
   user-select: none;
@@ -765,16 +824,16 @@ export default {
   backdrop-filter: blur(5px);
   box-sizing: border-box;
   border: none;
-  mask-image: radial-gradient(circle at -2.5px -2.5px, transparent 35px, black 35px);
+  mask-image: radial-gradient(circle at var(--mcp-mask-negative-center) var(--mcp-mask-negative-center), transparent var(--mcp-mask-radius), black var(--mcp-mask-radius));
 }
 
 .btn-stop {
   border-radius: 50%;
   position: absolute;
-  width: 60px;
-  height: 60px;
-  top: 45px;
-  left: 41px;
+  width: var(--mcp-stop-size);
+  height: var(--mcp-stop-size);
+  top: var(--mcp-stop-top);
+  left: var(--mcp-stop-left);
 
   background-color: rgba(255, 0, 0, 0.5);
   /* border: 1px solid rgba(255, 255, 255, 0.8); */
@@ -783,6 +842,16 @@ export default {
   box-sizing: border-box;
   /* 设置box-sizing为border-box */
   border: none;
+}
+
+.btn-stop .v-icon,
+.btn-track .v-icon,
+.btn-track-on .v-icon {
+  font-size: var(--mcp-v-icon-size);
+}
+
+.btn-speed span {
+  font-size: var(--mcp-speed-font-size);
 }
 
 .btn-speed:active,
@@ -801,7 +870,8 @@ export default {
 .ra-plus:active,
 .ra-minus:active,
 .dec-plus:active,
-.dec-minus:active {
+.dec-minus:active,
+.direction-pressed {
   /* transform: scale(0.95); */
   background-color: rgba(255, 255, 255, 0.7);
 }
@@ -818,10 +888,10 @@ export default {
 
 .btn-park {
   position: absolute;
-  width: 35px;
-  height: 35px;
-  bottom: 55px;
-  left: 10px;
+  width: var(--mcp-small-btn-size);
+  height: var(--mcp-small-btn-size);
+  bottom: var(--mcp-small-btn-bottom-top);
+  left: var(--mcp-small-btn-side-gap);
 
   user-select: none;
   background-color: rgba(0, 0, 0, 0.3);
@@ -832,10 +902,10 @@ export default {
 
 .btn-track {
   position: absolute;
-  width: 35px;
-  height: 35px;
-  bottom: 55px;
-  right: calc(50% - 17.5px);
+  width: var(--mcp-small-btn-size);
+  height: var(--mcp-small-btn-size);
+  bottom: var(--mcp-small-btn-bottom-top);
+  right: calc(50% - var(--mcp-small-btn-half));
 
   user-select: none;
   background-color: rgba(0, 0, 0, 0.3);
@@ -846,10 +916,10 @@ export default {
 
 .btn-park-on {
   position: absolute;
-  width: 35px;
-  height: 35px;
-  bottom: 55px;
-  left: 10px;
+  width: var(--mcp-small-btn-size);
+  height: var(--mcp-small-btn-size);
+  bottom: var(--mcp-small-btn-bottom-top);
+  left: var(--mcp-small-btn-side-gap);
 
   user-select: none;
   background-color: rgba(0, 255, 30, 0.5);
@@ -860,10 +930,10 @@ export default {
 
 .btn-track-on {
   position: absolute;
-  width: 35px;
-  height: 35px;
-  bottom: 55px;
-  right: calc(50% - 17.5px);
+  width: var(--mcp-small-btn-size);
+  height: var(--mcp-small-btn-size);
+  bottom: var(--mcp-small-btn-bottom-top);
+  right: calc(50% - var(--mcp-small-btn-half));
 
   user-select: none;
   background-color: rgba(0, 255, 30, 0.5);
@@ -874,34 +944,34 @@ export default {
 
 .btn-home {
   position: absolute;
-  width: 35px;
-  height: 35px;
-  bottom: 55px;
-  right: 10px;
+  width: var(--mcp-small-btn-size);
+  height: var(--mcp-small-btn-size);
+  bottom: var(--mcp-small-btn-bottom-top);
+  right: var(--mcp-small-btn-side-gap);
 }
 
 .btn-sync {
   position: absolute;
-  width: 35px;
-  height: 35px;
-  bottom: 10px;
-  left: 10px;
+  width: var(--mcp-small-btn-size);
+  height: var(--mcp-small-btn-size);
+  bottom: var(--mcp-small-btn-bottom-bottom);
+  left: var(--mcp-small-btn-side-gap);
 }
 
 .btn-speed {
   position: absolute;
-  width: 35px;
-  height: 35px;
-  bottom: 10px;
-  right: calc(50% - 17.5px);
+  width: var(--mcp-small-btn-size);
+  height: var(--mcp-small-btn-size);
+  bottom: var(--mcp-small-btn-bottom-bottom);
+  right: calc(50% - var(--mcp-small-btn-half));
 }
 
 .btn-slove {
   position: absolute;
-  width: 35px;
-  height: 35px;
-  bottom: 10px;
-  right: 10px;
+  width: var(--mcp-small-btn-size);
+  height: var(--mcp-small-btn-size);
+  bottom: var(--mcp-small-btn-bottom-bottom);
+  right: var(--mcp-small-btn-side-gap);
 }
 
 .border-icon {
@@ -911,26 +981,12 @@ export default {
   font-size: large;
 }
 
-.icon-container {
-  position: absolute;
-  top: 5px;
-  left: 5px;
-}
-
-.icon-container .green-icon {
-  color: rgba(51, 218, 121, 1);
-}
-
-.icon-container .red-icon {
-  color: rgba(250, 0, 0, 1);
-}
-
 .btn-close {
   position: absolute;
-  width: 25px;
-  height: 25px;
-  top: 3px;
-  right: 3px;
+  width: var(--mcp-close-size);
+  height: var(--mcp-close-size);
+  top: var(--mcp-close-offset);
+  right: var(--mcp-close-offset);
 
   user-select: none;
   background-color: rgba(0, 0, 0, 0.3);
@@ -938,6 +994,38 @@ export default {
   box-sizing: border-box;
   border: none;
   border-radius: 50%;
+}
+
+.mount-control-panel [data-testid="mcp-img-ra-plus"],
+.mount-control-panel [data-testid="mcp-img-ra-minus"],
+.mount-control-panel [data-testid="mcp-img-dec-plus"],
+.mount-control-panel [data-testid="mcp-img-dec-minus"] {
+  height: var(--mcp-dir-icon-size) !important;
+  min-height: var(--mcp-dir-icon-size) !important;
+}
+
+.mount-control-panel [data-testid="mcp-img-speed"],
+.mount-control-panel [data-testid="mcp-img-park"],
+.mount-control-panel [data-testid="mcp-img-solve"] {
+  height: var(--mcp-icon-large) !important;
+  min-height: var(--mcp-icon-large) !important;
+}
+
+.mount-control-panel [data-testid="mcp-img-home"],
+.mount-control-panel [data-testid="mcp-img-sync"] {
+  height: var(--mcp-icon-medium) !important;
+  min-height: var(--mcp-icon-medium) !important;
+}
+
+.mount-control-panel [data-testid="mcp-img-status-idle"],
+.mount-control-panel [data-testid="mcp-img-status-busy"] {
+  height: var(--mcp-status-icon) !important;
+  min-height: var(--mcp-status-icon) !important;
+}
+
+.mount-control-panel [data-testid="mcp-img-close"] {
+  height: var(--mcp-close-icon) !important;
+  min-height: var(--mcp-close-icon) !important;
 }
 
 @keyframes processing-animation {
@@ -963,61 +1051,94 @@ export default {
 
 .display-text-container {
   position: absolute;
-  top: 3%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  text-align: center;
-  width: 140px;
-  color: rgba(255, 255, 255, 0.5);
+  top: var(--mcp-display-top);
+  left: var(--mcp-display-left);
+  right: var(--mcp-display-right);
+  height: var(--mcp-display-height);
+  color: rgba(255, 255, 255, 0.9);
   user-select: none;
+  /* 文本分割线：使用伪元素绘制，方便微调垂直位置 */
+  --mcp-text-divider-offset: 2px;
+  --mcp-text-divider-color: rgba(255, 255, 255, 0.16);
 }
 
-/* 修改：更紧凑的水平布局样式 */
-.combined-text {
-  display: flex;
-  flex-direction: row;
-  gap: 1px;
+.display-text-container::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: var(--mcp-text-divider-offset);
+  height: 1px;
+  background: var(--mcp-text-divider-color);
+  pointer-events: none;
+}
+
+.mount-summary-row {
+  display: grid;
+  grid-template-columns: var(--mcp-coordinate-icon-size) minmax(0, 1fr) var(--mcp-coordinate-icon-size);
   align-items: center;
-  justify-content: center;
-  flex-wrap: nowrap;
+  gap: var(--mcp-text-gap);
+  height: 42%;
+  min-width: 0;
+}
+
+.status-dot {
+  width: var(--mcp-status-dot-size);
+  height: var(--mcp-status-dot-size);
+  border-radius: 50%;
+  justify-self: center;
+}
+
+.status-dot-idle {
+  background: rgba(51, 218, 121, 1);
+}
+
+.status-dot-busy {
+  background: rgba(255, 193, 7, 1);
+}
+
+.mount-coordinate-row {
+  display: grid;
+  grid-template-columns: var(--mcp-coordinate-icon-size) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--mcp-text-gap);
+  height: 58%;
+  min-width: 0;
 }
 
 .pier-side-text {
-  font-size: 6px;
+  grid-column: 2;
+  font-size: var(--mcp-pier-font-size);
   line-height: 1;
-  flex-shrink: 0;
+  font-weight: 600;
+  text-align: center;
   white-space: nowrap;
-  min-width: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.separator {
-  font-size: 6px;
-  color: rgba(255, 255, 255, 0.3);
-  flex-shrink: 0;
-  margin: 0;
+.coordinate-icon {
+  color: rgba(255, 255, 255, 0.9) !important;
+  font-size: var(--mcp-coordinate-icon-size) !important;
+  flex: 0 0 auto;
 }
 
 .radec-text {
-  font-size: 5px;
+  min-width: 0;
+  flex: 1 1 auto;
+  font-size: var(--mcp-radec-font-size);
   line-height: 1;
-  display: flex;
-  justify-content: center;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   align-items: center;
-  gap: 1px;
-  flex-wrap: nowrap;
-  flex-shrink: 1;
+  column-gap: var(--mcp-text-gap);
+  font-weight: 700;
 }
 
 .ra-line, .dec-line {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  flex-shrink: 1;
 }
 
-/* 移除不需要的样式 */
-/* .separator {
-  margin: 0 1px;
-  flex-shrink: 0;
-} */
 </style>
