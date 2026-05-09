@@ -524,15 +524,34 @@
       <v-card data-testid="pa-camera-select-card">
         <v-card-title class="text-h6" data-testid="pa-camera-select-title">选择极轴校准相机</v-card-title>
         <v-card-text data-testid="pa-camera-select-body">
-          主相机与导星镜均已连接，请选择用于自动极轴校准的相机。
+          多个相机均已连接，请选择用于自动极轴校准的相机。
           <div style="margin-top: 8px; color: #90a4ae;" data-testid="pa-camera-select-countdown">
-            {{ cameraSelectCountdown }} 秒后默认使用主相机
+            {{ cameraSelectCountdown }} 秒后默认使用{{ polarRoleLabel(cameraSelectDefaultRole) }}
           </div>
         </v-card-text>
         <v-card-actions>
           <v-spacer />
-          <v-btn text color="primary" @click="selectPolarCameraRole('MainCamera')" data-testid="pa-camera-select-main">主相机</v-btn>
-          <v-btn text color="primary" @click="selectPolarCameraRole('Guider')" data-testid="pa-camera-select-guider">导星镜</v-btn>
+          <v-btn
+            v-if="cameraSelectAvailableRoles.includes('PoleCamera')"
+            text
+            color="primary"
+            @click="selectPolarCameraRole('PoleCamera')"
+            data-testid="pa-camera-select-pole"
+          >电子极轴镜</v-btn>
+          <v-btn
+            v-if="cameraSelectAvailableRoles.includes('MainCamera')"
+            text
+            color="primary"
+            @click="selectPolarCameraRole('MainCamera')"
+            data-testid="pa-camera-select-main"
+          >主相机</v-btn>
+          <v-btn
+            v-if="cameraSelectAvailableRoles.includes('Guider')"
+            text
+            color="primary"
+            @click="selectPolarCameraRole('Guider')"
+            data-testid="pa-camera-select-guider"
+          >导星镜</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -580,12 +599,20 @@
             outlined
             data-testid="pa-prereq-guider-focal"
           />
+          <v-text-field
+            v-model="prereqForm.poleFocalLength"
+            label="电子极轴镜焦距 (mm)"
+            type="number"
+            dense
+            outlined
+            data-testid="pa-prereq-pole-focal"
+          />
           <div
             style="margin-top: 6px; color: #90a4ae;"
             data-testid="pa-prereq-selected-role"
             :data-role="selectedPolarCameraRole"
           >
-            当前选择设备: {{ selectedPolarCameraRole === 'Guider' ? '导星镜' : '主相机' }}
+            当前选择设备: {{ polarRoleLabel(selectedPolarCameraRole) }}
           </div>
         </v-card-text>
         <v-card-actions data-testid="pa-prereq-actions">
@@ -820,16 +847,20 @@ export default {
       cameraSelectCountdown: 60,
       cameraSelectTimer: null,
       cameraSelectResolver: null,
+      cameraSelectAvailableRoles: ['MainCamera', 'Guider'],
+      cameraSelectDefaultRole: 'MainCamera',
       showPrereqDialog: false,
       prereqDialogResolver: null,
       configCoordinatesRaw: '',
       configMainFocalLengthRaw: '',
       configGuiderFocalLengthRaw: '',
+      configPoleFocalLengthRaw: '',
       prereqForm: {
         latitude: '',
         longitude: '',
         mainFocalLength: '',
-        guiderFocalLength: ''
+        guiderFocalLength: '',
+        poleFocalLength: ''
       },
 
       // 观测者位置重试状态
@@ -976,6 +1007,7 @@ export default {
       this.$bus.$on('MainCameraFocalLength', this.onMainCameraFocalLengthConfig)
       this.$bus.$on('FocalLength', this.onLegacyMainCameraFocalLengthConfig)
       this.$bus.$on('GuiderFocalLength', this.onGuiderFocalLengthConfig)
+      this.$bus.$on('PoleCameraFocalLength', this.onPoleCameraFocalLengthConfig)
 
       // 监听指导调整阶段进度
       this.$bus.$on('PolarAlignmentGuidanceStepProgress', this.updateGuidanceStepProgress)
@@ -1005,6 +1037,7 @@ export default {
       this.$bus.$off('MainCameraFocalLength', this.onMainCameraFocalLengthConfig)
       this.$bus.$off('FocalLength', this.onLegacyMainCameraFocalLengthConfig)
       this.$bus.$off('GuiderFocalLength', this.onGuiderFocalLengthConfig)
+      this.$bus.$off('PoleCameraFocalLength', this.onPoleCameraFocalLengthConfig)
       this.$bus.$off('PolarAlignmentGuidanceStepProgress', this.updateGuidanceStepProgress)
 
       // 清理拖动事件监听
@@ -1019,7 +1052,7 @@ export default {
       this.stopMemoryCleanup()
       this.clearCameraSelectTimer()
       if (this.cameraSelectResolver) {
-        this.cameraSelectResolver('MainCamera')
+        this.cameraSelectResolver(this.cameraSelectDefaultRole || 'MainCamera')
         this.cameraSelectResolver = null
       }
       if (this.prereqDialogResolver) {
@@ -1084,6 +1117,11 @@ export default {
         this.prereqForm.guiderFocalLength = this.configGuiderFocalLengthRaw
       },
 
+      onPoleCameraFocalLengthConfig(value) {
+        this.configPoleFocalLengthRaw = String(value || '').trim()
+        this.prereqForm.poleFocalLength = this.configPoleFocalLengthRaw
+      },
+
       clearCameraSelectTimer() {
         if (this.cameraSelectTimer) {
           clearInterval(this.cameraSelectTimer)
@@ -1096,6 +1134,30 @@ export default {
         if (typeof getter !== 'function') return false
         const d = getter(deviceName)
         return !!(d && d.connected)
+      },
+
+      polarRoleLabel(role) {
+        if (role === 'PoleCamera') return '电子极轴镜'
+        if (role === 'Guider') return '导星镜'
+        return '主相机'
+      },
+
+      polarRoleDevice(role) {
+        if (role === 'PoleCamera') return 'PoleCamera'
+        if (role === 'Guider') return 'GuiderCamera'
+        return 'MainCamera'
+      },
+
+      polarFeatureDevices(role) {
+        return [this.polarRoleDevice(role), 'Mount']
+      },
+
+      getConnectedPolarRoles() {
+        const roles = []
+        if (this.hasConnectedDevice('PoleCamera')) roles.push('PoleCamera')
+        if (this.hasConnectedDevice('MainCamera')) roles.push('MainCamera')
+        if (this.hasConnectedDevice('GuiderCamera')) roles.push('Guider')
+        return roles
       },
 
       getCurrentCoordinates() {
@@ -1116,6 +1178,7 @@ export default {
         this.prereqForm.longitude = lon
         this.prereqForm.mainFocalLength = String(this.configMainFocalLengthRaw || '').trim()
         this.prereqForm.guiderFocalLength = String(this.configGuiderFocalLengthRaw || '').trim()
+        this.prereqForm.poleFocalLength = String(this.configPoleFocalLengthRaw || '').trim()
       },
 
       validateCoordinates(latValue, lonValue) {
@@ -1127,23 +1190,27 @@ export default {
         return true
       },
 
-      validateRoleFocalLength(role, mainFocal, guiderFocal) {
+      validateRoleFocalLength(role, mainFocal, guiderFocal, poleFocal) {
         const main = Number(mainFocal)
         const guider = Number(guiderFocal)
+        const pole = Number(poleFocal)
+        if (role === 'PoleCamera') return Number.isFinite(pole) && pole > 0
         if (role === 'Guider') return Number.isFinite(guider) && guider > 0
         return Number.isFinite(main) && main > 0
       },
 
-      requestCameraRoleSelection() {
+      requestCameraRoleSelection(availableRoles = ['MainCamera', 'Guider'], defaultRole = 'MainCamera') {
         return new Promise((resolve) => {
           this.cameraSelectResolver = resolve
+          this.cameraSelectAvailableRoles = Array.isArray(availableRoles) && availableRoles.length ? availableRoles : ['MainCamera']
+          this.cameraSelectDefaultRole = this.cameraSelectAvailableRoles.includes(defaultRole) ? defaultRole : this.cameraSelectAvailableRoles[0]
           this.cameraSelectCountdown = 60
           this.showCameraSelectDialog = true
           this.clearCameraSelectTimer()
           this.cameraSelectTimer = setInterval(() => {
             this.cameraSelectCountdown -= 1
             if (this.cameraSelectCountdown <= 0) {
-              this.selectPolarCameraRole('MainCamera')
+              this.selectPolarCameraRole(this.cameraSelectDefaultRole)
             }
           }, 1000)
         })
@@ -1154,7 +1221,8 @@ export default {
         this.clearCameraSelectTimer()
         const resolver = this.cameraSelectResolver
         this.cameraSelectResolver = null
-        if (resolver) resolver(role === 'Guider' ? 'Guider' : 'MainCamera')
+        const normalizedRole = role === 'PoleCamera' || role === 'Guider' ? role : 'MainCamera'
+        if (resolver) resolver(this.cameraSelectAvailableRoles.includes(normalizedRole) ? normalizedRole : this.cameraSelectDefaultRole)
       },
 
       openPrereqDialog(role) {
@@ -1178,14 +1246,16 @@ export default {
         const lon = String(this.prereqForm.longitude || '').trim()
         const mainFocal = String(this.prereqForm.mainFocalLength || '').trim()
         const guiderFocal = String(this.prereqForm.guiderFocalLength || '').trim()
+        const poleFocal = String(this.prereqForm.poleFocalLength || '').trim()
         const mainFocalNum = Number(mainFocal)
         const guiderFocalNum = Number(guiderFocal)
+        const poleFocalNum = Number(poleFocal)
 
         if (!this.validateCoordinates(lat, lon)) {
           this.callShowMessageBox('经纬度无效，请检查输入范围', 'warning')
           return
         }
-        if (!this.validateRoleFocalLength(this.selectedPolarCameraRole, mainFocal, guiderFocal)) {
+        if (!this.validateRoleFocalLength(this.selectedPolarCameraRole, mainFocal, guiderFocal, poleFocal)) {
           this.callShowMessageBox('所选设备焦距必须大于 0', 'warning')
           return
         }
@@ -1200,10 +1270,14 @@ export default {
         if (Number.isFinite(guiderFocalNum) && guiderFocalNum > 0) {
           this.$bus.$emit('AppSendMessage', 'Vue_Command', `saveToConfigFile:GuiderFocalLength:${guiderFocalNum}`)
         }
+        if (Number.isFinite(poleFocalNum) && poleFocalNum > 0) {
+          this.$bus.$emit('AppSendMessage', 'Vue_Command', `saveToConfigFile:PoleCameraFocalLength:${poleFocalNum}`)
+        }
 
         this.configCoordinatesRaw = `${lat},${lon},${isAutoLocation}`
         if (Number.isFinite(mainFocalNum) && mainFocalNum > 0) this.configMainFocalLengthRaw = String(mainFocalNum)
         if (Number.isFinite(guiderFocalNum) && guiderFocalNum > 0) this.configGuiderFocalLengthRaw = String(guiderFocalNum)
+        if (Number.isFinite(poleFocalNum) && poleFocalNum > 0) this.configPoleFocalLengthRaw = String(poleFocalNum)
 
         this.showPrereqDialog = false
         const resolver = this.prereqDialogResolver
@@ -2797,11 +2871,10 @@ export default {
           this.addLog(this.$t('Error: Mount Not Connected'), 'error')
           return
         }
-        const mainConnected = this.hasConnectedDevice('MainCamera')
-        const guiderConnected = this.hasConnectedDevice('GuiderCamera')
-        if (!mainConnected && !guiderConnected) {
-          this.addLog('自动极轴启动失败：主相机或导星镜未连接', 'error')
-          this.callShowMessageBox('请先连接主相机或导星镜', 'warning')
+        const connectedRoles = this.getConnectedPolarRoles()
+        if (!connectedRoles.length) {
+          this.addLog('自动极轴启动失败：主相机、导星镜或电子极轴镜未连接', 'error')
+          this.callShowMessageBox('请先连接主相机、导星镜或电子极轴镜', 'warning')
           return
         }
 
@@ -2812,28 +2885,26 @@ export default {
           return
         }
 
-        let role = guiderConnected && !mainConnected ? 'Guider' : 'MainCamera'
-        if (mainConnected && guiderConnected) {
-          role = await this.requestCameraRoleSelection()
+        let role = connectedRoles.length === 1 ? connectedRoles[0] : (connectedRoles.includes('PoleCamera') ? 'PoleCamera' : connectedRoles[0])
+        if (connectedRoles.length > 1) {
+          role = await this.requestCameraRoleSelection(connectedRoles, role)
         }
-        if (role === 'Guider') {
-          const guiderCheck = this.$canUseDevice('GuiderCamera', 'AutoPolarAlignment')
-          if (!guiderCheck.allowed) return
-          if (!guiderConnected) {
-            this.callShowMessageBox('导星镜未连接，无法使用导星镜执行自动极轴', 'warning')
-            return
-          }
-        } else {
-          const camCheck = this.$canUseDevice('MainCamera', 'AutoPolarAlignment')
-          if (!camCheck.allowed) return
+
+        const cameraDevice = this.polarRoleDevice(role)
+        const cameraCheck = this.$canUseDevice(cameraDevice, 'AutoPolarAlignment')
+        if (!cameraCheck.allowed) return
+        if (!this.hasConnectedDevice(cameraDevice)) {
+          this.callShowMessageBox(`${this.polarRoleLabel(role)}未连接，无法使用该设备执行自动极轴`, 'warning')
+          return
         }
 
         const needPrereqDialog = (() => {
           const { lat, lon } = this.getCurrentCoordinates()
           const mainFocal = String(this.configMainFocalLengthRaw || '').trim()
           const guiderFocal = String(this.configGuiderFocalLengthRaw || '').trim()
+          const poleFocal = String(this.configPoleFocalLengthRaw || '').trim()
           const locationOk = this.validateCoordinates(lat, lon)
-          const focalOk = this.validateRoleFocalLength(role, mainFocal, guiderFocal)
+          const focalOk = this.validateRoleFocalLength(role, mainFocal, guiderFocal, poleFocal)
           return !(locationOk && focalOk)
         })()
         if (needPrereqDialog) {
@@ -2854,7 +2925,7 @@ export default {
         }
         
         this.isCalibrationRunning = true
-        const featureDevices = role === 'Guider' ? ['GuiderCamera', 'Mount'] : ['MainCamera', 'Mount']
+        const featureDevices = this.polarFeatureDevices(role)
         this.$startFeature(featureDevices, 'AutoPolarAlignment')
         this.resetCalibration()
         this.addLog(this.$t('Starting Auto Calibration'), 'info')
@@ -2864,7 +2935,7 @@ export default {
       stopAutoCalibration() {
         this.isCalibrationRunning = false
         this.addLog(this.$t('Auto Calibration Stopped'), 'warning')
-        const featureDevices = this.activePolarCameraRole === 'Guider' ? ['GuiderCamera', 'Mount'] : ['MainCamera', 'Mount']
+        const featureDevices = this.polarFeatureDevices(this.activePolarCameraRole)
         this.$stopFeature(featureDevices, 'AutoPolarAlignment')
         this.$bus.$emit('AppSendMessage', 'Vue_Command', 'StopAutoPolarAlignment')
       },
@@ -3439,7 +3510,7 @@ export default {
         if (isRunning) {
           this.activePolarCameraRole = this.selectedPolarCameraRole || 'MainCamera'
         }
-        const featureDevices = this.activePolarCameraRole === 'Guider' ? ['GuiderCamera', 'Mount'] : ['MainCamera', 'Mount']
+        const featureDevices = this.polarFeatureDevices(this.activePolarCameraRole)
         if (isRunning) this.$startFeature(featureDevices, 'AutoPolarAlignment')
         else this.$stopFeature(featureDevices, 'AutoPolarAlignment')
         if (!isRunning) {

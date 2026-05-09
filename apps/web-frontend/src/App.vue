@@ -1001,7 +1001,12 @@ const FIXED_SDK_SUPPORT_RULES = {
     /^qhy\s+ccd2$/i,          // 匹配 "QHY CCD2" (显示标签)
   ],
   PoleCamera: [
-
+    /^indi_qhy_ccd$/i,        // 精确匹配驱动名称
+    /^indi_qhy_ccd2$/i,       // 匹配 indi_qhy_ccd2（后端支持的变体）
+    /^libqhyccd$/i,           // 匹配 libqhyccd（后端支持的变体）
+    /^qhyccd$/i,              // 精确匹配 QHYCCD（SDK驱动名）
+    /^qhy\s+ccd$/i,           // 匹配 "QHY CCD" (带空格，显示标签)
+    /^qhy\s+ccd2$/i,          // 匹配 "QHY CCD2" (显示标签)
   ],
   // 电调：匹配 QHYFocuser 驱动
   // QT端定义：SDK_DRIVER_NAME_INDI_QHY_CCD="indi_qhy_focuser", SDK_DRIVER_NAME_QHYCCD="QFocuser"
@@ -2324,7 +2329,7 @@ export default {
       await this.runAutoHistogramOnce();
     },
     // =========================
-    // MainCamera / Guider 模式联动与锁定逻辑
+    // QHY 相机模式联动与锁定逻辑
     // =========================
     normalizeDriverKey(name) {
       const n = String(name || '').trim();
@@ -2337,61 +2342,66 @@ export default {
     getDeviceByType(deviceType) {
       return (this.devices || []).find(d => d.driverType === deviceType) || null;
     },
-    isMainGuiderSameDriver() {
-      const main = this.getDeviceByType('MainCamera');
-      const guider = this.getDeviceByType('Guider');
-      const mk = this.normalizeDriverKey(main && main.driverName);
-      const gk = this.normalizeDriverKey(guider && guider.driverName);
-      return !!(mk && gk && mk === gk);
+    cameraMutexRoleTypes() {
+      return ['MainCamera', 'Guider', 'PoleCamera'];
     },
-    anySdkConnectedInMainGuider() {
-      const main = this.getDeviceByType('MainCamera');
-      const guider = this.getDeviceByType('Guider');
-      const mainSdkConnected = !!(main && main.isConnected && String(main.connectionMode || '').toUpperCase() === 'SDK');
-      const guiderSdkConnected = !!(guider && guider.isConnected && String(guider.connectionMode || '').toUpperCase() === 'SDK');
-      return mainSdkConnected || guiderSdkConnected;
+    linkedCameraModeDevices(deviceType) {
+      const roles = this.cameraMutexRoleTypes();
+      if (!roles.includes(deviceType)) return [];
+      const current = this.getDeviceByType(deviceType);
+      const key = this.normalizeDriverKey(current && current.driverName);
+      if (!key) return [];
+      return roles
+        .map(type => this.getDeviceByType(type))
+        .filter(d => d && this.normalizeDriverKey(d.driverName) === key);
     },
-    anyIndiConnectedInMainGuider() {
-      const main = this.getDeviceByType('MainCamera');
-      const guider = this.getDeviceByType('Guider');
-      const mainIndiConnected = !!(main && main.isConnected && String(main.connectionMode || 'INDI').toUpperCase() !== 'SDK');
-      const guiderIndiConnected = !!(guider && guider.isConnected && String(guider.connectionMode || 'INDI').toUpperCase() !== 'SDK');
-      return mainIndiConnected || guiderIndiConnected;
+    isCameraModeGroup(deviceType) {
+      return this.linkedCameraModeDevices(deviceType).length > 1;
     },
-    ensureMainGuiderModeConsistency(preferDeviceType = '') {
-      // 仅在同驱动时要求一致
-      if (!this.isMainGuiderSameDriver()) return;
+    anySdkConnectedInCameraModeGroup(deviceType) {
+      return this.linkedCameraModeDevices(deviceType).some(d =>
+        d && d.isConnected && String(d.connectionMode || '').toUpperCase() === 'SDK');
+    },
+    anyIndiConnectedInCameraModeGroup(deviceType) {
+      return this.linkedCameraModeDevices(deviceType).some(d =>
+        d && d.isConnected && String(d.connectionMode || 'INDI').toUpperCase() !== 'SDK');
+    },
+    ensureCameraModeConsistency(preferDeviceType = '') {
+      // 仅在同驱动相机组内要求一致
+      if (!this.isCameraModeGroup(preferDeviceType)) return;
 
-      const main = this.getDeviceByType('MainCamera');
-      const guider = this.getDeviceByType('Guider');
-      if (!main || !guider) return;
+      const linked = this.linkedCameraModeDevices(preferDeviceType);
+      if (!linked.length) return;
 
-      const mainMode = (String(main.connectionMode || 'INDI').toUpperCase() === 'SDK') ? 'SDK' : 'INDI';
-      const guiderMode = (String(guider.connectionMode || 'INDI').toUpperCase() === 'SDK') ? 'SDK' : 'INDI';
+      const modeOf = (d) => (String(d.connectionMode || 'INDI').toUpperCase() === 'SDK') ? 'SDK' : 'INDI';
 
-      // 若已存在 SDK 连接，则强制双方都锁到 SDK（并阻止切回 INDI）
-      if (this.anySdkConnectedInMainGuider()) {
-        if (mainMode !== 'SDK') this.requestSetConnectionMode('MainCamera', 'SDK', { silent: true, fromPeer: true });
-        if (guiderMode !== 'SDK') this.requestSetConnectionMode('Guider', 'SDK', { silent: true, fromPeer: true });
+      // 若已存在 SDK 连接，则强制同驱动相机组锁到 SDK（并阻止切回 INDI）
+      if (this.anySdkConnectedInCameraModeGroup(preferDeviceType)) {
+        linked.forEach(d => {
+          if (modeOf(d) !== 'SDK') this.requestSetConnectionMode(d.driverType, 'SDK', { silent: true, fromPeer: true });
+        });
         return;
       }
 
-      // 若已存在 INDI 连接，则强制双方都锁到 INDI（并阻止切到 SDK）
-      if (this.anyIndiConnectedInMainGuider()) {
-        if (mainMode !== 'INDI') this.requestSetConnectionMode('MainCamera', 'INDI', { silent: true, fromPeer: true });
-        if (guiderMode !== 'INDI') this.requestSetConnectionMode('Guider', 'INDI', { silent: true, fromPeer: true });
+      // 若已存在 INDI 连接，则强制同驱动相机组锁到 INDI（并阻止切到 SDK）
+      if (this.anyIndiConnectedInCameraModeGroup(preferDeviceType)) {
+        linked.forEach(d => {
+          if (modeOf(d) !== 'INDI') this.requestSetConnectionMode(d.driverType, 'INDI', { silent: true, fromPeer: true });
+        });
         return;
       }
 
-      // 无锁：若不一致，则以触发方（或当前 UI 选中值）为准同步另一方
-      if (mainMode !== guiderMode) {
-        let desired = 'INDI';
-        if (preferDeviceType === 'MainCamera') desired = mainMode;
-        else if (preferDeviceType === 'Guider') desired = guiderMode;
-        else desired = (String(this.selectedConnectionMode || '').toUpperCase() === 'SDK') ? 'SDK' : 'INDI';
+      // 无锁：若不一致，则以触发方（或当前 UI 选中值）为准同步其它同驱动相机
+      const modes = linked.map(modeOf);
+      if (new Set(modes).size > 1) {
+        const preferDevice = this.getDeviceByType(preferDeviceType);
+        const desired = preferDevice
+          ? modeOf(preferDevice)
+          : ((String(this.selectedConnectionMode || '').toUpperCase() === 'SDK') ? 'SDK' : 'INDI');
 
-        if (mainMode !== desired) this.requestSetConnectionMode('MainCamera', desired, { silent: true, fromPeer: true });
-        if (guiderMode !== desired) this.requestSetConnectionMode('Guider', desired, { silent: true, fromPeer: true });
+        linked.forEach(d => {
+          if (modeOf(d) !== desired) this.requestSetConnectionMode(d.driverType, desired, { silent: true, fromPeer: true });
+        });
       }
     },
     // 确保主相机的“USB Traffic”配置项存在；若不存在则动态插入到 Offset 后面
@@ -4107,6 +4117,11 @@ export default {
                     this.$bus.$emit('AppSendMessage', 'Vue_Command', 'GuiderFocalLength:' + parts[2]);
                   }
 
+                  if (parts[1] === 'PoleCameraFocalLength') {
+                    this.updateConfigItemValue(this.PoleCameraConfigItems, 'PoleCameraFocalLength', parts[2], 'ConfigureRecovery')
+                    this.$bus.$emit('AppSendMessage', 'Vue_Command', 'PoleCameraFocalLength:' + parts[2]);
+                  }
+
                   if (parts[1] === 'GuiderPixelSize') {
                     setGuiderItemValue('Guider Pixel size', parts[2]);
                     this.$bus.$emit('AppSendMessage', 'Vue_Command', 'GuiderPixelSize:' + parts[2]);
@@ -5659,10 +5674,8 @@ export default {
         }
       });
 
-      // 若主相机与导星镜选用了同一驱动：确保二者连接模式保持一致
-      if (this.CurrentDriverType === 'MainCamera' || this.CurrentDriverType === 'Guider') {
-        this.ensureMainGuiderModeConsistency(this.CurrentDriverType);
-      }
+      // 同驱动相机组保持连接模式一致
+      this.ensureCameraModeConsistency(this.CurrentDriverType);
     },
     clearDriver() {
       const currentDevice = this.devices.find(device => device.driverType === this.CurrentDriverType);
@@ -12287,10 +12300,11 @@ export default {
         return;
       }
       delete this.pendingConnectionModeByDevice[deviceType];
-      // 主相机/导星同驱动时，模式切换会成对发起 SetConnectionMode；一侧已断开时另一侧的 pending 也应清除
-      if ((deviceType === 'MainCamera' || deviceType === 'Guider') && this.isMainGuiderSameDriver()) {
-        delete this.pendingConnectionModeByDevice.MainCamera;
-        delete this.pendingConnectionModeByDevice.Guider;
+      // 同驱动相机组模式切换会联动发起 SetConnectionMode；一侧已断开时其它 pending 也应清除
+      if (this.isCameraModeGroup(deviceType)) {
+        this.linkedCameraModeDevices(deviceType).forEach(d => {
+          delete this.pendingConnectionModeByDevice[d.driverType];
+        });
       }
       this.isSettingConnectionMode = Object.keys(this.pendingConnectionModeByDevice || {}).length > 0;
     },
@@ -12310,17 +12324,16 @@ export default {
         return;
       }
 
-      // 规则：主相机与导星镜若使用同一驱动，则必须同一连接模式；且一旦存在 SDK 连接则禁止切换到 INDI
-      const isMainOrGuider = (deviceType === 'MainCamera' || deviceType === 'Guider');
-      if (isMainOrGuider && this.isMainGuiderSameDriver()) {
-        if (nextMode === 'INDI' && this.anySdkConnectedInMainGuider()) {
+      // 规则：同一 QHY 驱动下 Main/Guider/PoleCamera 必须同一连接模式；且连接后禁止跨模式切换
+      if (this.isCameraModeGroup(deviceType)) {
+        if (nextMode === 'INDI' && this.anySdkConnectedInCameraModeGroup(deviceType)) {
           // 禁止切回 INDI：回滚到 SDK 并提示
           dev.connectionMode = 'SDK';
           if (this.CurrentDriverType === deviceType) this.selectedConnectionMode = 'SDK';
           if (!opts.silent) this.callShowMessageBox(this.$t('SDKConnectedLockIndiForbidden'), 'warning');
           return;
         }
-        if (nextMode === 'SDK' && this.anyIndiConnectedInMainGuider()) {
+        if (nextMode === 'SDK' && this.anyIndiConnectedInCameraModeGroup(deviceType)) {
           // 禁止切到 SDK：回滚到 INDI 并提示
           dev.connectionMode = 'INDI';
           if (this.CurrentDriverType === deviceType) this.selectedConnectionMode = 'INDI';
@@ -12328,10 +12341,13 @@ export default {
           return;
         }
 
-        // 同步另一台相机的模式（避免 SDK/INDI 混用）
+        // 同步其它同驱动相机的模式（避免 SDK/INDI 混用）
         if (!opts.fromPeer) {
-          const peerType = (deviceType === 'MainCamera') ? 'Guider' : 'MainCamera';
-          this.requestSetConnectionMode(peerType, nextMode, { silent: true, fromPeer: true });
+          this.linkedCameraModeDevices(deviceType).forEach(peer => {
+            if (peer.driverType !== deviceType) {
+              this.requestSetConnectionMode(peer.driverType, nextMode, { silent: true, fromPeer: true });
+            }
+          });
         }
       }
 
@@ -12371,10 +12387,8 @@ export default {
       this.isSettingConnectionMode = Object.keys(this.pendingConnectionModeByDevice || {}).length > 0;
       this.SendConsoleLogMsg(`SetConnectionModeSuccess:${deviceType}:${mode}`, 'info');
 
-      // 成功后再次确保主相机/导星镜一致（防止并发/竞态导致短暂不一致）
-      if (deviceType === 'MainCamera' || deviceType === 'Guider') {
-        this.ensureMainGuiderModeConsistency(deviceType);
-      }
+      // 成功后再次确保同驱动相机组一致（防止并发/竞态导致短暂不一致）
+      this.ensureCameraModeConsistency(deviceType);
     },
 
     onSetConnectionModeFailed(deviceType, errorMsg) {
@@ -12402,10 +12416,8 @@ export default {
       const translated = (this.$t(errorMsg) !== errorMsg) ? this.$t(errorMsg) : errorMsg;
       this.callShowMessageBox(`SetConnectionMode failed: ${translated}`, 'error');
 
-      // 失败后也尝试恢复一致性（尤其是主相机/导星镜同驱动时）
-      if (deviceType === 'MainCamera' || deviceType === 'Guider') {
-        this.ensureMainGuiderModeConsistency(deviceType);
-      }
+      // 失败后也尝试恢复同驱动相机组一致性
+      this.ensureCameraModeConsistency(deviceType);
     },
     loadBindDeviceList(deviceObject) {
       console.log('loadBindDeviceList:', deviceObject);
@@ -12452,10 +12464,8 @@ export default {
         }
       }
 
-      // 打开设备页/刷新 UI 时，若主相机与导星镜同驱动，确保模式一致（并处理 SDK 连接锁定）
-      if (driverType === 'MainCamera' || driverType === 'Guider') {
-        this.ensureMainGuiderModeConsistency(driverType);
-      }
+      // 打开设备页/刷新 UI 时，同驱动相机组保持模式一致（并处理 SDK/INDI 连接锁定）
+      this.ensureCameraModeConsistency(driverType);
     },
     startLoading() {
       this.loadingDeviceSelection = true;
@@ -13629,13 +13639,13 @@ export default {
         return false;
       }
     },
-    // ConnectionMode 下拉框：根据“SDK已连接锁定”动态禁用 INDI 选项（仅对同驱动的主相机/导星镜生效）
+    // ConnectionMode 下拉框：根据“SDK已连接锁定”动态禁用 INDI 选项（同驱动相机组生效）
     connectionModeItemsForCurrentDevice() {
       const items = (this.connectionModeItems || []).map(i => ({ ...i }));
       const t = this.CurrentDriverType;
-      const isPair = (t === 'MainCamera' || t === 'Guider');
-      const lockToSdk = isPair && this.isMainGuiderSameDriver() && this.anySdkConnectedInMainGuider();
-      const lockToIndi = isPair && this.isMainGuiderSameDriver() && !lockToSdk && this.anyIndiConnectedInMainGuider();
+      const isGroup = this.isCameraModeGroup(t);
+      const lockToSdk = isGroup && this.anySdkConnectedInCameraModeGroup(t);
+      const lockToIndi = isGroup && !lockToSdk && this.anyIndiConnectedInCameraModeGroup(t);
 
       return items.map(it => {
         const v = String(it.value || '').toUpperCase();
