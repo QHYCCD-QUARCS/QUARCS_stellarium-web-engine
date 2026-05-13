@@ -1696,6 +1696,11 @@ export default {
       this.$store.commit('device/SET_DEVICE_CONNECTED', { device: 'GuiderCamera', connected });
       if (!connected) this.$store.commit('device/CLEAR_FEATURES', { device: 'GuiderCamera' });
     });
+    this.$bus.$on('PoleCameraConnected', (num) => {
+      const connected = num === 1;
+      this.$store.commit('device/SET_DEVICE_CONNECTED', { device: 'PoleCamera', connected });
+      if (!connected) this.$store.commit('device/CLEAR_FEATURES', { device: 'PoleCamera' });
+    });
     this.$bus.$on('CFWConnected', (num) => {
       const connected = num === 1;
       this.$store.commit('device/SET_DEVICE_CONNECTED', { device: 'CFW', connected });
@@ -4127,6 +4132,11 @@ export default {
                     this.$bus.$emit('AppSendMessage', 'Vue_Command', 'GuiderPixelSize:' + parts[2]);
                   }
 
+                  if (parts[1] === 'GuiderExposureMs') {
+                    this.$bus.$emit('GuiderExposureMs', parts[2]);
+                    this.$bus.$emit('AppSendMessage', 'Vue_Command', 'GuiderExpTimeSwitch:' + parts[2]);
+                  }
+
                   if (parts[1] === 'Coordinates') {
                     const [latStr, lngStr, isAutoStr] = parts[2].split(',').map(item => item.trim());
                     const lat = parseFloat(latStr);
@@ -4812,6 +4822,45 @@ export default {
                   const starCount = parseInt(parts[3]);
                   console.log('PolarAlignmentGuidanceStepProgress: ', step, message, starCount);
                   this.$bus.$emit('PolarAlignmentGuidanceStepProgress', step, message, starCount);
+                }
+                break;
+
+              case 'PoleMasterAlignmentState':
+                if (parts.length === 5) {
+                  const isRunning = parts[1] === 'true';
+                  const state = parseInt(parts[2], 10);
+                  const message = parts[3];
+                  const progress = parseInt(parts[4], 10);
+                  console.log('PoleMasterAlignmentState: ', isRunning, state, message, progress);
+                  this.$bus.$emit('PoleMasterAlignmentState', isRunning, state, message, progress);
+                }
+                break;
+
+              case 'PoleMasterAlignmentGuideData':
+                if (parts.length >= 10) {
+                  this.$bus.$emit('PoleMasterAlignmentGuideData', {
+                    imageW: parseInt(parts[1], 10),
+                    imageH: parseInt(parts[2], 10),
+                    axisX: parseFloat(parts[3]),
+                    axisY: parseFloat(parts[4]),
+                    poleX: parseFloat(parts[5]),
+                    poleY: parseFloat(parts[6]),
+                    errorPx: parseFloat(parts[7]),
+                    errorArcsec: parseFloat(parts[8]),
+                    hint: parts.slice(9).join(':')
+                  });
+                }
+                break;
+
+              case 'PoleMasterAlignmentFrameData':
+                if (parts.length >= 4) {
+                  const framePayload = {
+                    fileName: parts[1],
+                    imageWidth: parseInt(parts[2], 10),
+                    imageHeight: parseInt(parts[3], 10)
+                  };
+                  console.log('PoleMasterAlignmentFrameData:', framePayload);
+                  this.$bus.$emit('PoleMasterAlignmentFrameData', framePayload);
                 }
                 break;
 
@@ -5794,6 +5843,9 @@ export default {
       } else if (type === 'Guider') {
         this.$bus.$emit('GuiderConnected', 1);
         console.log('Guider is Connected.');
+      } else if (type === 'PoleCamera') {
+        this.$bus.$emit('PoleCameraConnected', 1);
+        console.log('PoleCamera is Connected.');
       }
       console.log('updateDevicesConnect: ', type, DeviceName, DriverName, isBind);
 
@@ -12085,6 +12137,7 @@ export default {
         this.$bus.$emit('MountConnected', 0);
         this.$bus.$emit('CFWConnected', 0);
         this.$bus.$emit('GuiderConnected', 0);
+        this.$bus.$emit('PoleCameraConnected', 0);
         this.clearDeviceList();
         this.$bus.$emit('deleteDeviceTypeAllocationList', 'all');
         return;
@@ -12122,6 +12175,8 @@ export default {
         this.$bus.$emit('CFWConnected', 0);
       } else if (devicetype == "Guider") {
         this.$bus.$emit('GuiderConnected', 0);
+      } else if (devicetype == "PoleCamera") {
+        this.$bus.$emit('PoleCameraConnected', 0);
       }
       
       // 恢复选中驱动：断开后保持驱动选择不变，方便用户重新连接
@@ -12142,6 +12197,7 @@ export default {
         this.$bus.$emit('MountConnected', 0);
         this.$bus.$emit('CFWConnected', 0);
         this.$bus.$emit('GuiderConnected', 0);
+        this.$bus.$emit('PoleCameraConnected', 0);
         this.clearDeviceList();
         this.$bus.$emit('deleteDeviceTypeAllocationList', 'all');
         return;
@@ -12179,6 +12235,8 @@ export default {
         this.$bus.$emit('CFWConnected', 0);
       } else if (devicetype == "Guider") {
         this.$bus.$emit('GuiderConnected', 0);
+      } else if (devicetype == "PoleCamera") {
+        this.$bus.$emit('PoleCameraConnected', 0);
       }
       
       // 恢复选中驱动：断开后保持驱动选择不变，方便用户重新连接
@@ -14279,8 +14337,31 @@ body,
 /* 主菜单抽屉整体下移，不遮挡顶部工具栏（工具栏高度 40px） */
 .v-navigation-drawer.menu-navigation-drawer {
   top: 40px !important;
-  height: calc(100% - 40px) !important;
+  height: calc(100vh - 40px) !important;
   max-height: calc(100vh - 40px) !important;
+}
+
+.v-navigation-drawer.menu-navigation-drawer .v-navigation-drawer__content {
+  height: 100% !important;
+  max-height: 100% !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+.v-navigation-drawer.menu-navigation-drawer .v-layout {
+  min-height: 100%;
+}
+
+.v-navigation-drawer.submenu-navigation-drawer {
+  top: 40px !important;
+  height: calc(100vh - 40px) !important;
+  max-height: calc(100vh - 40px) !important;
+}
+
+.v-navigation-drawer.submenu-navigation-drawer .v-navigation-drawer__content {
+  height: 100% !important;
+  max-height: 100% !important;
+  overflow: hidden !important;
 }
 
 /* 主菜单打开时浮在遮罩之上的菜单按钮，与顶部工具栏的菜单图标同一位置（z-index 高于 Vuetify overlay） */

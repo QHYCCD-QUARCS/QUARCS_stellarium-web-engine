@@ -209,6 +209,7 @@ export default {
     this.$bus.$on('GuiderCalibration', this.GuiderCalibration);
     this.$bus.$on('GuiderPulse', this.GuiderPulse);
     this.$bus.$on('GuiderStarSelected', this.GuiderStarSelected);
+    this.$bus.$on('GuiderExposureMs', this.GuiderExposureMs);
     this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getGuiderStatus');
   },
   mounted() {
@@ -229,6 +230,7 @@ export default {
     this.$bus.$off('GuiderCalibration', this.GuiderCalibration);
     this.$bus.$off('GuiderPulse', this.GuiderPulse);
     this.$bus.$off('GuiderStarSelected', this.GuiderStarSelected);
+    this.$bus.$off('GuiderExposureMs', this.GuiderExposureMs);
   },
   computed: {
     GuiderSwitchBtnClass() {
@@ -391,6 +393,13 @@ export default {
         this.ExpTime = 1000;
       }
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'GuiderExpTimeSwitch:' + this.ExpTime);
+    },
+
+    GuiderExposureMs(value) {
+      const exposureMs = parseInt(value, 10);
+      if (exposureMs === 500 || exposureMs === 1000 || exposureMs === 2000) {
+        this.ExpTime = exposureMs;
+      }
     },
 
     GuiderSwitchStatus(value) {

@@ -100,14 +100,30 @@
           </button>
 
           <button
-            class="header-btn"
+            class="header-btn trajectory-header-btn"
+            :class="{ 'trajectory-active': showTrajectoryOverlay }"
             @click="toggleTrajectoryOverlay"
             :title="showTrajectoryOverlay ? $t('Hide Trajectory Canvas') : $t('Show Trajectory Canvas')"
             data-testid="pa-btn-toggle-trajectory"
             :data-state="showTrajectoryOverlay ? 'shown' : 'hidden'"
           >
             <v-icon data-testid="pa-icon-toggle-trajectory">
-              {{ showTrajectoryOverlay ? 'mdi-eye-off' : 'mdi-crosshairs-gps' }}
+              {{ showTrajectoryOverlay ? 'mdi-vector-polyline-remove' : 'mdi-vector-polyline' }}
+            </v-icon>
+          </button>
+
+          <button
+            v-if="hasConnectedDevice('PoleCamera')"
+            class="header-btn pole-master-header-btn"
+            :class="{ 'pole-master-active': isPoleMasterViewActive }"
+            @click="togglePoleMasterView"
+            :disabled="!canAutoCalibrate"
+            :title="isPoleMasterViewActive ? '返回普通极轴校准界面' : '切换到电子极轴镜界面'"
+            data-testid="pa-btn-pole-master-calibration"
+            :data-state="isPoleMasterViewActive ? 'selected' : 'idle'"
+          >
+            <v-icon data-testid="pa-icon-pole-master-calibration">
+              mdi-camera-iris
             </v-icon>
           </button>
 
@@ -122,14 +138,40 @@
         </div>
       </div>
 
+      <PoleMasterPolarAlignmentPanel
+        v-if="showPoleMasterPanel && !isCollapsed"
+        :running="isPoleMasterCalibrationActive"
+        :state-number="poleMasterState"
+        :message="poleMasterMessage"
+        :progress="poleMasterProgress"
+        :guide="poleMasterGuide"
+        :frame="poleMasterFrame"
+        @stop="stopAutoCalibration"
+        @frame-log="addPoleMasterFrameLog"
+        data-testid="pa-pole-master-panel"
+      />
+
       <!-- 收缩状态内容 -->
       <div
-        v-if="isCollapsed"
+        v-else-if="isCollapsed"
         class="widget-content collapsed"
         :class="{ 'dragging': isDraggingState }"
         data-testid="pa-content-collapsed"
       >
         <div class="collapsed-info" data-testid="pa-collapsed-info">
+          <template v-if="showPoleMasterPanel">
+            <div class="collapsed-pole-master-error" data-testid="pa-collapsed-pole-master-error">
+              <span class="status-label">误差</span>
+              <span
+                class="status-value"
+                :class="{ 'needs-adjustment': poleMasterErrorArcsecNeedsAdjustment }"
+                data-testid="pa-collapsed-pole-master-error-value"
+              >
+                {{ formattedPoleMasterErrorArcsec }}
+              </span>
+            </div>
+          </template>
+          <template v-else>
           <div class="collapsed-progress" data-testid="pa-collapsed-progress">
             <div
               class="progress-circle"
@@ -168,6 +210,7 @@
               </span>
             </div>
           </div>
+          </template>
         </div>
       </div>
 
@@ -377,10 +420,11 @@
             <div class="action-buttons" data-testid="pa-action-buttons">
               <button
                 class="action-btn primary"
-                @click="startAutoCalibration"
+                @click="startAutoCalibration()"
                 :disabled="!canAutoCalibrate"
                 data-testid="pa-btn-auto-calibration"
                 :data-state="isCalibrationRunning ? 'running' : 'stopped'"
+                :data-mode="isPoleMasterCalibrationActive ? 'pole-master' : 'standard'"
               >
                 <v-icon v-if="!isCalibrationRunning">mdi-play-circle</v-icon>
                 <v-icon v-else>mdi-stop-circle</v-icon>
@@ -628,6 +672,7 @@
 
 <script>
 import swh from '@/assets/sw_helpers.js'
+import PoleMasterPolarAlignmentPanel from './PoleMasterPolarAlignmentPanel.vue'
 
 // 常量定义
 const COLORS = {
@@ -668,6 +713,9 @@ const DISPLAY_LOG_LIMIT = 10
 
 export default {
   name: 'AutomaticPolarAlignmentCalibration',
+  components: {
+    PoleMasterPolarAlignmentPanel
+  },
 
   props: {
     visible: {
@@ -843,6 +891,22 @@ export default {
 
       selectedPolarCameraRole: 'MainCamera',
       activePolarCameraRole: 'MainCamera',
+      isPoleMasterCalibrationActive: false,
+      poleMasterState: 0,
+      poleMasterMessage: '',
+      poleMasterProgress: 0,
+      poleMasterGuide: {
+        imageW: 0,
+        imageH: 0,
+        axisX: null,
+        axisY: null,
+        poleX: null,
+        poleY: null,
+        errorPx: null,
+        errorArcsec: null,
+        hint: ''
+      },
+      poleMasterFrame: null,
       showCameraSelectDialog: false,
       cameraSelectCountdown: 60,
       cameraSelectTimer: null,
@@ -890,6 +954,29 @@ export default {
     // 是否可以自动校准
     canAutoCalibrate() {
       return this.isConnected
+    },
+
+    showPoleMasterPanel() {
+      return this.activePolarCameraRole === 'PoleCamera' &&
+        (this.selectedPolarCameraRole === 'PoleCamera' ||
+          this.isPoleMasterCalibrationActive ||
+          this.poleMasterState > 0)
+    },
+
+    isPoleMasterViewActive() {
+      return this.selectedPolarCameraRole === 'PoleCamera' ||
+        this.activePolarCameraRole === 'PoleCamera' ||
+        this.isPoleMasterCalibrationActive
+    },
+
+    formattedPoleMasterErrorArcsec() {
+      const v = Number(this.poleMasterGuide?.errorArcsec)
+      return Number.isFinite(v) ? `${v.toFixed(1)}"` : '--'
+    },
+
+    poleMasterErrorArcsecNeedsAdjustment() {
+      const v = Number(this.poleMasterGuide?.errorArcsec)
+      return Number.isFinite(v) && v > 30
     },
 
     // 是否需要方位角调整 - 使用缓存避免重复计算
@@ -1011,6 +1098,9 @@ export default {
 
       // 监听指导调整阶段进度
       this.$bus.$on('PolarAlignmentGuidanceStepProgress', this.updateGuidanceStepProgress)
+      this.$bus.$on('PoleMasterAlignmentState', this.updatePoleMasterAlignmentState)
+      this.$bus.$on('PoleMasterAlignmentGuideData', this.updatePoleMasterGuideData)
+      this.$bus.$on('PoleMasterAlignmentFrameData', this.updatePoleMasterFrameData)
 
       // 组件加载完成后，若尚未收到更新消息，则主动请求极轴对齐状态
       if (!this.hasAcceptUpdateMessage) {
@@ -1039,6 +1129,9 @@ export default {
       this.$bus.$off('GuiderFocalLength', this.onGuiderFocalLengthConfig)
       this.$bus.$off('PoleCameraFocalLength', this.onPoleCameraFocalLengthConfig)
       this.$bus.$off('PolarAlignmentGuidanceStepProgress', this.updateGuidanceStepProgress)
+      this.$bus.$off('PoleMasterAlignmentState', this.updatePoleMasterAlignmentState)
+      this.$bus.$off('PoleMasterAlignmentGuideData', this.updatePoleMasterGuideData)
+      this.$bus.$off('PoleMasterAlignmentFrameData', this.updatePoleMasterFrameData)
 
       // 清理拖动事件监听
       this.cleanupDragListeners()
@@ -1089,6 +1182,59 @@ export default {
         this.isConnected = status === 1
         const statusText = this.isConnected ? this.$t('Connected') : this.$t('Disconnected')
         this.addLog(this.$t('Mount Connection Status', [statusText]), this.isConnected ? 'success' : 'warning')
+      },
+
+      updatePoleMasterAlignmentState(isRunning, state, message, progress) {
+        const stateNumber = Number(state)
+        const progressNumber = Number(progress)
+        this.activePolarCameraRole = 'PoleCamera'
+        this.poleMasterState = Number.isFinite(stateNumber) ? stateNumber : 0
+        this.poleMasterMessage = message || ''
+        this.poleMasterProgress = Number.isFinite(progressNumber) ? progressNumber : 0
+        this.isPoleMasterCalibrationActive = !!isRunning
+        this.isCalibrationRunning = !!isRunning
+        this.hasAcceptUpdateMessage = true
+
+        if (message) {
+          const level = this.poleMasterState === 10 ? 'error' : (this.poleMasterState === 9 ? 'success' : 'info')
+          this.addLog(message, level)
+        }
+
+        const featureDevices = this.polarFeatureDevices('PoleCamera')
+        if (isRunning) {
+          this.$startFeature(featureDevices, 'AutoPolarAlignment')
+        } else {
+          this.$stopFeature(featureDevices, 'AutoPolarAlignment')
+          this.isPoleMasterCalibrationActive = false
+        }
+      },
+
+      updatePoleMasterGuideData(data) {
+        if (!data || typeof data !== 'object') return
+        this.poleMasterGuide = { ...this.poleMasterGuide, ...data }
+      },
+
+      updatePoleMasterFrameData(data) {
+        if (!data || typeof data !== 'object') return
+        const fileName = data.fileName || data.url || ''
+        if (!fileName) return
+        this.poleMasterFrame = {
+          ...data,
+          sessionId: data.sessionId || `${fileName}:${Date.now()}`
+        }
+        this.addPoleMasterFrameLog(`收到极轴镜预览帧: ${fileName} (${data.imageWidth || '--'}x${data.imageHeight || '--'})`, 'info')
+      },
+
+      addPoleMasterFrameLog(message, level = 'info') {
+        const text = `[PoleMasterImage] ${message}`
+        if (level === 'error') {
+          console.error(text)
+        } else if (level === 'warning') {
+          console.warn(text)
+        } else {
+          console.log(text)
+        }
+        this.addLog(text, level)
       },
 
       onCoordinatesConfig(value) {
@@ -2866,7 +3012,18 @@ export default {
       // ========================================
       // 校准控制方法
       // ========================================
-      async startAutoCalibration() {
+      togglePoleMasterView() {
+        if (this.isCalibrationRunning) return
+        if (this.selectedPolarCameraRole === 'PoleCamera') {
+          this.selectedPolarCameraRole = 'MainCamera'
+          this.activePolarCameraRole = 'MainCamera'
+          return
+        }
+        this.selectedPolarCameraRole = 'PoleCamera'
+        this.activePolarCameraRole = 'PoleCamera'
+      },
+
+      async startAutoCalibration(preferredRole = null) {
         if (!this.isConnected) {
           this.addLog(this.$t('Error: Mount Not Connected'), 'error')
           return
@@ -2885,8 +3042,12 @@ export default {
           return
         }
 
-        let role = connectedRoles.length === 1 ? connectedRoles[0] : (connectedRoles.includes('PoleCamera') ? 'PoleCamera' : connectedRoles[0])
-        if (connectedRoles.length > 1) {
+        let role = preferredRole && connectedRoles.includes(preferredRole)
+          ? preferredRole
+          : (connectedRoles.includes(this.selectedPolarCameraRole)
+              ? this.selectedPolarCameraRole
+              : (connectedRoles.includes('MainCamera') ? 'MainCamera' : connectedRoles[0]))
+        if (!preferredRole && connectedRoles.length > 1) {
           role = await this.requestCameraRoleSelection(connectedRoles, role)
         }
 
@@ -2914,6 +3075,27 @@ export default {
 
         this.selectedPolarCameraRole = role
         this.activePolarCameraRole = role
+        if (role === 'PoleCamera') {
+          this.isPoleMasterCalibrationActive = true
+          this.poleMasterState = 1
+          this.poleMasterMessage = '电子极轴镜校准启动中'
+          this.poleMasterProgress = 0
+          this.poleMasterGuide = {
+            imageW: 0,
+            imageH: 0,
+            axisX: null,
+            axisY: null,
+            poleX: null,
+            poleY: null,
+            errorPx: null,
+            errorArcsec: null,
+            hint: ''
+          }
+          this.poleMasterFrame = null
+        } else {
+          this.isPoleMasterCalibrationActive = false
+          this.poleMasterState = 0
+        }
         // 重置进度条状态
         this.guidanceStep = null
         this.guidanceStepMessage = ''
@@ -2934,6 +3116,7 @@ export default {
 
       stopAutoCalibration() {
         this.isCalibrationRunning = false
+        this.isPoleMasterCalibrationActive = false
         this.addLog(this.$t('Auto Calibration Stopped'), 'warning')
         const featureDevices = this.polarFeatureDevices(this.activePolarCameraRole)
         this.$stopFeature(featureDevices, 'AutoPolarAlignment')
@@ -3514,6 +3697,7 @@ export default {
         if (isRunning) this.$startFeature(featureDevices, 'AutoPolarAlignment')
         else this.$stopFeature(featureDevices, 'AutoPolarAlignment')
         if (!isRunning) {
+          this.isPoleMasterCalibrationActive = false
           // 清除状态动画定时器
           if (this.guidanceStatusTimeout) {
             clearTimeout(this.guidanceStatusTimeout)
@@ -4323,12 +4507,19 @@ export default {
   left: 0 !important;
   top: 0 !important;
   width: 100vw;
-  height: 100vh;
+  height: 100dvh;
   max-width: 100vw;
-  max-height: 100vh;
+  max-height: 100dvh;
   border-radius: 0;
   box-sizing: border-box;
   cursor: default;
+}
+
+@supports not (height: 100dvh) {
+  .polar-alignment-widget:not(.collapsed) {
+    height: 100vh;
+    max-height: 100vh;
+  }
 }
 
 .polar-alignment-widget:not(.collapsed) .header-drag-area {
@@ -4348,6 +4539,8 @@ export default {
   padding: clamp(calc(6px * var(--pa-y-scale, 1)), calc(20px * var(--pa-y-scale, 1)), 20px) clamp(calc(10px * var(--pa-x-scale, 1)), calc(28px * var(--pa-x-scale, 1)), 28px);
   background: rgba(60, 60, 70, 0.9);
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  flex: 0 0 auto;
+  min-height: 0;
 }
 
 .header-drag-area {
@@ -4452,6 +4645,31 @@ export default {
   transform: scale(0.95);
 }
 
+.header-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.trajectory-header-btn {
+  color: #90caf9;
+}
+
+.trajectory-header-btn.trajectory-active {
+  color: #ffffff;
+  background: linear-gradient(135deg, #1e88e5, #00acc1);
+  box-shadow: 0 0 0 2px rgba(144, 202, 249, 0.30), 0 4px 14px rgba(30, 136, 229, 0.34);
+}
+
+.pole-master-header-btn {
+  color: #ffd54f;
+}
+
+.pole-master-header-btn.pole-master-active {
+  color: #ffffff;
+  background: linear-gradient(135deg, #7e57c2, #ff7043);
+  box-shadow: 0 0 0 2px rgba(255, 213, 79, 0.32), 0 4px 14px rgba(126, 87, 194, 0.34);
+}
+
 /* === 控件内容样式 === */
 .widget-content {
   transition: all 0.3s ease;
@@ -4461,6 +4679,7 @@ export default {
   z-index: 1;
   /* 确保内容区域不会阻止拖动事件 */
   pointer-events: auto;
+  min-height: 0;
 }
 
 /* 拖动状态：移除过渡动画 */
@@ -4475,15 +4694,17 @@ export default {
 .widget-content.expanded {
   --pa-content-padding-y: clamp(calc(8px * var(--pa-y-scale, 1)), calc(24px * var(--pa-y-scale, 1)), 24px);
   --pa-content-padding-x: clamp(calc(8px * var(--pa-x-scale, 1)), calc(24px * var(--pa-x-scale, 1)), 24px);
-  --pa-bottom-safe-space: clamp(10px, 3.5vh, 24px);
+  --pa-bottom-safe-space: clamp(10px, 2vh, 18px);
   padding: var(--pa-content-padding-y) var(--pa-content-padding-x) calc(var(--pa-content-padding-y) + var(--pa-bottom-safe-space) + env(safe-area-inset-bottom, 0px));
   flex: 1 1 auto;
   min-height: 0;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   touch-action: pan-y;
   display: flex;
   flex-direction: column;
   gap: clamp(calc(8px * var(--pa-y-scale, 1)), calc(20px * var(--pa-y-scale, 1)), 20px);
+  overscroll-behavior: contain;
 }
 
 /* === 收缩状态样式 === */
@@ -4533,6 +4754,26 @@ export default {
   gap: 4px;
 }
 
+.collapsed-pole-master-error {
+  flex: 1;
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.collapsed-pole-master-error .status-label {
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.76);
+}
+
+.collapsed-pole-master-error .status-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: #ffd54f;
+}
+
 .status-item {
   display: flex;
   justify-content: space-between;
@@ -4568,6 +4809,7 @@ export default {
   width: 100%;
   min-height: 0;
   align-items: stretch;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 /* === 校准步骤进度条样式 === */
