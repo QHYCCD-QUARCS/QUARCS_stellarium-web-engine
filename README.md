@@ -14,7 +14,7 @@
 - Obtain status feedback (debug information) from the server.
 - Some improvements in interaction logic.
 
-## Build(Linux)
+## Build(Only for Linux x86/64, ARM platform may have some difference)
 
 You need to make sure you have both emscripten and sconstruct installed.
 
