@@ -218,6 +218,7 @@
   "Clear keyword filter": "清空关键词过滤",
   "AutoFocusFitResultFlatLine": "自动对焦拟合结果为一条水平线。",
   "AutoFocusFailed": "对焦失败!",
+  "PoleMasterPoorSkyQuality": "环境质量较差，极轴镜星场解析失败",
   "DeviceBusyWithFeatures": "设备 {device} 正在参与功能：{features}",
   "CameraOpsBusy": "相机相关操作正在进行：{features}",
   "GuiderCamera": "导星相机",

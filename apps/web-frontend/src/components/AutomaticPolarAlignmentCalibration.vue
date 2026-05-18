@@ -113,18 +113,14 @@
           </button>
 
           <button
-            v-if="hasConnectedDevice('PoleCamera')"
             class="header-btn pole-master-header-btn"
-            :class="{ 'pole-master-active': isPoleMasterViewActive }"
-            @click="togglePoleMasterView"
-            :disabled="!canAutoCalibrate"
-            :title="isPoleMasterViewActive ? '返回普通极轴校准界面' : '切换到电子极轴镜界面'"
-            data-testid="pa-btn-pole-master-calibration"
-            :data-state="isPoleMasterViewActive ? 'selected' : 'idle'"
+            :class="{ 'pole-master-active': showPoleMasterPanel }"
+            @click="togglePoleMasterPanel"
+            :title="showPoleMasterPanel ? '关闭电子极轴镜界面' : '打开电子极轴镜界面'"
+            data-testid="pa-btn-toggle-pole-master"
+            :data-state="showPoleMasterPanel ? 'shown' : 'hidden'"
           >
-            <v-icon data-testid="pa-icon-pole-master-calibration">
-              mdi-camera-iris
-            </v-icon>
+            <v-icon data-testid="pa-icon-toggle-pole-master">mdi-camera-iris</v-icon>
           </button>
 
           <button
@@ -146,6 +142,7 @@
         :progress="poleMasterProgress"
         :guide="poleMasterGuide"
         :frame="poleMasterFrame"
+        :overlay="poleMasterOverlay"
         @stop="stopAutoCalibration"
         @frame-log="addPoleMasterFrameLog"
         data-testid="pa-pole-master-panel"
@@ -430,6 +427,19 @@
                 <v-icon v-else>mdi-stop-circle</v-icon>
                 <span data-testid="pa-btn-auto-calibration-text">
                   {{ isCalibrationRunning ? $t('Stop Calibration') : $t('Start Auto Calibration') }}
+                </span>
+              </button>
+              <button
+                class="action-btn simulation"
+                @click="startPoleMasterSimulation()"
+                :disabled="isCalibrationRunning && !isPoleMasterSimulationRunning"
+                data-testid="pa-btn-pole-master-simulation"
+                :data-state="isPoleMasterSimulationRunning ? 'running' : 'stopped'"
+              >
+                <v-icon v-if="!isPoleMasterSimulationRunning">mdi-flask-outline</v-icon>
+                <v-icon v-else>mdi-stop-circle</v-icon>
+                <span data-testid="pa-btn-pole-master-simulation-text">
+                  {{ isPoleMasterSimulationRunning ? '停止模拟' : '模拟测试' }}
                 </span>
               </button>
             </div>
@@ -892,9 +902,14 @@ export default {
       selectedPolarCameraRole: 'MainCamera',
       activePolarCameraRole: 'MainCamera',
       isPoleMasterCalibrationActive: false,
+      isPoleMasterSimulationRunning: false,
+      isPoleMasterPanelVisible: false,
       poleMasterState: 0,
       poleMasterMessage: '',
       poleMasterProgress: 0,
+      poleMasterCurrentFrameId: '',
+      poleMasterPendingGuideByFrameId: Object.create(null),
+      poleMasterPendingOverlayByFrameId: Object.create(null),
       poleMasterGuide: {
         imageW: 0,
         imageH: 0,
@@ -907,6 +922,7 @@ export default {
         hint: ''
       },
       poleMasterFrame: null,
+      poleMasterOverlay: null,
       showCameraSelectDialog: false,
       cameraSelectCountdown: 60,
       cameraSelectTimer: null,
@@ -957,10 +973,7 @@ export default {
     },
 
     showPoleMasterPanel() {
-      return this.activePolarCameraRole === 'PoleCamera' &&
-        (this.selectedPolarCameraRole === 'PoleCamera' ||
-          this.isPoleMasterCalibrationActive ||
-          this.poleMasterState > 0)
+      return this.isPoleMasterPanelVisible && this.isPoleMasterViewActive
     },
 
     isPoleMasterViewActive() {
@@ -1101,6 +1114,8 @@ export default {
       this.$bus.$on('PoleMasterAlignmentState', this.updatePoleMasterAlignmentState)
       this.$bus.$on('PoleMasterAlignmentGuideData', this.updatePoleMasterGuideData)
       this.$bus.$on('PoleMasterAlignmentFrameData', this.updatePoleMasterFrameData)
+      this.$bus.$on('PoleMasterAlignmentOverlayData', this.updatePoleMasterOverlayData)
+      this.$bus.$on('togglePoleMasterAlignmentPanel', this.togglePoleMasterPanelFromControl)
 
       // 组件加载完成后，若尚未收到更新消息，则主动请求极轴对齐状态
       if (!this.hasAcceptUpdateMessage) {
@@ -1132,6 +1147,8 @@ export default {
       this.$bus.$off('PoleMasterAlignmentState', this.updatePoleMasterAlignmentState)
       this.$bus.$off('PoleMasterAlignmentGuideData', this.updatePoleMasterGuideData)
       this.$bus.$off('PoleMasterAlignmentFrameData', this.updatePoleMasterFrameData)
+      this.$bus.$off('PoleMasterAlignmentOverlayData', this.updatePoleMasterOverlayData)
+      this.$bus.$off('togglePoleMasterAlignmentPanel', this.togglePoleMasterPanelFromControl)
 
       // 清理拖动事件监听
       this.cleanupDragListeners()
@@ -1172,10 +1189,13 @@ export default {
       // ========================================
       showInterface() {
         this.$emit('update:visible', true)
+        this.$bus.$emit('PoleMasterPanelVisible', this.showPoleMasterPanel)
       },
 
       hideInterface() {
         this.$emit('update:visible', false)
+        this.isPoleMasterPanelVisible = false
+        this.$bus.$emit('PoleMasterPanelVisible', false)
       },
 
       updateMountConnection(status) {
@@ -1188,16 +1208,18 @@ export default {
         const stateNumber = Number(state)
         const progressNumber = Number(progress)
         this.activePolarCameraRole = 'PoleCamera'
+        this.selectedPolarCameraRole = 'PoleCamera'
         this.poleMasterState = Number.isFinite(stateNumber) ? stateNumber : 0
-        this.poleMasterMessage = message || ''
+        const translatedMessage = this.translatePolarAlignmentMessage(message || '')
+        this.poleMasterMessage = translatedMessage
         this.poleMasterProgress = Number.isFinite(progressNumber) ? progressNumber : 0
         this.isPoleMasterCalibrationActive = !!isRunning
         this.isCalibrationRunning = !!isRunning
         this.hasAcceptUpdateMessage = true
 
-        if (message) {
+        if (translatedMessage) {
           const level = this.poleMasterState === 10 ? 'error' : (this.poleMasterState === 9 ? 'success' : 'info')
-          this.addLog(message, level)
+          this.addLog(translatedMessage, level)
         }
 
         const featureDevices = this.polarFeatureDevices('PoleCamera')
@@ -1206,23 +1228,134 @@ export default {
         } else {
           this.$stopFeature(featureDevices, 'AutoPolarAlignment')
           this.isPoleMasterCalibrationActive = false
+          this.isPoleMasterSimulationRunning = false
         }
+      },
+
+      translatePolarAlignmentMessage(message) {
+        if (!message || typeof message !== 'string') return ''
+        const qualityPrefix = '环境质量较差，极轴镜星场解析失败'
+        if (message.startsWith(qualityPrefix)) {
+          const detail = message.slice(qualityPrefix.length)
+          return `${this.$t('PoleMasterPoorSkyQuality')}${detail}`
+        }
+        return this.$t(message)
       },
 
       updatePoleMasterGuideData(data) {
         if (!data || typeof data !== 'object') return
-        this.poleMasterGuide = { ...this.poleMasterGuide, ...data }
+        const frameId = this.normalizePoleMasterFrameId(data.frameId)
+        if (!frameId) return
+        const currentFrameId = this.normalizePoleMasterFrameId(this.poleMasterCurrentFrameId)
+        console.log('[PoleMasterDebug][GuideIn]', {
+          frameId,
+          currentFrameId,
+          errorArcsec: data.errorArcsec,
+          errorPx: data.errorPx,
+          hint: data.hint
+        })
+        if (currentFrameId && frameId === currentFrameId) {
+          this.poleMasterGuide = { ...this.poleMasterGuide, ...data }
+          console.log('[PoleMasterDebug][GuideApplyNow]', {
+            frameId,
+            currentFrameId
+          })
+        } else {
+          this.poleMasterPendingGuideByFrameId[frameId] = { ...data }
+          console.warn('[PoleMasterDebug][GuidePending]', {
+            frameId,
+            currentFrameId,
+            pendingGuideKeys: Object.keys(this.poleMasterPendingGuideByFrameId || {})
+          })
+        }
       },
 
       updatePoleMasterFrameData(data) {
         if (!data || typeof data !== 'object') return
         const fileName = data.fileName || data.url || ''
         if (!fileName) return
+        const frameId = this.normalizePoleMasterFrameId(data.frameId)
+        if (!frameId) return
+        console.log('[PoleMasterDebug][FrameIn]', {
+          fileName,
+          frameId,
+          imageWidth: data.imageWidth,
+          imageHeight: data.imageHeight
+        })
+        this.poleMasterCurrentFrameId = frameId
+        // Keep last overlay until a new overlay for current frame arrives.
+        // Some backends currently reuse a coarse frameId (e.g. "polecamera"),
+        // clearing here causes diagnostics to flicker as "--/0/0" between messages.
         this.poleMasterFrame = {
           ...data,
-          sessionId: data.sessionId || `${fileName}:${Date.now()}`
+          frameId,
+          sessionId: data.sessionId || `${fileName}:${frameId || Date.now()}`
         }
+        this.applyPendingPoleMasterPayloadForCurrentFrame()
         this.addPoleMasterFrameLog(`收到极轴镜预览帧: ${fileName} (${data.imageWidth || '--'}x${data.imageHeight || '--'})`, 'info')
+      },
+
+      updatePoleMasterOverlayData(data) {
+        if (!data || typeof data !== 'object') return
+        const overlayFrameId = this.normalizePoleMasterFrameId(data.frameId)
+        if (!overlayFrameId) return
+        const currentFrameId = this.normalizePoleMasterFrameId(this.poleMasterCurrentFrameId)
+        console.log('[PoleMasterDebug][OverlayIn]', {
+          overlayFrameId,
+          currentFrameId,
+          phase: data.phase,
+          quality: data.quality
+        })
+        if (currentFrameId && overlayFrameId === currentFrameId) {
+          this.poleMasterOverlay = data
+          console.log('[PoleMasterDebug][OverlayApplyNow]', {
+            overlayFrameId,
+            currentFrameId
+          })
+        } else {
+          this.poleMasterPendingOverlayByFrameId[overlayFrameId] = { ...data }
+          console.warn('[PoleMasterDebug][OverlayPending]', {
+            overlayFrameId,
+            currentFrameId,
+            pendingOverlayKeys: Object.keys(this.poleMasterPendingOverlayByFrameId || {})
+          })
+        }
+      },
+      normalizePoleMasterFrameId(frameId) {
+        if (frameId == null) return ''
+        return String(frameId).trim()
+      },
+      applyPendingPoleMasterPayloadForCurrentFrame() {
+        const currentFrameId = this.normalizePoleMasterFrameId(this.poleMasterCurrentFrameId)
+        if (!currentFrameId) return
+        const pendingGuide = this.poleMasterPendingGuideByFrameId[currentFrameId]
+        if (pendingGuide) {
+          this.poleMasterGuide = { ...this.poleMasterGuide, ...pendingGuide }
+          delete this.poleMasterPendingGuideByFrameId[currentFrameId]
+          console.log('[PoleMasterDebug][GuidePendingApplied]', {
+            currentFrameId
+          })
+        }
+        const pendingOverlay = this.poleMasterPendingOverlayByFrameId[currentFrameId]
+        if (pendingOverlay) {
+          this.poleMasterOverlay = pendingOverlay
+          delete this.poleMasterPendingOverlayByFrameId[currentFrameId]
+          console.log('[PoleMasterDebug][OverlayPendingApplied]', {
+            currentFrameId,
+            phase: pendingOverlay.phase
+          })
+        }
+        console.log('[PoleMasterDebug][ApplyPendingDone]', {
+          currentFrameId,
+          hasGuide: !!this.poleMasterGuide,
+          hasOverlay: !!this.poleMasterOverlay,
+          leftGuidePendingKeys: Object.keys(this.poleMasterPendingGuideByFrameId || {}),
+          leftOverlayPendingKeys: Object.keys(this.poleMasterPendingOverlayByFrameId || {})
+        })
+      },
+      resetPoleMasterPendingPayload() {
+        this.poleMasterPendingGuideByFrameId = Object.create(null)
+        this.poleMasterPendingOverlayByFrameId = Object.create(null)
       },
 
       addPoleMasterFrameLog(message, level = 'info') {
@@ -3017,13 +3150,47 @@ export default {
         if (this.selectedPolarCameraRole === 'PoleCamera') {
           this.selectedPolarCameraRole = 'MainCamera'
           this.activePolarCameraRole = 'MainCamera'
+          this.setPoleMasterPanelVisible(false)
           return
         }
         this.selectedPolarCameraRole = 'PoleCamera'
         this.activePolarCameraRole = 'PoleCamera'
       },
 
+      setPoleMasterPanelVisible(visible) {
+        this.isPoleMasterPanelVisible = !!visible
+        this.$bus.$emit('PoleMasterPanelVisible', this.showPoleMasterPanel)
+        if (visible) {
+          this.$nextTick(this.constrainPanelToViewport)
+        }
+      },
+
+      togglePoleMasterPanel() {
+        if (this.showPoleMasterPanel) {
+          this.setPoleMasterPanelVisible(false)
+          return
+        }
+        this.selectedPolarCameraRole = 'PoleCamera'
+        this.activePolarCameraRole = 'PoleCamera'
+        this.setPoleMasterPanelVisible(true)
+      },
+
+      togglePoleMasterPanelFromControl() {
+        if (!this.visible) this.showInterface()
+        if (this.showPoleMasterPanel) {
+          this.setPoleMasterPanelVisible(false)
+          return
+        }
+        this.selectedPolarCameraRole = 'PoleCamera'
+        this.activePolarCameraRole = 'PoleCamera'
+        this.setPoleMasterPanelVisible(true)
+      },
+
       async startAutoCalibration(preferredRole = null) {
+        if (this.isPoleMasterSimulationRunning) {
+          this.stopAutoCalibration()
+          return
+        }
         if (!this.isConnected) {
           this.addLog(this.$t('Error: Mount Not Connected'), 'error')
           return
@@ -3092,6 +3259,9 @@ export default {
             hint: ''
           }
           this.poleMasterFrame = null
+          this.poleMasterOverlay = null
+          this.poleMasterCurrentFrameId = ''
+          this.resetPoleMasterPendingPayload()
         } else {
           this.isPoleMasterCalibrationActive = false
           this.poleMasterState = 0
@@ -3114,9 +3284,47 @@ export default {
         this.$bus.$emit('AppSendMessage', 'Vue_Command', `StartAutoPolarAlignment:${role}`)
       },
 
+      startPoleMasterSimulation() {
+        if (this.isPoleMasterSimulationRunning) {
+          this.stopAutoCalibration()
+          return
+        }
+        if (this.isCalibrationRunning) return
+
+        this.selectedPolarCameraRole = 'PoleCamera'
+        this.activePolarCameraRole = 'PoleCamera'
+        this.isPoleMasterCalibrationActive = true
+        this.isPoleMasterSimulationRunning = true
+        this.isCalibrationRunning = true
+        this.poleMasterState = 1
+        this.poleMasterMessage = '电子极轴镜模拟校准启动中'
+        this.poleMasterProgress = 0
+        this.poleMasterGuide = {
+          imageW: 0,
+          imageH: 0,
+          axisX: null,
+          axisY: null,
+          poleX: null,
+          poleY: null,
+          errorPx: null,
+          errorArcsec: null,
+          hint: ''
+        }
+        this.poleMasterFrame = null
+        this.poleMasterOverlay = null
+        this.poleMasterCurrentFrameId = ''
+        this.resetPoleMasterPendingPayload()
+        this.resetCalibration()
+        this.addLog('启动电子极轴镜模拟测试', 'info')
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'StartPoleMasterAlignmentSimulation')
+      },
+
       stopAutoCalibration() {
         this.isCalibrationRunning = false
         this.isPoleMasterCalibrationActive = false
+        this.isPoleMasterSimulationRunning = false
+        this.poleMasterCurrentFrameId = ''
+        this.resetPoleMasterPendingPayload()
         this.addLog(this.$t('Auto Calibration Stopped'), 'warning')
         const featureDevices = this.polarFeatureDevices(this.activePolarCameraRole)
         this.$stopFeature(featureDevices, 'AutoPolarAlignment')
@@ -3698,6 +3906,7 @@ export default {
         else this.$stopFeature(featureDevices, 'AutoPolarAlignment')
         if (!isRunning) {
           this.isPoleMasterCalibrationActive = false
+          this.isPoleMasterSimulationRunning = false
           // 清除状态动画定时器
           if (this.guidanceStatusTimeout) {
             clearTimeout(this.guidanceStatusTimeout)
@@ -4527,8 +4736,46 @@ export default {
 }
 
 .polar-alignment-widget.collapsed {
-  width: 300px;
-  max-width: 85vw;
+  width: min(300px, 82vw);
+  max-width: 82vw;
+}
+
+.polar-alignment-widget.collapsed .widget-header {
+  padding: clamp(6px, 1.8vw, 9px) clamp(8px, 2.2vw, 11px);
+  gap: clamp(4px, 1.2vw, 8px);
+}
+
+.polar-alignment-widget.collapsed .header-left {
+  gap: clamp(4px, 1.2vw, 7px);
+}
+
+.polar-alignment-widget.collapsed .header-icon {
+  font-size: clamp(14px, 3.8vw, 17px);
+}
+
+.polar-alignment-widget.collapsed .header-title {
+  font-size: clamp(11px, 3vw, 14px);
+  max-width: 100%;
+}
+
+.polar-alignment-widget.collapsed .status-dot {
+  width: clamp(7px, 2vw, 10px);
+  height: clamp(7px, 2vw, 10px);
+}
+
+.polar-alignment-widget.collapsed .header-controls {
+  gap: clamp(3px, 1vw, 6px);
+  flex-shrink: 0;
+}
+
+.polar-alignment-widget.collapsed .header-btn {
+  width: clamp(24px, 6.4vw, 30px);
+  height: clamp(24px, 6.4vw, 30px);
+  border-radius: 3px;
+}
+
+.polar-alignment-widget.collapsed .header-btn .v-icon {
+  font-size: clamp(13px, 3.4vw, 16px) !important;
 }
 
 /* === 控件头部样式 === */
@@ -4688,7 +4935,7 @@ export default {
 }
 
 .widget-content.collapsed {
-  padding: 12px;
+  padding: clamp(8px, 2.2vw, 10px);
 }
 
 .widget-content.expanded {
@@ -4756,20 +5003,20 @@ export default {
 
 .collapsed-pole-master-error {
   flex: 1;
-  min-height: 64px;
+  min-height: clamp(44px, 12vw, 54px);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 18px;
+  gap: clamp(8px, 2.4vw, 12px);
 }
 
 .collapsed-pole-master-error .status-label {
-  font-size: 16px;
+  font-size: clamp(11px, 2.6vw, 13px);
   color: rgba(255, 255, 255, 0.76);
 }
 
 .collapsed-pole-master-error .status-value {
-  font-size: 28px;
+  font-size: clamp(14px, 5.2vw, 22px);
   font-weight: 700;
   color: #ffd54f;
 }
@@ -5233,6 +5480,18 @@ export default {
   background: linear-gradient(135deg, #43a047, #388e3c);
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
+}
+
+.action-btn.simulation {
+  background: linear-gradient(135deg, #26a69a, #00897b);
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(38, 166, 154, 0.3);
+}
+
+.action-btn.simulation:hover:not(:disabled) {
+  background: linear-gradient(135deg, #00897b, #00796b);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(38, 166, 154, 0.4);
 }
 
 .action-btn.restore {

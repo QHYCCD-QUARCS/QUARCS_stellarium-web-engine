@@ -4837,8 +4837,8 @@ export default {
                 break;
 
               case 'PoleMasterAlignmentGuideData':
-                if (parts.length >= 10) {
-                  this.$bus.$emit('PoleMasterAlignmentGuideData', {
+                if (parts.length >= 11) {
+                  const payload = {
                     imageW: parseInt(parts[1], 10),
                     imageH: parseInt(parts[2], 10),
                     axisX: parseFloat(parts[3]),
@@ -4847,20 +4847,43 @@ export default {
                     poleY: parseFloat(parts[6]),
                     errorPx: parseFloat(parts[7]),
                     errorArcsec: parseFloat(parts[8]),
-                    hint: parts.slice(9).join(':')
-                  });
+                    frameId: parts[9] || '',
+                    hint: parts.slice(10).join(':')
+                  };
+                  console.log('PoleMasterAlignmentGuideData:', payload);
+                  this.$bus.$emit('PoleMasterAlignmentGuideData', payload);
                 }
                 break;
 
               case 'PoleMasterAlignmentFrameData':
-                if (parts.length >= 4) {
+                if (parts.length >= 5) {
                   const framePayload = {
                     fileName: parts[1],
                     imageWidth: parseInt(parts[2], 10),
-                    imageHeight: parseInt(parts[3], 10)
+                    imageHeight: parseInt(parts[3], 10),
+                    frameId: parts.slice(4).join(':')
                   };
                   console.log('PoleMasterAlignmentFrameData:', framePayload);
                   this.$bus.$emit('PoleMasterAlignmentFrameData', framePayload);
+                }
+                break;
+
+              case 'PoleMasterAlignmentOverlayData':
+                if (parts.length >= 2) {
+                  const rawJson = parts.slice(1).join(':');
+                  try {
+                    const overlayPayload = JSON.parse(rawJson);
+                    console.log('PoleMasterAlignmentOverlayData:', {
+                      frameId: overlayPayload && overlayPayload.frameId,
+                      phase: overlayPayload && overlayPayload.phase,
+                      imageW: overlayPayload && overlayPayload.imageW,
+                      imageH: overlayPayload && overlayPayload.imageH,
+                      quality: overlayPayload && overlayPayload.quality
+                    });
+                    this.$bus.$emit('PoleMasterAlignmentOverlayData', overlayPayload);
+                  } catch (error) {
+                    console.warn('PoleMasterAlignmentOverlayData parse failed:', error, rawJson);
+                  }
                 }
                 break;
 

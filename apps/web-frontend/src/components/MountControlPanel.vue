@@ -68,6 +68,19 @@
         </button>
       </div>
 
+      <div data-testid="mcp-pole-master-container">
+        <button
+          class="custom-button btn-pole-master no-select"
+          :class="{ 'pole-master-active': isPoleMasterPanelOpen }"
+          @click="togglePoleMasterPanel"
+          :title="isPoleMasterPanelOpen ? '关闭电子极轴镜界面' : '打开电子极轴镜界面'"
+          data-testid="mcp-btn-pole-master"
+          :data-state="isPoleMasterPanelOpen ? 'open' : 'closed'"
+        >
+          <v-icon data-testid="mcp-icon-pole-master">mdi-camera-iris</v-icon>
+        </button>
+      </div>
+
       <div v-if="showButtons" data-testid="mcp-function-buttons">
         <button v-bind:class="{ 'btn-park-on no-select': ParkSwitch, 'btn-park no-select': !ParkSwitch, 'processing': isParkProcessing, 'error-animation': isErrorPark }"
           @click="handleMountPark" data-testid="mcp-btn-park" :data-state="ParkSwitch ? 'on' : 'off'" :data-processing="isParkProcessing">
@@ -169,6 +182,7 @@ export default {
       isErrorSync: false,
       isErrorSolve: false,
       activeDirectionButton: null,
+      isPoleMasterPanelOpen: false,
     };
   },
   computed: {
@@ -275,6 +289,7 @@ export default {
     this.$bus.$on('MountConnected', this.updateMountConnection);
     this.$bus.$on('MountOperationComplete', this.handleOperationComplete);
     this.$bus.$on('handleOperationComplete', this.handleOperationComplete);
+    this.$bus.$on('PoleMasterPanelVisible', this.updatePoleMasterPanelVisible);
     // 新增经纬度监听
     this.$bus.$on('updateCurrentLocation', this.updateCurrentLocation);
     
@@ -292,6 +307,7 @@ export default {
     //   this.displayTimer = null;
     // }
     window.removeEventListener('resize', this.updatePanelSize);
+    this.$bus.$off('PoleMasterPanelVisible', this.updatePoleMasterPanelVisible);
     this.activeDirectionButton = null;
   },
   methods: {
@@ -348,6 +364,14 @@ export default {
       this.$bus.$emit('SendConsoleLogMsg', 'Mount Move Abort', 'info');
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'MountMoveAbort');
       this.$stopFeature(['Mount'], 'MountManualMove');
+    },
+
+    togglePoleMasterPanel() {
+      this.$bus.$emit('togglePoleMasterAlignmentPanel');
+    },
+
+    updatePoleMasterPanelVisible(visible) {
+      this.isPoleMasterPanelOpen = !!visible;
     },
 
     stopRA(direction) {
@@ -972,6 +996,19 @@ export default {
   height: var(--mcp-small-btn-size);
   bottom: var(--mcp-small-btn-bottom-bottom);
   right: var(--mcp-small-btn-side-gap);
+}
+
+.btn-pole-master {
+  position: absolute;
+  width: var(--mcp-small-btn-size);
+  height: var(--mcp-small-btn-size);
+  bottom: calc(var(--mcp-small-btn-bottom-bottom) + var(--mcp-small-btn-size) + 10px);
+  right: calc(50% - var(--mcp-small-btn-half));
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.btn-pole-master.pole-master-active {
+  background-color: rgba(51, 218, 121, 0.55);
 }
 
 .border-icon {

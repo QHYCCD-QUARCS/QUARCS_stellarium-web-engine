@@ -41,6 +41,26 @@
         </div>
         <div class="pm-hint" data-testid="pm-hint">{{ guide.hint || '调节赤道仪高度/方位，使两个圆重合' }}</div>
 
+        <div class="pm-diagnostics" data-testid="pm-diagnostics">
+          <div class="pm-diag-row">
+            <span>阶段</span>
+            <strong>{{ overlayPhaseLabel }}</strong>
+          </div>
+          <div class="pm-diag-row">
+            <span>识别/跟踪</span>
+            <strong>{{ overlayStarSummary }}</strong>
+          </div>
+          <div class="pm-diag-row">
+            <span>曝光时间</span>
+            <strong>{{ overlayExposureSummary }}</strong>
+          </div>
+          <div class="pm-diag-row">
+            <span>RA/残差</span>
+            <strong>{{ overlayQualitySummary }}</strong>
+          </div>
+          <div v-if="overlayWarningText" class="pm-warning">{{ overlayWarningText }}</div>
+        </div>
+
         <div
           class="pm-status-pill"
           data-testid="pm-status-pill"
@@ -80,21 +100,26 @@ export default {
         hint: ''
       })
     },
+    overlay: {
+      type: Object,
+      default: () => null
+    },
     collapsedSummary: { type: Boolean, default: false }
   },
   data() {
     return {
       steps: [
         { value: 1, label: '准备', icon: 'mdi-cog' },
-        { value: 2, label: '识别星场', icon: 'mdi-star-four-points' },
-        { value: 3, label: '旋转 RA 1', icon: 'mdi-rotate-right' },
-        { value: 5, label: '旋转 RA 2', icon: 'mdi-rotate-right' },
-        { value: 7, label: '标定轴心', icon: 'mdi-crosshairs-gps' },
-        { value: 8, label: '手动调整', icon: 'mdi-tune' },
+        { value: 2, label: '星场确认', icon: 'mdi-star-four-points' },
+        { value: 3, label: '固定星确认', icon: 'mdi-vector-circle' },
+        { value: 5, label: '旋转采样', icon: 'mdi-rotate-right' },
+        { value: 7, label: '轴心拟合', icon: 'mdi-crosshairs-gps' },
+        { value: 8, label: '返回/调整', icon: 'mdi-tune' },
         { value: 9, label: '完成', icon: 'mdi-check' }
       ],
       frameCanvas: null,
       frameLoadKey: '',
+      frameRequestKey: '',
       frameImageMeta: null,
       frameObjectUrl: ''
     }
@@ -104,7 +129,9 @@ export default {
       return this.stateNumber === 10
     },
     hasGuideData() {
-      return Number.isFinite(Number(this.guide.axisX)) && Number.isFinite(Number(this.guide.poleX))
+      const axisX = this.guide && this.guide.axisX
+      const poleX = this.guide && this.guide.poleX
+      return Number.isFinite(axisX) && Number.isFinite(poleX)
     },
     hasFrameImage() {
       return !!this.frameCanvas
@@ -116,6 +143,64 @@ export default {
     formattedPx() {
       const v = Number(this.guide.errorPx)
       return Number.isFinite(v) ? v.toFixed(1) : '--'
+    },
+    overlayQuality() {
+      return this.effectiveOverlay?.quality || {}
+    },
+    currentFrameId() {
+      const v = this.frame?.frameId
+      return v == null ? '' : String(v)
+    },
+    overlayFrameId() {
+      const v = this.overlay?.frameId
+      return v == null ? '' : String(v)
+    },
+    effectiveOverlay() {
+      // If both sides provide frameId, only render overlay bound to current frame.
+      if (this.currentFrameId && this.overlayFrameId && this.currentFrameId !== this.overlayFrameId) {
+        return null
+      }
+      return this.overlay || null
+    },
+    overlayPhaseLabel() {
+      const map = {
+        'field-confirmation': '星场确认',
+        'ra-rotation-1': 'RA 旋转 1',
+        'ra-rotation-2': 'RA 旋转 2',
+        'axis-fit': '轴心拟合',
+        'return-home': '返回 Home',
+        'guiding-init': '实时调整初始化',
+        'guiding': '实时调整',
+        'simulation': '模拟演示',
+        'capture': '采集解析'
+      }
+      return map[this.effectiveOverlay?.phase] || this.effectiveOverlay?.phase || '--'
+    },
+    overlayStarSummary() {
+      if (!this.effectiveOverlay || !this.effectiveOverlay.quality) return '--/--'
+      const stars = Number(this.overlayQuality.detectedStarCount)
+      const fallbackStars = Number(this.overlayQuality.starCount)
+      const tracked = Number(this.overlayQuality.selectedTrackStarCount)
+      const s = Number.isFinite(stars) ? stars : (Number.isFinite(fallbackStars) ? fallbackStars : 0)
+      const t = Number.isFinite(tracked) ? tracked : 0
+      return `${s}/${t}`
+    },
+    overlayExposureSummary() {
+      const exposureMs = Number(this.overlayQuality.exposureMs)
+      if (!Number.isFinite(exposureMs) || exposureMs <= 0) return '--'
+      if (exposureMs < 1000) return `${Math.round(exposureMs)}ms`
+      return `${(exposureMs / 1000).toFixed(1)}s`
+    },
+    overlayQualitySummary() {
+      const ra = Number(this.overlayQuality.lastRaRotationDeg)
+      const residual = Number(this.overlayQuality.axisResidualPx)
+      const raText = Number.isFinite(ra) ? `${ra.toFixed(1)}°` : '--'
+      const resText = Number.isFinite(residual) ? `${residual.toFixed(1)}px` : '--'
+      return `${raText}/${resText}`
+    },
+    overlayWarningText() {
+      const warnings = Array.isArray(this.effectiveOverlay?.warnings) ? this.effectiveOverlay.warnings : []
+      return warnings.filter(Boolean).join('；')
     },
     currentStepValue() {
       if (this.failed) {
@@ -139,6 +224,13 @@ export default {
   watch: {
     guide: {
       handler() {
+        console.log('[PoleMasterDebug][PanelGuide]', {
+          currentFrameId: this.currentFrameId,
+          axisX: this.guide && this.guide.axisX,
+          poleX: this.guide && this.guide.poleX,
+          errorArcsec: this.guide && this.guide.errorArcsec,
+          hasGuideData: this.hasGuideData
+        })
         this.$nextTick(this.draw)
       },
       deep: true,
@@ -149,7 +241,24 @@ export default {
     },
     frame: {
       handler() {
+        console.log('[PoleMasterDebug][PanelFrame]', {
+          currentFrameId: this.currentFrameId,
+          fileName: this.frame && (this.frame.fileName || this.frame.url),
+          imageWidth: this.frame && this.frame.imageWidth,
+          imageHeight: this.frame && this.frame.imageHeight
+        })
         this.loadFrameImage()
+      },
+      deep: true
+    },
+    overlay: {
+      handler() {
+        console.log('[PoleMasterDebug][PanelOverlay]', {
+          overlayFrameId: this.overlayFrameId,
+          currentFrameId: this.currentFrameId,
+          effectiveOverlayPhase: this.effectiveOverlay && this.effectiveOverlay.phase
+        })
+        this.$nextTick(this.draw)
       },
       deep: true
     }
@@ -180,30 +289,22 @@ export default {
     },
     async loadFrameImage() {
       const fileName = this.frame?.fileName || this.frame?.url || ''
-      if (!fileName) {
-        this.frameCanvas = null
-        this.frameLoadKey = ''
-        this.frameImageMeta = null
-        this.releaseFrameObjectUrl()
-        this.$nextTick(this.draw)
-        return
-      }
+      if (!fileName) return
       const key = String(fileName)
       if (key === this.frameLoadKey && this.frameCanvas) return
-      this.frameLoadKey = key
+      this.frameRequestKey = key
       try {
         const src = this.resolveFrameSrc(fileName)
         this.emitFrameLog(`开始下载极轴镜预览图: ${src}`, 'info')
         const offscreen = await this.loadImageToCanvas(src)
-        if (key !== this.frameLoadKey) return
+        if (key !== this.frameRequestKey) return
         this.frameCanvas = offscreen
+        this.frameLoadKey = key
         this.frameImageMeta = { width: offscreen.width, height: offscreen.height }
         this.emitFrameLog(`极轴镜预览图下载完成: ${offscreen.width}x${offscreen.height}`, 'success')
       } catch (error) {
         console.warn('PoleMaster frame load failed:', error)
         this.emitFrameLog(`极轴镜预览图下载失败: ${error && error.message ? error.message : error}`, 'error')
-        this.frameCanvas = null
-        this.frameImageMeta = null
       }
       this.$nextTick(this.draw)
     },
@@ -259,8 +360,8 @@ export default {
       if (!canvas) return
       const rect = canvas.getBoundingClientRect()
       const dpr = window.devicePixelRatio || 1
-      const w = Math.max(320, Math.floor(rect.width || 640))
-      const h = Math.max(220, Math.floor(rect.height || 360))
+      const w = Math.max(1, Math.floor(rect.width || canvas.clientWidth || 1))
+      const h = Math.max(1, Math.floor(rect.height || canvas.clientHeight || 1))
       canvas.width = Math.floor(w * dpr)
       canvas.height = Math.floor(h * dpr)
       const ctx = canvas.getContext('2d')
@@ -273,7 +374,8 @@ export default {
       if (this.frameCanvas) {
         const imageW = this.frameCanvas.width
         const imageH = this.frameCanvas.height
-        const scale = Math.max(w / imageW, h / imageH)
+        // Use contain scaling so the full frame is always visible.
+        const scale = Math.min(w / imageW, h / imageH)
         const ox = (w - imageW * scale) / 2
         const oy = (h - imageH * scale) / 2
         ctx.imageSmoothingEnabled = true
@@ -297,11 +399,12 @@ export default {
         }
       }
 
-      if (!this.hasGuideData || Number(this.stateNumber) < 7) return
-      const imageW = imageDraw ? imageDraw.imageW : Math.max(1, Number(this.guide.imageW) || 1)
-      const imageH = imageDraw ? imageDraw.imageH : Math.max(1, Number(this.guide.imageH) || 1)
-      const guideW = Math.max(1, Number(this.guide.imageW) || imageW)
-      const guideH = Math.max(1, Number(this.guide.imageH) || imageH)
+      const overlayW = Number(this.effectiveOverlay?.imageW)
+      const overlayH = Number(this.effectiveOverlay?.imageH)
+      const imageW = imageDraw ? imageDraw.imageW : Math.max(1, Number(this.guide.imageW) || overlayW || 1)
+      const imageH = imageDraw ? imageDraw.imageH : Math.max(1, Number(this.guide.imageH) || overlayH || 1)
+      const guideW = Math.max(1, Number(this.guide.imageW) || overlayW || imageW)
+      const guideH = Math.max(1, Number(this.guide.imageH) || overlayH || imageH)
       const scale = imageDraw ? imageDraw.scale : Math.min(w / imageW, h / imageH)
       const ox = imageDraw ? imageDraw.ox : (w - imageW * scale) / 2
       const oy = imageDraw ? imageDraw.oy : (h - imageH * scale) / 2
@@ -309,13 +412,17 @@ export default {
       const sy = imageH / guideH
       const mapX = (x) => ox + Number(x) * sx * scale
       const mapY = (y) => oy + Number(y) * sy * scale
-      const axis = { x: mapX(this.guide.axisX), y: mapY(this.guide.axisY) }
-      const pole = { x: mapX(this.guide.poleX), y: mapY(this.guide.poleY) }
-
       ctx.strokeStyle = 'rgba(255,255,255,0.45)'
       ctx.strokeRect(ox, oy, imageW * scale, imageH * scale)
       ctx.font = '12px sans-serif'
       ctx.lineWidth = 2
+
+      this.drawOverlay(ctx, mapX, mapY)
+      this.drawRotationIndicator(ctx, w, h)
+
+      if (!this.hasGuideData || Number(this.stateNumber) < 7) return
+      const axis = { x: mapX(this.guide.axisX), y: mapY(this.guide.axisY) }
+      const pole = { x: mapX(this.guide.poleX), y: mapY(this.guide.poleY) }
 
       ctx.strokeStyle = '#4caf50'
       ctx.beginPath()
@@ -339,6 +446,111 @@ export default {
       ctx.stroke()
       ctx.setLineDash([])
     },
+    drawOverlay(ctx, mapX, mapY) {
+      const overlay = this.effectiveOverlay || {}
+      const isDrawablePoint = point => point &&
+        Number.isFinite(Number(point.x)) &&
+        Number.isFinite(Number(point.y))
+      const drawPoint = (point, radius, color, fill = false) => {
+        if (!isDrawablePoint(point)) return
+        ctx.beginPath()
+        ctx.arc(mapX(point.x), mapY(point.y), radius, 0, Math.PI * 2)
+        if (fill) {
+          ctx.fillStyle = color
+          ctx.fill()
+        } else {
+          ctx.strokeStyle = color
+          ctx.stroke()
+        }
+      }
+      const detectedStars = Array.isArray(overlay.detectedStars) ? overlay.detectedStars.slice(0, 120) : []
+      ctx.lineWidth = 1.6
+      for (const star of detectedStars) {
+        drawPoint(star, 6, 'rgba(66,165,245,0.95)', false)
+      }
+      const trackedStars = Array.isArray(overlay.selectedTrackStars) ? overlay.selectedTrackStars.slice(0, 60) : []
+      ctx.lineWidth = 2
+      for (const star of trackedStars) {
+        drawPoint(star, 7, 'rgba(76,175,80,0.98)', false)
+      }
+      const fixedStars = Array.isArray(overlay.fixedStars) ? overlay.fixedStars.slice(0, 8) : []
+      ctx.lineWidth = 2
+      for (const star of fixedStars) {
+        if (!star || star.visible === false) continue
+        const point = star.matched ? star.detected : star.expected
+        const color = star.matched ? 'rgba(66,165,245,0.95)' : 'rgba(239,83,80,0.95)'
+        drawPoint(point, 8, color, false)
+        const name = String(star.name || star.id || '').toLowerCase()
+        if (name.includes('polaris') || name.includes('北极星')) {
+          this.drawLabel(ctx, '北极星', mapX(point.x) + 12, mapY(point.y) - 10, color)
+        }
+      }
+
+      const axisCandidate = overlay.axisCandidate
+      if (axisCandidate && axisCandidate.valid !== false && Number.isFinite(Number(axisCandidate.x))) {
+        const x = mapX(axisCandidate.x)
+        const y = mapY(axisCandidate.y)
+        ctx.strokeStyle = 'rgba(129,199,132,0.85)'
+        ctx.lineWidth = 2
+        ctx.beginPath()
+        ctx.moveTo(x - 12, y)
+        ctx.lineTo(x + 12, y)
+        ctx.moveTo(x, y - 12)
+        ctx.lineTo(x, y + 12)
+        ctx.stroke()
+      }
+    },
+    drawRotationIndicator(ctx, w, h) {
+      const rotationDegRaw = Number(this.overlayQuality.rotationFromFirstDeg)
+      const rotationDeg = Number.isFinite(rotationDegRaw) ? rotationDegRaw : 0
+      const direction = rotationDeg >= 0 ? '顺时针' : '逆时针'
+      const absDeg = Math.abs(rotationDeg)
+
+      const boxX = 12
+      const boxY = 12
+      const boxW = 168
+      const boxH = 66
+      ctx.save()
+      ctx.fillStyle = 'rgba(0,0,0,0.64)'
+      ctx.strokeStyle = 'rgba(255,255,255,0.22)'
+      ctx.lineWidth = 1
+      ctx.fillRect(boxX, boxY, boxW, boxH)
+      ctx.strokeRect(boxX, boxY, boxW, boxH)
+
+      const cx = boxX + 24
+      const cy = boxY + 40
+      const len = 18
+      const rad = rotationDeg * Math.PI / 180
+      // 基准方向：首帧解析角度定义为竖直向上（0°）
+      const x2 = cx + Math.sin(rad) * len
+      const y2 = cy - Math.cos(rad) * len
+
+      ctx.strokeStyle = '#ffd54f'
+      ctx.lineWidth = 2.2
+      ctx.beginPath()
+      ctx.moveTo(cx, cy)
+      ctx.lineTo(x2, y2)
+      ctx.stroke()
+
+      const head = 5
+      const a = Math.atan2(y2 - cy, x2 - cx)
+      ctx.beginPath()
+      ctx.moveTo(x2, y2)
+      ctx.lineTo(x2 - head * Math.cos(a - Math.PI / 6), y2 - head * Math.sin(a - Math.PI / 6))
+      ctx.lineTo(x2 - head * Math.cos(a + Math.PI / 6), y2 - head * Math.sin(a + Math.PI / 6))
+      ctx.closePath()
+      ctx.fillStyle = '#ffd54f'
+      ctx.fill()
+
+      ctx.fillStyle = 'rgba(255,255,255,0.92)'
+      ctx.font = '12px sans-serif'
+      ctx.fillText('旋转方向', boxX + 54, boxY + 22)
+      ctx.fillText(`${direction} ${absDeg.toFixed(1)}°`, boxX + 54, boxY + 43)
+      ctx.fillStyle = 'rgba(255,255,255,0.7)'
+      ctx.font = '11px sans-serif'
+      ctx.fillText('首帧=竖直(0°)', boxX + 54, boxY + 59)
+      ctx.restore()
+    },
     drawLabel(ctx, text, x, y, color) {
       const paddingX = 4
       const paddingY = 3
@@ -359,11 +571,12 @@ export default {
   padding: 14px;
   color: #fff;
   pointer-events: auto;
-  height: 100%;
+  flex: 1 1 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
+  overflow: hidden;
 }
 
 .pm-progress {
@@ -419,11 +632,12 @@ export default {
   gap: 14px;
   min-height: 0;
   flex: 1 1 auto;
+  overflow: hidden;
 }
 
 .pm-canvas-wrap {
   position: relative;
-  min-height: 220px;
+  min-height: 0;
   border: 1px solid rgba(255,255,255,0.12);
   border-radius: 6px;
   overflow: hidden;
@@ -501,6 +715,40 @@ export default {
   color: rgba(255,255,255,0.90);
   font-size: 12px;
   line-height: 1.45;
+}
+
+.pm-diagnostics {
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 6px;
+  padding: 8px;
+  background: rgba(255,255,255,0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.pm-diag-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  color: rgba(255,255,255,0.70);
+}
+
+.pm-diag-row strong {
+  color: #e3f2fd;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.pm-warning {
+  color: #ffd54f;
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .pm-status-pill {
