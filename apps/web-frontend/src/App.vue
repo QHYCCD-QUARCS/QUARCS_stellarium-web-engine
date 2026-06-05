@@ -7495,7 +7495,9 @@ export default {
     getTileRenderParamsKey() {
       const params = this.getTileRenderParamsSnapshot();
       if (!params) return 'no-gpm';
-      return `${params.cfa}|${params.gainR}|${params.gainB}|${params.blackLevel}|${params.whiteLevel}`;
+      // 加入 frameId：确保新旧帧即使拉伸参数相同，也不会共享处理后的瓦片
+      const frameId = (this.tileFrameId != null) ? this.tileFrameId : 'none';
+      return `${params.cfa}|${params.gainR}|${params.gainB}|${params.blackLevel}|${params.whiteLevel}|${frameId}`;
     },
 
     getTileRenderParamsSnapshot(sourceGpm = this.tileGPM) {
@@ -7959,8 +7961,9 @@ export default {
       }
       
       const paramsSnapshot = this.getTileRenderParamsSnapshot();
+      const frameId = (this.tileFrameId != null) ? this.tileFrameId : 'none';
       const paramsKey = paramsSnapshot
-        ? `${paramsSnapshot.cfa}|${paramsSnapshot.gainR}|${paramsSnapshot.gainB}|${paramsSnapshot.blackLevel}|${paramsSnapshot.whiteLevel}`
+        ? `${paramsSnapshot.cfa}|${paramsSnapshot.gainR}|${paramsSnapshot.gainB}|${paramsSnapshot.blackLevel}|${paramsSnapshot.whiteLevel}|${frameId}`
         : 'no-gpm';
 
       // 先对“已有原始数据”的可见瓦片做分批就地处理，避免参数变化时长时间同步阻塞主线程。
