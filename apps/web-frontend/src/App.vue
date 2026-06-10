@@ -1185,6 +1185,7 @@ export default {
         { driverType: 'MainCamera', label: 'Auto Save', value: false, inputType: 'switch' }, // 自动保存
         { driverType: 'MainCamera', label: 'Save Failed Parse', value: false, inputType: 'switch' }, // 保存解析失败图片
         { driverType: 'MainCamera', label: 'Save Folder', value: 'local', inputType: 'select' ,selectValue: ['local']}, // 保存文件夹
+        { driverType: 'MainCamera', label: 'Tile Level Mode', value: 'full', inputType: 'select', selectValue: ['full', 'minmax'] }, // 瓦片层级模式
         // { driverType: 'MainCamera', label: 'Tile Build Mode', value: 'merged_single_level', inputType: 'select', selectValue: ['pyramid', 'merged_single_level'] }, // 瓦片构建模式
         // 循环拍摄
         // { driverType: 'MainCamera', label: 'Exposuer delay', value: 0, inputType: 'number' }, // 循环拍摄间隔时间
@@ -1542,6 +1543,10 @@ export default {
         lutG: null,
         lutB: null
       },
+      reusableCvMats: {}, // 图像热路径临时 Mat 复用，减少 wasm 堆分配抖动
+      tileImageBitmapSupported: typeof createImageBitmap === 'function',
+      roiOverlayCanvas: null,
+      roiOverlayCtx: null,
 
       showRaDecDialog: false, // 控制是否显示设置GOTO目标对话框
 
@@ -3213,6 +3218,7 @@ export default {
                 // - v2(追加): ...:{previewWidth}:{previewHeight}:{previewBinningFactor}
                 // - v3(追加): ...:{frameId}
                 // - v4(追加): ...:{buildMode}
+                // - v5(追加): ...:{levelMode}
                 if (parts.length >= 11) {
                   const normalizedCfa = this.normalizeCfaPattern(parts[8]);
                   const gpm = {
@@ -3232,6 +3238,7 @@ export default {
                     previewBinningFactor: (parts.length >= 14) ? parseInt(parts[13]) : null,
                     frameId: (parts.length >= 15) ? parseInt(parts[14]) : null,
                     buildMode: (parts.length >= 16) ? parts[15] : 'pyramid',
+                    levelMode: (parts.length >= 17) ? parts[16] : 'full',
                   };
                   const tileGpmRxExtra = {
                     sessionId: gpm.sessionId,
@@ -6892,6 +6899,10 @@ export default {
       }
       return 'pyramid';
     },
+    normalizeTileLevelModeValue(value) {
+      const v = String(value || '').trim().toLowerCase();
+      return v === 'minmax' ? 'minmax' : 'full';
+    },
 
     hasPendingVisibleTileDownloads() {
       if (!this.tileGPM || !this.tileSessionId || this.tileFrameId == null) return false;
@@ -7235,6 +7246,7 @@ export default {
      */
     async handleTileGPM(gpm) {
       gpm.buildMode = this.normalizeTileBuildModeValue(gpm.buildMode);
+      gpm.levelMode = this.normalizeTileLevelModeValue(gpm.levelMode);
       this.SendConsoleLogMsg(`Received TileGPM: session=${gpm.sessionId}, size=${gpm.imageWidth}x${gpm.imageHeight}, maxZoom=${gpm.maxZoomLevel}`, 'info');
       this.logMainCameraImagePipeLine('App.vue', 'handleTileGPM', 'incomingSessionId', gpm.sessionId);
       this.logMainCameraImagePipeLine('App.vue', 'handleTileGPM', 'incomingFrameId', gpm.frameId);
@@ -7271,6 +7283,8 @@ export default {
       const nextMaxZoomLevel = Number.isFinite(Number(gpm.maxZoomLevel))
         ? Number(gpm.maxZoomLevel)
         : null;
+      const prevLevelMode = this.normalizeTileLevelModeValue(prevGpm.levelMode);
+      const nextLevelMode = this.normalizeTileLevelModeValue(gpm.levelMode);
       const prevFrameId = (this.tileFrameId != null && Number.isFinite(Number(this.tileFrameId)))
         ? Number(this.tileFrameId)
         : null;
@@ -7283,6 +7297,7 @@ export default {
         prevPreviewWidth !== nextPreviewWidth ||
         prevPreviewHeight !== nextPreviewHeight ||
         prevMaxZoomLevel !== nextMaxZoomLevel ||
+        prevLevelMode !== nextLevelMode ||
         (prevGpm.cfa || 'null') !== (gpm.cfa || 'null');
 
       const sessionIdStr = String(gpm.sessionId || '');
@@ -7349,6 +7364,10 @@ export default {
       if (tileBuildModeItem) {
         tileBuildModeItem.value = gpm.buildMode;
       }
+      const tileLevelModeItem = this.MainCameraConfigItems.find(item => item.label === 'Tile Level Mode');
+      if (tileLevelModeItem) {
+        tileLevelModeItem.value = gpm.levelMode;
+      }
       // 注意：后端每张图使用独立 session（live_<epoch>），frameId 仍用于错帧丢弃
       if (incomingFrameId !== null) {
         this.tileFrameId = incomingFrameId;
@@ -7401,7 +7420,7 @@ export default {
 
       if (isNewSession || isOverwriteLiveFrame) {
         // 新会话或 live 覆盖写帧：清空瓦片缓存与队列，避免旧帧残留/命中缓存导致不刷新
-        this.tileCache.clear();
+        this.clearTileRenderCache();
         this.tileRawDataCache.clear();
         this.tilePendingLoads.clear();
         this.tileReadyKeys.clear();
@@ -7606,13 +7625,16 @@ export default {
       this.isFocuserPanelVisible = nextVisible;
 
       if (!this.tileGPM) return;
+      if (nextVisible) {
+        // 打开 ROI（对焦）面板时保持当前主图不变，避免触发全量重绘导致“闪一下”。
+        // ROI 小图的自动拉伸/白平衡仍在 showRoiImage() 前端链路内执行。
+        return;
+      }
 
-      // 对焦面板显隐会改变允许请求的最高瓦片层级。
-      // 这里强制清空一次合成缓冲，避免旧的高精/低精层残留在画面上。
-      this.tileCanvasNeedsClear = true;
+      // 仅在关闭 ROI 面板时移除 ROI 叠加并重绘底图，确保画面回到纯瓦片视图。
+      this.roiOverlayImageData = null;
       this.tileForceFullRender = true;
-      this.scheduleVisibleAreaToBackend(true);
-      this.loadVisibleTiles();
+      this.renderTiles();
     },
 
     /**
@@ -7627,6 +7649,7 @@ export default {
       if (maxZ === 0) return 0;
 
       const gpm = gpmOverride || this.tileGPM;
+      const levelMode = this.normalizeTileLevelModeValue(gpm && gpm.levelMode);
       const imageWidth = Number(gpm && gpm.imageWidth);
       const imageHeight = Number(gpm && gpm.imageHeight);
       const canvasWidth = Math.max(1, Number(this.CanvasWidth) || 0);
@@ -7638,6 +7661,9 @@ export default {
       const MIN_SCALE = 0.01;
       const MAX_SCALE = 1.0;
       const clampedScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, Number(scale) || 1));
+      if (levelMode === 'minmax') {
+        return clampedScale < 0.5 ? maxZ : 0;
+      }
       const visibleWidth = imageWidth * clampedScale;
       const imageAspect = imageWidth / imageHeight;
       const canvasAspect = canvasWidth / canvasHeight;
@@ -7881,6 +7907,7 @@ export default {
       const requestMaxZ = this.getEffectiveRequestedTileMaxZ(gpm);
       const currentZ = Math.min(this.getCurrentTargetTileZ(gpm), requestMaxZ);
       const buildMode = this.normalizeTileBuildModeValue(gpm.buildMode);
+      const levelMode = this.normalizeTileLevelModeValue(gpm.levelMode);
       const visibleRect = this.getCurrentVisibleRect();
       if (!visibleRect) return [];
 
@@ -7896,16 +7923,18 @@ export default {
         width: gpm.imageWidth,
         height: gpm.imageHeight,
       };
-      const requestLevels = this.tileMergedPreviewReady
-        ? Array.from(new Set([
-            Math.max(0, currentZ - 1),
-            currentZ,
-          ])).sort((a, b) => a - b)
-        : Array.from(new Set([
-            0,
-            Math.max(0, currentZ - 1),
-            currentZ,
-          ])).sort((a, b) => a - b);
+      const requestLevels = levelMode === 'minmax'
+        ? Array.from(new Set([0, currentZ])).sort((a, b) => a - b)
+        : (this.tileMergedPreviewReady
+          ? Array.from(new Set([
+              Math.max(0, currentZ - 1),
+              currentZ,
+            ])).sort((a, b) => a - b)
+          : Array.from(new Set([
+              0,
+              Math.max(0, currentZ - 1),
+              currentZ,
+            ])).sort((a, b) => a - b));
       const fullyLocalHighResMode = !!this.tileFullCacheComplete;
       const localOnlyZ = Math.max(0, requestMaxZ);
       const effectiveRequestLevels = fullyLocalHighResMode
@@ -7934,6 +7963,7 @@ export default {
           currentZ,
           requestMaxZ,
           buildMode,
+          levelMode,
           levels: effectiveRequestLevels.join(','),
           fullyLocalHighResMode,
           count: tiles.length,
@@ -8164,8 +8194,8 @@ export default {
 
         try {
           const processedTile = this.processTile(this.tileRawDataCache.get(key), paramsSnapshot);
-          const renderSource = this.createTileRenderSource(processedTile);
-          this.tileCache.set(key, {
+          const renderSource = await this.createTileRenderSource(processedTile);
+          this.setTileRenderCacheEntry(key, {
             renderSource,
             width: processedTile.width,
             height: processedTile.height,
@@ -8382,6 +8412,22 @@ export default {
       return true;
     },
 
+    getVisibleTileKeysForLevel(levelZ, keys = null) {
+      if (!Number.isFinite(levelZ)) return [];
+      const targetKeys = keys
+        || ((this.currentVisibleTiles && this.currentVisibleTiles.size > 0)
+          ? Array.from(this.currentVisibleTiles)
+          : []);
+      if (!targetKeys || targetKeys.length === 0) return [];
+      const z = Number(levelZ);
+      return targetKeys.filter(key => {
+        const parts = String(key || '').split('/');
+        if (parts.length < 3) return false;
+        const tileZ = Number(parts[0]);
+        return Number.isFinite(tileZ) && tileZ === z;
+      });
+    },
+
     async waitForVisibleTilesReady(batchId, keys = null) {
       const targetKeys = keys
         || ((this.currentVisibleTiles && this.currentVisibleTiles.size > 0)
@@ -8585,7 +8631,7 @@ export default {
               const t0 = performance.now();
               processedTile = this.processTile(tileData, paramsSnapshot);
               const t1 = performance.now();
-              renderSource = this.createTileRenderSource(processedTile);
+              renderSource = await this.createTileRenderSource(processedTile);
               const t2 = performance.now();
               const processTileMs = +(t1 - t0).toFixed(2);
               const createTileRenderSourceMs = +(t2 - t1).toFixed(2);
@@ -8598,9 +8644,9 @@ export default {
               );
             } else {
               processedTile = this.processTile(tileData, paramsSnapshot);
-              renderSource = this.createTileRenderSource(processedTile);
+              renderSource = await this.createTileRenderSource(processedTile);
             }
-            this.tileCache.set(key, {
+            this.setTileRenderCacheEntry(key, {
               renderSource,
               width: processedTile.width,
               height: processedTile.height,
@@ -8641,7 +8687,10 @@ export default {
               this.tileMergedPreviewReady = true;
               shouldTriggerMergedDetailLoad = true;
             } else if (shouldPatchRender) {
-              this.scheduleIncrementalTileRender();
+              const levelKeys = this.getVisibleTileKeysForLevel(tile.z);
+              if (levelKeys.length > 0 && this.hasCompleteVisibleTileCache(levelKeys)) {
+                this.scheduleIncrementalTileRender();
+              }
             }
             if (!this.tileAllowIncrementalRender) {
               this.commitVisibleTilePresentation();
@@ -8747,14 +8796,13 @@ export default {
       const params = renderParams || this.getTileRenderParamsSnapshot();
       if (!params) return null;
       
-      // 创建OpenCV Mat
       let mat = null;
       let resultImg = null;
       let roiMat = null;
       let finalImg = null;
       
       try {
-        mat = new cv.Mat(height, width, cv.CV_16UC1);
+        mat = this.getReusableCvMat('tile16', height, width, cv.CV_16UC1);
         mat.data16U.set(data);
         
         // 应用统一的处理参数
@@ -8807,13 +8855,19 @@ export default {
       } finally {
         if (roiMat) roiMat.delete();
         if (finalImg && finalImg !== resultImg) finalImg.delete();
-        if (mat) mat.delete();
         if (resultImg) resultImg.delete();
       }
     },
 
-    createTileRenderSource(imageData) {
+    async createTileRenderSource(imageData) {
       if (!imageData) return null;
+      if (this.tileImageBitmapSupported) {
+        try {
+          return await createImageBitmap(imageData);
+        } catch (e) {
+          this.tileImageBitmapSupported = false;
+        }
+      }
       const canvas = document.createElement('canvas');
       canvas.width = imageData.width;
       canvas.height = imageData.height;
@@ -8821,6 +8875,31 @@ export default {
       if (!ctx) return null;
       ctx.putImageData(imageData, 0, 0);
       return canvas;
+    },
+
+    releaseTileRenderSource(source) {
+      if (source && typeof source.close === 'function') {
+        source.close();
+      }
+    },
+
+    setTileRenderCacheEntry(key, entry) {
+      if (!this.tileCache) return;
+      const prev = this.tileCache.get(key);
+      if (prev && prev.renderSource && prev.renderSource !== entry.renderSource) {
+        this.releaseTileRenderSource(prev.renderSource);
+      }
+      this.tileCache.set(key, entry);
+    },
+
+    clearTileRenderCache() {
+      if (!this.tileCache) return;
+      for (const cached of this.tileCache.values()) {
+        if (cached && cached.renderSource) {
+          this.releaseTileRenderSource(cached.renderSource);
+        }
+      }
+      this.tileCache.clear();
     },
 
     /**
@@ -8834,6 +8913,13 @@ export default {
       const ctx = this.tileCtx;
       const s = Number(this.tileRasterScale) > 0 ? Number(this.tileRasterScale) : 1;
       let needsFullRender = Boolean(this.tileForceFullRender);
+      const z = this.calculateTileLevel(this.scale, gpm.maxZoomLevel, gpm);
+      const currentLevelKeys = this.getVisibleTileKeysForLevel(z);
+
+      // 按层整批显示：当前目标层瓦片未全部就绪时，保持上一帧，不提交局部块状结果。
+      if (currentLevelKeys.length > 0 && !this.hasCompleteVisibleTileCache(currentLevelKeys)) {
+        return;
+      }
       
       // 只在新会话开始时清空一次；层级切换时不清空，避免“先透明后补齐”的闪烁
       if (this.tileCanvasNeedsClear) {
@@ -8843,9 +8929,6 @@ export default {
         needsFullRender = true;
       }
       
-      // 获取当前应该显示的层级（反向金字塔）
-      const z = this.calculateTileLevel(this.scale, gpm.maxZoomLevel, gpm);
-
       // 若缩放导致瓦片层级切换：清理“当前可视区域”，避免旧层级瓦片残留造成“看起来没有更新”的错觉
       if (this._tileLastRenderedZ === undefined) {
         this._tileLastRenderedZ = z;
@@ -9827,6 +9910,94 @@ export default {
       return samples[50]; // 返回采样的中位数
     },
 
+    getReusableCvMat(key, rows, cols, type) {
+      if (!this.reusableCvMats) {
+        this.reusableCvMats = {};
+      }
+      const mat = this.reusableCvMats[key];
+      const matAlive = mat && (typeof mat.isDeleted !== 'function' || !mat.isDeleted());
+      if (matAlive && mat.rows === rows && mat.cols === cols && mat.type() === type) {
+        return mat;
+      }
+      if (matAlive && typeof mat.delete === 'function') {
+        mat.delete();
+      }
+      const next = new cv.Mat(rows, cols, type);
+      this.reusableCvMats[key] = next;
+      return next;
+    },
+
+    releaseReusableCvMats() {
+      if (!this.reusableCvMats) return;
+      Object.keys(this.reusableCvMats).forEach((key) => {
+        const mat = this.reusableCvMats[key];
+        const matAlive = mat && (typeof mat.isDeleted !== 'function' || !mat.isDeleted());
+        if (matAlive && typeof mat.delete === 'function') {
+          mat.delete();
+        }
+      });
+      this.reusableCvMats = {};
+    },
+
+    getBayerCvtColorMode(bayerPattern) {
+      switch (bayerPattern) {
+        case 'RGGB': return cv.COLOR_BayerRG2RGBA;
+        case 'GR': return cv.COLOR_BayerGR2RGBA;
+        case 'GB': return cv.COLOR_BayerGB2RGBA;
+        case 'BG': return cv.COLOR_BayerBG2RGBA;
+        default: return cv.COLOR_GRAY2RGBA;
+      }
+    },
+
+    applyBayerLutTo8Bit(data16U, data8, rows, cols, bayerPattern, lutR, lutG, lutB) {
+      for (let y = 0; y < rows; y += 2) {
+        const y1 = y + 1;
+        const row0 = y * cols;
+        const row1 = y1 * cols;
+        const hasY1 = y1 < rows;
+
+        for (let x = 0; x < cols; x += 2) {
+          const x1 = x + 1;
+          const hasX1 = x1 < cols;
+          const i00 = row0 + x;
+
+          if (bayerPattern === 'GR') {
+            data8[i00] = lutG[data16U[i00]];
+            if (hasX1) data8[i00 + 1] = lutR[data16U[i00 + 1]];
+            if (hasY1) {
+              const i10 = row1 + x;
+              data8[i10] = lutB[data16U[i10]];
+              if (hasX1) data8[i10 + 1] = lutG[data16U[i10 + 1]];
+            }
+          } else if (bayerPattern === 'GB') {
+            data8[i00] = lutG[data16U[i00]];
+            if (hasX1) data8[i00 + 1] = lutB[data16U[i00 + 1]];
+            if (hasY1) {
+              const i10 = row1 + x;
+              data8[i10] = lutR[data16U[i10]];
+              if (hasX1) data8[i10 + 1] = lutG[data16U[i10 + 1]];
+            }
+          } else if (bayerPattern === 'BG') {
+            data8[i00] = lutB[data16U[i00]];
+            if (hasX1) data8[i00 + 1] = lutG[data16U[i00 + 1]];
+            if (hasY1) {
+              const i10 = row1 + x;
+              data8[i10] = lutG[data16U[i10]];
+              if (hasX1) data8[i10 + 1] = lutR[data16U[i10 + 1]];
+            }
+          } else {
+            data8[i00] = lutR[data16U[i00]];
+            if (hasX1) data8[i00 + 1] = lutG[data16U[i00 + 1]];
+            if (hasY1) {
+              const i10 = row1 + x;
+              data8[i10] = lutG[data16U[i10]];
+              if (hasX1) data8[i10 + 1] = lutB[data16U[i10 + 1]];
+            }
+          }
+        }
+      }
+    },
+
     /**
      * 应用白平衡和亮度拉伸，将16位图像转换为8位图像
      * @param {cv.Mat} img16 - 输入的16位图像Mat对象
@@ -9858,11 +10029,10 @@ export default {
       if (imageType === 'gray') {
         // 单色相机 - 一步转换到8位RGBA
         const rgbaImg = new cv.Mat();
-        const gray8 = new cv.Mat();
+        const gray8 = this.getReusableCvMat('gray8', img16.rows, img16.cols, cv.CV_8U);
 
         img16.convertTo(gray8, cv.CV_8U, scale, offset);
         cv.cvtColor(gray8, rgbaImg, cv.COLOR_GRAY2RGBA);
-        gray8.delete();
 
         return rgbaImg;
       } else {
@@ -9875,94 +10045,16 @@ export default {
         this.logImagePipelineHotPath('applyStretchAndGain', 'gainR', gainR);
         this.logImagePipelineHotPath('applyStretchAndGain', 'gainB', gainB);
 
-        // 使用LUT优化白平衡和拉伸
-        // 1. 创建三个LUT表
         const { lutR, lutG, lutB } = this.getLUT(blackLevel, whiteLevel, gainR, gainB);
 
-        // 3. 创建8位输出图像
-        const img8 = new cv.Mat(img16.rows, img16.cols, cv.CV_8UC1);
-
-        // 4. 使用LUT应用白平衡和拉伸
-        // 为避免像素遍历，我们使用更高效的方式
+        const img8 = this.getReusableCvMat('bayer8', img16.rows, img16.cols, cv.CV_8UC1);
         const rows = img16.rows;
         const cols = img16.cols;
-        const data8 = img8.data;
-
-        // 确定Bayer模式的位置
-        let rOffsets, gOffsets, bOffsets;
-        switch (bayerPattern) {
-          case 'RGGB':
-            rOffsets = [{ y: 0, x: 0 }];
-            gOffsets = [{ y: 0, x: 1 }, { y: 1, x: 0 }];
-            bOffsets = [{ y: 1, x: 1 }];
-            break;
-          case 'GR':
-            gOffsets = [{ y: 0, x: 0 }, { y: 1, x: 1 }];
-            rOffsets = [{ y: 0, x: 1 }];
-            bOffsets = [{ y: 1, x: 0 }];
-            break;
-          case 'GB':
-            gOffsets = [{ y: 0, x: 0 }, { y: 1, x: 1 }];
-            bOffsets = [{ y: 0, x: 1 }];
-            rOffsets = [{ y: 1, x: 0 }];
-            break;
-          case 'BG':
-            bOffsets = [{ y: 0, x: 0 }];
-            gOffsets = [{ y: 0, x: 1 }, { y: 1, x: 0 }];
-            rOffsets = [{ y: 1, x: 1 }];
-            break;
-          default:
-            rOffsets = [{ y: 0, x: 0 }];
-            gOffsets = [{ y: 0, x: 1 }, { y: 1, x: 0 }];
-            bOffsets = [{ y: 1, x: 1 }];
-        }
-
-        // 使用TypedArray方式处理 - 比逐个像素处理更快
-        const data16U = img16.data16U;
-
-        // 使用Bayer掩码创建转换LUT，批量处理
-        for (let y = 0; y < rows; y += 2) {
-          for (let x = 0; x < cols; x += 2) {
-            // 处理2x2块
-            // R位置
-            for (const pos of rOffsets) {
-              const idx = (y + pos.y) * cols + (x + pos.x);
-              if (idx < data16U.length) {
-                data8[idx] = lutR[data16U[idx]];
-              }
-            }
-
-            // G位置
-            for (const pos of gOffsets) {
-              const idx = (y + pos.y) * cols + (x + pos.x);
-              if (idx < data16U.length) {
-                data8[idx] = lutG[data16U[idx]];
-              }
-            }
-
-            // B位置
-            for (const pos of bOffsets) {
-              const idx = (y + pos.y) * cols + (x + pos.x);
-              if (idx < data16U.length) {
-                data8[idx] = lutB[data16U[idx]];
-              }
-            }
-          }
-        }
+        this.applyBayerLutTo8Bit(img16.data16U, img8.data, rows, cols, bayerPattern, lutR, lutG, lutB);
 
         // 5. 将8位单通道转为RGBA
         const rgbaImg = new cv.Mat();
-        let cvmode;
-        switch (bayerPattern) {
-          case 'RGGB': cvmode = cv.COLOR_BayerRG2RGBA; break;
-          case 'GR': cvmode = cv.COLOR_BayerGR2RGBA; break;
-          case 'GB': cvmode = cv.COLOR_BayerGB2RGBA; break;
-          case 'BG': cvmode = cv.COLOR_BayerBG2RGBA; break;
-          default: cvmode = cv.COLOR_GRAY2RGBA;
-        }
-
-        cv.cvtColor(img8, rgbaImg, cvmode);
-        img8.delete();
+        cv.cvtColor(img8, rgbaImg, this.getBayerCvtColorMode(bayerPattern));
 
         return rgbaImg;
       }
@@ -13400,10 +13492,14 @@ export default {
       if (bx >= this.bufferCanvas.width || by >= this.bufferCanvas.height) return;
       if (bx + dw <= 0 || by + dh <= 0) return;
 
-      const tmp = document.createElement('canvas');
-      tmp.width = w;
-      tmp.height = h;
-      const tctx = tmp.getContext('2d');
+      if (!this.roiOverlayCanvas) {
+        this.roiOverlayCanvas = document.createElement('canvas');
+        this.roiOverlayCtx = this.roiOverlayCanvas.getContext('2d');
+      }
+      const tmp = this.roiOverlayCanvas;
+      if (tmp.width !== w) tmp.width = w;
+      if (tmp.height !== h) tmp.height = h;
+      const tctx = this.roiOverlayCtx || tmp.getContext('2d');
       if (!tctx) return;
       tctx.putImageData(this.roiOverlayImageData, 0, 0);
       const prevSmooth = this.bufferCtx.imageSmoothingEnabled;
@@ -13571,6 +13667,16 @@ export default {
             this.tileGPM.buildMode = normalizedMode;
             this.tileCanvasNeedsClear = true;
             this.rememberTileViewportState();
+            this.loadVisibleTiles();
+          }
+        }else if (label === 'Tile Level Mode') {
+          const normalizedMode = this.normalizeTileLevelModeValue(value);
+          this.sendMessage('Vue_Command', 'SetMainCameraTileLevelMode:' + normalizedMode);
+          if (this.tileGPM) {
+            this.tileGPM.levelMode = normalizedMode;
+            this.tileCanvasNeedsClear = true;
+            this.tileForceFullRender = true;
+            this.scheduleVisibleAreaToBackend(true);
             this.loadVisibleTiles();
           }
         }else if (label === 'LoopCaptureNum') {
@@ -14048,6 +14154,10 @@ export default {
   // 在组件销毁时移除
     beforeDestroy() {
     this.stopTileReadyFallbackPolling();
+    this.clearTileRenderCache();
+    this.releaseReusableCvMats();
+    this.roiOverlayCanvas = null;
+    this.roiOverlayCtx = null;
     this.$bus.$off('FocuserPanelVisibilityChanged', this.handleFocuserPanelVisibilityChanged);
     document.removeEventListener('touchstart', this.preventDefault);
     document.removeEventListener('touchmove', this.preventDefault);
