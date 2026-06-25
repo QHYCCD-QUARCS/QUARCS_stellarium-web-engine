@@ -1433,6 +1433,9 @@ export default {
 
       loadingSelectDriver: false,
       loadingConnectAllDevice: false,
+      autoConnectAllEnabled: false,
+      autoConnectAllTriggered: false,
+      autoConnectAllTimer: null,
 
       CurrentLocationLng: 0,
       CurrentLocationLat: 0,
@@ -3958,6 +3961,30 @@ export default {
                 }
                 break;
 
+              case 'ClearGuiderDebugCandidates':
+                this.$bus.$emit('ClearGuiderDebugCandidates');
+                break;
+
+              case 'GuiderDebugCandidatePosition':
+                if (parts.length === 5) {
+                  const imageW = parseInt(parts[1], 10);
+                  const imageH = parseInt(parts[2], 10);
+                  const starX = parseInt(parts[3], 10);
+                  const starY = parseInt(parts[4], 10);
+                  this.DrawGuiderDebugCandidate(imageW, imageH, starX, starY);
+                }
+                break;
+
+              case 'GuiderDebugSelectedCandidatePosition':
+                if (parts.length === 5) {
+                  const imageW = parseInt(parts[1], 10);
+                  const imageH = parseInt(parts[2], 10);
+                  const starX = parseInt(parts[3], 10);
+                  const starY = parseInt(parts[4], 10);
+                  this.DrawGuiderDebugSelectedCandidate(imageW, imageH, starX, starY);
+                }
+                break;
+
               // 内置导星（GuiderCore）消息
               case 'GuiderCoreState':
                 if (parts.length === 2) {
@@ -5560,6 +5587,43 @@ export default {
 
 
       this.disconnectTimeoutTriggered = false;
+      this.scheduleAutoConnectAllDevice('status-recovery');
+    },
+
+    scheduleAutoConnectAllDevice(reason = 'unknown') {
+      if (!this.autoConnectAllEnabled || this.autoConnectAllTriggered) {
+        return;
+      }
+      if (this.autoConnectAllTimer) {
+        clearTimeout(this.autoConnectAllTimer);
+      }
+      this.autoConnectAllTimer = setTimeout(() => {
+        this.autoConnectAllTimer = null;
+        this.tryAutoConnectAllDevice(reason);
+      }, 2000);
+    },
+
+    tryAutoConnectAllDevice(reason = 'unknown') {
+      if (!this.autoConnectAllEnabled || this.autoConnectAllTriggered) {
+        return;
+      }
+      if (this.QTClientVersion === 'Not connected') {
+        this.scheduleAutoConnectAllDevice('wait-qt-client');
+        return;
+      }
+      if (this.loadingConnectAllDevice) {
+        this.scheduleAutoConnectAllDevice('wait-connect-all-finish');
+        return;
+      }
+      if (this.haveDeviceConnect) {
+        this.autoConnectAllTriggered = true;
+        return;
+      }
+
+      this.autoConnectAllTriggered = true;
+      console.log(`QHYCCD | auto trigger connectAllDevice (${reason}).`);
+      this.SendConsoleLogMsg(`Auto Connect All Device on page load (${reason})`, 'info');
+      this.connectAllDevice();
     },
 
     openPowerManagerPage() {
@@ -10434,6 +10498,28 @@ export default {
       this.$bus.$emit('PHD2MultiStarsPosition', StarStartX, StarStartY, StarWidth, StarHeight);
     },
 
+    DrawGuiderDebugCandidate(PHD2ImageSize_X, PHD2ImageSize_Y, Star_X, Star_Y) {
+      const mapped = this.mapGuiderImagePointToScreen(PHD2ImageSize_X, PHD2ImageSize_Y, Star_X, Star_Y);
+      const StarWidth = 32 * mapped.rect.width / Math.max(1, PHD2ImageSize_X);
+      const StarHeight = 32 * mapped.rect.height / Math.max(1, PHD2ImageSize_Y);
+
+      const StarStartX = mapped.x - StarWidth / 2;
+      const StarStartY = mapped.y - StarHeight / 2;
+
+      this.$bus.$emit('GuiderDebugCandidatePosition', StarStartX, StarStartY, StarWidth, StarHeight);
+    },
+
+    DrawGuiderDebugSelectedCandidate(PHD2ImageSize_X, PHD2ImageSize_Y, Star_X, Star_Y) {
+      const mapped = this.mapGuiderImagePointToScreen(PHD2ImageSize_X, PHD2ImageSize_Y, Star_X, Star_Y);
+      const StarWidth = 24 * mapped.rect.width / Math.max(1, PHD2ImageSize_X);
+      const StarHeight = 24 * mapped.rect.height / Math.max(1, PHD2ImageSize_Y);
+
+      const StarStartX = mapped.x - StarWidth / 2;
+      const StarStartY = mapped.y - StarHeight / 2;
+
+      this.$bus.$emit('GuiderDebugSelectedCandidatePosition', StarStartX, StarStartY, StarWidth, StarHeight);
+    },
+
     calculateHistogram(imageData) {
       console.log('QHYCCD | calculateHistogram');
       const histogram = [
@@ -10689,6 +10775,19 @@ export default {
     setStateFromQueryArgs: function () {
       // Check whether the observing panel must be displayed
       this.$store.commit('setValue', { varName: 'showSidePanel', newValue: this.$route.path.startsWith('/p/') })
+
+      const autoConnectAllFlag = this.$route.query.autoConnectAll
+      this.autoConnectAllEnabled = autoConnectAllFlag === '1' ||
+        autoConnectAllFlag === 'true' ||
+        autoConnectAllFlag === 'yes' ||
+        autoConnectAllFlag === 'on'
+      if (!this.autoConnectAllEnabled) {
+        this.autoConnectAllTriggered = false
+        if (this.autoConnectAllTimer) {
+          clearTimeout(this.autoConnectAllTimer)
+          this.autoConnectAllTimer = null
+        }
+      }
 
       // Set the core's state from URL query arguments such
       // as date, location, view direction & fov
@@ -13969,6 +14068,10 @@ export default {
   },
   // 在组件销毁时移除
     beforeDestroy() {
+    if (this.autoConnectAllTimer) {
+      clearTimeout(this.autoConnectAllTimer);
+      this.autoConnectAllTimer = null;
+    }
     this.stopTileReadyFallbackPolling();
     this.$bus.$off('FocuserPanelVisibilityChanged', this.handleFocuserPanelVisibilityChanged);
     document.removeEventListener('touchstart', this.preventDefault);
