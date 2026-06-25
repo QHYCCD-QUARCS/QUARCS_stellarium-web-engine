@@ -1433,9 +1433,6 @@ export default {
 
       loadingSelectDriver: false,
       loadingConnectAllDevice: false,
-      autoConnectAllEnabled: false,
-      autoConnectAllTriggered: false,
-      autoConnectAllTimer: null,
 
       CurrentLocationLng: 0,
       CurrentLocationLat: 0,
@@ -5587,43 +5584,6 @@ export default {
 
 
       this.disconnectTimeoutTriggered = false;
-      this.scheduleAutoConnectAllDevice('status-recovery');
-    },
-
-    scheduleAutoConnectAllDevice(reason = 'unknown') {
-      if (!this.autoConnectAllEnabled || this.autoConnectAllTriggered) {
-        return;
-      }
-      if (this.autoConnectAllTimer) {
-        clearTimeout(this.autoConnectAllTimer);
-      }
-      this.autoConnectAllTimer = setTimeout(() => {
-        this.autoConnectAllTimer = null;
-        this.tryAutoConnectAllDevice(reason);
-      }, 2000);
-    },
-
-    tryAutoConnectAllDevice(reason = 'unknown') {
-      if (!this.autoConnectAllEnabled || this.autoConnectAllTriggered) {
-        return;
-      }
-      if (this.QTClientVersion === 'Not connected') {
-        this.scheduleAutoConnectAllDevice('wait-qt-client');
-        return;
-      }
-      if (this.loadingConnectAllDevice) {
-        this.scheduleAutoConnectAllDevice('wait-connect-all-finish');
-        return;
-      }
-      if (this.haveDeviceConnect) {
-        this.autoConnectAllTriggered = true;
-        return;
-      }
-
-      this.autoConnectAllTriggered = true;
-      console.log(`QHYCCD | auto trigger connectAllDevice (${reason}).`);
-      this.SendConsoleLogMsg(`Auto Connect All Device on page load (${reason})`, 'info');
-      this.connectAllDevice();
     },
 
     openPowerManagerPage() {
@@ -10776,19 +10736,6 @@ export default {
       // Check whether the observing panel must be displayed
       this.$store.commit('setValue', { varName: 'showSidePanel', newValue: this.$route.path.startsWith('/p/') })
 
-      const autoConnectAllFlag = this.$route.query.autoConnectAll
-      this.autoConnectAllEnabled = autoConnectAllFlag === '1' ||
-        autoConnectAllFlag === 'true' ||
-        autoConnectAllFlag === 'yes' ||
-        autoConnectAllFlag === 'on'
-      if (!this.autoConnectAllEnabled) {
-        this.autoConnectAllTriggered = false
-        if (this.autoConnectAllTimer) {
-          clearTimeout(this.autoConnectAllTimer)
-          this.autoConnectAllTimer = null
-        }
-      }
-
       // Set the core's state from URL query arguments such
       // as date, location, view direction & fov
       let that = this
@@ -14068,10 +14015,6 @@ export default {
   },
   // 在组件销毁时移除
     beforeDestroy() {
-    if (this.autoConnectAllTimer) {
-      clearTimeout(this.autoConnectAllTimer);
-      this.autoConnectAllTimer = null;
-    }
     this.stopTileReadyFallbackPolling();
     this.$bus.$off('FocuserPanelVisibilityChanged', this.handleFocuserPanelVisibilityChanged);
     document.removeEventListener('touchstart', this.preventDefault);
