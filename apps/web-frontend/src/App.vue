@@ -3970,6 +3970,30 @@ export default {
                 }
                 break;
 
+              case 'ClearGuiderDebugCandidates':
+                this.$bus.$emit('ClearGuiderDebugCandidates');
+                break;
+
+              case 'GuiderDebugCandidatePosition':
+                if (parts.length === 5) {
+                  const imageW = parseInt(parts[1], 10);
+                  const imageH = parseInt(parts[2], 10);
+                  const starX = parseInt(parts[3], 10);
+                  const starY = parseInt(parts[4], 10);
+                  this.DrawGuiderDebugCandidate(imageW, imageH, starX, starY);
+                }
+                break;
+
+              case 'GuiderDebugSelectedCandidatePosition':
+                if (parts.length === 5) {
+                  const imageW = parseInt(parts[1], 10);
+                  const imageH = parseInt(parts[2], 10);
+                  const starX = parseInt(parts[3], 10);
+                  const starY = parseInt(parts[4], 10);
+                  this.DrawGuiderDebugSelectedCandidate(imageW, imageH, starX, starY);
+                }
+                break;
+
               // 内置导星（GuiderCore）消息
               case 'GuiderCoreState':
                 if (parts.length === 2) {
@@ -7589,7 +7613,9 @@ export default {
     getTileRenderParamsKey() {
       const params = this.getTileRenderParamsSnapshot();
       if (!params) return 'no-gpm';
-      return `${params.cfa}|${params.gainR}|${params.gainB}|${params.blackLevel}|${params.whiteLevel}`;
+      // 加入 frameId：确保新旧帧即使拉伸参数相同，也不会共享处理后的瓦片
+      const frameId = (this.tileFrameId != null) ? this.tileFrameId : 'none';
+      return `${params.cfa}|${params.gainR}|${params.gainB}|${params.blackLevel}|${params.whiteLevel}|${frameId}`;
     },
 
     getTileRenderParamsSnapshot(sourceGpm = this.tileGPM) {
@@ -8064,8 +8090,9 @@ export default {
       }
       
       const paramsSnapshot = this.getTileRenderParamsSnapshot();
+      const frameId = (this.tileFrameId != null) ? this.tileFrameId : 'none';
       const paramsKey = paramsSnapshot
-        ? `${paramsSnapshot.cfa}|${paramsSnapshot.gainR}|${paramsSnapshot.gainB}|${paramsSnapshot.blackLevel}|${paramsSnapshot.whiteLevel}`
+        ? `${paramsSnapshot.cfa}|${paramsSnapshot.gainR}|${paramsSnapshot.gainB}|${paramsSnapshot.blackLevel}|${paramsSnapshot.whiteLevel}|${frameId}`
         : 'no-gpm';
 
       // 先对“已有原始数据”的可见瓦片做分批就地处理，避免参数变化时长时间同步阻塞主线程。
@@ -10596,6 +10623,28 @@ export default {
       const StarStartY = mapped.y - StarHeight / 2;
 
       this.$bus.$emit('PHD2MultiStarsPosition', StarStartX, StarStartY, StarWidth, StarHeight);
+    },
+
+    DrawGuiderDebugCandidate(PHD2ImageSize_X, PHD2ImageSize_Y, Star_X, Star_Y) {
+      const mapped = this.mapGuiderImagePointToScreen(PHD2ImageSize_X, PHD2ImageSize_Y, Star_X, Star_Y);
+      const StarWidth = 32 * mapped.rect.width / Math.max(1, PHD2ImageSize_X);
+      const StarHeight = 32 * mapped.rect.height / Math.max(1, PHD2ImageSize_Y);
+
+      const StarStartX = mapped.x - StarWidth / 2;
+      const StarStartY = mapped.y - StarHeight / 2;
+
+      this.$bus.$emit('GuiderDebugCandidatePosition', StarStartX, StarStartY, StarWidth, StarHeight);
+    },
+
+    DrawGuiderDebugSelectedCandidate(PHD2ImageSize_X, PHD2ImageSize_Y, Star_X, Star_Y) {
+      const mapped = this.mapGuiderImagePointToScreen(PHD2ImageSize_X, PHD2ImageSize_Y, Star_X, Star_Y);
+      const StarWidth = 24 * mapped.rect.width / Math.max(1, PHD2ImageSize_X);
+      const StarHeight = 24 * mapped.rect.height / Math.max(1, PHD2ImageSize_Y);
+
+      const StarStartX = mapped.x - StarWidth / 2;
+      const StarStartY = mapped.y - StarHeight / 2;
+
+      this.$bus.$emit('GuiderDebugSelectedCandidatePosition', StarStartX, StarStartY, StarWidth, StarHeight);
     },
 
     calculateHistogram(imageData) {

@@ -45,3 +45,6 @@ pnpm-debug.log*
 lerna-debug.log*
 
 apps/web-frontend/test-results/*
+
+# local analysis scratch files
+tile_analysis_context.txt

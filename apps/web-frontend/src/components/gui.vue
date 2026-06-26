@@ -31,6 +31,18 @@
 
     <div v-show="showPHD2BoxAndCross && PHD2CrossView" class="PHD2CircleClass" v-for="(Star, index) in PHD2MultiStars"
       :key="index" :style="{ top: Star.Y + 'px', left: Star.X + 'px', width: Star.Width + 'px', height: Star.Height + 'px', borderRadius: (Math.min(Star.Width, Star.Height) / 2) + 'px' }"></div>
+    <div
+      v-for="(Star, index) in guiderDebugCandidates"
+      :key="'guider-debug-candidate-' + index"
+      v-show="showPHD2BoxAndCross"
+      class="guider-debug-candidate-box"
+      :style="{ top: Star.Y + 'px', left: Star.X + 'px', width: Star.Width + 'px', height: Star.Height + 'px' }"
+    ></div>
+    <div
+      v-show="showPHD2BoxAndCross && guiderDebugSelectedCandidate"
+      class="guider-debug-selected-box"
+      :style="guiderDebugSelectedCandidate ? { top: guiderDebugSelectedCandidate.Y + 'px', left: guiderDebugSelectedCandidate.X + 'px', width: guiderDebugSelectedCandidate.Width + 'px', height: guiderDebugSelectedCandidate.Height + 'px' } : {}"
+    ></div>
 
     <message-box v-for="(msg, index) in messageList" :key="msg.id" :message="msg.message" :type="msg.type"
       :Pos="msg.Pos" @close="removeMessage(index)"></message-box>
@@ -671,6 +683,8 @@ export default {
       PHD2Cross_Height: 0,
 
       PHD2MultiStars: [],
+      guiderDebugCandidates: [],
+      guiderDebugSelectedCandidate: null,
 
       CurrentGuiderStatus: 'null',
 
@@ -753,6 +767,7 @@ export default {
     this.$bus.$on('ImageManagerPanelClose', this.closeImageManagerPanel);
     this.$bus.$on('ImageManagerPanelOpen', this.openImageManagerPanel);
     this.$bus.$on('toggleDeviceAllocationPanel', this.toggleDeviceAllocationPanel);
+    this.$bus.$on('openDeviceAllocationPanel', this.openDeviceAllocationPanel);
     this.$bus.$on('toggleINDIDebugDialog', this.toggleINDIDebugDialog);
     this.$bus.$on('toggleRPIHotspotDialog', this.toggleRPIHotspotDialog);
     this.$bus.$on('toggleDateTimePicker', this.toggleDateTimePicker);
@@ -773,6 +788,9 @@ export default {
     this.$bus.$on('ClearPHD2MultiStars', this.ClearPHD2MultiStars);
     this.$bus.$on('PHD2MultiStarsPosition', this.PHD2MultiStarsPosition);
     this.$bus.$on('PHD2CrossPosition', this.PHD2CrossPosition);
+    this.$bus.$on('ClearGuiderDebugCandidates', this.ClearGuiderDebugCandidates);
+    this.$bus.$on('GuiderDebugCandidatePosition', this.GuiderDebugCandidatePosition);
+    this.$bus.$on('GuiderDebugSelectedCandidatePosition', this.GuiderDebugSelectedCandidatePosition);
     this.$bus.$on('GuiderStatus', this.GuiderStatus);
     this.$bus.$on('PHD2StarBoxView', this.togglePHD2StarBox);
     this.$bus.$on('PHD2StarCrossView', this.togglePHD2StarCross);
@@ -812,6 +830,9 @@ export default {
   },
   beforeDestroy() {
     try {
+      this.$bus.$off('ClearGuiderDebugCandidates', this.ClearGuiderDebugCandidates);
+      this.$bus.$off('GuiderDebugCandidatePosition', this.GuiderDebugCandidatePosition);
+      this.$bus.$off('GuiderDebugSelectedCandidatePosition', this.GuiderDebugSelectedCandidatePosition);
       this.$bus.$off('GuiderLockStar', this.onGuiderLockStar);
       this.$bus.$off('GuiderStarSelected', this.onGuiderStarSelected);
     } catch (e) {
@@ -927,6 +948,12 @@ export default {
         if (this.ShowDateTimePicker) {
           this.ShowDateTimePicker = false;
         }
+      }
+    },
+
+    openDeviceAllocationPanel() {
+      if (!this.ShowDeviceAllocationPanel) {
+        this.toggleDeviceAllocationPanel();
       }
     },
 
@@ -1098,6 +1125,19 @@ export default {
 
     ClearPHD2MultiStars() {
       this.PHD2MultiStars = [];
+    },
+
+    GuiderDebugCandidatePosition(StarStartX, StarStartY, StarWidth = 32, StarHeight = 32) {
+      this.guiderDebugCandidates.push({ X: StarStartX, Y: StarStartY, Width: StarWidth, Height: StarHeight });
+    },
+
+    GuiderDebugSelectedCandidatePosition(StarStartX, StarStartY, StarWidth = 24, StarHeight = 24) {
+      this.guiderDebugSelectedCandidate = { X: StarStartX, Y: StarStartY, Width: StarWidth, Height: StarHeight };
+    },
+
+    ClearGuiderDebugCandidates() {
+      this.guiderDebugCandidates = [];
+      this.guiderDebugSelectedCandidate = null;
     },
 
     GuiderStatus(status) {
@@ -2609,6 +2649,22 @@ export default {
   background-color: transparent;
   box-sizing: border-box;
   outline: 1px solid rgba(51, 218, 121, 1);
+}
+
+.guider-debug-candidate-box {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1px solid rgba(255, 196, 61, 0.95);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+  background: rgba(255, 196, 61, 0.08);
+}
+
+.guider-debug-selected-box {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px solid rgba(36, 219, 255, 0.98);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45), 0 0 10px rgba(36, 219, 255, 0.35);
+  background: rgba(36, 219, 255, 0.08);
 }
 
 .guider-lock-label {
