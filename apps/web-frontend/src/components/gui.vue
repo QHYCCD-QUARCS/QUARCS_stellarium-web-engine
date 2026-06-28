@@ -17,12 +17,24 @@
     </div>
     <!-- 导星星点信息（仿 PHD2：在锁星框旁显示当前导星星点坐标/质量） -->
     <div
-      v-show="showPHD2BoxAndCross && PHD2BoxView && hasGuiderLockStar"
-      class="guider-lock-label"
-      :class="{ 'guider-lock-label-flash': guiderLockFlash }"
+      v-show="showPHD2BoxAndCross && PHD2BoxView"
+      class="guider-lock-panel"
       :style="{ top: (PHD2Box_Y - 18) + 'px', left: (PHD2Box_X + PHD2Box_Width + 6) + 'px' }"
     >
-      {{ guiderLockLabel }}
+      <div
+        v-show="hasGuiderLockStar"
+        class="guider-lock-label"
+        :class="{ 'guider-lock-label-flash': guiderLockFlash }"
+      >
+        {{ guiderLockLabel }}
+      </div>
+      <button
+        type="button"
+        class="get-click guider-box-mode-btn"
+        @click.stop="cycleGuiderBoxDisplayMode"
+      >
+        Box: {{ guiderBoxDisplayModeLabel }}
+      </button>
     </div>
     <div v-show="showPHD2BoxAndCross && PHD2CrossView" :class="SwitchPHD2CrossClass"
       :style="{ top: 0 + 'px', left: PHD2Cross_X + 'px', width: 1 + 'px', height: PHD2Cross_Height + 'px' }"></div>
@@ -32,14 +44,42 @@
     <div v-show="showPHD2BoxAndCross && PHD2CrossView" class="PHD2CircleClass" v-for="(Star, index) in PHD2MultiStars"
       :key="index" :style="{ top: Star.Y + 'px', left: Star.X + 'px', width: Star.Width + 'px', height: Star.Height + 'px', borderRadius: (Math.min(Star.Width, Star.Height) / 2) + 'px' }"></div>
     <div
-      v-for="(Star, index) in guiderDebugCandidates"
+      v-for="(Star, index) in guiderDebugDedupCandidates"
       :key="'guider-debug-candidate-' + index"
-      v-show="showPHD2BoxAndCross"
+      v-show="showGuiderDebugOverlay"
+      class="guider-debug-dedup-box"
+      :style="{ top: Star.Y + 'px', left: Star.X + 'px', width: Star.Width + 'px', height: Star.Height + 'px' }"
+    ></div>
+    <div
+      v-for="(Star, index) in guiderDebugSnrCandidates"
+      :key="'guider-debug-snr-' + index"
+      v-show="showGuiderDebugOverlay"
+      class="guider-debug-snr-box"
+      :style="{ top: Star.Y + 'px', left: Star.X + 'px', width: Star.Width + 'px', height: Star.Height + 'px' }"
+    ></div>
+    <div
+      v-for="(Star, index) in guiderDebugCandidates"
+      :key="'guider-debug-legacy-' + index"
+      v-show="showGuiderDebugOverlay"
       class="guider-debug-candidate-box"
       :style="{ top: Star.Y + 'px', left: Star.X + 'px', width: Star.Width + 'px', height: Star.Height + 'px' }"
     ></div>
     <div
-      v-show="showPHD2BoxAndCross && guiderDebugSelectedCandidate"
+      v-for="(Star, index) in guiderDebugFinalCandidates"
+      :key="'guider-debug-final-' + index"
+      v-show="showGuiderDebugOverlay"
+      class="guider-debug-final-box"
+      :style="{ top: Star.Y + 'px', left: Star.X + 'px', width: Star.Width + 'px', height: Star.Height + 'px' }"
+    ></div>
+    <div
+      v-for="(Star, index) in guiderDebugFinalCandidates"
+      :key="'guider-debug-final-label-' + index"
+      v-show="showGuiderDebugOverlay && Star.Label"
+      class="guider-debug-final-label"
+      :style="{ top: (Star.Y - 22) + 'px', left: (Star.X + Star.Width + 8) + 'px' }"
+    >{{ Star.Label }}</div>
+    <div
+      v-show="showGuiderDebugOverlay && guiderDebugSelectedCandidate"
       class="guider-debug-selected-box"
       :style="guiderDebugSelectedCandidate ? { top: guiderDebugSelectedCandidate.Y + 'px', left: guiderDebugSelectedCandidate.X + 'px', width: guiderDebugSelectedCandidate.Width + 'px', height: guiderDebugSelectedCandidate.Height + 'px' } : {}"
     ></div>
@@ -684,6 +724,9 @@ export default {
 
       PHD2MultiStars: [],
       guiderDebugCandidates: [],
+      guiderDebugDedupCandidates: [],
+      guiderDebugSnrCandidates: [],
+      guiderDebugFinalCandidates: [],
       guiderDebugSelectedCandidate: null,
 
       CurrentGuiderStatus: 'null',
@@ -700,6 +743,7 @@ export default {
       guiderLockHFD: null,
       guiderLockFlash: false,
       guiderLockFlashTimer: null,
+      guiderBoxDisplayModeLabel: 'Auto',
 
       loadingImageSolve: false,
 
@@ -790,10 +834,14 @@ export default {
     this.$bus.$on('PHD2CrossPosition', this.PHD2CrossPosition);
     this.$bus.$on('ClearGuiderDebugCandidates', this.ClearGuiderDebugCandidates);
     this.$bus.$on('GuiderDebugCandidatePosition', this.GuiderDebugCandidatePosition);
+    this.$bus.$on('GuiderDebugDedupCandidatePosition', this.GuiderDebugDedupCandidatePosition);
+    this.$bus.$on('GuiderDebugSnrCandidatePosition', this.GuiderDebugSnrCandidatePosition);
+    this.$bus.$on('GuiderDebugFinalCandidatePosition', this.GuiderDebugFinalCandidatePosition);
     this.$bus.$on('GuiderDebugSelectedCandidatePosition', this.GuiderDebugSelectedCandidatePosition);
     this.$bus.$on('GuiderStatus', this.GuiderStatus);
     this.$bus.$on('PHD2StarBoxView', this.togglePHD2StarBox);
     this.$bus.$on('PHD2StarCrossView', this.togglePHD2StarCross);
+    this.$bus.$on('GuiderBoxDisplayModeChanged', this.onGuiderBoxDisplayModeChanged);
     this.$bus.$on('GuiderLockStar', this.onGuiderLockStar);
     this.$bus.$on('GuiderStarSelected', this.onGuiderStarSelected);
     this.$bus.$on("ImageSolveFinished", this.ImageSolveFinished);
@@ -824,6 +872,7 @@ export default {
   mounted() {
     // 根据屏幕分辨率高度判断布局，立即执行（不需要等待DOM渲染）
     this.checkScaleButtonsOverlap();
+    this.$bus.$emit('RequestGuiderBoxDisplayMode');
     
     // this.resizeRedBox(1920, 1080);
     // this.$bus.$emit('syncROI_length');
@@ -832,7 +881,11 @@ export default {
     try {
       this.$bus.$off('ClearGuiderDebugCandidates', this.ClearGuiderDebugCandidates);
       this.$bus.$off('GuiderDebugCandidatePosition', this.GuiderDebugCandidatePosition);
+      this.$bus.$off('GuiderDebugDedupCandidatePosition', this.GuiderDebugDedupCandidatePosition);
+      this.$bus.$off('GuiderDebugSnrCandidatePosition', this.GuiderDebugSnrCandidatePosition);
+      this.$bus.$off('GuiderDebugFinalCandidatePosition', this.GuiderDebugFinalCandidatePosition);
       this.$bus.$off('GuiderDebugSelectedCandidatePosition', this.GuiderDebugSelectedCandidatePosition);
+      this.$bus.$off('GuiderBoxDisplayModeChanged', this.onGuiderBoxDisplayModeChanged);
       this.$bus.$off('GuiderLockStar', this.onGuiderLockStar);
       this.$bus.$off('GuiderStarSelected', this.onGuiderStarSelected);
     } catch (e) {
@@ -1127,16 +1180,31 @@ export default {
       this.PHD2MultiStars = [];
     },
 
+    GuiderDebugDedupCandidatePosition(StarStartX, StarStartY, StarWidth = 30, StarHeight = 30) {
+      this.guiderDebugDedupCandidates.push({ X: StarStartX, Y: StarStartY, Width: StarWidth, Height: StarHeight });
+    },
+
     GuiderDebugCandidatePosition(StarStartX, StarStartY, StarWidth = 32, StarHeight = 32) {
       this.guiderDebugCandidates.push({ X: StarStartX, Y: StarStartY, Width: StarWidth, Height: StarHeight });
     },
 
-    GuiderDebugSelectedCandidatePosition(StarStartX, StarStartY, StarWidth = 24, StarHeight = 24) {
+    GuiderDebugSnrCandidatePosition(StarStartX, StarStartY, StarWidth = 40, StarHeight = 40) {
+      this.guiderDebugSnrCandidates.push({ X: StarStartX, Y: StarStartY, Width: StarWidth, Height: StarHeight });
+    },
+
+    GuiderDebugFinalCandidatePosition(StarStartX, StarStartY, StarWidth = 50, StarHeight = 50, label = '') {
+      this.guiderDebugFinalCandidates.push({ X: StarStartX, Y: StarStartY, Width: StarWidth, Height: StarHeight, Label: label });
+    },
+
+    GuiderDebugSelectedCandidatePosition(StarStartX, StarStartY, StarWidth = 60, StarHeight = 60) {
       this.guiderDebugSelectedCandidate = { X: StarStartX, Y: StarStartY, Width: StarWidth, Height: StarHeight };
     },
 
     ClearGuiderDebugCandidates() {
       this.guiderDebugCandidates = [];
+      this.guiderDebugDedupCandidates = [];
+      this.guiderDebugSnrCandidates = [];
+      this.guiderDebugFinalCandidates = [];
       this.guiderDebugSelectedCandidate = null;
     },
 
@@ -1819,6 +1887,18 @@ export default {
         this.PHD2CrossView = false;
       }
     },
+    cycleGuiderBoxDisplayMode() {
+      this.$bus.$emit('CycleGuiderBoxDisplayMode');
+    },
+    onGuiderBoxDisplayModeChanged(mode) {
+      const labels = {
+        AUTO: 'Auto',
+        S: 'S',
+        M: 'M',
+        L: 'L'
+      };
+      this.guiderBoxDisplayModeLabel = labels[mode] || 'Auto';
+    },
 
     onGuiderLockStar(imgW, imgH, x, y) {
       const prevX = this.guiderLockRawX;
@@ -2108,6 +2188,9 @@ export default {
           'cross-Connected': this.CurrentGuiderStatus === 'Connected',
         }
       ];
+    },
+    showGuiderDebugOverlay() {
+      return this.isGuiderMode || this.showPHD2BoxAndCross;
     },
     hasGuiderLockStar() {
       return Number.isFinite(this.guiderLockRawX) && Number.isFinite(this.guiderLockRawY);
@@ -2653,22 +2736,71 @@ export default {
 
 .guider-debug-candidate-box {
   position: absolute;
+  z-index: 30;
   box-sizing: border-box;
-  border: 1px solid rgba(255, 196, 61, 0.95);
+  border: 1px solid rgba(51, 218, 121, 0.98);
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
-  background: rgba(255, 196, 61, 0.08);
+  background: transparent;
+  pointer-events: none;
+}
+
+.guider-debug-dedup-box {
+  position: absolute;
+  z-index: 20;
+  box-sizing: border-box;
+  border: 1px solid rgba(186, 108, 255, 0.95);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+  background: transparent;
+  pointer-events: none;
+}
+
+.guider-debug-snr-box {
+  position: absolute;
+  z-index: 40;
+  box-sizing: border-box;
+  border: 2px solid rgba(255, 196, 61, 0.98);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35), 0 0 10px rgba(255, 196, 61, 0.22);
+  background: transparent;
+  pointer-events: none;
+}
+
+.guider-debug-final-box {
+  position: absolute;
+  z-index: 30;
+  box-sizing: border-box;
+  border: 2px solid rgba(51, 218, 121, 0.98);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+  background: transparent;
+  pointer-events: none;
+}
+
+.guider-debug-final-label {
+  position: absolute;
+  z-index: 50;
+  padding: 4px 10px;
+  font-size: 18px;
+  line-height: 24px;
+  font-weight: 700;
+  color: rgba(207, 255, 226, 0.98);
+  background: rgba(7, 28, 16, 0.9);
+  border: 1px solid rgba(51, 218, 121, 0.72);
+  border-radius: 8px;
+  white-space: nowrap;
+  pointer-events: none;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95);
 }
 
 .guider-debug-selected-box {
   position: absolute;
+  z-index: 60;
   box-sizing: border-box;
   border: 2px solid rgba(36, 219, 255, 0.98);
   box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45), 0 0 10px rgba(36, 219, 255, 0.35);
   background: rgba(36, 219, 255, 0.08);
+  pointer-events: none;
 }
 
 .guider-lock-label {
-  position: absolute;
   padding: 2px 6px;
   font-size: 11px;
   line-height: 14px;
@@ -2678,6 +2810,33 @@ export default {
   border-radius: 6px;
   user-select: none;
   white-space: nowrap;
+}
+
+.guider-lock-panel {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.guider-box-mode-btn {
+  pointer-events: auto;
+  padding: 2px 8px;
+  height: 20px;
+  font-size: 11px;
+  line-height: 14px;
+  color: rgba(255, 255, 255, 0.95);
+  background: rgba(18, 18, 18, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  user-select: none;
+  cursor: pointer;
+}
+
+.guider-box-mode-btn:hover {
+  border-color: rgba(255, 255, 255, 0.42);
+  background: rgba(28, 28, 28, 0.76);
 }
 
 .guider-lock-label-flash {

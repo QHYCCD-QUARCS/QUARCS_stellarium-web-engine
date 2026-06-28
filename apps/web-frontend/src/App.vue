@@ -1071,6 +1071,16 @@ export default {
       onlineHandler: null,
       offlineHandler: null,
       visibilityChangeHandler: null,
+      guiderBoxDisplayMode: 'AUTO',
+      lastPHD2BoxState: null,
+      guiderCanvasImage: null,
+      guiderCanvasRedrawPending: false,
+      guiderDebugOverlay: {
+        dedup: [],
+        snr: [],
+        final: [],
+        selected: null
+      },
 
       QTClientVersion: 'Not connected',
       VueClientVersion: process.env.VUE_APP_VERSION || '—',
@@ -1617,6 +1627,8 @@ export default {
     this.$bus.$on('PolarPointAltitude', this.setPolarPointAltitude);
     this.$bus.$on('showStelCanvas', this.showStelCanvas);
     this.$bus.$on('RecalibratePolarAxis', this.RecalibratePolarAxis);
+    this.$bus.$on('CycleGuiderBoxDisplayMode', this.cycleGuiderBoxDisplayMode);
+    this.$bus.$on('RequestGuiderBoxDisplayMode', this.broadcastGuiderBoxDisplayMode);
     // 统一缓存 appVersion，便于后续任意组件读取
     this.$bus.$on('appVersion', (ver) => {
       this.AppVersion = ver || '—';
@@ -3935,14 +3947,35 @@ export default {
                 break;
 
               case 'PHD2StarBoxPosition':
-                if (parts.length === 5) {
+                if (parts.length === 5 || parts.length === 6) {
                   const PHD2ImageSize_X = parseInt(parts[1], 10);
                   const PHD2ImageSize_Y = parseInt(parts[2], 10);
                   const Box_X = parseInt(parts[3], 10);
                   const Box_Y = parseInt(parts[4], 10);
-                  this.DrawPHD2Box(PHD2ImageSize_X, PHD2ImageSize_Y, Box_X, Box_Y);
+                  const boxHalfSizePx = parts.length >= 6 ? parseInt(parts[5], 10) : null;
+                  this.lastPHD2BoxState = {
+                    imageW: PHD2ImageSize_X,
+                    imageH: PHD2ImageSize_Y,
+                    x: Box_X,
+                    y: Box_Y,
+                    halfSizePx: boxHalfSizePx
+                  };
+                  this.DrawPHD2Box(PHD2ImageSize_X, PHD2ImageSize_Y, Box_X, Box_Y, boxHalfSizePx);
                   // 同步把“锁定星点”的原始像素坐标广播给 UI（用于显示导星的是哪颗星）
                   this.$bus.$emit('GuiderLockStar', PHD2ImageSize_X, PHD2ImageSize_Y, Box_X, Box_Y);
+                }
+                break;
+
+              case 'GuiderSearchBoxMode':
+                if (parts.length >= 3) {
+                  const mode = parts[1];
+                  const halfSizePx = parseInt(parts[2], 10);
+                  this.guiderBoxDisplayMode = mode;
+                  this.$bus.$emit('GuiderBoxDisplayModeChanged', mode);
+                  if (this.lastPHD2BoxState) {
+                    this.lastPHD2BoxState.halfSizePx = halfSizePx;
+                    this.redrawLastPHD2Box();
+                  }
                 }
                 break;
 
@@ -3971,7 +4004,39 @@ export default {
                 break;
 
               case 'ClearGuiderDebugCandidates':
+                this.guiderDebugOverlay.dedup = [];
+                this.guiderDebugOverlay.snr = [];
+                this.guiderDebugOverlay.final = [];
+                this.guiderDebugOverlay.selected = null;
+                console.info('[GuiderDebugOverlay] cleared');
+                this.scheduleGuiderCanvasRedraw();
                 this.$bus.$emit('ClearGuiderDebugCandidates');
+                break;
+
+              case 'GuiderDebugDedupCandidatePosition':
+                if (parts.length === 5) {
+                  const imageW = parseInt(parts[1], 10);
+                  const imageH = parseInt(parts[2], 10);
+                  const starX = parseInt(parts[3], 10);
+                  const starY = parseInt(parts[4], 10);
+                  this.guiderDebugOverlay.dedup.push({ x: starX, y: starY, imageW, imageH });
+                  console.info('[GuiderDebugOverlay] dedup', this.guiderDebugOverlay.dedup.length, starX, starY);
+                  this.scheduleGuiderCanvasRedraw();
+                  this.DrawGuiderDebugDedupCandidate(imageW, imageH, starX, starY);
+                }
+                break;
+
+              case 'GuiderDebugSnrCandidatePosition':
+                if (parts.length === 5) {
+                  const imageW = parseInt(parts[1], 10);
+                  const imageH = parseInt(parts[2], 10);
+                  const starX = parseInt(parts[3], 10);
+                  const starY = parseInt(parts[4], 10);
+                  this.guiderDebugOverlay.snr.push({ x: starX, y: starY, imageW, imageH });
+                  console.info('[GuiderDebugOverlay] snr', this.guiderDebugOverlay.snr.length, starX, starY);
+                  this.scheduleGuiderCanvasRedraw();
+                  this.DrawGuiderDebugSnrCandidate(imageW, imageH, starX, starY);
+                }
                 break;
 
               case 'GuiderDebugCandidatePosition':
@@ -3984,12 +4049,29 @@ export default {
                 }
                 break;
 
+              case 'GuiderDebugFinalCandidatePosition':
+                if (parts.length >= 5) {
+                  const imageW = parseInt(parts[1], 10);
+                  const imageH = parseInt(parts[2], 10);
+                  const starX = parseInt(parts[3], 10);
+                  const starY = parseInt(parts[4], 10);
+                  const label = parts.length >= 6 ? parts.slice(5).join(':') : '';
+                  this.guiderDebugOverlay.final.push({ x: starX, y: starY, imageW, imageH, label });
+                  console.info('[GuiderDebugOverlay] final', this.guiderDebugOverlay.final.length, starX, starY, label);
+                  this.scheduleGuiderCanvasRedraw();
+                  this.DrawGuiderDebugFinalCandidate(imageW, imageH, starX, starY, label);
+                }
+                break;
+
               case 'GuiderDebugSelectedCandidatePosition':
                 if (parts.length === 5) {
                   const imageW = parseInt(parts[1], 10);
                   const imageH = parseInt(parts[2], 10);
                   const starX = parseInt(parts[3], 10);
                   const starY = parseInt(parts[4], 10);
+                  this.guiderDebugOverlay.selected = { x: starX, y: starY, imageW, imageH };
+                  console.info('[GuiderDebugOverlay] selected', starX, starY);
+                  this.scheduleGuiderCanvasRedraw();
                   this.DrawGuiderDebugSelectedCandidate(imageW, imageH, starX, starY);
                 }
                 break;
@@ -6181,15 +6263,11 @@ export default {
       const canvas = document.getElementById('guiderCamera-canvas');
       // const canvas = document.getElementById('mainCamera-canvas');
       if (canvas.getContext) {
-        const ctx = canvas.getContext('2d');
         const img = new Image();
 
         img.onload = () => {
-          canvas.width = img.width;
-          canvas.height = img.height;
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-          ctx.drawImage(img, 0, 0);
-          // this.$bus.$emit('showSolveImage', img);
+          this.guiderCanvasImage = img;
+          this.renderGuiderCanvas();
         };
 
         // 添加错误处理
@@ -6200,6 +6278,28 @@ export default {
 
         img.src = imagePath;
       }
+    },
+
+    scheduleGuiderCanvasRedraw() {
+      if (this.guiderCanvasRedrawPending) return;
+      this.guiderCanvasRedrawPending = true;
+      window.requestAnimationFrame(() => {
+        this.guiderCanvasRedrawPending = false;
+        this.renderGuiderCanvas();
+      });
+    },
+
+    renderGuiderCanvas() {
+      const canvas = document.getElementById('guiderCamera-canvas');
+      const img = this.guiderCanvasImage;
+      if (!canvas || !canvas.getContext || !img) return;
+
+      const ctx = canvas.getContext('2d');
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      canvas.width = img.width;
+      canvas.height = img.height;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0);
     },
 
     /**
@@ -10598,15 +10698,59 @@ export default {
       };
     },
 
-    DrawPHD2Box(PHD2ImageSize_X, PHD2ImageSize_Y, Box_X, Box_Y) {
+    DrawPHD2Box(PHD2ImageSize_X, PHD2ImageSize_Y, Box_X, Box_Y, boxHalfSizePx = null) {
       const mapped = this.mapGuiderImagePointToScreen(PHD2ImageSize_X, PHD2ImageSize_Y, Box_X, Box_Y);
-      const BoxWidth = 20 * mapped.rect.width / Math.max(1, PHD2ImageSize_X);
-      const BoxHeight = 20 * mapped.rect.height / Math.max(1, PHD2ImageSize_Y);
+      const resolvedHalfSizePx = this.resolveGuiderBoxDisplayHalfSize(boxHalfSizePx);
+      const BoxWidth = (resolvedHalfSizePx * 2) * mapped.rect.width / Math.max(1, PHD2ImageSize_X);
+      const BoxHeight = (resolvedHalfSizePx * 2) * mapped.rect.height / Math.max(1, PHD2ImageSize_Y);
 
       const BoxStartX = mapped.x - BoxWidth / 2;
       const BoxStartY = mapped.y - BoxHeight / 2;
 
       this.$bus.$emit('PHD2BoxPosition', BoxStartX, BoxStartY, BoxWidth, BoxHeight);
+    },
+
+    resolveGuiderBoxDisplayHalfSize(boxHalfSizePx) {
+      return Number.isFinite(Number(boxHalfSizePx)) && Number(boxHalfSizePx) > 0
+        ? Number(boxHalfSizePx)
+        : 24;
+    },
+
+    cycleGuiderBoxDisplayMode() {
+      const modes = ['AUTO', 'S', 'M', 'L'];
+      const currentIndex = modes.indexOf(this.guiderBoxDisplayMode);
+      const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % modes.length : 0;
+      const nextMode = modes[nextIndex];
+      const nextHalfSizePx = this.guiderBoxHalfSizeForMode(nextMode);
+      this.guiderBoxDisplayMode = nextMode;
+      this.broadcastGuiderBoxDisplayMode();
+      if (this.lastPHD2BoxState) {
+        this.lastPHD2BoxState.halfSizePx = nextHalfSizePx;
+        this.redrawLastPHD2Box();
+      }
+      this.sendMessage('Vue_Command', 'GuiderSearchBoxMode:' + nextMode);
+    },
+
+    broadcastGuiderBoxDisplayMode() {
+      this.$bus.$emit('GuiderBoxDisplayModeChanged', this.guiderBoxDisplayMode);
+    },
+
+    guiderBoxHalfSizeForMode(mode) {
+      if (mode === 'S') return 16;
+      if (mode === 'M') return 24;
+      if (mode === 'L') return 36;
+      return 24;
+    },
+
+    redrawLastPHD2Box() {
+      if (!this.lastPHD2BoxState) return;
+      this.DrawPHD2Box(
+        this.lastPHD2BoxState.imageW,
+        this.lastPHD2BoxState.imageH,
+        this.lastPHD2BoxState.x,
+        this.lastPHD2BoxState.y,
+        this.lastPHD2BoxState.halfSizePx
+      );
     },
 
     DrawPHD2Cross(PHD2ImageSize_X, PHD2ImageSize_Y, Cross_X, Cross_Y) {
@@ -10625,6 +10769,28 @@ export default {
       this.$bus.$emit('PHD2MultiStarsPosition', StarStartX, StarStartY, StarWidth, StarHeight);
     },
 
+    DrawGuiderDebugDedupCandidate(PHD2ImageSize_X, PHD2ImageSize_Y, Star_X, Star_Y) {
+      const mapped = this.mapGuiderImagePointToScreen(PHD2ImageSize_X, PHD2ImageSize_Y, Star_X, Star_Y);
+      const StarWidth = 30 * mapped.rect.width / Math.max(1, PHD2ImageSize_X);
+      const StarHeight = 30 * mapped.rect.height / Math.max(1, PHD2ImageSize_Y);
+
+      const StarStartX = mapped.x - StarWidth / 2;
+      const StarStartY = mapped.y - StarHeight / 2;
+
+      this.$bus.$emit('GuiderDebugDedupCandidatePosition', StarStartX, StarStartY, StarWidth, StarHeight);
+    },
+
+    DrawGuiderDebugSnrCandidate(PHD2ImageSize_X, PHD2ImageSize_Y, Star_X, Star_Y) {
+      const mapped = this.mapGuiderImagePointToScreen(PHD2ImageSize_X, PHD2ImageSize_Y, Star_X, Star_Y);
+      const StarWidth = 40 * mapped.rect.width / Math.max(1, PHD2ImageSize_X);
+      const StarHeight = 40 * mapped.rect.height / Math.max(1, PHD2ImageSize_Y);
+
+      const StarStartX = mapped.x - StarWidth / 2;
+      const StarStartY = mapped.y - StarHeight / 2;
+
+      this.$bus.$emit('GuiderDebugSnrCandidatePosition', StarStartX, StarStartY, StarWidth, StarHeight);
+    },
+
     DrawGuiderDebugCandidate(PHD2ImageSize_X, PHD2ImageSize_Y, Star_X, Star_Y) {
       const mapped = this.mapGuiderImagePointToScreen(PHD2ImageSize_X, PHD2ImageSize_Y, Star_X, Star_Y);
       const StarWidth = 32 * mapped.rect.width / Math.max(1, PHD2ImageSize_X);
@@ -10636,10 +10802,21 @@ export default {
       this.$bus.$emit('GuiderDebugCandidatePosition', StarStartX, StarStartY, StarWidth, StarHeight);
     },
 
+    DrawGuiderDebugFinalCandidate(PHD2ImageSize_X, PHD2ImageSize_Y, Star_X, Star_Y, label = '') {
+      const mapped = this.mapGuiderImagePointToScreen(PHD2ImageSize_X, PHD2ImageSize_Y, Star_X, Star_Y);
+      const StarWidth = 50 * mapped.rect.width / Math.max(1, PHD2ImageSize_X);
+      const StarHeight = 50 * mapped.rect.height / Math.max(1, PHD2ImageSize_Y);
+
+      const StarStartX = mapped.x - StarWidth / 2;
+      const StarStartY = mapped.y - StarHeight / 2;
+
+      this.$bus.$emit('GuiderDebugFinalCandidatePosition', StarStartX, StarStartY, StarWidth, StarHeight, label);
+    },
+
     DrawGuiderDebugSelectedCandidate(PHD2ImageSize_X, PHD2ImageSize_Y, Star_X, Star_Y) {
       const mapped = this.mapGuiderImagePointToScreen(PHD2ImageSize_X, PHD2ImageSize_Y, Star_X, Star_Y);
-      const StarWidth = 24 * mapped.rect.width / Math.max(1, PHD2ImageSize_X);
-      const StarHeight = 24 * mapped.rect.height / Math.max(1, PHD2ImageSize_Y);
+      const StarWidth = 60 * mapped.rect.width / Math.max(1, PHD2ImageSize_X);
+      const StarHeight = 60 * mapped.rect.height / Math.max(1, PHD2ImageSize_Y);
 
       const StarStartX = mapped.x - StarWidth / 2;
       const StarStartY = mapped.y - StarHeight / 2;
@@ -14208,6 +14385,8 @@ export default {
     this.roiOverlayCanvas = null;
     this.roiOverlayCtx = null;
     this.$bus.$off('FocuserPanelVisibilityChanged', this.handleFocuserPanelVisibilityChanged);
+    this.$bus.$off('CycleGuiderBoxDisplayMode', this.cycleGuiderBoxDisplayMode);
+    this.$bus.$off('RequestGuiderBoxDisplayMode', this.broadcastGuiderBoxDisplayMode);
     document.removeEventListener('touchstart', this.preventDefault);
     document.removeEventListener('touchmove', this.preventDefault);
     document.removeEventListener('touchend', this.preventDefault);
