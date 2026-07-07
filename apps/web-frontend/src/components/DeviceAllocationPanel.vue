@@ -494,8 +494,17 @@ export default {
       if (!device) return '';
       const matched = (this.DeviceTypes || []).find((item) => {
         if (!item || !item.isBind) return false;
-        return this.isSameDeviceIndex(item.selectedDeviceIndex, device.DeviceIndex) &&
-          this.roleCandidateType(item.DeviceType) === device.DeviceType;
+        // 优先通过 selectedDeviceIndex 精确匹配
+        if (this.isSameDeviceIndex(item.selectedDeviceIndex, device.DeviceIndex) &&
+          this.roleCandidateType(item.DeviceType) === device.DeviceType) {
+          return true;
+        }
+        // 兜底：通过 DeviceName 匹配（解决 selectedDeviceIndex 为 null 时无法过滤的问题）
+        if (item.DeviceName && item.DeviceName === device.DeviceName &&
+          this.isCameraDeviceType(item.DeviceType)) {
+          return true;
+        }
+        return false;
       });
       return matched ? matched.DeviceType : '';
     },
