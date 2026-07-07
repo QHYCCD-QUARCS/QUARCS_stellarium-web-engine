@@ -74,6 +74,17 @@
               {{ $t('DeviceAllocation_NoAvailableCandidateDevice') }}
             </li>
           </ul>
+
+          <!-- 连接按钮：选中设备后显示，点击后执行绑定 -->
+          <div v-if="selectedDeviceType && selectedCandidateForBinding" class="connect-action-row">
+            <button
+              class="connect-btn"
+              @click.stop="confirmBindSelected()"
+              data-testid="dap-act-connect-device"
+            >
+              {{ $t('DeviceAllocation_Connect') }}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -202,14 +213,22 @@ export default {
         this.$bus.$emit('SendConsoleLogMsg', this.$t('DeviceAllocation_RoleAlreadyBoundToThisDevice', { role }), 'info');
         return;
       }
-      // 两步操作：先选槽位，再点右侧设备。点击后立即提交绑定/换绑。
+      // 两步操作：先选槽位，再点右侧设备。点击后仅标记选中，不立即绑定。
       selectedRoleObj.DeviceName = device.DeviceName;
       selectedRoleObj.selectedDeviceIndex = device.DeviceIndex;
       this.$bus.$emit(
         'SendConsoleLogMsg',
-        `[DIAG][DAP_CANDIDATE_SELECT] source=${source} dev=${this.getDeviceKey(device)}`,
+        `[DIAG][DAP_CANDIDATE_SELECT] source=${source} dev=${this.getDeviceKey(device)} (selected, not bound yet)`,
         'warning'
       );
+      // 不再立即调用 BindingDevice，等待用户点击连接按钮
+    },
+    confirmBindSelected() {
+      // 用户点击连接按钮后，执行绑定
+      const selectedRole = (this.DeviceTypes || []).find(t => t && t.isSelected);
+      if (!selectedRole) return;
+      const selectedRoleIndex = (this.DeviceTypes || []).findIndex(item => item && item.isSelected);
+      if (selectedRoleIndex < 0) return;
       this.BindingDevice(selectedRoleIndex);
     },
     logCandidateTouch(phase, device, event) {
@@ -632,6 +651,15 @@ export default {
     panelWidth() {
       return this.DeviceTypes.length <= 3 ? '760px' : '860px';
     },
+    selectedCandidateForBinding() {
+      // 返回当前选中的候选设备，用于控制连接按钮显示
+      if (!this.selectedDeviceType) return null;
+      const selectedRole = (this.DeviceTypes || []).find(t => t && t.isSelected);
+      if (!selectedRole || selectedRole.selectedDeviceIndex === null || selectedRole.selectedDeviceIndex === undefined) return null;
+      const idx = selectedRole.selectedDeviceIndex;
+      const dev = (this.candidateDeviceList || []).find(d => d.DeviceIndex === idx);
+      return dev || null;
+    },
   },
   mounted: function () {
     this.GetConnectedDevices();
@@ -845,6 +873,40 @@ export default {
   text-align: center;
   cursor: default !important;
   background: rgba(255, 255, 255, 0.02) !important;
+}
+
+/* 连接按钮区域 */
+.connect-action-row {
+  display: flex;
+  justify-content: center;
+  padding: 12px 0 4px;
+  border-top: 1px solid rgba(153, 187, 255, 0.15);
+  margin-top: 8px;
+}
+
+.connect-btn {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 32px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+  letter-spacing: 0.5px;
+}
+
+.connect-btn:hover {
+  background: linear-gradient(135deg, #16a34a, #15803d);
+  box-shadow: 0 6px 16px rgba(34, 197, 94, 0.4);
+  transform: translateY(-1px);
+}
+
+.connect-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.3);
 }
 
 .device-list li.selected {
