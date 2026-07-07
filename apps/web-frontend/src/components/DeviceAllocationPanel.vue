@@ -57,6 +57,9 @@
                 selected: isSelectedCandidate(device),
                 occupied: !!getDeviceOccupant(device),
                 swappable: canSwapWithSelectedRole(device),
+                'cat-5iii': device.cameraCategory === '5III',
+                'cat-demo': device.cameraCategory === 'DEMO',
+                'cat-other': device.cameraCategory === 'OTHER',
               }"
             >
               <div class="device-main-row">
@@ -244,19 +247,22 @@ export default {
       }
     },
 
-    DeviceToBeAllocated(a, b, c) {
-      // 兼容两种调用：
+    DeviceToBeAllocated(a, b, c, d) {
+      // 兼容三种调用：
+      // - 新（带分类）：DeviceToBeAllocated(DeviceType, DeviceIndex, DeviceName, cameraCategory)
       // - 新：DeviceToBeAllocated(DeviceType, DeviceIndex, DeviceName)
       // - 旧：DeviceToBeAllocated(DeviceIndex, DeviceName)
-      let deviceType, index, name;
+      let deviceType, index, name, cameraCategory;
       if (typeof a === 'string' && typeof c !== 'undefined') {
         deviceType = a;
         index = b;
         name = c;
+        cameraCategory = (typeof d !== 'undefined' && d) ? d : 'OTHER';
       } else {
         deviceType = 'Device'; // 旧协议没有类型信息，统一归类
         index = a;
         name = b;
+        cameraCategory = 'OTHER';
       }
 
       if (!this.isAllocatableDeviceType(deviceType)) return;
@@ -281,11 +287,11 @@ export default {
       } else {
         if (occupied) {
           this.$bus.$emit('SendConsoleLogMsg', 'Device already exists:' + normalizedIndex + ':' + name, 'info');
-          this.DeviceList.push({DeviceType: deviceType, DeviceName: name, DeviceIndex: normalizedIndex, isBind: true });
+          this.DeviceList.push({DeviceType: deviceType, DeviceName: name, DeviceIndex: normalizedIndex, isBind: true, cameraCategory: cameraCategory });
         } else {
           this.$bus.$emit('SendConsoleLogMsg', 'Add Device To Be Allocated:' + normalizedIndex + ':' + name, 'info');
           console.log('Add Device To Be Allocated:', normalizedIndex, name);
-          this.DeviceList.push({DeviceType: deviceType, DeviceName: name, DeviceIndex: normalizedIndex, isBind: false });
+          this.DeviceList.push({DeviceType: deviceType, DeviceName: name, DeviceIndex: normalizedIndex, isBind: false, cameraCategory: cameraCategory });
         }
       }
       this.syncRoleIndexesByDeviceName(deviceType, name, normalizedIndex);
@@ -844,6 +850,22 @@ export default {
 
 .device-list li.swappable {
   border-left: 3px solid rgba(255, 203, 124, 0.95);
+}
+
+/* [修改] 相机类别背景色提示 */
+.device-list li.cat-5iii {
+  background: rgba(59, 130, 246, 0.12);
+  border-color: rgba(59, 130, 246, 0.35);
+}
+
+.device-list li.cat-demo {
+  background: rgba(249, 115, 22, 0.12);
+  border-color: rgba(249, 115, 22, 0.35);
+}
+
+.device-list li.cat-other {
+  background: rgba(34, 197, 94, 0.12);
+  border-color: rgba(34, 197, 94, 0.35);
 }
 
 .device-meta {
