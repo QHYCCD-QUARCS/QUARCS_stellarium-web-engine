@@ -12589,6 +12589,10 @@ export default {
           return;
         }
       }
+      // 修复：如果所有设备都已连接，重置isConnecting并停止loading，避免UI卡死
+      this.SendConsoleLogMsg(`Driver ${DeviceType} is already connected`, 'info');
+      this.isConnecting = false;
+      this.stopLoading();
     },
     connectDriverSuccess(devicetype) {
       console.log('connectDriverSuccess:', devicetype);
