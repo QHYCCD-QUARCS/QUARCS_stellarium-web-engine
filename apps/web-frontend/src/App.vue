@@ -155,6 +155,38 @@
             class="config-input submenu-serial-select">
           </v-select>
 
+            <div
+              v-if="showInlineCameraAllocationBar"
+              class="inline-camera-allocation"
+              data-testid="ui-app-inline-camera-allocation"
+            >
+              <div class="inline-camera-allocation__header">
+                <span class="inline-camera-allocation__title">{{ $t('Select Camera') }}</span>
+                <span class="inline-camera-allocation__hint">{{ $t(CurrentDriverType) }}</span>
+              </div>
+
+              <div class="inline-camera-allocation__list">
+                <button
+                  v-for="candidate in currentInlineCameraCandidates"
+                  :key="candidate.key"
+                  type="button"
+                  class="inline-camera-allocation__card"
+                  :class="{ 'is-selected': isInlineCameraCandidateSelected(candidate) }"
+                  :title="candidate.DeviceName"
+                  @click="selectInlineCameraCandidate(candidate)"
+                >
+                  <span class="inline-camera-allocation__text">
+                    <span class="inline-camera-allocation__model">
+                      {{ inlineCameraCandidateModel(candidate) }}
+                    </span>
+                    <span class="inline-camera-allocation__guid">
+                      {{ inlineCameraCandidateGuid(candidate) }}
+                    </span>
+                  </span>
+                </button>
+              </div>
+            </div>
+
             <v-row no-gutters>
               <v-col cols="6">
                 <button type="button" @click="clearDriver" class="btn-confirm" aria-label="Clear driver" data-testid="ui-app-btn-clear-driver">
@@ -1437,6 +1469,14 @@ export default {
       sdkSupportCache: {},
       // 模式设置请求的待处理缓存：{ [deviceType]: { prev: 'INDI'|'SDK', next: 'INDI'|'SDK' } }
       pendingConnectionModeByDevice: {},
+      // QHY SDK 多相机候选条（左侧设备页内嵌版本）
+      inlineCameraAllocationRoles: [],
+      inlineCameraAllocationCandidates: [],
+      inlineCameraAllocationSelection: {
+        MainCamera: '',
+        Guider: '',
+        PoleCamera: '',
+      },
 
       devicesList: [], // 设备选项数组
       selectedDevice: null, // 选中的设备
@@ -3109,22 +3149,34 @@ export default {
               case 'AddDeviceType':
                 if (parts.length === 2) {
                   const DeviceType = parts[1];
+                  this.addInlineCameraAllocationRole(DeviceType);
                   this.$bus.$emit('AddDeviceType', DeviceType);
                 }
                 break;
 
               case 'DeviceToBeAllocated':
-                if (parts.length === 4) {
+                // 支持4部分（旧格式）和5部分（新格式，含cameraCategory）
+                if (parts.length >= 4) {
                   const DeviceType = parts[1];
                   const DeviceIndex = parts[2];
                   const DeviceName = parts[3];
+                  const cameraCategory = parts.length >= 5 ? parts[4] : 'OTHER';
                   // 关键：必须携带 DeviceType，否则分配列表会混淆（例如电调/赤道仪错绑）
                   const idxNum = Number(DeviceIndex);
-                  this.$bus.$emit('DeviceToBeAllocated', DeviceType, Number.isFinite(idxNum) ? idxNum : DeviceIndex, DeviceName);
+                  this.upsertInlineCameraAllocationCandidate(DeviceType, Number.isFinite(idxNum) ? idxNum : DeviceIndex, DeviceName);
+                  this.$bus.$emit('DeviceToBeAllocated', DeviceType, Number.isFinite(idxNum) ? idxNum : DeviceIndex, DeviceName, cameraCategory);
                 }
                 break;
 
               case 'ShowDeviceAllocationWindow':
+                if (this.isCameraAllocationRole(this.CurrentDriverType)) {
+                  this.SendConsoleLogMsg('[DIAG][ALLOC_INLINE] use_inline_camera_candidate_bar', 'info');
+                  this.$store.commit('setValue', { varName: 'showNavigationDrawer', newValue: true });
+                  this.isOpenPowerPage = false;
+                  this.isOpenDevicePage = true;
+                  this.drawer_2 = true;
+                  break;
+                }
                 // 幂等打开：后端可能重复下发 ShowDeviceAllocationWindow。
                 // 先显式关闭主/子菜单，再打开分配面板，避免 toggle 造成“开-关-开”抖动。
                 this.SendConsoleLogMsg(
@@ -4319,6 +4371,12 @@ export default {
                 if (parts.length >= 2) {
                   const deviceType = parts[1];
                   this.SendConsoleLogMsg(`ConnectDriverPendingAllocation:${deviceType}`, 'info');
+                  if (this.isCameraAllocationRole(deviceType)) {
+                    this.CurrentDriverType = deviceType;
+                    this.isOpenPowerPage = false;
+                    this.isOpenDevicePage = true;
+                    this.drawer_2 = true;
+                  }
                 }
                 this.isConnecting = false;
                 this.stopLoading();
@@ -4495,6 +4553,11 @@ export default {
                 if (parts.length === 2) {
                   const deviceType = parts[1];
                   if (deviceType != '') {
+                    if (deviceType === 'all') {
+                      this.clearInlineCameraAllocationState('all');
+                    } else {
+                      this.clearInlineCameraAllocationState(deviceType);
+                    }
                     this.$bus.$emit('deleteDeviceTypeAllocationList', deviceType);
                   }
                   if (deviceType == 'CFW') {
@@ -5825,6 +5888,99 @@ export default {
           return [];
       }
     },
+    isCameraAllocationRole(deviceType) {
+      return ['MainCamera', 'Guider', 'PoleCamera'].includes(String(deviceType || ''));
+    },
+    addInlineCameraAllocationRole(deviceType) {
+      if (!this.isCameraAllocationRole(deviceType)) return;
+      if (!this.inlineCameraAllocationRoles.includes(deviceType)) {
+        this.inlineCameraAllocationRoles = [...this.inlineCameraAllocationRoles, deviceType];
+      }
+    },
+    clearInlineCameraAllocationState(role = 'all') {
+      if (role === 'all') {
+        this.inlineCameraAllocationRoles = [];
+        this.inlineCameraAllocationCandidates = [];
+        this.inlineCameraAllocationSelection = {
+          MainCamera: '',
+          Guider: '',
+          PoleCamera: '',
+        };
+        return;
+      }
+      if (!this.isCameraAllocationRole(role)) return;
+      this.inlineCameraAllocationRoles = (this.inlineCameraAllocationRoles || []).filter(item => item !== role);
+      this.$set(this.inlineCameraAllocationSelection, role, '');
+    },
+    upsertInlineCameraAllocationCandidate(deviceType, deviceIndex, deviceName) {
+      if (String(deviceType || '') !== 'CCD') return;
+      if (!deviceName || String(deviceName).trim() === '') return;
+      const key = `${deviceType}:${deviceIndex}`;
+      const normalized = {
+        DeviceType: deviceType,
+        DeviceIndex: deviceIndex,
+        DeviceName: deviceName,
+      };
+      const next = [...(this.inlineCameraAllocationCandidates || [])];
+      const existingIndex = next.findIndex(item => `${item.DeviceType}:${item.DeviceIndex}` === key);
+      if (existingIndex >= 0) {
+        next.splice(existingIndex, 1, normalized);
+      } else {
+        next.push(normalized);
+      }
+      this.inlineCameraAllocationCandidates = next;
+      ['MainCamera', 'Guider', 'PoleCamera'].forEach((role) => {
+        const dev = (this.devices || []).find(item => item && item.driverType === role);
+        if (dev && dev.isConnected && dev.device === deviceName) {
+          this.$set(this.inlineCameraAllocationSelection, role, key);
+        }
+      });
+    },
+    removeInlineCameraAllocationCandidateByName(deviceName) {
+      if (!deviceName) return;
+      this.inlineCameraAllocationCandidates = (this.inlineCameraAllocationCandidates || []).filter(
+        candidate => candidate && candidate.DeviceName !== deviceName
+      );
+    },
+    inlineCameraCandidateModel(candidate) {
+      const raw = String((candidate && candidate.DeviceName) || '').trim();
+      if (!raw) return 'QHY';
+      const withoutPrefix = raw.replace(/^QHY\s+CCD\s+/i, '').replace(/^QHYCCD\s+/i, '');
+      if (withoutPrefix.includes('-')) {
+        return withoutPrefix.slice(0, withoutPrefix.lastIndexOf('-')) || withoutPrefix;
+      }
+      if (withoutPrefix.includes('_')) {
+        return withoutPrefix.slice(0, withoutPrefix.lastIndexOf('_')) || withoutPrefix;
+      }
+      return withoutPrefix;
+    },
+    inlineCameraCandidateGuid(candidate) {
+      const raw = String((candidate && candidate.DeviceName) || '').trim();
+      if (!raw) return '--';
+      const withoutPrefix = raw.replace(/^QHY\s+CCD\s+/i, '').replace(/^QHYCCD\s+/i, '');
+      let token = withoutPrefix;
+      if (withoutPrefix.includes('-')) {
+        token = withoutPrefix.slice(withoutPrefix.lastIndexOf('-') + 1);
+      } else if (withoutPrefix.includes('_')) {
+        token = withoutPrefix.slice(withoutPrefix.lastIndexOf('_') + 1);
+      }
+      token = String(token || '').trim();
+      if (!token) return '--';
+      return token.slice(0, 8);
+    },
+    isInlineCameraCandidateSelected(candidate) {
+      const role = this.CurrentDriverType || '';
+      if (!this.isCameraAllocationRole(role) || !candidate) return false;
+      return this.inlineCameraAllocationSelection[role] === `${candidate.DeviceType}:${candidate.DeviceIndex}`;
+    },
+    selectInlineCameraCandidate(candidate) {
+      const role = this.CurrentDriverType || '';
+      if (!this.isCameraAllocationRole(role) || !candidate) return;
+      const selectionKey = `${candidate.DeviceType}:${candidate.DeviceIndex}`;
+      this.$set(this.inlineCameraAllocationSelection, role, selectionKey);
+      this.SendConsoleLogMsg(`InlineCameraAllocationSelect:${role}:${candidate.DeviceIndex}:${candidate.DeviceName}`, 'info');
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', `BindingDevice:${role}:${candidate.DeviceIndex}`);
+    },
 
     confirmDriver() {
       // 确定驱动的逻辑
@@ -5984,6 +6140,17 @@ export default {
         console.log('PoleCamera is Connected.');
       }
       console.log('updateDevicesConnect: ', type, DeviceName, DriverName, isBind);
+
+      if (this.isCameraAllocationRole(type)) {
+        if (isBind && DeviceName) {
+          const match = (this.inlineCameraAllocationCandidates || []).find(item => item && item.DeviceName === DeviceName);
+          if (match) {
+            this.$set(this.inlineCameraAllocationSelection, type, `${match.DeviceType}:${match.DeviceIndex}`);
+          }
+        } else if (!isBind) {
+          this.$set(this.inlineCameraAllocationSelection, type, '');
+        }
+      }
 
       this.$bus.$emit('DeviceConnectSuccess', type, DeviceName, DriverName, isBind);
     },
@@ -12481,6 +12648,7 @@ export default {
         this.$bus.$emit('PoleCameraConnected', 0);
         this.clearDeviceList();
         this.$bus.$emit('deleteDeviceTypeAllocationList', 'all');
+        this.clearInlineCameraAllocationState('all');
         return;
       };
 
@@ -12508,6 +12676,7 @@ export default {
       }
 
       this.$bus.$emit('deleteDeviceTypeAllocationList', devicetype);
+      this.clearInlineCameraAllocationState(devicetype);
       if (devicetype == "MainCamera") {
         this.$bus.$emit('MainCameraConnected', 0);
       } else if (devicetype == "Mount") {
@@ -12541,6 +12710,7 @@ export default {
         this.$bus.$emit('PoleCameraConnected', 0);
         this.clearDeviceList();
         this.$bus.$emit('deleteDeviceTypeAllocationList', 'all');
+        this.clearInlineCameraAllocationState('all');
         return;
       };
 
@@ -12568,6 +12738,7 @@ export default {
       }
 
       this.$bus.$emit('deleteDeviceTypeAllocationList', devicetype);
+      this.clearInlineCameraAllocationState(devicetype);
       if (devicetype == "MainCamera") {
         this.$bus.$emit('MainCameraConnected', 0);
       } else if (devicetype == "Mount") {
@@ -12821,6 +12992,13 @@ export default {
     loadBindDeviceList(deviceObject) {
       console.log('loadBindDeviceList:', deviceObject);
       this.$bus.$emit('loadBindDeviceList', deviceObject);
+      if (Array.isArray(deviceObject)) {
+        deviceObject.forEach((item) => {
+          if (item && item.DeviceType && typeof item.DeviceName !== 'undefined' && typeof item.DeviceIndex !== 'undefined') {
+            this.upsertInlineCameraAllocationCandidate(item.DeviceType, item.DeviceIndex, item.DeviceName);
+          }
+        });
+      }
 
     },
     loadBindDeviceTypeList(deviceTypeObject) {
@@ -12828,6 +13006,7 @@ export default {
       this.$bus.$emit('loadBindDeviceTypeList', deviceTypeObject);
       deviceTypeObject.forEach(deviceType => {
         const { Type, DeviceName, DriverName, isbind } = deviceType;
+        this.addInlineCameraAllocationRole(Type);
         // 刷新/恢复阶段常会触发此列表回传，默认静默更新，避免频繁弹窗
         this.updateDevicesConnect(Type, DeviceName, DriverName, isbind, { silent: true });
       });
@@ -12875,6 +13054,7 @@ export default {
     deleteDeviceAllocationList(deviceName) {
       console.log('deleteDeviceAllocationList:', deviceName);
       this.$bus.$emit('deleteDeviceAllocationList', deviceName);
+      this.removeInlineCameraAllocationCandidateByName(deviceName);
     },
     UnBindingDevice(type, name) {
       // 解绑只改变“绑定状态”，不应污染/清空 driverName（尤其是 SDK 模式下会导致后续逻辑错乱）
@@ -14075,6 +14255,28 @@ export default {
       const dev = this.currentDevice;
       return !!(dev && dev.isConnected && this.isNotBindDevice(dev.device));
     },
+    showInlineCameraAllocationBar() {
+      const role = this.CurrentDriverType || '';
+      if (!['MainCamera', 'Guider', 'PoleCamera'].includes(role)) return false;
+      if (this.DeviceIsConnected) return false;
+      const dev = this.currentDevice;
+      const mode = String((dev && dev.connectionMode) || this.selectedConnectionMode || 'INDI').toUpperCase();
+      if (mode !== 'SDK') return false;
+      if (!this.inlineCameraAllocationRoles.includes(role)) return false;
+      return this.currentInlineCameraCandidates.length > 1;
+    },
+    currentInlineCameraCandidates() {
+      return (this.inlineCameraAllocationCandidates || [])
+        .map(candidate => ({
+          ...candidate,
+          key: `${candidate.DeviceType}:${candidate.DeviceIndex}`,
+        }))
+        .sort((a, b) => {
+          const aName = String(a.DeviceName || '');
+          const bName = String(b.DeviceName || '');
+          return aName.localeCompare(bName, 'en', { numeric: true, sensitivity: 'base' });
+        });
+    },
     menuDrawerWidth() {
       return 170;
     },
@@ -14767,6 +14969,88 @@ body,
   font-size: 15px;
   color: rgba(255, 255, 255, 0.5);
   user-select: none;
+}
+
+.inline-camera-allocation {
+  margin: 8px 0 12px;
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.inline-camera-allocation__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.inline-camera-allocation__title {
+  color: rgba(255, 255, 255, 0.94);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.inline-camera-allocation__hint {
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 11px;
+}
+
+.inline-camera-allocation__list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.inline-camera-allocation__card {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.92);
+  text-align: left;
+  transition: border-color 0.16s ease, background-color 0.16s ease;
+}
+
+.inline-camera-allocation__card:hover {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.inline-camera-allocation__card.is-selected {
+  border-color: rgba(92, 192, 141, 0.92);
+  background: rgba(92, 192, 141, 0.22);
+}
+
+.inline-camera-allocation__text {
+  display: block;
+  width: 100%;
+}
+
+.inline-camera-allocation__model,
+.inline-camera-allocation__guid {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.inline-camera-allocation__model {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.inline-camera-allocation__guid {
+  margin-top: 4px;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 11px;
+  line-height: 1.2;
 }
 
 .submenu-connection-mode {
