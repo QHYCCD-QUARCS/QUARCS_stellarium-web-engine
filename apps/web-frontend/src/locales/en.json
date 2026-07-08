@@ -759,6 +759,6 @@
   "DeviceAllocation_PleaseSelectDeviceFirst": "Please select a device first",
   "DeviceAllocation_Action_Binding": "Binding",
   "DeviceAllocation_Action_Swap": "Swap",
-  "DeviceAllocation_Connect": "Connect"
+  "DeviceAllocation_Connect": "Connect",
   "Cancelled": "Cancelled"
 }

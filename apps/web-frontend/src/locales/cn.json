@@ -759,6 +759,6 @@
   "DeviceAllocation_PleaseSelectDeviceFirst": "请先选择设备",
   "DeviceAllocation_Action_Binding": "绑定",
   "DeviceAllocation_Action_Swap": "交换",
-  "DeviceAllocation_Connect": "连接"
+  "DeviceAllocation_Connect": "连接",
   "Cancelled": "已取消"
 }

@@ -3190,11 +3190,14 @@ export default {
                   break;
                 }
                 // 幂等打开：后端可能重复下发 ShowDeviceAllocationWindow。
-                // 先显式关闭主/子菜单，再打开分配面板，避免 toggle 造成“开-关-开”抖动。
+                // 先清空旧列表避免重复设备，再关闭菜单，最后打开分配面板。
                 this.SendConsoleLogMsg(
                   `[DIAG][ALLOC_POPUP_FLOW] stage=rx_show_alloc nav=${this.$store.state.showNavigationDrawer ? 1 : 0} submenu=${this.drawer_2 ? 1 : 0} devPage=${this.isOpenDevicePage ? 1 : 0}`,
                   'warning'
                 );
+                // 清空旧设备列表，防止重复累积
+                this.$bus.$emit('clearDeviceAllocationList');
+                this.clearInlineCameraAllocationState('all');
                 this.$store.commit('setValue', { varName: 'showNavigationDrawer', newValue: false });
                 this.drawer_2 = false;
                 this.isOpenDevicePage = false;
@@ -12989,6 +12992,13 @@ export default {
 
       // 成功后再次确保同驱动相机组一致（防止并发/竞态导致短暂不一致）
       this.ensureCameraModeConsistency(deviceType);
+
+      // 切换到SDK模式且设备未连接时，自动触发ConnectDriver
+      if (mode === 'SDK' && dev && !dev.isConnected && this.isCameraAllocationRole(deviceType)) {
+        const driverName = dev.driverName || 'QHYCCD';
+        this.SendConsoleLogMsg(`Auto-connect SDK for ${deviceType} after mode switch`, 'info');
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', `ConnectDriver:${driverName}:${deviceType}:SDK`);
+      }
     },
 
     onSetConnectionModeFailed(deviceType, errorMsg) {
