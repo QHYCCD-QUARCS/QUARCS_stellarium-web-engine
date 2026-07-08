@@ -186,17 +186,7 @@
                 </button>
               </div>
 
-              <!-- 连接按钮：选中相机后显示 -->
-              <div v-if="inlineCameraAllocationSelection[CurrentDriverType]" class="inline-camera-allocation__connect-row">
-                <button
-                  type="button"
-                  class="inline-camera-allocation__connect-btn"
-                  @click="confirmInlineCameraBind()"
-                  data-testid="ui-app-inline-camera-connect"
-                >
-                  {{ $t('DeviceAllocation_Connect') }}
-                </button>
-              </div>
+
             </div>
 
             <v-row no-gutters>
@@ -5993,21 +5983,9 @@ export default {
       if (!this.isCameraAllocationRole(role) || !candidate) return;
       const selectionKey = `${candidate.DeviceType}:${candidate.DeviceIndex}`;
       this.$set(this.inlineCameraAllocationSelection, role, selectionKey);
-      this.SendConsoleLogMsg(`InlineCameraAllocationSelect:${role}:${candidate.DeviceIndex}:${candidate.DeviceName} (selected, not bound yet)`, 'info');
-      // 不再立即调用 BindingDevice，等待用户点击连接按钮
-    },
-    confirmInlineCameraBind() {
-      // 用户点击inline camera连接按钮后，执行绑定
-      const role = this.CurrentDriverType || '';
-      if (!this.isCameraAllocationRole(role)) return;
-      const selectionKey = this.inlineCameraAllocationSelection[role];
-      if (!selectionKey) return;
-      // 解析 DeviceType:DeviceIndex
-      const parts = selectionKey.split(':');
-      if (parts.length < 2) return;
-      const deviceIndex = parseInt(parts[1], 10);
-      if (isNaN(deviceIndex)) return;
-      this.SendConsoleLogMsg(`InlineCameraBind:${role}:${deviceIndex}`, 'info');
+      this.SendConsoleLogMsg(`InlineCameraAllocationSelect:${role}:${candidate.DeviceIndex}:${candidate.DeviceName} (binding immediately)`, 'info');
+      // 点击即绑定，无需额外连接按钮
+      const deviceIndex = candidate.DeviceIndex;
       this.$bus.$emit('AppSendMessage', 'Vue_Command', `BindingDevice:${role}:${deviceIndex}`);
     },
 
@@ -15100,24 +15078,6 @@ body,
   padding: 8px 0 0;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   margin-top: 8px;
-}
-
-.inline-camera-allocation__connect-btn {
-  background: linear-gradient(135deg, #22c55e, #16a34a);
-  color: #fff;
-  border: none;
-  border-radius: 6px;
-  padding: 8px 24px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.3);
-}
-
-.inline-camera-allocation__connect-btn:hover {
-  background: linear-gradient(135deg, #16a34a, #15803d);
-  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4);
 }
 
 .submenu-connection-mode {
