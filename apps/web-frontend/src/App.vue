@@ -6343,6 +6343,11 @@ export default {
       if (isBind && this.isConnecting) {
         this.isConnecting = false;
         this.stopLoading();
+        // 关闭设备设置抽屉和页面（与connectDriverSuccess行为一致）
+        if (this.drawer_2 == true) {
+          this.drawer_2 = false;
+          this.isOpenDevicePage = false;
+        }
       }
 
       if (type === 'MainCamera') {
