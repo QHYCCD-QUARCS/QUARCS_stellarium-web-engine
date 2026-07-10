@@ -15399,6 +15399,25 @@ body,
   width: 150px;
   display: inline-block;
   margin: 5px 0;
+  font-size: 14px !important;
+}
+
+/* 下拉列表项字体 */
+.config-input >>> .v-list-item__title,
+.config-input /deep/ .v-list-item__title {
+  font-size: 14px !important;
+}
+
+/* 下拉标签字体 */
+.config-input >>> .v-select__selections,
+.config-input /deep/ .v-select__selections {
+  font-size: 14px !important;
+}
+
+/* 下拉输入框字体 */
+.config-input >>> input,
+.config-input /deep/ input {
+  font-size: 14px !important;
 }
 
 /* 滑块容器 */
