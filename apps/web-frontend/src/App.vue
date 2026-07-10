@@ -706,7 +706,7 @@
                       'connected-device': device.isConnected,
                       'not-bind-device': device.isConnected && isNotBindDevice(device.device)
                     }"
-                  >{{ device.device }}</div>
+                  >{{ getDeviceDisplayText(device) }}</div>
                   </span>
                 </v-list-item-title>
               </v-list-item-content>
@@ -2708,6 +2708,15 @@ export default {
     },
     isNotBindDevice(name) {
       return (name || '').trim() === 'Not Bind Device';
+    },
+    // 设备菜单第二行显示文字：SDK模式下显示"QHYCCD SDK"
+    getDeviceDisplayText(device) {
+      if (!device) return '';
+      const mode = String(device.connectionMode || '').toUpperCase();
+      if (mode === 'SDK') {
+        return 'QHYCCD SDK';
+      }
+      return device.device || '';
     },
     // 串口选择变更：在连接面板中（波特率下方）选择串口
     onSerialPortSelect(driverType, value) {
