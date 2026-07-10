@@ -495,19 +495,19 @@
         <div style="position: absolute; top: 50px; max-height: calc(100% - 50px); width: 200px; overflow-y: auto;">
           <v-list dense>
             <v-list-item @click.stop="SwitchOutPutPower(1, OutPutPower_1_ON)"
-              :style="{ height: '36px', marginBottom: '10px' }" data-testid="ui-app-power-page-output-power-1">
+              :style="{ height: '44px', marginBottom: '10px' }" data-testid="ui-app-power-page-output-power-1">
               <v-list-item-icon style="margin-right: 10px;">
                 <div style="display: flex; justify-content: center; align-items: center;">
-                  <img src="@/assets/images/svg/ui/OutPutPower.svg" height="30px"
-                    style="min-height: 30px; pointer-events: none;"></img>
+                  <img src="@/assets/images/svg/ui/OutPutPower.svg" height="36px"
+                    style="min-height: 36px; pointer-events: none;"></img>
                 </div>
               </v-list-item-icon>
               <v-list-item-content>
                 <v-list-item-title>
                   <span>
-                    <div :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('OutPut Power 1') }}
+                    <div :style="{ height: '18px', padding: '1px', fontSize: '14px' }">{{ $t('OutPut Power 1') }}
                     </div>
-                    <div :style="{ fontSize: '7px' }" :class="{ 'connected-device': OutPutPower_1_ON }">{{OutPutPower_1_ON ? '[ON]' : '[OFF]' }}</div>
+                    <div :style="{ fontSize: '10px' }" :class="{ 'connected-device': OutPutPower_1_ON }">{{OutPutPower_1_ON ? '[ON]' : '[OFF]' }}</div>
                   </span>
                 </v-list-item-title>
 
@@ -515,19 +515,19 @@
             </v-list-item>
 
             <v-list-item @click.stop="SwitchOutPutPower(2, OutPutPower_2_ON)"
-              :style="{ height: '36px', marginBottom: '10px' }" data-testid="ui-app-power-page-output-power-2">
+              :style="{ height: '44px', marginBottom: '10px' }" data-testid="ui-app-power-page-output-power-2">
               <v-list-item-icon style="margin-right: 10px;">
                 <div style="display: flex; justify-content: center; align-items: center;">
-                  <img src="@/assets/images/svg/ui/OutPutPower.svg" height="30px"
-                    style="min-height: 30px; pointer-events: none;"></img>
+                  <img src="@/assets/images/svg/ui/OutPutPower.svg" height="36px"
+                    style="min-height: 36px; pointer-events: none;"></img>
                 </div>
               </v-list-item-icon>
               <v-list-item-content>
                 <v-list-item-title>
                   <span>
-                    <div :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('OutPut Power 2') }}
+                    <div :style="{ height: '18px', padding: '1px', fontSize: '14px' }">{{ $t('OutPut Power 2') }}
                     </div>
-                    <div :style="{ fontSize: '7px' }" :class="{ 'connected-device': OutPutPower_2_ON }">{{OutPutPower_2_ON ?'[ON]' : '[OFF]' }}</div>
+                    <div :style="{ fontSize: '10px' }" :class="{ 'connected-device': OutPutPower_2_ON }">{{OutPutPower_2_ON ?'[ON]' : '[OFF]' }}</div>
                   </span>
                 </v-list-item-title>
 
@@ -536,51 +536,51 @@
 
             <v-divider :style="{ marginBottom: '10px' }"></v-divider>
 
-            <v-list-item @click.stop="RestartQuarcsServerViaProcess()" :style="{ height: '36px', marginBottom: '10px' }" data-testid="ui-app-power-page-restart-quarcs-server">
+            <v-list-item @click.stop="RestartQuarcsServerViaProcess()" :style="{ height: '44px', marginBottom: '10px' }" data-testid="ui-app-power-page-restart-quarcs-server">
               <v-list-item-icon style="margin-right: 10px;">
                 <div style="display: flex; justify-content: center; align-items: center;">
-                  <img src="@/assets/images/svg/ui/Reboot.svg" height="30px"
-                    style="min-height: 30px; pointer-events: none;"></img>
+                  <img src="@/assets/images/svg/ui/Reboot.svg" height="36px"
+                    style="min-height: 36px; pointer-events: none;"></img>
                 </div>
               </v-list-item-icon>
               <v-list-item-content>
-                <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Restart QUARCS Server') }}</v-list-item-title>
+                <v-list-item-title :style="{ height: '18px', padding: '1px', fontSize: '14px' }">{{ $t('Restart QUARCS Server') }}</v-list-item-title>
               </v-list-item-content>
             </v-list-item>
 
-            <v-list-item @click.stop="RestartRaspberryPi()" :style="{ height: '36px', marginBottom: '10px' }" data-testid="ui-app-power-page-restart">
+            <v-list-item @click.stop="RestartRaspberryPi()" :style="{ height: '44px', marginBottom: '10px' }" data-testid="ui-app-power-page-restart">
               <v-list-item-icon style="margin-right: 10px;">
                 <div style="display: flex; justify-content: center; align-items: center;">
-                    <img src="@/assets/images/svg/ui/Reboot.svg" height="30px"
-                    style="min-height: 30px; pointer-events: none;"></img>
+                    <img src="@/assets/images/svg/ui/Reboot.svg" height="36px"
+                    style="min-height: 36px; pointer-events: none;"></img>
                 </div>
               </v-list-item-icon>
               <v-list-item-content>
-                <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Restart')}}</v-list-item-title>
+                <v-list-item-title :style="{ height: '18px', padding: '1px', fontSize: '14px' }">{{ $t('Restart')}}</v-list-item-title>
               </v-list-item-content>
             </v-list-item>
 
-            <v-list-item @click.stop="ShutdownRaspberryPi()" :style="{ height: '36px', marginBottom: '10px' }" data-testid="ui-app-power-page-shutdown">
+            <v-list-item @click.stop="ShutdownRaspberryPi()" :style="{ height: '44px', marginBottom: '10px' }" data-testid="ui-app-power-page-shutdown">
               <v-list-item-icon style="margin-right: 10px;">
                 <div style="display: flex; justify-content: center; align-items: center;">
-                    <img src="@/assets/images/svg/ui/PowerOFF.svg" height="30px"
-                    style="min-height: 30px; pointer-events: none;"></img>
+                    <img src="@/assets/images/svg/ui/PowerOFF.svg" height="36px"
+                    style="min-height: 36px; pointer-events: none;"></img>
                 </div>
               </v-list-item-icon>
               <v-list-item-content>
-                <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Shut Down')}}</v-list-item-title>
+                <v-list-item-title :style="{ height: '18px', padding: '1px', fontSize: '14px' }">{{ $t('Shut Down')}}</v-list-item-title>
               </v-list-item-content>
             </v-list-item>
             <!-- 强制更新 -->
-            <v-list-item @click.stop="ForceUpdate()" :style="{ height: '36px', marginBottom: '10px' }" data-testid="ui-app-power-page-force-update">
+            <v-list-item @click.stop="ForceUpdate()" :style="{ height: '44px', marginBottom: '10px' }" data-testid="ui-app-power-page-force-update">
               <v-list-item-icon style="margin-right: 10px;">
                 <div style="display: flex; justify-content: center; align-items: center;">
-                    <img src="@/assets/images/svg/ui/PowerOFF.svg" height="30px"
-                    style="min-height: 30px; pointer-events: none;"></img>
+                    <img src="@/assets/images/svg/ui/PowerOFF.svg" height="36px"
+                    style="min-height: 36px; pointer-events: none;"></img>
                 </div>
               </v-list-item-icon>
               <v-list-item-content>
-                <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Force Update')}}</v-list-item-title>
+                <v-list-item-title :style="{ height: '18px', padding: '1px', fontSize: '14px' }">{{ $t('Force Update')}}</v-list-item-title>
               </v-list-item-content>
             </v-list-item>
 
@@ -623,7 +623,7 @@
                 Server Version: {{ QTClientVersion }}
               </span> -->
               <span :style="{
-                fontSize: '10px',
+                fontSize: '14px',
                 color: getQTClientVersionColor,
                 userSelect: 'none',
                 whiteSpace: 'nowrap'
@@ -635,43 +635,43 @@
           </template>
 
           <!-- 退出(Quit) -->
-          <v-list-item @click.stop="QuitToMainApp()" :style="{ height: '36px' }" data-testid="ui-app-menu-quit">
+          <v-list-item @click.stop="QuitToMainApp()" :style="{ height: '44px' }" data-testid="ui-app-menu-quit">
             <v-list-item-icon style="margin-right: 10px;">
               <div style="display: flex; justify-content: center; align-items: center;">
-                <img src="@/assets/images/svg/ui/Quit.svg" height="30px"
-                  style="min-height: 30px; pointer-events: none;"></img>
+                <img src="@/assets/images/svg/ui/Quit.svg" height="36px"
+                  style="min-height: 36px; pointer-events: none;"></img>
               </div>
             </v-list-item-icon>
             <v-list-item-content>
-              <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Quit')
+              <v-list-item-title :style="{ height: '18px', padding: '1px', fontSize: '14px' }">{{ $t('Quit')
               }}</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
 
           <!-- 视图设置(View Settings) -->
-          <v-list-item @click.stop="toggleStoreValue('showViewSettingsDialog')" :style="{ height: '36px' }" data-testid="ui-app-menu-general-settings">
+          <v-list-item @click.stop="toggleStoreValue('showViewSettingsDialog')" :style="{ height: '44px' }" data-testid="ui-app-menu-general-settings">
             <v-list-item-icon style="margin-right: 10px;">
               <div style="display: flex; justify-content: center; align-items: center;">
-                <img src="@/assets/images/svg/ui/Setting.svg" height="30px"
-                  style="min-height: 30px; pointer-events: none;"></img>
+                <img src="@/assets/images/svg/ui/Setting.svg" height="36px"
+                  style="min-height: 36px; pointer-events: none;"></img>
               </div>
             </v-list-item-icon>
             <v-list-item-content>
-              <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('General Settings')
+              <v-list-item-title :style="{ height: '18px', padding: '1px', fontSize: '14px' }">{{ $t('General Settings')
               }}</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
 
           <!-- 电源管理(Power Management) -->
-          <v-list-item @click.stop="openPowerManagerPage()" :style="{ height: '36px' }" data-testid="ui-app-menu-open-power-manager">
+          <v-list-item @click.stop="openPowerManagerPage()" :style="{ height: '44px' }" data-testid="ui-app-menu-open-power-manager">
             <v-list-item-icon style="margin-right: 10px;">
               <div style="display: flex; justify-content: center; align-items: center;">
-                <img src="@/assets/images/svg/ui/Power.svg" height="30px"
-                  style="min-height: 30px; pointer-events: none;"></img>
+                <img src="@/assets/images/svg/ui/Power.svg" height="36px"
+                  style="min-height: 36px; pointer-events: none;"></img>
               </div>
             </v-list-item-icon>
             <v-list-item-content>
-              <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Power Management')
+              <v-list-item-title :style="{ height: '18px', padding: '1px', fontSize: '14px' }">{{ $t('Power Management')
               }}</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
@@ -683,7 +683,7 @@
             v-for="(device, index) in devices"
             :key="device.driverType || index"
             @click.stop="selectDevice(device)"
-            :style="{ height: '36px' }"
+            :style="{ height: '44px' }"
             :data-testid="`ui-app-menu-device-${device && device.driverType ? device.driverType : UNKNOWN_DRIVER_TYPE}`"
             :data-driver-type="device && device.driverType ? device.driverType : UNKNOWN_DRIVER_TYPE"
             :data-device-name="device && device.device ? device.device : ''"
@@ -692,16 +692,16 @@
           >
               <v-list-item-icon style="margin-right: 10px;">
                 <div style="display: flex; justify-content: center; align-items: center;">
-                <img :src="require(`@/assets/images/svg/ui/${device.driverType}.svg`)" height="30px"
-                  style="min-height: 30px"></img>
+                <img :src="require(`@/assets/images/svg/ui/${device.driverType}.svg`)" height="36px"
+                  style="min-height: 36px"></img>
                 </div>
               </v-list-item-icon>
               <v-list-item-content>
                 <v-list-item-title>
                   <span>
-                  <div :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t(device.driverType) }}</div>
+                  <div :style="{ height: '18px', padding: '1px', fontSize: '14px' }">{{ $t(device.driverType) }}</div>
                   <div
-                    :style="{ fontSize: '7px' }"
+                    :style="{ fontSize: '14px' }"
                     :class="{
                       'connected-device': device.isConnected,
                       'not-bind-device': device.isConnected && isNotBindDevice(device.device)
@@ -717,18 +717,18 @@
           <!-- 连接所有(Connect All) -->
           <v-list-item :disabled="loadingConnectAllDevice" @touchstart.stop.prevent="startConnectBtnPress"
             @touchend.stop.prevent="endConnectBtnPress" @mousedown.stop="startConnectBtnPress" @mouseup.stop="endConnectBtnPress"
-            :style="{ height: '36px' }"
+            :style="{ height: '44px' }"
             data-testid="ui-app-menu-connect-all"
             :data-state="loadingConnectAllDevice ? 'busy' : 'idle'"
             :aria-disabled="loadingConnectAllDevice ? 'true' : 'false'">
             <v-list-item-icon style="margin-right: 10px;">
               <div style="display: flex; justify-content: center; align-items: center;">
-                <img src="@/assets/images/svg/ui/Connect.svg" height="30px"
-                  style="min-height: 30px; pointer-events: none;">
+                <img src="@/assets/images/svg/ui/Connect.svg" height="36px"
+                  style="min-height: 36px; pointer-events: none;">
               </div>
             </v-list-item-icon>
             <v-list-item-content>
-              <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px', userSelect: 'none' }">
+              <v-list-item-title :style="{ height: '18px', padding: '1px', fontSize: '14px', userSelect: 'none' }">
                 {{ $t('Connect All') }}
               </v-list-item-title>
               <v-progress-linear v-if="loadingConnectAllDevice" indeterminate color="white"
@@ -737,71 +737,71 @@
           </v-list-item>
 
           <!-- 断开所有连接(Disconnect All) -->
-          <v-list-item @click.stop="disconnectAllDevice(false)" :style="{ height: '36px' }" data-testid="ui-app-menu-disconnect-all">
+          <v-list-item @click.stop="disconnectAllDevice(false)" :style="{ height: '44px' }" data-testid="ui-app-menu-disconnect-all">
             <v-list-item-icon style="margin-right: 10px;">
               <div style="display: flex; justify-content: center; align-items: center;">
-                <img src="@/assets/images/svg/ui/DisConnect.svg" height="30px"
-                  style="min-height: 30px; pointer-events: none;"></img>
+                <img src="@/assets/images/svg/ui/DisConnect.svg" height="36px"
+                  style="min-height: 36px; pointer-events: none;"></img>
               </div>
             </v-list-item-icon>
             <v-list-item-content>
-              <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px', userSelect: 'none' }">{{
+              <v-list-item-title :style="{ height: '18px', padding: '1px', fontSize: '14px', userSelect: 'none' }">{{
                 $t('Disconnect All') }}</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
 
           <!-- 设备分配(Device Allocation) -->
-          <v-list-item @click.stop="DeviceAllocation()" :style="{ height: '36px' }" data-testid="ui-app-menu-device-allocation">
+          <v-list-item @click.stop="DeviceAllocation()" :style="{ height: '44px' }" data-testid="ui-app-menu-device-allocation">
             <v-list-item-icon style="margin-right: 10px;">
               <div style="display: flex; justify-content: center; align-items: center;">
-                <img src="@/assets/images/svg/ui/Allocation.svg" height="30px"
-                  style="min-height: 30px; pointer-events: none;"></img>
+                <img src="@/assets/images/svg/ui/Allocation.svg" height="36px"
+                  style="min-height: 36px; pointer-events: none;"></img>
               </div>
             </v-list-item-icon>
             <v-list-item-content>
-              <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{
+              <v-list-item-title :style="{ height: '18px', padding: '1px', fontSize: '14px' }">{{
                 $t('Device Allocation') }}</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
 
           <!-- 校准极轴(Calibrate Polar Axis) -->
-          <v-list-item @click.stop="CalibratePolarAxis()" :style="{ height: '36px' }" data-testid="ui-app-menu-calibrate-polar-axis">
+          <v-list-item @click.stop="CalibratePolarAxis()" :style="{ height: '44px' }" data-testid="ui-app-menu-calibrate-polar-axis">
             <v-list-item-icon style="margin-right: 10px;">
               <div style="display: flex; justify-content: center; align-items: center;">
-                <img src="@/assets/images/svg/ui/PoleAxis.svg" height="30px"
-                  style="min-height: 30px; pointer-events: none;"></img>
+                <img src="@/assets/images/svg/ui/PoleAxis.svg" height="36px"
+                  style="min-height: 36px; pointer-events: none;"></img>
               </div>
             </v-list-item-icon>
             <v-list-item-content>
-              <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{
+              <v-list-item-title :style="{ height: '18px', padding: '1px', fontSize: '14px' }">{{
                 $t('Calibrate Polar Axis') }}</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
 
           <!-- 图像文件(Image Files) -->
-          <v-list-item @click.stop="OpenIamgeFolder()" :style="{ height: '36px' }" data-testid="ui-app-menu-open-image-manager">
+          <v-list-item @click.stop="OpenIamgeFolder()" :style="{ height: '44px' }" data-testid="ui-app-menu-open-image-manager">
             <v-list-item-icon style="margin-right: 10px;">
               <div style="display: flex; justify-content: center; align-items: center;">
-                <img src="@/assets/images/svg/ui/FolderSwitch.svg" height="30px"
-                  style="min-height: 30px; pointer-events: none;"></img>
+                <img src="@/assets/images/svg/ui/FolderSwitch.svg" height="36px"
+                  style="min-height: 36px; pointer-events: none;"></img>
               </div>
             </v-list-item-icon>
             <v-list-item-content>
-              <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Image Files')
+              <v-list-item-title :style="{ height: '18px', padding: '1px', fontSize: '14px' }">{{ $t('Image Files')
               }}</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
 
           <!-- 日志(Logs) -->
-          <v-list-item @click.stop="OpenDebugLog()" :style="{ height: '36px' }" data-testid="ui-app-menu-open-debug-log">
+          <v-list-item @click.stop="OpenDebugLog()" :style="{ height: '44px' }" data-testid="ui-app-menu-open-debug-log">
             <v-list-item-icon style="margin-right: 10px;">
               <div style="display: flex; justify-content: center; align-items: center;">
-                <img src="@/assets/images/svg/ui/DebugLog.svg" height="30px"
-                  style="min-height: 30px; pointer-events: none;"></img>
+                <img src="@/assets/images/svg/ui/DebugLog.svg" height="36px"
+                  style="min-height: 36px; pointer-events: none;"></img>
               </div>
             </v-list-item-icon>
             <v-list-item-content>
-              <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Logs')
+              <v-list-item-title :style="{ height: '18px', padding: '1px', fontSize: '14px' }">{{ $t('Logs')
               }}</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
@@ -809,17 +809,17 @@
           <v-divider></v-divider>
 
           <!-- 纬度和经度(Lat & Long) -->
-          <v-list-item @click.stop="locationClicked()" :style="{ height: '36px' }" data-testid="ui-app-menu-location">
+          <v-list-item @click.stop="locationClicked()" :style="{ height: '44px' }" data-testid="ui-app-menu-location">
             <v-list-item-icon style="margin-right: 10px;">
               <div style="display: flex; justify-content: center; align-items: center;">
-                <img :src="require(`@/assets/images/svg/ui/Location.svg`)" height="30px" style="min-height: 30px"></img>
+                <img :src="require(`@/assets/images/svg/ui/Location.svg`)" height="36px" style="min-height: 36px"></img>
               </div>
             </v-list-item-icon>
             <v-list-item-content>
               <v-list-item-title>
                 <span>
-                  <div :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Lat & Long') }}</div>
-                  <div :style="{ fontSize: '7px' }">{{ '(' + $store.state.currentLocation.lat + ', ' +
+                  <div :style="{ height: '18px', padding: '1px', fontSize: '14px' }">{{ $t('Lat & Long') }}</div>
+                  <div :style="{ fontSize: '10px' }">{{ '(' + $store.state.currentLocation.lat + ', ' +
                     $store.state.currentLocation.lng + ')' }}</div>
                 </span>
               </v-list-item-title>
@@ -828,31 +828,31 @@
 
           <!-- 刷新页面(Refresh Page) -->
           <v-list-item @click.stop="ShowConfirmDialog('Confirm', $t('Are you sure you need to refresh?'), 'Refresh')"
-            :style="{ height: '36px' }" data-testid="ui-app-menu-refresh-page">
+            :style="{ height: '44px' }" data-testid="ui-app-menu-refresh-page">
             <v-list-item-icon style="margin-right: 10px;">
               <div style="display: flex; justify-content: center; align-items: center;">
-                <img :src="require(`@/assets/images/svg/ui/Refresh.svg`)" height="30px" style="min-height: 30px"></img>
+                <img :src="require(`@/assets/images/svg/ui/Refresh.svg`)" height="36px" style="min-height: 36px"></img>
               </div>
             </v-list-item-icon>
             <v-list-item-content>
               <v-list-item-title>
                 <span>
-                  <div :style="{ fontSize: '10px' }">{{ $t('Refresh Page') }}</div>
+                  <div :style="{ fontSize: '14px' }">{{ $t('Refresh Page') }}</div>
                 </span>
               </v-list-item-title>
             </v-list-item-content>
           </v-list-item>
 
           <!-- 数据版权(Data Credits) -->
-          <v-list-item @click.stop="toggleStoreValue('showDataCreditsDialog')" :style="{ height: '36px' }" data-testid="ui-app-menu-data-credits">
+          <v-list-item @click.stop="toggleStoreValue('showDataCreditsDialog')" :style="{ height: '44px' }" data-testid="ui-app-menu-data-credits">
             <v-list-item-icon style="margin-right: 10px;">
               <div style="display: flex; justify-content: center; align-items: center;">
-                <img src="@/assets/images/svg/ui/DataCredits.svg" height="30px"
-                  style="min-height: 30px; pointer-events: none;"></img>
+                <img src="@/assets/images/svg/ui/DataCredits.svg" height="36px"
+                  style="min-height: 36px; pointer-events: none;"></img>
               </div>
             </v-list-item-icon>
             <v-list-item-content>
-              <v-list-item-title :style="{ height: '15px', padding: '1px', fontSize: '10px' }">{{ $t('Data Credits')
+              <v-list-item-title :style="{ height: '18px', padding: '1px', fontSize: '14px' }">{{ $t('Data Credits')
               }}</v-list-item-title>
             </v-list-item-content>
           </v-list-item>
