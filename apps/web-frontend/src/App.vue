@@ -2709,11 +2709,11 @@ export default {
     isNotBindDevice(name) {
       return (name || '').trim() === 'Not Bind Device';
     },
-    // 设备菜单第二行显示文字：SDK模式下显示"QHYCCD SDK"
+    // 设备菜单第二行显示文字：SDK模式下未连接时显示"QHYCCD SDK"，连接后显示具体设备名
     getDeviceDisplayText(device) {
       if (!device) return '';
       const mode = String(device.connectionMode || '').toUpperCase();
-      if (mode === 'SDK') {
+      if (mode === 'SDK' && !device.isConnected) {
         return 'QHYCCD SDK';
       }
       return device.device || '';
