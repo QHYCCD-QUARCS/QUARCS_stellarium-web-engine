@@ -1771,6 +1771,213 @@ export default {
 
   },
   methods: {
+    // [DEBUG] 全局动态tooltip：事件委托 + 真实DOM，不影响布局
+    _initDebugTooltip() {
+      this._debugTooltipEl = null;
+      this._debugTooltipVisible = false;
+      const DEBUG_SELECTORS = 'button, [role="button"], .v-btn, .v-icon[tabindex], a[onclick], span[onclick], input, select, textarea, .v-list-item, [role="menuitem"]';
+
+      const getTooltipText = (el) => {
+        // 优先使用data-testid或data-debug-id
+        if (el.getAttribute && el.getAttribute('data-testid')) return el.getAttribute('data-testid');
+        if (el.getAttribute && el.getAttribute('data-debug-id')) return el.getAttribute('data-debug-id');
+        // 尝试从class中提取有意义的名称
+        if (el.className && typeof el.className === 'string') {
+          const classes = el.className.split(' ').filter(c => c && !c.startsWith('v-') && !c.startsWith('mdi-') && !c.startsWith('q-') && c.length > 1);
+          if (classes.length > 0) return classes[0];
+        }
+        // 尝试从子元素获取文本
+        if (el.textContent && el.textContent.trim().length < 50) {
+          const text = el.textContent.trim();
+          if (text && text.length > 0) return text;
+        }
+        // 回退到标签名
+        return el.tagName ? el.tagName.toLowerCase() : 'element';
+      };
+
+      const showTooltip = (el) => {
+        if (this._debugTooltipVisible) return;
+        if (!this._debugTooltipEl) {
+          this._debugTooltipEl = document.createElement('div');
+          this._debugTooltipEl.style.cssText = 'position:fixed;background:rgba(10,10,40,0.97);color:#0f0;padding:4px 10px;border-radius:4px;font-size:13px;font-weight:bold;font-family:Consolas,Mono,monospace;white-space:nowrap;pointer-events:none;z-index:99999;box-shadow:0 2px 12px rgba(0,0,0,0.6);border:1px solid rgba(0,255,0,0.4);display:none;text-shadow:0 0 4px rgba(0,255,0,0.3);';
+          document.body.appendChild(this._debugTooltipEl);
+        }
+        const text = getTooltipText(el);
+        this._debugTooltipEl.textContent = text;
+        this._debugTooltipEl.style.display = 'block';
+        this._debugTooltipVisible = true;
+
+        const rect = el.getBoundingClientRect();
+        this._debugTooltipEl.style.left = (rect.left + rect.width / 2) + 'px';
+        this._debugTooltipEl.style.top = (rect.top - 4) + 'px';
+        this._debugTooltipEl.style.transform = 'translate(-50%, -100%)';
+      };
+
+      const hideTooltip = () => {
+        if (this._debugTooltipEl) {
+          this._debugTooltipEl.style.display = 'none';
+          this._debugTooltipVisible = false;
+        }
+      };
+
+      this._debugTooltipHandler = (e) => {
+        const target = e.target.matches(DEBUG_SELECTORS) ? e.target : e.target.closest(DEBUG_SELECTORS);
+        if (target) {
+          showTooltip(target);
+        } else {
+          hideTooltip();
+        }
+      };
+
+      document.addEventListener('mouseover', this._debugTooltipHandler);
+      console.log('[DEBUG] Dynamic tooltip enabled');
+    },
+    _destroyDebugTooltip() {
+      if (this._debugTooltipHandler) {
+        document.removeEventListener('mouseover', this._debugTooltipHandler);
+        this._debugTooltipHandler = null;
+      }
+      if (this._debugTooltipEl) {
+        this._debugTooltipEl.remove();
+        this._debugTooltipEl = null;
+      }
+      this._debugTooltipVisible = false;
+      console.log('[DEBUG] Dynamic tooltip disabled');
+    },
+    // [DEBUG] 自定义右键菜单
+    _initDebugContextMenu() {
+      const DEBUG_SELECTORS = 'button, [role="button"], .v-btn, .v-icon[tabindex], a[onclick], span[onclick], input, select, textarea, .v-list-item, [role="menuitem"]';
+
+      const getTooltipText = (el) => {
+        if (el.getAttribute && el.getAttribute('data-testid')) return el.getAttribute('data-testid');
+        if (el.getAttribute && el.getAttribute('data-debug-id')) return el.getAttribute('data-debug-id');
+        if (el.className && typeof el.className === 'string') {
+          const classes = el.className.split(' ').filter(c => c && !c.startsWith('v-') && !c.startsWith('mdi-') && !c.startsWith('q-') && c.length > 1);
+          if (classes.length > 0) return classes[0];
+        }
+        if (el.textContent && el.textContent.trim().length < 50) {
+          const text = el.textContent.trim();
+          if (text && text.length > 0) return text;
+        }
+        return el.tagName ? el.tagName.toLowerCase() : 'element';
+      };
+
+      // 创建菜单容器
+      this._debugContextMenu = document.createElement('div');
+      this._debugContextMenu.style.cssText = 'position:fixed;background:rgba(10,10,40,0.97);border:1px solid rgba(0,255,0,0.4);border-radius:6px;padding:4px 0;min-width:180px;z-index:99999;display:none;box-shadow:0 4px 16px rgba(0,0,0,0.6);';
+      document.body.appendChild(this._debugContextMenu);
+
+      const hideMenu = () => {
+        if (this._debugContextMenu) {
+          this._debugContextMenu.style.display = 'none';
+        }
+      };
+
+      this._debugContextMenuHandler = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const target = e.target.matches(DEBUG_SELECTORS) ? e.target : e.target.closest(DEBUG_SELECTORS);
+        const menu = this._debugContextMenu;
+        menu.innerHTML = '';
+
+        // 菜单项1：拷贝控件名称
+        const copyBtn = document.createElement('div');
+        copyBtn.style.cssText = 'padding:8px 16px;cursor:pointer;font-size:13px;color:#0f0;font-family:Consolas,Mono,monospace;white-space:nowrap;user-select:none;-webkit-user-select:none;';
+        copyBtn.textContent = '📋 拷贝控件名称';
+        copyBtn.addEventListener('mousedown', (ev) => { ev.stopPropagation(); });
+        copyBtn.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          const text = target ? getTooltipText(target) : 'unknown';
+          try {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.left = '-9999px';
+            document.body.appendChild(ta);
+            ta.select();
+            ta.setSelectionRange(0, ta.value.length);
+            const ok = document.execCommand('copy');
+            document.body.removeChild(ta);
+            if (ok) {
+              copyBtn.textContent = '✅ 已拷贝: ' + text;
+            } else {
+              copyBtn.textContent = '❌ 拷贝失败';
+            }
+          } catch (err) {
+            copyBtn.textContent = '❌ 拷贝失败: ' + err.message;
+          }
+          hideMenu();
+          setTimeout(() => { copyBtn.textContent = '📋 拷贝控件名称'; }, 2000);
+        });
+        copyBtn.addEventListener('mouseenter', () => { copyBtn.style.background = 'rgba(0,255,0,0.15)'; });
+        copyBtn.addEventListener('mouseleave', () => { copyBtn.style.background = 'transparent'; });
+        menu.appendChild(copyBtn);
+
+        // 分隔线
+        const sep = document.createElement('div');
+        sep.style.cssText = 'height:1px;background:rgba(0,255,0,0.2);margin:4px 0;';
+        menu.appendChild(sep);
+
+        // 菜单项2：显示元素信息
+        const infoBtn = document.createElement('div');
+        infoBtn.style.cssText = 'padding:8px 16px;cursor:pointer;font-size:13px;color:#0f0;font-family:Consolas,Mono,monospace;white-space:nowrap;user-select:none;-webkit-user-select:none;';
+        infoBtn.textContent = '🔍 显示元素信息';
+        infoBtn.addEventListener('mousedown', (ev) => { ev.stopPropagation(); });
+        infoBtn.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          if (target) {
+            const info = 'Tag: ' + target.tagName + '\nClass: ' + target.className + '\nText: ' + (target.textContent ? target.textContent.trim().substring(0,50) : '');
+            console.log('[DEBUG] Element info:\n' + info);
+            alert(info);
+          }
+          hideMenu();
+        });
+        infoBtn.addEventListener('mouseenter', () => { infoBtn.style.background = 'rgba(0,255,0,0.15)'; });
+        infoBtn.addEventListener('mouseleave', () => { infoBtn.style.background = 'transparent'; });
+        menu.appendChild(infoBtn);
+
+        // 定位菜单
+        menu.style.display = 'block';
+        menu.style.left = e.clientX + 'px';
+        menu.style.top = e.clientY + 'px';
+
+        // 确保菜单不超出屏幕
+        const rect = menu.getBoundingClientRect();
+        if (rect.right > window.innerWidth) {
+          menu.style.left = (window.innerWidth - rect.width - 4) + 'px';
+        }
+        if (rect.bottom > window.innerHeight) {
+          menu.style.top = (window.innerHeight - rect.height - 4) + 'px';
+        }
+      };
+
+      this._debugContextMenuCloseHandler = (e) => {
+        if (e.button === 0) { // 左键点击其他地方关闭
+          hideMenu();
+        }
+      };
+
+      document.addEventListener('contextmenu', this._debugContextMenuHandler);
+      document.addEventListener('mousedown', this._debugContextMenuCloseHandler);
+      console.log('[DEBUG] Custom context menu enabled');
+    },
+    _destroyDebugContextMenu() {
+      if (this._debugContextMenuHandler) {
+        document.removeEventListener('contextmenu', this._debugContextMenuHandler);
+        this._debugContextMenuHandler = null;
+      }
+      if (this._debugContextMenuCloseHandler) {
+        document.removeEventListener('mousedown', this._debugContextMenuCloseHandler);
+        this._debugContextMenuCloseHandler = null;
+      }
+      if (this._debugContextMenu) {
+        this._debugContextMenu.remove();
+        this._debugContextMenu = null;
+      }
+      console.log('[DEBUG] Custom context menu disabled');
+    },
+
     logMainCameraImagePipeLine(fileName, functionName, variableName, value) {
       let normalizedValue = value
       if (typeof value === 'object' && value !== null) {
@@ -14493,6 +14700,12 @@ export default {
     this.connect();
     this.setupNetworkStatusListener();
 
+    // [DEBUG] 启动全局动态tooltip
+    this.$nextTick(() => {
+      this._initDebugTooltip();
+      this._initDebugContextMenu();
+    });
+
     // 使用 Promise 检查 OpenCV.js 是否加载完成
     this.loadOpenCv().then(() => {
       if (!this._isDestroyed) { // 检查组件是否已销毁
@@ -14662,6 +14875,10 @@ export default {
       document.removeEventListener('visibilitychange', this.visibilityChangeHandler);
       this.visibilityChangeHandler = null;
     }
+    // [DEBUG] 清理tooltip和右键菜单
+    this._destroyDebugTooltip();
+    this._destroyDebugContextMenu();
+
     if (this.websocketReconnectTimeout) {
       clearTimeout(this.websocketReconnectTimeout);
       this.websocketReconnectTimeout = null;
