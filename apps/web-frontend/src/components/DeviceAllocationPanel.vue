@@ -204,16 +204,16 @@ export default {
         this.$bus.$emit('SendConsoleLogMsg', this.$t('DeviceAllocation_RoleAlreadyBoundToThisDevice', { role }), 'info');
         return;
       }
-      // 两步操作改为一步：点击候选设备直接绑定
+      // 两步操作：点击候选设备仅选中，不立即绑定
       selectedRoleObj.DeviceName = device.DeviceName;
       selectedRoleObj.selectedDeviceIndex = device.DeviceIndex;
       this.$bus.$emit(
         'SendConsoleLogMsg',
-        `[DIAG][DAP_CANDIDATE_SELECT] source=${source} dev=${this.getDeviceKey(device)} (binding immediately)`,
+        `[DIAG][DAP_CANDIDATE_SELECT] source=${source} dev=${this.getDeviceKey(device)} (selected, click connect to bind)`,
         'info'
       );
-      // 点击即绑定，无需额外连接按钮
-      this.BindingDevice(selectedRoleIndex);
+      // 通知App.vue当前弹窗面板的选中状态，供connectDriver使用
+      this.$bus.$emit('DeviceAllocationSelected', role, device.DeviceIndex, device.DeviceName);
     },
     logCandidateTouch(phase, device, event) {
       const ts = Math.round((typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now());
