@@ -3323,10 +3323,12 @@ export default {
                   const deviceName = parts[2];
                   const driverName = parts[3];
 
+                  // CFW等附属设备由主设备连接流程统一提示，此处静默处理
+                  const silentForAccessory = (type === 'CFW');
                   if (deviceName != '') {
-                    this.updateDevicesConnect(type, deviceName, driverName, true);
+                    this.updateDevicesConnect(type, deviceName, driverName, true, { silent: silentForAccessory });
                   } else {
-                    this.updateDevicesConnect(type, deviceName, driverName, false);
+                    this.updateDevicesConnect(type, deviceName, driverName, false, { silent: silentForAccessory });
                   }
                 }
                 break;
@@ -6335,6 +6337,13 @@ export default {
       this.refreshHaveDeviceConnect();
       // 注释掉：不再在单个设备连接成功时关闭进度条，等待全部连接完成消息
       // this.loadingConnectAllDevice = false;
+
+      // 修复：ConnectSuccess消息路径下重置连接状态，解决BindingDevice路径下按钮一直转圈的问题
+      // （ConnectDriverSuccess路径已在connectDriverSuccess中处理）
+      if (isBind && this.isConnecting) {
+        this.isConnecting = false;
+        this.stopLoading();
+      }
 
       if (type === 'MainCamera') {
         // 连接成功：仍视为已连接（是否绑定由 bound 单独标记，不影响其它功能）
