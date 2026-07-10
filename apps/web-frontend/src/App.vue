@@ -88,7 +88,7 @@
                   "
                 >
                   <v-list-item-content>
-                    <v-list-item-title>{{ item && item.label ? item.label : item }}</v-list-item-title>
+                    <v-list-item-title :style="{ fontSize: '14px' }">{{ item && item.label ? item.label : item }}</v-list-item-title>
                   </v-list-item-content>
                 </v-list-item>
               </template>
