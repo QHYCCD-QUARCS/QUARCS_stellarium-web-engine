@@ -6515,7 +6515,7 @@ export default {
     clearDeviceList() {
       this.clearPendingConnectionModeAfterDisconnect('all');
       this.devices.forEach(device => {
-        device.device = device.driverName;
+        // 保留之前选择的设备名称，断开连接不取消设备选择
         device.isConnected = false;
         device.isget = false;
         device.BaudRate = 9600;
