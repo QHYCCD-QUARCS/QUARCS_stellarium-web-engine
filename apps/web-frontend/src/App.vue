@@ -2713,7 +2713,7 @@ export default {
     getDeviceDisplayText(device) {
       if (!device) return '';
       // 优先显示已保存的设备名称（即使断开连接也保留）
-      if (device.device && device.device !== 'Not Bind Device') {
+      if (device.device && device.device !== 'Not Bind Device' && device.device !== '') {
         return device.device;
       }
       // 未选择设备时，SDK模式显示提示文字
@@ -12922,7 +12922,8 @@ export default {
         if (device.driverType === devicetype && device.isConnected) {
           device.isConnected = false;
           device.isget = false;
-          device.device = device.driverName;
+          // 保留之前选择的设备名称，断开连接不取消设备选择
+          // device.device = device.driverName;
           // 防护：如果 driverName 是 "SDK" 或 "INDI"，清空它，避免断开后仍然保留无效值
           const upperName = String(device.driverName || '').toUpperCase();
           if (upperName === 'SDK' || upperName === 'INDI') {
@@ -12935,7 +12936,8 @@ export default {
         if (device.driverType === devicetype) {
           device.isConnected = false;
           device.isget = false;
-          device.device = device.driverName;
+          // 保留之前选择的设备名称
+          // device.device = device.driverName;
         }
       }
 
@@ -12984,7 +12986,8 @@ export default {
         if (device.driverType === devicetype && device.isConnected) {
           device.isConnected = false;
           device.isget = false;
-          device.device = device.driverName;
+          // 保留之前选择的设备名称，断开连接不取消设备选择
+          // device.device = device.driverName;
           // 防护：如果 driverName 是 "SDK" 或 "INDI"，清空它，避免断开后仍然保留无效值
           const upperName = String(device.driverName || '').toUpperCase();
           if (upperName === 'SDK' || upperName === 'INDI') {
@@ -12997,7 +13000,8 @@ export default {
         if (device.driverType === devicetype) {
           device.isConnected = false;
           device.isget = false;
-          device.device = device.driverName;
+          // 保留之前选择的设备名称
+          // device.device = device.driverName;
         }
       }
 
