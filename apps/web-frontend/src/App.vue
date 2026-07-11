@@ -2709,14 +2709,19 @@ export default {
     isNotBindDevice(name) {
       return (name || '').trim() === 'Not Bind Device';
     },
-    // 设备菜单第二行显示文字：SDK模式下未连接时显示"QHYCCD SDK"，连接后显示具体设备名
+    // 设备菜单第二行显示文字
     getDeviceDisplayText(device) {
       if (!device) return '';
+      // 优先显示已保存的设备名称（即使断开连接也保留）
+      if (device.device && device.device !== 'Not Bind Device') {
+        return device.device;
+      }
+      // 未选择设备时，SDK模式显示提示文字
       const mode = String(device.connectionMode || '').toUpperCase();
-      if (mode === 'SDK' && !device.isConnected) {
+      if (mode === 'SDK') {
         return 'QHYCCD SDK';
       }
-      return device.device || '';
+      return '';
     },
     // 串口选择变更：在连接面板中（波特率下方）选择串口
     onSerialPortSelect(driverType, value) {
