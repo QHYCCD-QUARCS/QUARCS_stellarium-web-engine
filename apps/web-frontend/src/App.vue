@@ -15402,21 +15402,20 @@ body,
   font-size: 14px !important;
 }
 
-/* 下拉列表项字体 */
-.config-input >>> .v-list-item__title,
-.config-input /deep/ .v-list-item__title {
+/* 全局：所有v-select下拉框字体放大 */
+.v-select .v-select__selections {
   font-size: 14px !important;
 }
 
-/* 下拉标签字体 */
-.config-input >>> .v-select__selections,
-.config-input /deep/ .v-select__selections {
+.v-select input {
   font-size: 14px !important;
 }
 
-/* 下拉输入框字体 */
-.config-input >>> input,
-.config-input /deep/ input {
+.v-select .v-list-item__title {
+  font-size: 14px !important;
+}
+
+.v-select .v-input__slot {
   font-size: 14px !important;
 }
 

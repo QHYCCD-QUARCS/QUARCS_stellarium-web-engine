@@ -98,4 +98,9 @@ export default {
 .message-slide-leave-active {
   animation: hidePanelAnimation 0.4s ease;
 }
+
+.message-content {
+  font-size: 16px;
+  font-weight: 500;
+}
 </style>
