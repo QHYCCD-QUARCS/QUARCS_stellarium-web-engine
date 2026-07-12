@@ -362,8 +362,6 @@
 
     <ImageManagerPanel v-show="ShowImageManagerPanel" :isOpen="ShowImageManagerPanel" />
 
-    <DeviceAllocationPanel v-show="ShowDeviceAllocationPanel" :isOpen="ShowDeviceAllocationPanel" />
-
     <INDIDebugDialog v-show="ShowINDIDebugDialog" :isOpen="ShowINDIDebugDialog" />
 
     <RPIHotspotDialog v-show="ShowRPIHotspotDialog" />
@@ -597,8 +595,6 @@ import CapturePanel from '@/components/CapturePanel.vue';
 
 import ImageManagerPanel from '@/components/ImageManagerPanel.vue';
 
-import DeviceAllocationPanel from '@/components/DeviceAllocationPanel.vue';
-
 import INDIDebugDialog from '@/components/indiDebugDialog.vue';
 
 import RPIHotspotDialog from '@/components/RPI-Hotspot.vue';
@@ -634,7 +630,6 @@ export default {
       isRedBoxMode: false,  // 是否为红框模式
       ShowSchedulePanel: false,  // 是否显示日程面板
       ShowImageManagerPanel: false,  // 是否显示图像管理器面板
-      ShowDeviceAllocationPanel: false,  // 是否显示设备分配面板
       ShowINDIDebugDialog: false,  // 是否显示INDI调试对话框
       ShowRPIHotspotDialog: false,  // 是否显示RPI热点对话框
       ShowDateTimePicker: false,  // 是否显示日期时间选择器
@@ -810,8 +805,6 @@ export default {
     this.$bus.$on('toggleFocuserPanel', this.toggleFocuserPanel);
     this.$bus.$on('ImageManagerPanelClose', this.closeImageManagerPanel);
     this.$bus.$on('ImageManagerPanelOpen', this.openImageManagerPanel);
-    this.$bus.$on('toggleDeviceAllocationPanel', this.toggleDeviceAllocationPanel);
-    this.$bus.$on('openDeviceAllocationPanel', this.openDeviceAllocationPanel);
     this.$bus.$on('toggleINDIDebugDialog', this.toggleINDIDebugDialog);
     this.$bus.$on('toggleRPIHotspotDialog', this.toggleRPIHotspotDialog);
     this.$bus.$on('toggleDateTimePicker', this.toggleDateTimePicker);
@@ -988,25 +981,6 @@ export default {
     closeImageManagerPanel() {
       if (this.ShowImageManagerPanel) {
         this.ShowImageManagerPanel = false;
-      }
-    },
-
-    toggleDeviceAllocationPanel() {
-      this.ShowDeviceAllocationPanel = !this.ShowDeviceAllocationPanel;
-      if (this.ShowDeviceAllocationPanel) {
-        // 打开设备管理时，关闭任务计划表和时间控制器
-        if (this.ShowSchedulePanel) {
-          this.ShowSchedulePanel = false;
-        }
-        if (this.ShowDateTimePicker) {
-          this.ShowDateTimePicker = false;
-        }
-      }
-    },
-
-    openDeviceAllocationPanel() {
-      if (!this.ShowDeviceAllocationPanel) {
-        this.toggleDeviceAllocationPanel();
       }
     },
 
@@ -2263,7 +2237,6 @@ export default {
     SchedulePanel,
     CapturePanel,
     ImageManagerPanel,
-    DeviceAllocationPanel,
     INDIDebugDialog,
     RPIHotspotDialog,
     DateTimePicker,

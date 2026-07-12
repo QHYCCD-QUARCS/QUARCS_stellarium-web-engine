@@ -683,6 +683,22 @@
 <script>
 import swh from '@/assets/sw_helpers.js'
 import PoleMasterPolarAlignmentPanel from './PoleMasterPolarAlignmentPanel.vue'
+import {
+  addVector3,
+  alignmentScaleForDistance,
+  cartesianToHorizontal,
+  crossProduct3,
+  dotProduct3,
+  equatorialRelativeTrajectory,
+  horizontalToCartesian,
+  normalizeAngleDelta,
+  normalizeVector3,
+  projectOriginOntoLine,
+  scaleVector3,
+  subtractVector3,
+  vectorLength3,
+  unwrapAngleSequence,
+} from '@/domain/polar-alignment/polarAlignmentMath'
 
 // 常量定义
 const COLORS = {
@@ -2151,13 +2167,7 @@ export default {
         const { hasLatLon, lat, lon } = this.ensureObserverLocation()
 
         if (!hasLatLon) {
-          // 无经纬度：退化为 RA/DEC 差值序列，并进行 RA 展开
-          const dRaList = rawPoints.map(p => this.normalizeRaDelta(p.ra - this.targetRawPosition.ra))
-          const unwrapped = this.unwrapRaDeltaSequence(dRaList)
-          return rawPoints.map((p, i) => ({
-            x: unwrapped[i],
-            y: p.dec - this.targetRawPosition.dec
-          }))
+          return equatorialRelativeTrajectory(rawPoints, this.targetRawPosition)
         }
 
         const times = rawPoints.map((p, idx) => {
@@ -2237,58 +2247,14 @@ export default {
 
         this.alignmentCurrentDistanceDeg = rDeg
 
-        // 阈值：10°、1°、10'、1'、10\"、1\"
-        const tenDeg = 10.0                 // 10°
-        const oneDeg = 1.0                  // 1°
-        const tenArcminDeg = 10.0 / 60.0    // 10'
-        const oneArcminDeg = 1.0 / 60.0     // 1'
-        const tenArcsecDeg = 10.0 / 3600.0  // 10\"
-        const oneArcsecDeg = 1.0 / 3600.0   // 1\"
-
-        // 判定当前所处“细分级别”
-        let newStage
-        if (rDeg >= oneDeg) {
-          // [10°, 1°]：度级（外 10°，内 1°）
-          newStage = 'deg_10_1'
-        } else if (rDeg >= tenArcminDeg) {
-          // [60', 10']：角分级（外 60'，内 10'）
-          newStage = 'arcmin_60_10'
-        } else if (rDeg > oneArcminDeg) {
-          // [10', 1']：角分级（外 10'，内 1'）
-          newStage = 'arcmin_10_1'
-        } else if (rDeg >= tenArcsecDeg) {
-          // [60\", 10\"]：角秒级（外 60\"，内 10\"）
-          newStage = 'arcsec_60_10'
-        } else {
-          // (10\", 0)：角秒级（外 10\"，内 1\"）
-          newStage = 'arcsec_10_1'
-        }
+        const scale = alignmentScaleForDistance(rDeg)
+        const newStage = scale.stage
 
         const prevStage = this.alignmentScaleStage || 'deg_10_1'
         this.alignmentScaleStage = newStage
 
-        // 根据细分级别设置目标圈半径（单位：度）
-        if (newStage === 'deg_10_1') {
-          // 度级：外圈 10°，内圈 1°
-          this.outerRingDeg = 10.0
-          this.innerRingDeg = 1.0
-        } else if (newStage === 'arcmin_60_10') {
-          // 角分级：外圈 60' (=1°)，内圈 10'
-          this.outerRingDeg = 60.0 / 60.0      // 60' = 1°
-          this.innerRingDeg = 10.0 / 60.0      // 10'
-        } else if (newStage === 'arcmin_10_1') {
-          // 角分级：外圈 10'，内圈 1'
-          this.outerRingDeg = 10.0 / 60.0      // 10'
-          this.innerRingDeg = 1.0 / 60.0       // 1'
-        } else if (newStage === 'arcsec_60_10') {
-          // 角秒级：外圈 60\" (=1')，内圈 10\"
-          this.outerRingDeg = 60.0 / 3600.0    // 60\" = 1'
-          this.innerRingDeg = 10.0 / 3600.0    // 10\"
-        } else {
-          // 角秒级：外圈 10\"，内圈 1\"
-          this.outerRingDeg = 10.0 / 3600.0    // 10\"
-          this.innerRingDeg = 1.0 / 3600.0     // 1\"
-        }
+        this.outerRingDeg = scale.outerRingDeg
+        this.innerRingDeg = scale.innerRingDeg
 
         // 每次“精度级别”发生变化时（degree ↔ arcmin ↔ arcsec），
         // 都视为进入一个新的工作阶段：清除旧轨迹（保留最近两点）并重新计算比例尺。
@@ -2297,13 +2263,7 @@ export default {
           this.clearOldTrajectory()
         }
 
-        // 颜色：当偏差小于 60 角秒（1 角分）时，目标圈和标注全部改为绿色
-        const sixtyArcsecDeg = 60.0 / 3600.0  // 60" = 1'
-        if (rDeg <= sixtyArcsecDeg) {
-          this.targetRingColor = '#4CAF50' // 绿色 - 偏差小于 60 角秒
-        } else {
-          this.targetRingColor = '#FFD54F' // 黄色 - 偏差大于 60 角秒
-        }
+        this.targetRingColor = scale.color
       },
       ensureViewMappingInitialized(seqWorld) {
         if (!seqWorld || seqWorld.length === 0) return
@@ -2559,60 +2519,28 @@ export default {
         return { dx, dy }
       },
       normalizeRaDelta(deltaDeg) {
-        // 将 RA 差值归一到 [-180, 180)
-        let x = deltaDeg
-        x = ((x + 540) % 360) - 180
-        return x
+        return normalizeAngleDelta(deltaDeg)
       },
       normalizeAzDelta(deltaDeg) {
-        // 将 Az 差值归一到 [-180, 180)
-        let x = deltaDeg
-        x = ((x + 540) % 360) - 180
-        return x
+        return normalizeAngleDelta(deltaDeg)
       },
       addVector3(a, b) {
-        return {
-          x: a.x + b.x,
-          y: a.y + b.y,
-          z: a.z + b.z
-        }
+        return addVector3(a, b)
       },
       subtractVector3(a, b) {
-        return {
-          x: a.x - b.x,
-          y: a.y - b.y,
-          z: a.z - b.z
-        }
+        return subtractVector3(a, b)
       },
       scaleVector3(v, s) {
-        return {
-          x: v.x * s,
-          y: v.y * s,
-          z: v.z * s
-        }
+        return scaleVector3(v, s)
       },
       dotProduct3(a, b) {
-        return a.x * b.x + a.y * b.y + a.z * b.z
+        return dotProduct3(a, b)
       },
       horizontalToCartesian(azDeg, altDeg, radius = 1) {
-        const azRad = azDeg * Math.PI / 180.0
-        const altRad = altDeg * Math.PI / 180.0
-        const cosAlt = Math.cos(altRad)
-        return {
-          x: radius * Math.sin(azRad) * cosAlt,
-          y: radius * Math.cos(azRad) * cosAlt,
-          z: radius * Math.sin(altRad)
-        }
+        return horizontalToCartesian(azDeg, altDeg, radius)
       },
       cartesianToHorizontal(cart) {
-        const radius = Math.sqrt(cart.x * cart.x + cart.y * cart.y + cart.z * cart.z)
-        if (!Number.isFinite(radius) || radius <= 0) {
-          return { az: NaN, alt: NaN }
-        }
-        const alt = Math.asin(Math.max(-1, Math.min(1, cart.z / radius))) * 180.0 / Math.PI
-        let az = Math.atan2(cart.x, cart.y) * 180.0 / Math.PI
-        if (az < 0) az += 360.0
-        return { az, alt }
+        return cartesianToHorizontal(cart)
       },
       adjustmentValueToDegrees(value, unit) {
         if (!Number.isFinite(value)) return NaN
@@ -2809,18 +2737,7 @@ export default {
         }
       },
       unwrapRaDeltaSequence(dRaDegList) {
-        // 使相邻 dRA 序列在数值上连续，避免跨 0/360 发生长连线
-        if (!dRaDegList || dRaDegList.length === 0) return []
-        const out = [dRaDegList[0]]
-        for (let i = 1; i < dRaDegList.length; i++) {
-          let curr = dRaDegList[i]
-          let prev = out[i - 1]
-          let diff = curr - prev
-          while (diff > 180) { curr -= 360; diff = curr - prev }
-          while (diff < -180) { curr += 360; diff = curr - prev }
-          out.push(curr)
-        }
-        return out
+        return unwrapAngleSequence(dRaDegList)
       },
       appendTrajectoryPoint(rawRaDeg, rawDecDeg) {
         // 已保留以兼容调用，但当前重绘使用 redrawTrajectory 覆盖全量绘制
@@ -2876,30 +2793,12 @@ export default {
         // 使用“全量连续展开”的最后两点，允许 RA 超出常规范围，保证几何连续
         const pair = this.getWorldABForPerp(); if (!pair) return
         const { A, B } = pair
-        const O = { x: 0, y: 0 } // 目标在世界坐标为原点（与 worldForPoint/展开保持一致）
-        // 线段 AB 的向量与 O 到 AB 的投影参数 t
-        const vx = B.x - A.x
-        const vy = B.y - A.y
-        const len2 = vx * vx + vy * vy
-        if (len2 < 1e-9) return
-        const t = ((O.x - A.x) * vx + (O.y - A.y) * vy) / len2
-        let Hx, Hy, segment
-        if (t >= 0 && t <= 1) {
-          // 垂足在线段上
-          Hx = A.x + t * vx
-          Hy = A.y + t * vy
-          // 垂足在线段上时，不再绘制整段，只画 O→H 的垂线
-          segment = null
-        } else {
-          // 垂足在线段外：计算真正的垂足 H，并把线段朝 H 方向有限延长至 H
-          Hx = A.x + t * vx
-          Hy = A.y + t * vy
-          if (t < 0) {
-            segment = { x1: Hx, y1: Hy, x2: A.x, y2: A.y }
-          } else {
-            segment = { x1: B.x, y1: B.y, x2: Hx, y2: Hy }
-          }
-        }
+        const O = { x: 0, y: 0 }
+        const projection = projectOriginOntoLine(A, B)
+        if (!projection) return
+        const Hx = projection.foot.x
+        const Hy = projection.foot.y
+        const segment = projection.extension
         // 画垂线（O->H）与（可能的延长）线段，均使用虚线
         const canvas = this.$refs.trajectoryCanvas
         if (!canvas) return
@@ -4278,30 +4177,21 @@ export default {
        * 计算两个向量的叉积
        */
       crossProduct(v1, v2) {
-        return {
-          x: v1.y * v2.z - v1.z * v2.y,
-          y: v1.z * v2.x - v1.x * v2.z,
-          z: v1.x * v2.y - v1.y * v2.x
-        }
+        return crossProduct3(v1, v2)
       },
 
       /**
        * 计算向量长度
        */
       vectorLength(v) {
-        return Math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z)
+        return vectorLength3(v)
       },
 
       /**
        * 归一化向量
        */
       normalizeVector(v) {
-        const length = this.vectorLength(v)
-        return {
-          x: v.x / length,
-          y: v.y / length,
-          z: v.z / length
-        }
+        return normalizeVector3(v)
       },
 
       /**
