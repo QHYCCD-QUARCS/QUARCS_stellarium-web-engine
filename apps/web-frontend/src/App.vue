@@ -10095,15 +10095,24 @@ export default {
       const payload = parts.slice(1);
       if (!payload.length) return;
 
-      const isNewFormat = (payload.length % 4 === 0);
-      const step = isNewFormat ? 4 : 2;
+      // 兼容三种线格式（后端与前端同批部署，单一生产者 loadSelectedDriverList）：
+      //   5 字段(最新)：Desc:Driver:SDKSupport:Mode:DeviceModel  —— 新增持久化型号
+      //   4 字段(旧)  ：Desc:Driver:SDKSupport:Mode
+      //   2 字段(更旧)：Desc:Driver
+      // 优先按最大且整除的步长解析；当前后端始终发 5 字段，故优先取 5。
+      const n = payload.length;
+      const step = (n % 5 === 0) ? 5 : (n % 4 === 0) ? 4 : 2;
+      const hasSdkField = step >= 4;
+      const hasModelField = step >= 5;
 
       for (let i = 0; i < payload.length; i += step) {
         const deviceType = (payload[i] || '').trim();
         const driverName = (payload[i + 1] || '').trim();
-        const supportSDK = isNewFormat ? String(payload[i + 2]).trim().toLowerCase() === 'true' : undefined;
-        const modeRaw = isNewFormat ? String(payload[i + 3] || '').trim() : undefined;
+        const supportSDK = hasSdkField ? String(payload[i + 2]).trim().toLowerCase() === 'true' : undefined;
+        const modeRaw = hasSdkField ? String(payload[i + 3] || '').trim() : undefined;
         const connectionMode = (modeRaw && modeRaw.toUpperCase() === 'SDK') ? 'SDK' : (modeRaw ? 'INDI' : undefined);
+        // 持久化型号（可能为空：从未绑定过该设备）
+        const deviceModel = hasModelField ? (payload[i + 4] || '').trim() : undefined;
 
         if (!deviceType) continue;
 
@@ -10124,13 +10133,21 @@ export default {
         const dev = this.devices.find(d => d.driverType === deviceType);
         if (!dev) continue;
 
+        // 优先用持久化型号作为左侧"设备名"显示（仅未连接时）。型号非空时会被
+        // deviceDisplayText/hasBoundDeviceName 识别为真实设备名并显示为白色（未连接）；
+        // 连接后由实时连接流程写入 dev.device，这里不覆盖，避免用旧持久化值盖掉在线值。
+        if (typeof deviceModel === 'string' && deviceModel !== '' && !dev.isConnected) {
+          dev.device = deviceModel;
+        }
+
         // 只有在 driverName 有效时才更新（避免空字符串或无效值覆盖已有的驱动名称）
         if (driverName && driverName.trim() !== '') {
           if (!dev.isConnected && !hasBoundDeviceName(dev)) {
+            // 尚无真实设备名（型号为空）时，用驱动名兜底显示
             dev.device = driverName;
             dev.driverName = driverName;
           } else {
-            // 已连接或已有持久化绑定时只同步驱动名，不能用驱动覆盖具体设备名
+            // 已连接或已有持久化绑定/型号时只同步驱动名，不能用驱动覆盖具体设备名
             dev.driverName = driverName;
           }
         }
