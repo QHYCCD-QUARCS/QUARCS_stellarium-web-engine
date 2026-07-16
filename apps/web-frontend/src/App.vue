@@ -11631,9 +11631,11 @@ export default {
       const role = this.CurrentDriverType || '';
       if (!['MainCamera', 'Guider', 'PoleCamera'].includes(role)) return false;
       if (this.DeviceIsConnected) return false;
-      const dev = this.currentDevice;
-      const mode = String((dev && dev.connectionMode) || this.selectedConnectionMode || 'INDI').toUpperCase();
-      if (mode !== 'SDK') return false;
+      // 候选条原先有 `if (mode !== 'SDK') return false;`，即仅 SDK 模式渲染。
+      // 后端移除相机自动分配后，INDI 模式同样需要用户手动指派；而
+      // ShowDeviceAllocationWindow 对相机角色会走内联分支并 break（跳过弹窗面板），
+      // 于是 INDI 下两种分配 UI 都没有 -> 用户看不到相机列表。
+      // 绑定动作本身与传输无关（发 BindingDevice:<Role>:<Index>），故放开该限制。
       if (!this.inlineCameraAllocationRoles.includes(role)) return false;
       return this.currentInlineCameraCandidates.length > 1;
     },
