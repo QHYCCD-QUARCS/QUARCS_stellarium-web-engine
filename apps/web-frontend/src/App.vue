@@ -10308,33 +10308,24 @@ export default {
       if (dev) dev.connectionMode = mode;
       if (this.CurrentDriverType === deviceType) this.selectedConnectionMode = mode;
 
-      // 这条 Success 是不是【本客户端】发起的？pendingConnectionModeByDevice 只在本客户端
-      // 调 requestSetConnectionMode 时写入，因此它是唯一可靠的“发起方”判据。
-      // 必须在下面 delete 之前取。
-      const initiatedByThisClient = !!this.pendingConnectionModeByDevice[deviceType];
-
       delete this.pendingConnectionModeByDevice[deviceType];
       this.isSettingConnectionMode = Object.keys(this.pendingConnectionModeByDevice || {}).length > 0;
       this.SendConsoleLogMsg(`SetConnectionModeSuccess:${deviceType}:${mode}`, 'info');
 
-      // ── 关键：SetConnectionModeSuccess 是【广播】消息，所有连接的前端都会收到 ──
-      // 它是“状态通知”，不是“只发给我的应答”。因此这里只允许更新本地视图（上面几行），
-      // 绝不能无条件触发副作用命令，否则：
-      //   1) 多客户端/多标签页：每个页面都独立发一遍命令 -> N 倍放大（多人使用必然出问题）；
-      //   2) 叠加后端 SetConnectionMode 的“同驱动联动”（一条命令对组内每个角色各回一条
-      //      Success），单次切换就被放大成连接风暴（实测两相机都设 SDK -> 候选上报 ~25 轮）。
-      // 【不要】在这里调 ensureCameraModeConsistency：它会 requestSetConnectionMode 回灌，
-      // 而本函数正是由 Success 触发的 -> 前后端反馈环。后端已保证整组一致。
-
-      // 自动连接：仅当这条 Success 是本客户端发起的模式切换所致才触发。
-      // （不能用 deviceType === CurrentDriverType 把关：多个客户端可能都停在同一设备页，
-      //   那样每个客户端仍会各发一条 ConnectDriver。）
-      if (initiatedByThisClient && mode === 'SDK' && dev && !dev.isConnected &&
-          this.isCameraAllocationRole(deviceType)) {
-        const driverName = dev.driverName || 'QHYCCD';
-        this.SendConsoleLogMsg(`Auto-connect SDK for ${deviceType} after mode switch`, 'info');
-        this.$bus.$emit('AppSendMessage', 'Vue_Command', `ConnectDriver:${driverName}:${deviceType}:SDK`);
-      }
+      // ── 这里只更新本地视图，不触发任何命令。两条理由 ──
+      //
+      // 1) 语义：INDI/SDK 下拉框的语义是“选择连接方式”，不是“连接”。原先这里在
+      //    mode==='SDK' 时会自动发 ConnectDriver，导致“一选 SDK 就立刻弹出相机列表”，
+      //    而选 INDI 却要点连接按钮 —— 两条传输行为不一致，且与下拉框语义不符。
+      //    现统一为：选模式只改模式；相机列表一律等用户点 Connect 后才出现（对齐 INDI）。
+      //
+      // 2) 广播：SetConnectionModeSuccess 是【广播】消息，所有连接的前端都会收到。
+      //    它是“状态通知”而非“只发给我的应答”，若据此触发副作用命令，多客户端/多标签页
+      //    会各发一遍 -> N 倍放大（多人使用必然出问题）；叠加后端 SetConnectionMode 的
+      //    “同驱动联动”（一条命令对组内每个角色各回一条 Success），单次切换就被放大成
+      //    连接风暴（实测两相机都设 SDK -> 候选上报 ~25 轮）。
+      //    同理【不要】在这里调 ensureCameraModeConsistency：它会 requestSetConnectionMode
+      //    回灌，而本函数正是由 Success 触发的 -> 前后端反馈环。后端已保证整组一致。
     },
 
     onSetConnectionModeFailed(deviceType, errorMsg) {
