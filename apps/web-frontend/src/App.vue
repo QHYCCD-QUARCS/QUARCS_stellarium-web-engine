@@ -10252,28 +10252,15 @@ export default {
         return;
       }
 
-      // 规则：同一 QHY 驱动下 Main/Guider/PoleCamera 必须同一连接模式；且连接后禁止跨模式切换
-      if (this.isCameraModeGroup(deviceType)) {
-        if (nextMode === 'INDI' && this.anySdkConnectedInCameraModeGroup(deviceType)) {
-          // 禁止切回 INDI：回滚到 SDK 并提示
-          dev.connectionMode = 'SDK';
-          if (this.CurrentDriverType === deviceType) this.selectedConnectionMode = 'SDK';
-          if (!opts.silent) this.callShowMessageBox(this.$t('SDKConnectedLockIndiForbidden'), 'warning');
-          return;
-        }
-        if (nextMode === 'SDK' && this.anyIndiConnectedInCameraModeGroup(deviceType)) {
-          // 禁止切到 SDK：回滚到 INDI 并提示
-          dev.connectionMode = 'INDI';
-          if (this.CurrentDriverType === deviceType) this.selectedConnectionMode = 'INDI';
-          if (!opts.silent) this.callShowMessageBox(this.$t('INDIConnectedLockSdkForbidden'), 'warning');
-          return;
-        }
-
-        // 同驱动相机组的模式同步由【后端】SetConnectionMode 负责（它会联动整组并对每个角色
-        // 回吐 SetConnectionModeSuccess）。前端不要重复下发 peer 命令：否则 1 次用户操作
-        // -> 前端 2 条命令 -> 后端各回 2 条 Success = 4 条，再叠加 onSetConnectionModeSuccess
-        // 里的自动连接/一致性回灌，会形成前后端反馈环，SDK 模式下把候选上报放大到几十轮。
-      }
+      // ── M3：已拆除"同驱动相机组必须同模式"的前端镜像锁 ────────────────────────
+      // 原先：组内任一相机以 SDK 连着就禁止别的角色切 INDI（反之亦然）。该约束过宽 ——
+      // 硬件层面允许不同物理相机分别走 SDK/INDI（排他只发生在 OpenQHYCCD/同一台设备）。
+      // 此前必须禁止，是因为 SDK 连接会"扫到几台就 open 全部"，占住本该留给 INDI 的相机；
+      // 那是代码自造的冲突，已由后端 M2（只登记不 open + 绑定时才按需打开）消除。
+      // 保留的约束：已连接的设备不许切模式（见上方 DeviceConnectedLockModeChangeForbidden）。
+      //
+      // 同时不要在此下发 peer 命令：后端已不再联动整组，每条命令只改一个角色、只回一条
+      // 应答；前端若再替 peer 发命令，会让 1 次用户操作变成多条命令 -> 放大。
 
       // 只有在“该驱动支持 SDK 或目标模式为 INDI”时才允许发（INDI 永远安全）
       if (nextMode === 'SDK' && !dev.supportSDK) {
