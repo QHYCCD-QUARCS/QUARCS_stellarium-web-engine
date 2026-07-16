@@ -9902,6 +9902,16 @@ export default {
           const msg = (mode === 'SDK')
             ? `ConnectDriver:${DriverName}:${DeviceType}:SDK`
             : `ConnectDriver:${DriverName}:${DeviceType}`;
+
+          // 发起新连接前清空候选，避免与上一次连接的候选叠加。
+          // ShowDeviceAllocationWindow 的内联分支会 break，不会走到 popup 分支里的
+          // clearInlineCameraAllocationState('all')，所以候选一直只增不清；而且
+          // 候选按 `CCD:<index>` 做键，SDK 用负数下标、INDI 用 0 基下标，两者键不冲突
+          // -> SDK(4) + INDI(2) 叠成 6 条。这里在每次 ConnectDriver 前重置，
+          // 后端随后会用新一批 DeviceToBeAllocated / AddDeviceType 完整重建。
+          // 注意不能放在 ShowDeviceAllocationWindow：候选在它之前到达，清了就没了。
+          this.clearInlineCameraAllocationState('all');
+
           this.$bus.$emit('AppSendMessage', 'Vue_Command', msg);
           this.SendConsoleLogMsg('Start Connecting driver:' + DeviceType + ' ' + DriverName, 'info');
           return;
@@ -10259,14 +10269,10 @@ export default {
           return;
         }
 
-        // 同步其它同驱动相机的模式（避免 SDK/INDI 混用）
-        if (!opts.fromPeer) {
-          this.linkedCameraModeDevices(deviceType).forEach(peer => {
-            if (peer.driverType !== deviceType) {
-              this.requestSetConnectionMode(peer.driverType, nextMode, { silent: true, fromPeer: true });
-            }
-          });
-        }
+        // 同驱动相机组的模式同步由【后端】SetConnectionMode 负责（它会联动整组并对每个角色
+        // 回吐 SetConnectionModeSuccess）。前端不要重复下发 peer 命令：否则 1 次用户操作
+        // -> 前端 2 条命令 -> 后端各回 2 条 Success = 4 条，再叠加 onSetConnectionModeSuccess
+        // 里的自动连接/一致性回灌，会形成前后端反馈环，SDK 模式下把候选上报放大到几十轮。
       }
 
       // 只有在“该驱动支持 SDK 或目标模式为 INDI”时才允许发（INDI 永远安全）
@@ -10301,15 +10307,30 @@ export default {
       const dev = this.devices.find(d => d.driverType === deviceType);
       if (dev) dev.connectionMode = mode;
       if (this.CurrentDriverType === deviceType) this.selectedConnectionMode = mode;
+
+      // 这条 Success 是不是【本客户端】发起的？pendingConnectionModeByDevice 只在本客户端
+      // 调 requestSetConnectionMode 时写入，因此它是唯一可靠的“发起方”判据。
+      // 必须在下面 delete 之前取。
+      const initiatedByThisClient = !!this.pendingConnectionModeByDevice[deviceType];
+
       delete this.pendingConnectionModeByDevice[deviceType];
       this.isSettingConnectionMode = Object.keys(this.pendingConnectionModeByDevice || {}).length > 0;
       this.SendConsoleLogMsg(`SetConnectionModeSuccess:${deviceType}:${mode}`, 'info');
 
-      // 成功后再次确保同驱动相机组一致（防止并发/竞态导致短暂不一致）
-      this.ensureCameraModeConsistency(deviceType);
+      // ── 关键：SetConnectionModeSuccess 是【广播】消息，所有连接的前端都会收到 ──
+      // 它是“状态通知”，不是“只发给我的应答”。因此这里只允许更新本地视图（上面几行），
+      // 绝不能无条件触发副作用命令，否则：
+      //   1) 多客户端/多标签页：每个页面都独立发一遍命令 -> N 倍放大（多人使用必然出问题）；
+      //   2) 叠加后端 SetConnectionMode 的“同驱动联动”（一条命令对组内每个角色各回一条
+      //      Success），单次切换就被放大成连接风暴（实测两相机都设 SDK -> 候选上报 ~25 轮）。
+      // 【不要】在这里调 ensureCameraModeConsistency：它会 requestSetConnectionMode 回灌，
+      // 而本函数正是由 Success 触发的 -> 前后端反馈环。后端已保证整组一致。
 
-      // 切换到SDK模式且设备未连接时，自动触发ConnectDriver
-      if (mode === 'SDK' && dev && !dev.isConnected && this.isCameraAllocationRole(deviceType)) {
+      // 自动连接：仅当这条 Success 是本客户端发起的模式切换所致才触发。
+      // （不能用 deviceType === CurrentDriverType 把关：多个客户端可能都停在同一设备页，
+      //   那样每个客户端仍会各发一条 ConnectDriver。）
+      if (initiatedByThisClient && mode === 'SDK' && dev && !dev.isConnected &&
+          this.isCameraAllocationRole(deviceType)) {
         const driverName = dev.driverName || 'QHYCCD';
         this.SendConsoleLogMsg(`Auto-connect SDK for ${deviceType} after mode switch`, 'info');
         this.$bus.$emit('AppSendMessage', 'Vue_Command', `ConnectDriver:${driverName}:${deviceType}:SDK`);
