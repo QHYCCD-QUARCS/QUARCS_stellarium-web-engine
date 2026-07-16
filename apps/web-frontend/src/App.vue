@@ -3589,23 +3589,35 @@ export default {
         } else {
           this.sendMessage('Vue_Command', 'disconnectAllDevice');
           this.SendConsoleLogMsg('Disconnect All Device', 'info');
-          this.haveDeviceConnect = false;
-          // this.devices.forEach(device => {
-          //   device.isConnected = false;
-          //   // device.device = '';
-          // });
-
-          this.$bus.$emit('MainCameraConnected', 0);
-          this.$bus.$emit('MountConnected', 0);
-          this.$bus.$emit('CFWConnected', 0);
-          this.$bus.$emit('FocuserConnected', 0);
-          this.$bus.$emit('GuiderConnected', 0);
-          this.clearDeviceList();
+          this.resetAllDeviceUiState();
         }
       } else {
         this.callShowMessageBox('No devices have been connected.', 'error');
       }
       this.selectedDriver = '';
+    },
+
+    // 「全部设备已断开」后的 UI 状态复位 —— 只此一处。
+    // 这段曾被复制成三份（disconnectAllDevice / disconnectDriversuccess('all') /
+    // disconnectDriverFail('all')），每份各漏一点：
+    //   - 菜单里的「全部断开」漏了 clearInlineCameraAllocationState('all')，
+    //     断开后候选条仍留着上一次的设备；再连接时新候选按 `CCD:<index>` 另起键
+    //     （SDK 用负下标、INDI 用 0 基下标，互不冲突）→ 叠成一串幽灵设备。
+    //   - 另两份漏了 FocuserConnected。
+    // 收敛成一个函数后，调用者无从漏。
+    resetAllDeviceUiState() {
+      this.haveDeviceConnect = false;
+      [
+        'MainCameraConnected',
+        'MountConnected',
+        'CFWConnected',
+        'FocuserConnected',
+        'GuiderConnected',
+        'PoleCameraConnected',
+      ].forEach(evt => this.$bus.$emit(evt, 0));
+      this.clearDeviceList();
+      this.$bus.$emit('deleteDeviceTypeAllocationList', 'all');
+      this.clearInlineCameraAllocationState('all');
     },
 
     clearDeviceList() {
@@ -9970,17 +9982,14 @@ export default {
       console.log('disconnectDevicesuccess:', devicetype);
       this.drawer_2 = false
       if (devicetype == "all") {
+        // NOTE: 这里的 sendMessage('disconnectAllDevice') 是"拿通知当指令"——
+        // 后端发 DisconnectDriverSuccess:all 是在告知"已经全断开了"，前端却回敬一条
+        // "请断开全部"，触发后端再走一遍 INDI 服务重启。多客户端时 N 倍放大。
+        // 详见 QT 仓库 doc/2026-07-17_多客户端广播串扰_根因与方案.md §2.2。
+        // 暂未删除：删掉会改变断开链路的实际行为，需真机验证，留给单独一轮处理。
         this.sendMessage('Vue_Command', 'disconnectAllDevice');
         this.SendConsoleLogMsg('Disconnect All Device', 'info');
-        this.haveDeviceConnect = false;
-        this.$bus.$emit('MainCameraConnected', 0);
-        this.$bus.$emit('MountConnected', 0);
-        this.$bus.$emit('CFWConnected', 0);
-        this.$bus.$emit('GuiderConnected', 0);
-        this.$bus.$emit('PoleCameraConnected', 0);
-        this.clearDeviceList();
-        this.$bus.$emit('deleteDeviceTypeAllocationList', 'all');
-        this.clearInlineCameraAllocationState('all');
+        this.resetAllDeviceUiState();
         return;
       };
 
@@ -10039,17 +10048,14 @@ export default {
       console.log('disconnectDeviceFail:', devicetype);
       this.drawer_2 = false
       if (devicetype == "all") {
+        // NOTE: 这里的 sendMessage('disconnectAllDevice') 是"拿通知当指令"——
+        // 后端发 DisconnectDriverSuccess:all 是在告知"已经全断开了"，前端却回敬一条
+        // "请断开全部"，触发后端再走一遍 INDI 服务重启。多客户端时 N 倍放大。
+        // 详见 QT 仓库 doc/2026-07-17_多客户端广播串扰_根因与方案.md §2.2。
+        // 暂未删除：删掉会改变断开链路的实际行为，需真机验证，留给单独一轮处理。
         this.sendMessage('Vue_Command', 'disconnectAllDevice');
         this.SendConsoleLogMsg('Disconnect All Device', 'info');
-        this.haveDeviceConnect = false;
-        this.$bus.$emit('MainCameraConnected', 0);
-        this.$bus.$emit('MountConnected', 0);
-        this.$bus.$emit('CFWConnected', 0);
-        this.$bus.$emit('GuiderConnected', 0);
-        this.$bus.$emit('PoleCameraConnected', 0);
-        this.clearDeviceList();
-        this.$bus.$emit('deleteDeviceTypeAllocationList', 'all');
-        this.clearInlineCameraAllocationState('all');
+        this.resetAllDeviceUiState();
         return;
       };
 
