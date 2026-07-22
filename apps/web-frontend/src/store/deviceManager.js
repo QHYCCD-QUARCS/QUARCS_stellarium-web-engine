@@ -8,6 +8,7 @@ const initialDevices = () => ({
   Mount: { connected: false, bound: true, running: false, features: [] },
   PoleCamera: { connected: false, bound: true, running: false, features: [] },
   CFW: { connected: false, bound: true, running: false, features: [] },
+  CAA: { connected: false, bound: true, running: false, features: [] },
 })
 
 // 功能分组：用于跨设备互斥检测
@@ -127,5 +128,4 @@ export default {
     },
   }
 }
-
 

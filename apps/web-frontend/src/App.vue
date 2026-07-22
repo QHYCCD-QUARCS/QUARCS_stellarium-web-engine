@@ -311,25 +311,53 @@
                     </div>
                   </button>
 
-                  <!-- 滑动条 -->
-                  <v-slider
-                    v-model="item.value"
-                    :step="item.inputStep"
-                    :max="item.inputMax"
-                    :min="item.inputMin"
-                    :disabled="isCurrentDeviceUnbound"
-                    @change="handleConfigChange(item.label, item.value, item.driverType)"
-                    color="white"
-                    class="align-center slider-control"
-                    :data-testid="
-                      'ui-config-'
-                      + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')
-                      + '-'
-                      + String(item.label || 'Field').replace(/[^A-Za-z0-9]+/g, '')
-                      + '-slider-'
-                      + index
-                    "
-                  />
+                  <div :class="['slider-control-row', { 'slider-control-row--with-input': item.withInput }]">
+                    <!-- 滑动条 -->
+                    <v-slider
+                      v-model="item.value"
+                      :step="item.inputStep"
+                      :max="item.inputMax"
+                      :min="item.inputMin"
+                      :disabled="isCurrentDeviceUnbound"
+                      @change="handleConfigChange(item.label, item.value, item.driverType)"
+                      color="white"
+                      class="align-center slider-control"
+                      :data-testid="
+                        'ui-config-'
+                        + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')
+                        + '-'
+                        + String(item.label || 'Field').replace(/[^A-Za-z0-9]+/g, '')
+                        + '-slider-'
+                        + index
+                      "
+                    />
+
+                    <v-text-field
+                      v-if="item.withInput"
+                      :value="item.value"
+                      :type="isDesktop ? 'number' : 'text'"
+                      :min="item.inputMin"
+                      :max="item.inputMax"
+                      :step="item.inputStep"
+                      :disabled="isCurrentDeviceUnbound"
+                      hide-details
+                      dense
+                      solo
+                      flat
+                      class="slider-number-input"
+                      @input="item.value = $event"
+                      @blur="onSliderNumberCommit(item)"
+                      @keydown.enter.prevent="onSliderNumberCommit(item)"
+                      :data-testid="
+                        'ui-config-'
+                        + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')
+                        + '-'
+                        + String(item.label || 'Field').replace(/[^A-Za-z0-9]+/g, '')
+                        + '-slider-number-'
+                        + index
+                      "
+                    />
+                  </div>
 
                   <!-- 增加按钮 -->
                   <button
@@ -1068,6 +1096,22 @@ const FIXED_SDK_SUPPORT_RULES = {
     // 注意：后端的包含匹配（"qhy" 和 "focus"）在前端使用精确匹配，避免误判
     // 如果需要支持更多变体，可以添加更宽松的规则，但要小心误判
   ],
+  CAA: [
+    /^indi_qhy_ccd$/i,
+    /^indi_qhy_ccd2$/i,
+    /^libqhyccd$/i,
+    /^qhyccd$/i,
+    /^qhy\s+ccd$/i,
+    /^qhy\s+ccd2$/i,
+  ],
+  Rotator: [
+    /^indi_qhy_ccd$/i,
+    /^indi_qhy_ccd2$/i,
+    /^libqhyccd$/i,
+    /^qhyccd$/i,
+    /^qhy\s+ccd$/i,
+    /^qhy\s+ccd2$/i,
+  ],
   // 如果后续要扩展更多 SDK（例如 ZWO），可在这里加规则
 };
 
@@ -1200,6 +1244,7 @@ export default {
         { name: '电动调焦器', driverType: 'Focuser', type: 'Focusers', ListNum: "22", isget: false, device: '', BaudRate: 9600, driverName: '', usbSerialPath: '', sdkVersion: '', supportSDK: false, connectionMode: 'INDI', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_Focuser' },
         { name: '电子极轴镜', driverType: 'PoleCamera', type: 'CCDs', ListNum: "2", isget: false, device: '', BaudRate: 9600, driverName: '', usbSerialPath: '', sdkVersion: '', supportSDK: false, connectionMode: 'INDI', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_PoleCamera' },
         { name: '滤镜轮', driverType: 'CFW', type: 'Filter Wheels', ListNum: "21", isget: false, device: '', BaudRate: 9600, driverName: '', usbSerialPath: '', sdkVersion: '', supportSDK: false, connectionMode: 'INDI', isConnected: false, dialogStateVar: 'showDeviceSettingsDialog_CFW' },
+        { name: 'CAA', driverType: 'CAA', type: 'Rotator', ListNum: "24", isget: false, device: '', BaudRate: 9600, driverName: '', usbSerialPath: '', sdkVersion: '', supportSDK: true, connectionMode: 'SDK', isConnected: false, dialogStateVar: '' },
       ],
 
       // Changing the label name also requires changing the emit signal name
@@ -1284,6 +1329,11 @@ export default {
         { driverType: 'CFW', label: 'CFW Current', inputType: 'tip', value: '-', isCfwMenuDisplay: true },
         { driverType: 'CFW', label: 'CFW Next', inputType: 'button', buttonText: 'CFW Next', buttonTextWhenDisabled: 'Moving...', _disabled: false, isCfwMenuControl: true, cfwDirection: 'plus' },
       ],
+      CAAConfigItems: [
+        { driverType: 'CAA', label: 'CAA Current Angle', value: '-', inputType: 'tip' },
+        { driverType: 'CAA', label: 'CAA Target Angle', value: 0, inputType: 'slider', inputMin: 0, inputMax: 360, inputStep: 0.1, withInput: true, allowDecimal: true },
+      ],
+      caaLastConfirmedAngle: 0,
       cfwMenuButtonsDisabled: false,
       cfwMenuCurrentIndex: 0,
       cfwMenuLastConfirmedIndex: 0,
@@ -1781,6 +1831,11 @@ export default {
       const connected = num === 1;
       this.$store.commit('device/SET_DEVICE_CONNECTED', { device: 'CFW', connected });
       if (!connected) this.$store.commit('device/CLEAR_FEATURES', { device: 'CFW' });
+    });
+    this.$bus.$on('CAAConnected', (num) => {
+      const connected = num === 1;
+      this.$store.commit('device/SET_DEVICE_CONNECTED', { device: 'CAA', connected });
+      if (!connected) this.$store.commit('device/CLEAR_FEATURES', { device: 'CAA' });
     });
 
     this.memoryCheckInterval = setInterval(this.checkMemoryUsage, 30000);
@@ -2475,7 +2530,16 @@ export default {
       return normalizeDriverKey(name);
     },
     getDeviceByType(deviceType) {
-      return getDeviceByType(this.devices, deviceType);
+      const normalizedType = this.normalizeDeviceType(deviceType);
+      return getDeviceByType(this.devices, normalizedType);
+    },
+    normalizeDeviceType(deviceType) {
+      const type = String(deviceType || '').trim();
+      return type === 'Rotator' ? 'CAA' : type;
+    },
+    backendDeviceType(deviceType) {
+      const type = String(deviceType || '').trim();
+      return type === 'CAA' ? 'Rotator' : type;
     },
     cameraMutexRoleTypes() {
       return [...CAMERA_MUTEX_ROLE_TYPES];
@@ -2632,6 +2696,82 @@ export default {
       this.SendConsoleLogMsg('SetCFWPosition:' + (nextIndex + 1), 'info');
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'SetCFWPosition:' + (nextIndex + 1));
     },
+    getCaaCurrentAngleItem() {
+      return this.CAAConfigItems.find(item => item && item.label === 'CAA Current Angle');
+    },
+    getCaaTargetAngleItem() {
+      return this.CAAConfigItems.find(item => item && item.label === 'CAA Target Angle');
+    },
+    normalizeCaaAngle(value) {
+      const num = this._toNumber(value);
+      if (!Number.isFinite(num)) return null;
+      const target = this.getCaaTargetAngleItem();
+      const min = target && Number.isFinite(Number(target.inputMin)) ? Number(target.inputMin) : 0;
+      const max = target && Number.isFinite(Number(target.inputMax)) ? Number(target.inputMax) : 360;
+      const step = target && Number.isFinite(Number(target.inputStep)) && Number(target.inputStep) > 0
+        ? Number(target.inputStep)
+        : 0.1;
+      let next = Math.min(Math.max(num, min), max);
+      next = min + Math.round((next - min) / step) * step;
+      next = Math.min(Math.max(next, min), max);
+      return Number(next.toFixed(6));
+    },
+    updateCaaRotatorRange(min, max, step, current) {
+      const target = this.getCaaTargetAngleItem();
+      if (target) {
+        const minNum = Number(min);
+        const maxNum = Number(max);
+        const stepNum = Number(step);
+        if (Number.isFinite(minNum)) this.$set(target, 'inputMin', minNum);
+        if (Number.isFinite(maxNum)) this.$set(target, 'inputMax', maxNum);
+        if (Number.isFinite(stepNum) && stepNum > 0) this.$set(target, 'inputStep', stepNum);
+      }
+      this.updateCaaRotatorAngle(current);
+    },
+    updateCaaRotatorAngle(angle) {
+      const next = this.normalizeCaaAngle(angle);
+      if (next === null) return;
+      this.caaLastConfirmedAngle = next;
+      const current = this.getCaaCurrentAngleItem();
+      const target = this.getCaaTargetAngleItem();
+      if (current) this.$set(current, 'value', next.toFixed(2));
+      if (target) this.$set(target, 'value', next);
+      this.bumpSubmenuRender();
+    },
+    markCaaUnavailable(reason = '') {
+      const caa = this.getDeviceByType('CAA');
+      if (caa) {
+        caa.isConnected = false;
+        caa.device = '';
+        caa.driverName = '';
+        caa.connectionMode = 'SDK';
+        caa.supportSDK = true;
+      }
+      const current = this.getCaaCurrentAngleItem();
+      if (current) this.$set(current, 'value', '-');
+      this.$store.commit('device/SET_DEVICE_CONNECTED', { device: 'CAA', connected: false });
+      this.$store.commit('device/CLEAR_FEATURES', { device: 'CAA' });
+      this.$bus.$emit('CAAConnected', 0);
+      if (this.CurrentDriverType === 'CAA') this.DeviceIsConnected = false;
+      if (reason) this.SendConsoleLogMsg('CAA unavailable: ' + reason, 'warning');
+      this.bumpSubmenuRender();
+    },
+    handleCaaTargetAngleChange(value) {
+      const caaDevice = this.getDeviceByType('CAA');
+      const mainCamera = this.getDeviceByType('MainCamera');
+      const mainCameraSdk = !!(mainCamera && mainCamera.isConnected && String(mainCamera.connectionMode || '').toUpperCase() === 'SDK');
+      if (!(caaDevice && caaDevice.isConnected && mainCameraSdk)) {
+        this.callShowMessageBox('Please connect the CAA through the main camera SDK first.', 'error');
+        this.updateCaaRotatorAngle(this.caaLastConfirmedAngle);
+        return;
+      }
+      const angle = this.normalizeCaaAngle(value);
+      if (angle === null) return;
+      const target = this.getCaaTargetAngleItem();
+      if (target) this.$set(target, 'value', angle);
+      this.SendConsoleLogMsg('SetCAARotator:' + angle.toFixed(2), 'info');
+      this.sendMessage('Vue_Command', 'SetCAARotator:' + angle.toFixed(2));
+    },
     // 是否允许小数：step 不是整数，或显式允许
     allowsDecimal(item) {
       const step = item.step ?? 1;
@@ -2700,6 +2840,30 @@ export default {
       // 回写并通知
       item.value = v;
       this.handleConfigChange(item.label, v, item.driverType);
+    },
+    onSliderNumberCommit(item) {
+      if (!item) return;
+      const v = this.normalizeSliderValue(item.value, item);
+      if (v === null) return;
+      this.$set(item, 'value', v);
+      this.handleConfigChange(item.label, v, item.driverType);
+    },
+    normalizeSliderValue(value, item) {
+      let v = this._toNumber(value);
+      if (!Number.isFinite(v)) return null;
+      const min = Number(item.inputMin);
+      const max = Number(item.inputMax);
+      const step = Number(item.inputStep);
+      if (Number.isFinite(min) && v < min) v = min;
+      if (Number.isFinite(max) && v > max) v = max;
+      if (Number.isFinite(step) && step > 0) {
+        const base = Number.isFinite(min) ? min : 0;
+        v = base + Math.round((v - base) / step) * step;
+        if (Number.isFinite(min) && v < min) v = min;
+        if (Number.isFinite(max) && v > max) v = max;
+        v = Number(v.toFixed(12));
+      }
+      return v;
     },
 
     // 数字键盘相关方法
@@ -3197,6 +3361,8 @@ export default {
           return this.PoleCameraConfigItems;
         case 'CFW':
           return this.CFWConfigItems;
+        case 'CAA':
+          return this.CAAConfigItems;
         default:
           return [];
       }
@@ -3356,6 +3522,7 @@ export default {
           MainCamera: 20,
           CFW: 21,
           Focuser: 22,
+          CAA: 24,
         };
         targetSlot = fallbackSlotMap[this.CurrentDriverType];
       }
@@ -3414,6 +3581,8 @@ export default {
     },
 
     updateDevicesConnect(type, DeviceName, DriverName, isBind = true, opts = {}) {    // 连接成功
+      const rawType = type;
+      type = this.normalizeDeviceType(type);
       const silent = !!opts.silent;
       this.SendConsoleLogMsg('updateDevicesConnect' + type + ' ' + DeviceName + ' ' + DriverName + ' ' + isBind, 'info');
       
@@ -3433,6 +3602,10 @@ export default {
             device.driverName = DriverName;
           }
           device.isConnected = true;
+          if (rawType === 'Rotator' || type === 'CAA') {
+            device.connectionMode = 'SDK';
+            device.supportSDK = true;
+          }
         }
       });
       if (!silent) {
@@ -3440,6 +3613,9 @@ export default {
         this.callShowMessageBox(shownName + ' success connected', 'success');
       }
       this.refreshHaveDeviceConnect();
+      if (this.CurrentDriverType === type) {
+        this.DeviceIsConnected = true;
+      }
       // 注释掉：不再在单个设备连接成功时关闭进度条，等待全部连接完成消息
       // this.loadingConnectAllDevice = false;
 
@@ -3466,7 +3642,10 @@ export default {
         console.log('Mount is Connected.');
       } else if (type === 'CFW') {
         this.$bus.$emit('CFWConnected', 1);
-        console.log('Mount is Connected.');
+        console.log('CFW is Connected.');
+      } else if (type === 'CAA') {
+        this.$bus.$emit('CAAConnected', 1);
+        console.log('CAA is Connected.');
       } else if (type === 'Focuser') {
         this.$bus.$emit('FocuserConnected', 1);
         console.log('Focuser is Connected.');
@@ -9866,6 +10045,7 @@ export default {
       // this.isOpenDevicePage = false;
       this.startLoading();
       const DeviceType = this.CurrentDriverType;
+      const BackendDeviceType = this.backendDeviceType(DeviceType);
 
       // 检查是否处于SDK相机分配状态
       // 此时需要发送BindingDevice而非ConnectDriver
@@ -9912,8 +10092,8 @@ export default {
           // 根据 UI 当前选择的连接模式，显式携带 :SDK，避免后端仍处于 INDI 默认分支
           const mode = String(device.connectionMode || this.selectedConnectionMode || 'INDI').toUpperCase();
           const msg = (mode === 'SDK')
-            ? `ConnectDriver:${DriverName}:${DeviceType}:SDK`
-            : `ConnectDriver:${DriverName}:${DeviceType}`;
+            ? `ConnectDriver:${DriverName}:${BackendDeviceType}:SDK`
+            : `ConnectDriver:${DriverName}:${BackendDeviceType}`;
 
           // 发起新连接前清空候选，避免与上一次连接的候选叠加。
           // ShowDeviceAllocationWindow 的内联分支会 break，不会走到 popup 分支里的
@@ -9972,13 +10152,15 @@ export default {
     },
     disconnectDriver() {
       const DeviceType = this.CurrentDriverType;
+      const BackendDeviceType = this.backendDeviceType(DeviceType);
       for (const device of this.devices) {
         if (device.driverType === DeviceType && device.isConnected) {
-          this.$bus.$emit('AppSendMessage', 'Vue_Command', 'DisconnectDevice:' + device.device + ":" + DeviceType);
+          this.$bus.$emit('AppSendMessage', 'Vue_Command', 'DisconnectDevice:' + device.device + ":" + BackendDeviceType);
         }
       }
     },
     disconnectDriversuccess(devicetype) {
+      devicetype = this.normalizeDeviceType(devicetype);
       console.log('disconnectDevicesuccess:', devicetype);
       this.drawer_2 = false
       if (devicetype == "all") {
@@ -10031,6 +10213,8 @@ export default {
         this.$bus.$emit('MountConnected', 0);
       } else if (devicetype == "CFW") {
         this.$bus.$emit('CFWConnected', 0);
+      } else if (devicetype == "CAA") {
+        this.$bus.$emit('CAAConnected', 0);
       } else if (devicetype == "Guider") {
         this.$bus.$emit('GuiderConnected', 0);
       } else if (devicetype == "PoleCamera") {
@@ -10039,12 +10223,14 @@ export default {
       
       // 恢复选中驱动：断开后保持驱动选择不变，方便用户重新连接
       if (this.CurrentDriverType === devicetype) {
+        this.DeviceIsConnected = false;
         this.updateSelectedDriver(devicetype);
       }
       this.refreshHaveDeviceConnect();
     },
 
     disconnectDriverFail(devicetype) {
+      devicetype = this.normalizeDeviceType(devicetype);
       console.log('disconnectDeviceFail:', devicetype);
       this.drawer_2 = false
       if (devicetype == "all") {
@@ -10092,6 +10278,8 @@ export default {
         this.$bus.$emit('MountConnected', 0);
       } else if (devicetype == "CFW") {
         this.$bus.$emit('CFWConnected', 0);
+      } else if (devicetype == "CAA") {
+        this.$bus.$emit('CAAConnected', 0);
       } else if (devicetype == "Guider") {
         this.$bus.$emit('GuiderConnected', 0);
       } else if (devicetype == "PoleCamera") {
@@ -10100,6 +10288,7 @@ export default {
       
       // 恢复选中驱动：断开后保持驱动选择不变，方便用户重新连接
       if (this.CurrentDriverType === devicetype) {
+        this.DeviceIsConnected = false;
         this.updateSelectedDriver(devicetype);
       }
       this.refreshHaveDeviceConnect();
@@ -10122,7 +10311,7 @@ export default {
       const hasModelField = step >= 5;
 
       for (let i = 0; i < payload.length; i += step) {
-        const deviceType = (payload[i] || '').trim();
+        const deviceType = this.normalizeDeviceType((payload[i] || '').trim());
         const driverName = (payload[i + 1] || '').trim();
         const supportSDK = hasSdkField ? String(payload[i + 2]).trim().toLowerCase() === 'true' : undefined;
         const modeRaw = hasSdkField ? String(payload[i + 3] || '').trim() : undefined;
@@ -10183,6 +10372,7 @@ export default {
     // 分别匹配 driverName (value) 和 driverLabel (label)，二者有一者匹配即可
     isDriverSupportSDK(deviceType, driverName, driverLabel = '') {
       if (!deviceType || !driverName) return false;
+      deviceType = this.normalizeDeviceType(deviceType);
 
       const rules = FIXED_SDK_SUPPORT_RULES[deviceType] || [];
       if (rules.length === 0) return false;
@@ -10196,6 +10386,7 @@ export default {
 
     // 驱动切换/状态恢复后：刷新 supportSDK + selectedConnectionMode，并在“不支持 SDK”时强制回到 INDI
     refreshSdkSupportAndModeForDevice(deviceType, driverName) {
+      deviceType = this.normalizeDeviceType(deviceType);
       const driverItem = (this.drivers || []).find(d => d.value === driverName);
       const driverLabel = driverItem ? driverItem.label : '';
       const supportSDK = this.isDriverSupportSDK(deviceType, driverName, driverLabel);
@@ -10228,6 +10419,7 @@ export default {
 
     // 设备断开或清空列表时：释放 SetConnectionMode 等待状态，避免连接模式下拉框永久 disabled
     clearPendingConnectionModeAfterDisconnect(deviceType) {
+      deviceType = this.normalizeDeviceType(deviceType);
       if (!deviceType || deviceType === 'all') {
         this.pendingConnectionModeByDevice = {};
         this.isSettingConnectionMode = false;
@@ -10244,6 +10436,7 @@ export default {
     },
 
     requestSetConnectionMode(deviceType, mode, opts = {}) {
+      deviceType = this.normalizeDeviceType(deviceType);
       const nextMode = (String(mode || '').toUpperCase() === 'SDK') ? 'SDK' : 'INDI';
       const dev = this.devices.find(d => d.driverType === deviceType);
       if (!dev) return;
@@ -10286,7 +10479,7 @@ export default {
       dev.connectionMode = nextMode;
       if (this.CurrentDriverType === deviceType) this.selectedConnectionMode = nextMode;
 
-      this.$bus.$emit('AppSendMessage', 'Vue_Command', `SetConnectionMode:${deviceType}:${nextMode}`);
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', `SetConnectionMode:${this.backendDeviceType(deviceType)}:${nextMode}`);
       if (!opts.silent) this.SendConsoleLogMsg(`SetConnectionMode:${deviceType}:${nextMode}`, 'info');
     },
 
@@ -10297,6 +10490,7 @@ export default {
     },
 
     onSetConnectionModeSuccess(deviceType, mode) {
+      deviceType = this.normalizeDeviceType(deviceType);
       const dev = this.devices.find(d => d.driverType === deviceType);
       if (dev) dev.connectionMode = mode;
       if (this.CurrentDriverType === deviceType) this.selectedConnectionMode = mode;
@@ -10322,6 +10516,7 @@ export default {
     },
 
     onSetConnectionModeFailed(deviceType, errorMsg) {
+      deviceType = this.normalizeDeviceType(deviceType);
       const pending = this.pendingConnectionModeByDevice[deviceType];
       const dev = this.devices.find(d => d.driverType === deviceType);
 
@@ -10366,9 +10561,10 @@ export default {
       this.$bus.$emit('loadBindDeviceTypeList', deviceTypeObject);
       deviceTypeObject.forEach(deviceType => {
         const { Type, DeviceName, DriverName, isbind } = deviceType;
-        this.addInlineCameraAllocationRole(Type);
+        const normalizedType = this.normalizeDeviceType(Type);
+        this.addInlineCameraAllocationRole(normalizedType);
         // 刷新/恢复阶段常会触发此列表回传，默认静默更新，避免频繁弹窗
-        this.updateDevicesConnect(Type, DeviceName, DriverName, isbind, { silent: true });
+        this.updateDevicesConnect(normalizedType, DeviceName, DriverName, isbind, { silent: true });
       });
     },
     updateSelectedDriver(driverType) {
@@ -11351,7 +11547,7 @@ export default {
     decrementAndNotify(item) {
       if (this.isCurrentDeviceUnbound) return;
       if (item.value > item.inputMin) {
-        item.value -= item.inputStep;
+        item.value = this.normalizeSliderValue(Number(item.value) - Number(item.inputStep || 1), item);
         this.handleConfigChange(item.label, item.value, item.driverType);
       }
     },
@@ -11359,7 +11555,7 @@ export default {
     incrementAndNotify(item) {
       if (this.isCurrentDeviceUnbound) return;
       if (item.value < item.inputMax) {
-        item.value += item.inputStep;
+        item.value = this.normalizeSliderValue(Number(item.value) + Number(item.inputStep || 1), item);
         this.handleConfigChange(item.label, item.value, item.driverType);
       }
     },
@@ -11394,7 +11590,9 @@ export default {
       if (!options.skipDirty) this.queueDeviceConfigChange(label, value, driverType);
       console.log(`配置已更改: ${label} = ${value}`);
       if (value !== '') {
-        if (driverType === 'Guider' && label === 'Gain') {
+        if (driverType === 'CAA' && label === 'CAA Target Angle') {
+          this.handleCaaTargetAngleChange(value);
+        } else if (driverType === 'Guider' && label === 'Gain') {
           this.sendMessage('Vue_Command', 'SetGuiderGain:' + parseInt(value));
         } else if (driverType === 'Guider' && label === 'Offset') {
           this.sendMessage('Vue_Command', 'SetGuiderOffset:' + parseInt(value));
@@ -12540,7 +12738,7 @@ body,
 /* 滑块容器 */
 .slider-container {
   text-align: left;
-  height: 30px;
+  height: 58px;
   width: 150px;
   display: inline-block;
   margin-bottom: 20px;
@@ -12557,10 +12755,39 @@ body,
 }
 
 /* 滑块控制样式 */
+.slider-control-row {
+  position: relative;
+  height: 30px;
+}
+
+.slider-control-row--with-input {
+  display: grid;
+  grid-template-columns: 1fr 54px;
+  align-items: center;
+  gap: 4px;
+  padding: 0 26px;
+}
+
 .slider-control {
   position: absolute;
   left: 30px;
   width: calc(100% - 60px);
+}
+
+.slider-control-row--with-input .slider-control {
+  position: static;
+  width: 100%;
+}
+
+.slider-number-input {
+  width: 54px;
+  margin: 0 !important;
+  font-size: 12px !important;
+}
+
+.slider-number-input input {
+  text-align: center;
+  padding: 0 4px !important;
 }
 
 /* 提示控制样式 */

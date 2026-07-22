@@ -504,6 +504,37 @@ export default {
                 }
                 break;
 
+              case 'CAARotatorRange':
+                if (parts.length >= 5) {
+                  this.updateCaaRotatorRange(parts[1], parts[2], parts[3], parts[4]);
+                }
+                break;
+
+              case 'CAARotatorAngle':
+                if (parts.length >= 2) {
+                  this.updateCaaRotatorAngle(parts[1]);
+                }
+                break;
+
+              case 'SetCAARotatorSuccess':
+                if (parts.length >= 2) {
+                  this.updateCaaRotatorAngle(parts[1]);
+                }
+                break;
+
+              case 'SetCAARotatorFailed':
+              case 'CAARotatorFailed':
+                if (parts.length >= 2) {
+                  const reason = parts.slice(1).join(':');
+                  this.updateCaaRotatorAngle(this.caaLastConfirmedAngle);
+                  this.callShowMessageBox('CAA: ' + reason, 'error');
+                }
+                break;
+
+              case 'CAARotatorUnavailable':
+                this.markCaaUnavailable('CAARotatorUnavailable');
+                break;
+
               case 'getCFWList':
                 if (parts.length === 2) {
                   this.$bus.$emit('initCFWList', parts[1]);
@@ -1194,7 +1225,7 @@ export default {
 
               case 'ConnectDriverSuccess':
                 if (parts.length === 2) {
-                  const device = parts[1];
+                  const device = this.normalizeDeviceType(parts[1]);
                   this.connectDriverSuccess(device);
                 }
                 break;
@@ -1218,7 +1249,7 @@ export default {
 
               case 'getDevicePort':
                 if (parts.length === 3) {
-                  const driverType = parts[1];
+                  const driverType = this.normalizeDeviceType(parts[1]);
                   const usbSerialPath = parts[2];
                   const target = this.devices.find(dev => dev.driverType === driverType);
                   if (target) {
@@ -1232,7 +1263,7 @@ export default {
 
               case 'getSDKVersion':
                 if (parts.length === 3) {
-                  const driverType = parts[1];
+                  const driverType = this.normalizeDeviceType(parts[1]);
                   const sdkVersion = parts[2];
                   console.log('getSDKVersion:', driverType, ',', sdkVersion);
                   const target = this.devices.find(dev => dev.driverType === driverType);
@@ -1270,7 +1301,7 @@ export default {
               case 'SetConnectionModeSuccess':
                 // 格式：SetConnectionModeSuccess:DeviceDescription:Mode
                 if (parts.length === 3) {
-                  const deviceType = (parts[1] || '').trim();
+                  const deviceType = this.normalizeDeviceType((parts[1] || '').trim());
                   const mode = (parts[2] || '').trim().toUpperCase() === 'SDK' ? 'SDK' : 'INDI';
                   this.onSetConnectionModeSuccess(deviceType, mode);
                 }
@@ -1279,7 +1310,7 @@ export default {
               case 'SetConnectionModeFailed':
                 // 格式：SetConnectionModeFailed:DeviceDescription:ErrorMessage
                 if (parts.length >= 3) {
-                  const deviceType = (parts[1] || '').trim();
+                  const deviceType = this.normalizeDeviceType((parts[1] || '').trim());
                   const errorMsg = parts.slice(2).join(':'); // 兼容错误信息里包含 ':'
                   this.onSetConnectionModeFailed(deviceType, errorMsg);
                 }
@@ -1287,14 +1318,14 @@ export default {
 
               case 'DisconnectDriverSuccess':
                 if (parts.length === 2) {
-                  const device = parts[1];
+                  const device = this.normalizeDeviceType(parts[1]);
                   this.disconnectDriversuccess(device);
                 }
                 break;
 
               case 'DisconnectDriverFail':
                 if (parts.length === 2) {
-                  const driver = parts[1];
+                  const driver = this.normalizeDeviceType(parts[1]);
                   this.disconnectDriverFail(driver)
                 }
 
@@ -1385,7 +1416,7 @@ export default {
 
               case 'deleteDeviceTypeAllocationList':
                 if (parts.length === 2) {
-                  const deviceType = parts[1];
+                  const deviceType = this.normalizeDeviceType(parts[1]);
                   if (deviceType != '') {
                     if (deviceType === 'all') {
                       this.clearInlineCameraAllocationState('all');
@@ -1404,6 +1435,8 @@ export default {
                         this.$bus.$emit('CFWConnected', 0);
                       }
                     }
+                  } else if (deviceType == 'CAA') {
+                    this.markCaaUnavailable('deleteDeviceTypeAllocationList');
                   }
                 }
                 break;
