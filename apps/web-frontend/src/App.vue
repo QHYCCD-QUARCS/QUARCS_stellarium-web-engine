@@ -276,7 +276,10 @@
                 " />
 
               <!-- 滑动条类型 -->
-              <div v-if="item.inputType === 'slider'" class="slider-container">
+              <div
+                v-if="item.inputType === 'slider'"
+                :class="['slider-container', { 'slider-container--with-input': item.withInput }]"
+              >
                 <span
                   class="slider-label"
                   :data-testid="
@@ -12738,11 +12741,16 @@ body,
 /* 滑块容器 */
 .slider-container {
   text-align: left;
-  height: 58px;
+  height: 30px;
   width: 150px;
   display: inline-block;
   margin-bottom: 20px;
   position: relative;
+}
+
+.slider-container--with-input {
+  height: 58px;
+  width: 170px;
 }
 
 /* 滑块标签 */
@@ -12762,10 +12770,10 @@ body,
 
 .slider-control-row--with-input {
   display: grid;
-  grid-template-columns: 1fr 54px;
+  grid-template-columns: minmax(0, 1fr) 48px;
   align-items: center;
   gap: 4px;
-  padding: 0 26px;
+  padding: 0 24px;
 }
 
 .slider-control {
@@ -12780,7 +12788,7 @@ body,
 }
 
 .slider-number-input {
-  width: 54px;
+  width: 48px;
   margin: 0 !important;
   font-size: 12px !important;
 }
@@ -12825,15 +12833,15 @@ body,
 /* 减少按钮样式 */
 .btn-minus {
   position: absolute;
+  top: 24px;
   left: 5px;
-  transform: translateY(5px);
 }
 
 /* 增加按钮样式 */
 .btn-plus {
   position: absolute;
+  top: 24px;
   right: 5px;
-  transform: translateY(5px);
 }
 
 /* 按钮内容居中 */
