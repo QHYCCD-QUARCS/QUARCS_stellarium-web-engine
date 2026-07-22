@@ -281,7 +281,7 @@
                 :class="['slider-container', { 'slider-container--with-input': item.withInput }]"
               >
                 <span
-                  class="slider-label"
+                  :class="['slider-label', { 'slider-label--with-input': item.withInput }]"
                   :data-testid="
                     'ui-config-'
                     + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')
@@ -291,7 +291,32 @@
                     + index
                   "
                 >
-                  {{ $t(item.label) }}: {{ item.value }}
+                  <template v-if="item.withInput">
+                    <span>{{ $t(item.label) }}:</span>
+                    <input
+                      class="slider-number-input"
+                      :value="item.value"
+                      :type="isDesktop ? 'number' : 'text'"
+                      :min="item.inputMin"
+                      :max="item.inputMax"
+                      :step="item.inputStep"
+                      :disabled="isCurrentDeviceUnbound"
+                      @input="item.value = $event"
+                      @blur="onSliderNumberCommit(item)"
+                      @keydown.enter.prevent="onSliderNumberCommit(item)"
+                      :data-testid="
+                        'ui-config-'
+                        + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')
+                        + '-'
+                        + String(item.label || 'Field').replace(/[^A-Za-z0-9]+/g, '')
+                        + '-slider-number-'
+                        + index
+                      "
+                    />
+                  </template>
+                  <template v-else>
+                    {{ $t(item.label) }}: {{ item.value }}
+                  </template>
                 </span>
                 <div>
                   <!-- 减小按钮 -->
@@ -335,27 +360,6 @@
                       "
                     />
 
-                    <input
-                      v-if="item.withInput"
-                      class="slider-number-input"
-                      :value="item.value"
-                      :type="isDesktop ? 'number' : 'text'"
-                      :min="item.inputMin"
-                      :max="item.inputMax"
-                      :step="item.inputStep"
-                      :disabled="isCurrentDeviceUnbound"
-                      @input="item.value = $event"
-                      @blur="onSliderNumberCommit(item)"
-                      @keydown.enter.prevent="onSliderNumberCommit(item)"
-                      :data-testid="
-                        'ui-config-'
-                        + String(item.driverType || 'Unknown').replace(/[^A-Za-z0-9]+/g, '')
-                        + '-'
-                        + String(item.label || 'Field').replace(/[^A-Za-z0-9]+/g, '')
-                        + '-slider-number-'
-                        + index
-                      "
-                    />
                   </div>
 
                   <!-- 增加按钮 -->
@@ -12746,7 +12750,7 @@ body,
 
 .slider-container--with-input {
   height: 58px;
-  width: 180px;
+  width: 150px;
 }
 
 /* 滑块标签 */
@@ -12758,6 +12762,13 @@ body,
   margin-bottom: 5px;
 }
 
+.slider-label--with-input {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
 /* 滑块控制样式 */
 .slider-control-row {
   position: relative;
@@ -12765,11 +12776,8 @@ body,
 }
 
 .slider-control-row--with-input {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 44px;
-  align-items: center;
-  gap: 6px;
-  padding: 0 30px;
+  display: block;
+  padding: 0;
 }
 
 .slider-control {
@@ -12778,14 +12786,9 @@ body,
   width: calc(100% - 60px);
 }
 
-.slider-control-row--with-input .slider-control {
-  position: static;
-  width: 100%;
-}
-
 .slider-number-input {
-  width: 44px;
-  height: 24px;
+  width: 46px;
+  height: 22px;
   box-sizing: border-box;
   border: 0;
   border-radius: 4px;
@@ -12793,7 +12796,7 @@ body,
   background: rgba(255, 255, 255, 0.08);
   color: rgba(255, 255, 255, 0.92);
   font-size: 12px;
-  line-height: 24px;
+  line-height: 22px;
   text-align: center;
   padding: 0 3px;
   appearance: textfield;
