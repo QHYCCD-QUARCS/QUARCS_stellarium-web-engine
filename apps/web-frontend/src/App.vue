@@ -261,7 +261,7 @@
                 :disabled="isCurrentDeviceUnbound"
                 enterkeyhint="done" 
                 @blur="isMobile ? handleNumberBlur(item) : onNumberCommit(item)" 
-                @keydown.enter.prevent="onNumberCommit(item)"
+                @keydown.enter.prevent="item.commitOnButton ? handleNumberActionConfirm(item) : onNumberCommit(item)"
                 @focus="isMobile ? openNumberKeyboard(item, $event) : null"
                 @click="isMobile ? openNumberKeyboard(item, $event) : null"
                 @input="!isMobile ? (item.value = $event) : null"
@@ -654,7 +654,7 @@
                 Server Version: {{ QTClientVersion }}
               </span> -->
               <span :style="{
-                fontSize: '14px',
+                fontSize: '10px',
                 color: getQTClientVersionColor,
                 userSelect: 'none',
                 whiteSpace: 'nowrap'
@@ -1333,8 +1333,9 @@ export default {
         { driverType: 'CFW', label: 'CFW Next', inputType: 'button', buttonText: 'CFW Next', buttonTextWhenDisabled: 'Moving...', _disabled: false, isCfwMenuControl: true, cfwDirection: 'plus' },
       ],
       CAAConfigItems: [
-        { driverType: 'CAA', label: 'CAA Current Angle', value: '-', inputType: 'tip' },
-        { driverType: 'CAA', label: 'CAA Target Angle', value: 0, inputType: 'slider', inputMin: 0, inputMax: 360, inputStep: 0.1, withInput: true, allowDecimal: true },
+        { driverType: 'CAA', label: 'CAA Accumulated Offset', value: '0.00°', inputType: 'tip' },
+        { driverType: 'CAA', label: 'CAA Target Angle', value: 0, inputType: 'number', min: -360, max: 360, step: 0.1, allowDecimal: true, allowNegative: true, commitOnButton: true },
+        { driverType: 'CAA', label: 'SetCAARotator', inputType: 'button', buttonText: 'Confirm', buttonTextWhenDisabled: 'Moving...', _disabled: false, isCaaRotateConfirm: true },
       ],
       caaLastConfirmedAngle: 0,
       cfwMenuButtonsDisabled: false,
@@ -2621,6 +2622,10 @@ export default {
         this.handleCfwMenuButtonClick(item);
         return;
       }
+      if (item && item.driverType === 'CAA' && item.isCaaRotateConfirm) {
+        this.handleCaaRotateConfirm(item);
+        return;
+      }
       if (item && item.label === 'ApplyRefWhiteBalance') {
         this.handleConfigChange(item.label, true, item.driverType);
         return;
@@ -2702,17 +2707,26 @@ export default {
     getCaaCurrentAngleItem() {
       return this.CAAConfigItems.find(item => item && item.label === 'CAA Current Angle');
     },
+    getCaaAccumulatedOffsetItem() {
+      return this.CAAConfigItems.find(item => item && item.label === 'CAA Accumulated Offset');
+    },
     getCaaTargetAngleItem() {
       return this.CAAConfigItems.find(item => item && item.label === 'CAA Target Angle');
+    },
+    getCaaRotateButtonItem() {
+      return this.CAAConfigItems.find(item => item && item.isCaaRotateConfirm);
     },
     normalizeCaaAngle(value) {
       const num = this._toNumber(value);
       if (!Number.isFinite(num)) return null;
       const target = this.getCaaTargetAngleItem();
-      const min = target && Number.isFinite(Number(target.inputMin)) ? Number(target.inputMin) : 0;
-      const max = target && Number.isFinite(Number(target.inputMax)) ? Number(target.inputMax) : 360;
-      const step = target && Number.isFinite(Number(target.inputStep)) && Number(target.inputStep) > 0
-        ? Number(target.inputStep)
+      const minValue = target && target.inputMin !== undefined ? target.inputMin : target && target.min;
+      const maxValue = target && target.inputMax !== undefined ? target.inputMax : target && target.max;
+      const stepValue = target && target.inputStep !== undefined ? target.inputStep : target && target.step;
+      const min = Number.isFinite(Number(minValue)) ? Number(minValue) : -360;
+      const max = Number.isFinite(Number(maxValue)) ? Number(maxValue) : 360;
+      const step = Number.isFinite(Number(stepValue)) && Number(stepValue) > 0
+        ? Number(stepValue)
         : 0.1;
       let next = Math.min(Math.max(num, min), max);
       next = min + Math.round((next - min) / step) * step;
@@ -2725,9 +2739,18 @@ export default {
         const minNum = Number(min);
         const maxNum = Number(max);
         const stepNum = Number(step);
-        if (Number.isFinite(minNum)) this.$set(target, 'inputMin', minNum);
-        if (Number.isFinite(maxNum)) this.$set(target, 'inputMax', maxNum);
-        if (Number.isFinite(stepNum) && stepNum > 0) this.$set(target, 'inputStep', stepNum);
+        if (Number.isFinite(minNum)) {
+          this.$set(target, 'inputMin', minNum);
+          this.$set(target, 'min', minNum);
+        }
+        if (Number.isFinite(maxNum)) {
+          this.$set(target, 'inputMax', maxNum);
+          this.$set(target, 'max', maxNum);
+        }
+        if (Number.isFinite(stepNum) && stepNum > 0) {
+          this.$set(target, 'inputStep', stepNum);
+          this.$set(target, 'step', stepNum);
+        }
       }
       this.updateCaaRotatorAngle(current);
     },
@@ -2739,6 +2762,21 @@ export default {
       const target = this.getCaaTargetAngleItem();
       if (current) this.$set(current, 'value', next.toFixed(2));
       if (target) this.$set(target, 'value', next);
+      this.setCaaRotateButtonDisabled(false);
+      this.bumpSubmenuRender();
+    },
+    setCaaRotateButtonDisabled(disabled) {
+      this.CAAConfigItems.forEach(item => {
+        if (item && item.isCaaRotateConfirm) {
+          this.$set(item, '_disabled', disabled);
+        }
+      });
+    },
+    updateCaaAccumulatedOffset(value) {
+      const num = this._toNumber(value);
+      if (!Number.isFinite(num)) return;
+      const item = this.getCaaAccumulatedOffsetItem();
+      if (item) this.$set(item, 'value', num.toFixed(2) + '°');
       this.bumpSubmenuRender();
     },
     markCaaUnavailable(reason = '') {
@@ -2752,6 +2790,8 @@ export default {
       }
       const current = this.getCaaCurrentAngleItem();
       if (current) this.$set(current, 'value', '-');
+      this.updateCaaAccumulatedOffset(0);
+      this.setCaaRotateButtonDisabled(false);
       this.$store.commit('device/SET_DEVICE_CONNECTED', { device: 'CAA', connected: false });
       this.$store.commit('device/CLEAR_FEATURES', { device: 'CAA' });
       this.$bus.$emit('CAAConnected', 0);
@@ -2766,14 +2806,26 @@ export default {
       if (!(caaDevice && caaDevice.isConnected && mainCameraSdk)) {
         this.callShowMessageBox('Please connect the CAA through the main camera SDK first.', 'error');
         this.updateCaaRotatorAngle(this.caaLastConfirmedAngle);
-        return;
+        return false;
       }
       const angle = this.normalizeCaaAngle(value);
-      if (angle === null) return;
+      if (angle === null) return false;
       const target = this.getCaaTargetAngleItem();
       if (target) this.$set(target, 'value', angle);
       this.SendConsoleLogMsg('SetCAARotator:' + angle.toFixed(2), 'info');
       this.sendMessage('Vue_Command', 'SetCAARotator:' + angle.toFixed(2));
+      return true;
+    },
+    handleCaaRotateConfirm(buttonItem = null) {
+      const target = this.getCaaTargetAngleItem();
+      if (!target) return;
+      this.onNumberCommit(target);
+      const angle = this.normalizeCaaAngle(target.value);
+      if (angle === null) return;
+      if (angle === 0) return;
+      const button = buttonItem || this.getCaaRotateButtonItem();
+      const sent = this.handleCaaTargetAngleChange(angle);
+      if (sent && button) this.$set(button, '_disabled', true);
     },
     // 是否允许小数：step 不是整数，或显式允许
     allowsDecimal(item) {
@@ -2842,7 +2894,15 @@ export default {
 
       // 回写并通知
       item.value = v;
+      if (item.commitOnButton) return;
       this.handleConfigChange(item.label, v, item.driverType);
+    },
+    handleNumberActionConfirm(item) {
+      if (!item) return;
+      this.onNumberCommit(item);
+      if (item.driverType === 'CAA' && item.label === 'CAA Target Angle') {
+        this.handleCaaRotateConfirm();
+      }
     },
     onSliderNumberCommit(item) {
       if (!item) return;
@@ -12508,6 +12568,36 @@ body,
 
 .v-navigation-drawer.menu-navigation-drawer .v-layout {
   min-height: 100%;
+}
+
+.v-navigation-drawer.menu-navigation-drawer .v-list-item {
+  align-items: center !important;
+  min-height: 44px !important;
+}
+
+.v-navigation-drawer.menu-navigation-drawer .v-list-item__icon {
+  align-self: center !important;
+  height: 36px;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  min-width: 36px;
+}
+
+.v-navigation-drawer.menu-navigation-drawer .v-list-item__content {
+  align-self: center !important;
+  overflow: visible;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+.v-navigation-drawer.menu-navigation-drawer .v-list-item__title {
+  line-height: 18px !important;
+  overflow: visible;
+}
+
+.v-navigation-drawer.menu-navigation-drawer .v-list-item__title div {
+  box-sizing: border-box;
+  line-height: 16px !important;
 }
 
 .v-navigation-drawer.submenu-navigation-drawer {
