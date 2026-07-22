@@ -335,19 +335,15 @@
                       "
                     />
 
-                    <v-text-field
+                    <input
                       v-if="item.withInput"
+                      class="slider-number-input"
                       :value="item.value"
                       :type="isDesktop ? 'number' : 'text'"
                       :min="item.inputMin"
                       :max="item.inputMax"
                       :step="item.inputStep"
                       :disabled="isCurrentDeviceUnbound"
-                      hide-details
-                      dense
-                      solo
-                      flat
-                      class="slider-number-input"
                       @input="item.value = $event"
                       @blur="onSliderNumberCommit(item)"
                       @keydown.enter.prevent="onSliderNumberCommit(item)"
@@ -12750,7 +12746,7 @@ body,
 
 .slider-container--with-input {
   height: 58px;
-  width: 170px;
+  width: 180px;
 }
 
 /* 滑块标签 */
@@ -12770,10 +12766,10 @@ body,
 
 .slider-control-row--with-input {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 48px;
+  grid-template-columns: minmax(0, 1fr) 44px;
   align-items: center;
-  gap: 4px;
-  padding: 0 24px;
+  gap: 6px;
+  padding: 0 30px;
 }
 
 .slider-control {
@@ -12788,14 +12784,25 @@ body,
 }
 
 .slider-number-input {
-  width: 48px;
-  margin: 0 !important;
-  font-size: 12px !important;
+  width: 44px;
+  height: 24px;
+  box-sizing: border-box;
+  border: 0;
+  border-radius: 4px;
+  outline: none;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 12px;
+  line-height: 24px;
+  text-align: center;
+  padding: 0 3px;
+  appearance: textfield;
 }
 
-.slider-number-input input {
-  text-align: center;
-  padding: 0 4px !important;
+.slider-number-input::-webkit-outer-spin-button,
+.slider-number-input::-webkit-inner-spin-button {
+  margin: 0;
+  appearance: none;
 }
 
 /* 提示控制样式 */
