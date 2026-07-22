@@ -516,6 +516,12 @@ export default {
                 }
                 break;
 
+              case 'CAARotatorAccumulatedOffset':
+                if (parts.length >= 2) {
+                  this.updateCaaAccumulatedOffset(parts[1]);
+                }
+                break;
+
               case 'SetCAARotatorSuccess':
                 if (parts.length >= 2) {
                   this.updateCaaRotatorAngle(parts[1]);
