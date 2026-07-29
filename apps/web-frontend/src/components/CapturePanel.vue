@@ -278,11 +278,11 @@ export default {
       this.isCFWMoving = true;
 
       if (this.cfwMoveWatchdog) clearTimeout(this.cfwMoveWatchdog);
-      // 避免异常情况下无限转：15s 兜底
+      // 避免异常情况下无限转：60s 兜底
       this.cfwMoveWatchdog = setTimeout(() => {
         // 统一走失败处理：会负责停转、解锁按钮、并把 UI 位置还原到 lastConfirmedCFWIndex
         this.SetCFWPositionFailed('timeout');
-      }, 15000);
+      }, 60000);
     },
     finishCfwMoving() {
       this.isCFWMoving = false;
@@ -902,4 +902,3 @@ export default {
 }
 
 </style>
-
