@@ -1784,8 +1784,6 @@ export default {
     this.$bus.$on('SendConsoleLogMsg', this.SendConsoleLogMsg);
     // this.$bus.$on('DisconnectDriverSuccess', this.disconnectDriversuccess);
     this.$bus.$on('UnBindingDevice', this.UnBindingDevice);
-    // 监听DeviceAllocationPanel的选中状态，供connectDriver使用
-    this.$bus.$on('DeviceAllocationSelected', this.onDeviceAllocationSelected);
     this.$bus.$on('CloseWebView', this.QuitToMainApp)
     this.$bus.$on('RedBoxSizeChange', this.RedBoxSizeChange);
     this.$bus.$on('setFocuserState', this.setFocuserState);  // 设置调焦状态和进度
@@ -3550,13 +3548,9 @@ export default {
       if (!this.isCameraAllocationRole(role) || !candidate) return;
       const selectionKey = `${candidate.DeviceType}:${candidate.DeviceIndex}`;
       this.$set(this.inlineCameraAllocationSelection, role, selectionKey);
-      this.SendConsoleLogMsg(`InlineCameraAllocationSelect:${role}:${candidate.DeviceIndex}:${candidate.DeviceName} (selected, click connect to bind)`, 'info');
-    },
-
-    // 接收DeviceAllocationPanel弹窗的选中状态
-    onDeviceAllocationSelected(role, deviceIndex, deviceName) {
-      this.$set(this.inlineCameraAllocationSelection, role, `CCD:${deviceIndex}`);
-      this.SendConsoleLogMsg(`DeviceAllocationPanelSelected:${role}:${deviceIndex}:${deviceName} (selected, click connect to bind)`, 'info');
+      this.SendConsoleLogMsg(`InlineCameraAllocationSelect:${role}:${candidate.DeviceIndex}:${candidate.DeviceName} (binding immediately)`, 'info');
+      const deviceIndex = candidate.DeviceIndex;
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', `BindingDevice:${role}:${deviceIndex}`);
     },
 
 
@@ -10145,36 +10139,6 @@ export default {
       this.startLoading();
       const DeviceType = this.CurrentDriverType;
       const BackendDeviceType = this.backendDeviceType(DeviceType);
-
-      // 检查是否处于SDK相机分配状态
-      // 此时需要发送BindingDevice而非ConnectDriver
-      // 支持内联条和弹窗面板两种场景
-      const selection = this.inlineCameraAllocationSelection[DeviceType];
-      const selectedCandidate = (this.inlineCameraAllocationCandidates || []).find(candidate =>
-        candidate && `${candidate.DeviceType}:${candidate.DeviceIndex}` === selection
-      );
-      const currentRoleDevice = (this.devices || []).find(device => device && device.driverType === DeviceType);
-      const selectionParts = selection ? selection.split(':') : [];
-      const selectedDeviceIndex = Number.parseInt(selectionParts[1], 10);
-      const validAllocationSelection = !!(
-        selection &&
-        selectedCandidate &&
-        selectionParts.length === 2 &&
-        Number.isInteger(selectedDeviceIndex)
-      );
-      const reconnectingPersistedCamera = !!(
-        currentRoleDevice &&
-        !currentRoleDevice.isConnected &&
-        selectedCandidate &&
-        selectedCandidate.DeviceName === currentRoleDevice.device
-      );
-      if (selection && this.isCameraAllocationRole(DeviceType) && !validAllocationSelection) {
-        this.$set(this.inlineCameraAllocationSelection, DeviceType, '');
-      } else if (validAllocationSelection && this.isCameraAllocationRole(DeviceType) && !reconnectingPersistedCamera) {
-        this.SendConsoleLogMsg(`InlineCameraBind:${DeviceType}:${selectedDeviceIndex} (binding selected camera)`, 'info');
-        this.$bus.$emit('AppSendMessage', 'Vue_Command', `BindingDevice:${DeviceType}:${selectedDeviceIndex}`);
-        return;
-      }
 
       for (const device of this.devices) {
         if (device.driverType === DeviceType && device.isConnected == false) {
