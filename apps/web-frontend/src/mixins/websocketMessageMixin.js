@@ -1242,12 +1242,13 @@ export default {
                 if (parts.length >= 2) {
                   const deviceType = parts[1];
                   this.SendConsoleLogMsg(`ConnectDriverPendingAllocation:${deviceType}`, 'info');
-                  if (this.isCameraAllocationRole(deviceType)) {
-                    this.CurrentDriverType = deviceType;
-                    this.isOpenPowerPage = false;
-                    this.isOpenDevicePage = true;
-                    this.drawer_2 = true;
-                  }
+                  this.CurrentDriverType = this.normalizeDeviceType(deviceType);
+                  this.$store.commit('setValue', { varName: 'showNavigationDrawer', newValue: false });
+                  this.drawer_2 = false;
+                  this.isOpenDevicePage = false;
+                  this.$nextTick(() => {
+                    this.$bus.$emit('openDeviceAllocationPanel');
+                  });
                 }
                 this.isConnecting = false;
                 this.stopLoading();
@@ -1424,11 +1425,6 @@ export default {
                 if (parts.length === 2) {
                   const deviceType = this.normalizeDeviceType(parts[1]);
                   if (deviceType != '') {
-                    if (deviceType === 'all') {
-                      this.clearInlineCameraAllocationState('all');
-                    } else {
-                      this.clearInlineCameraAllocationState(deviceType);
-                    }
                     this.$bus.$emit('deleteDeviceTypeAllocationList', deviceType);
                   }
                   if (deviceType == 'CFW') {

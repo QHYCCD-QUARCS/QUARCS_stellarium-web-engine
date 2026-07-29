@@ -64,7 +64,6 @@ export function handleDeviceDiscoveryMessage(vm, messageType, parts) {
       break
     case 'AddDeviceType':
       if (parts.length === 2) {
-        vm.addInlineCameraAllocationRole(parts[1])
         vm.$bus.$emit('AddDeviceType', parts[1])
       }
       break
@@ -73,7 +72,6 @@ export function handleDeviceDiscoveryMessage(vm, messageType, parts) {
         const [, deviceType, rawIndex, deviceName, cameraCategory = 'OTHER'] = parts
         const numericIndex = Number(rawIndex)
         const deviceIndex = Number.isFinite(numericIndex) ? numericIndex : rawIndex
-        vm.upsertInlineCameraAllocationCandidate(deviceType, deviceIndex, deviceName)
         vm.$bus.$emit('DeviceToBeAllocated', deviceType, deviceIndex, deviceName, cameraCategory)
       }
       break
