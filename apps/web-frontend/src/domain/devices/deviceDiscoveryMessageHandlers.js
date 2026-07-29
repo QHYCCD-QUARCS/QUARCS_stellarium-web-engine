@@ -79,20 +79,10 @@ export function handleDeviceDiscoveryMessage(vm, messageType, parts) {
       break
     }
     case 'ShowDeviceAllocationWindow':
-      if (vm.isCameraAllocationRole(vm.CurrentDriverType)) {
-        vm.SendConsoleLogMsg('[DIAG][ALLOC_INLINE] use_inline_camera_candidate_bar', 'info')
-        vm.$store.commit('setValue', { varName: 'showNavigationDrawer', newValue: true })
-        vm.isOpenPowerPage = false
-        vm.isOpenDevicePage = true
-        vm.drawer_2 = true
-        break
-      }
       vm.SendConsoleLogMsg(
         `[DIAG][ALLOC_POPUP_FLOW] stage=rx_show_alloc nav=${vm.$store.state.showNavigationDrawer ? 1 : 0} submenu=${vm.drawer_2 ? 1 : 0} devPage=${vm.isOpenDevicePage ? 1 : 0}`,
         'warning'
       )
-      vm.$bus.$emit('clearDeviceAllocationList')
-      vm.clearInlineCameraAllocationState('all')
       vm.$store.commit('setValue', { varName: 'showNavigationDrawer', newValue: false })
       vm.drawer_2 = false
       vm.isOpenDevicePage = false

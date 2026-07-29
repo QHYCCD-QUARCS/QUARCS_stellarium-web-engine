@@ -781,6 +781,20 @@
             </v-list-item-content>
           </v-list-item>
 
+          <!-- 设备分配(Device Allocation) -->
+          <v-list-item @click.stop="DeviceAllocation()" :style="{ height: '44px' }" data-testid="ui-app-menu-device-allocation">
+            <v-list-item-icon style="margin-right: 10px;">
+              <div style="display: flex; justify-content: center; align-items: center;">
+                <img src="@/assets/images/svg/ui/Allocation.svg" height="36px"
+                  style="min-height: 36px; pointer-events: none;"></img>
+              </div>
+            </v-list-item-icon>
+            <v-list-item-content>
+              <v-list-item-title :style="{ height: '18px', padding: '1px', fontSize: '14px' }">{{
+                $t('Device Allocation') }}</v-list-item-title>
+            </v-list-item-content>
+          </v-list-item>
+
           <!-- 校准极轴(Calibrate Polar Axis) -->
           <v-list-item @click.stop="CalibratePolarAxis()" :style="{ height: '44px' }" data-testid="ui-app-menu-calibrate-polar-axis">
             <v-list-item-icon style="margin-right: 10px;">
@@ -1769,6 +1783,9 @@ export default {
     this.$bus.$on('PolarAxisMode', this.PolarAxisMode);
     this.$bus.$on('SendConsoleLogMsg', this.SendConsoleLogMsg);
     // this.$bus.$on('DisconnectDriverSuccess', this.disconnectDriversuccess);
+    this.$bus.$on('UnBindingDevice', this.UnBindingDevice);
+    // 监听DeviceAllocationPanel的选中状态，供connectDriver使用
+    this.$bus.$on('DeviceAllocationSelected', this.onDeviceAllocationSelected);
     this.$bus.$on('CloseWebView', this.QuitToMainApp)
     this.$bus.$on('RedBoxSizeChange', this.RedBoxSizeChange);
     this.$bus.$on('setFocuserState', this.setFocuserState);  // 设置调焦状态和进度
@@ -3454,6 +3471,19 @@ export default {
       this.inlineCameraAllocationRoles = (this.inlineCameraAllocationRoles || []).filter(item => item !== role);
       this.$set(this.inlineCameraAllocationSelection, role, '');
     },
+    clearExpiredSdkCameraAllocationState(role = 'all') {
+      const roles = role === 'all' ? ['MainCamera', 'Guider', 'PoleCamera'] : [role];
+      roles.forEach((item) => {
+        if (this.isCameraAllocationRole(item)) {
+          this.inlineCameraAllocationRoles = (this.inlineCameraAllocationRoles || []).filter(activeRole => activeRole !== item);
+          this.$set(this.inlineCameraAllocationSelection, item, '');
+        }
+      });
+      this.inlineCameraAllocationCandidates = (this.inlineCameraAllocationCandidates || []).filter((candidate) => {
+        const index = Number.parseInt(String(candidate && candidate.DeviceIndex), 10);
+        return !Number.isInteger(index) || index >= 0;
+      });
+    },
     upsertInlineCameraAllocationCandidate(deviceType, deviceIndex, deviceName) {
       if (String(deviceType || '') !== 'CCD') return;
       if (!deviceName || String(deviceName).trim() === '') return;
@@ -3521,6 +3551,12 @@ export default {
       const selectionKey = `${candidate.DeviceType}:${candidate.DeviceIndex}`;
       this.$set(this.inlineCameraAllocationSelection, role, selectionKey);
       this.SendConsoleLogMsg(`InlineCameraAllocationSelect:${role}:${candidate.DeviceIndex}:${candidate.DeviceName} (selected, click connect to bind)`, 'info');
+    },
+
+    // 接收DeviceAllocationPanel弹窗的选中状态
+    onDeviceAllocationSelected(role, deviceIndex, deviceName) {
+      this.$set(this.inlineCameraAllocationSelection, role, `CCD:${deviceIndex}`);
+      this.SendConsoleLogMsg(`DeviceAllocationPanelSelected:${role}:${deviceIndex}:${deviceName} (selected, click connect to bind)`, 'info');
     },
 
 
@@ -10118,17 +10154,25 @@ export default {
         candidate && `${candidate.DeviceType}:${candidate.DeviceIndex}` === selection
       );
       const currentRoleDevice = (this.devices || []).find(device => device && device.driverType === DeviceType);
+      const selectionParts = selection ? selection.split(':') : [];
+      const selectedDeviceIndex = Number.parseInt(selectionParts[1], 10);
+      const validAllocationSelection = !!(
+        selection &&
+        selectedCandidate &&
+        selectionParts.length === 2 &&
+        Number.isInteger(selectedDeviceIndex)
+      );
       const reconnectingPersistedCamera = !!(
         currentRoleDevice &&
         !currentRoleDevice.isConnected &&
         selectedCandidate &&
         selectedCandidate.DeviceName === currentRoleDevice.device
       );
-      if (selection && this.isCameraAllocationRole(DeviceType) && !reconnectingPersistedCamera) {
-        const parts = selection.split(':');
-        const deviceIndex = parseInt(parts[1], 10);
-        this.SendConsoleLogMsg(`InlineCameraBind:${DeviceType}:${deviceIndex} (binding selected camera)`, 'info');
-        this.$bus.$emit('AppSendMessage', 'Vue_Command', `BindingDevice:${DeviceType}:${deviceIndex}`);
+      if (selection && this.isCameraAllocationRole(DeviceType) && !validAllocationSelection) {
+        this.$set(this.inlineCameraAllocationSelection, DeviceType, '');
+      } else if (validAllocationSelection && this.isCameraAllocationRole(DeviceType) && !reconnectingPersistedCamera) {
+        this.SendConsoleLogMsg(`InlineCameraBind:${DeviceType}:${selectedDeviceIndex} (binding selected camera)`, 'info');
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', `BindingDevice:${DeviceType}:${selectedDeviceIndex}`);
         return;
       }
 
@@ -10263,10 +10307,18 @@ export default {
         }
       }
 
-      // Disconnect 只释放连接，不清除驱动、模式、候选快照和用户选择。
-      // SDK 池索引已经失效；重新连接已保存相机时 connectDriver 会按 cameraId
-      // 重新扫描并静默回连，而不会复用旧 BindingDevice 索引。
-      if (!this.isCameraAllocationRole(devicetype)) {
+      // SDK 相机断开会释放后端相机池，旧的负数 DeviceIndex 已失效。
+      // 保留驱动和模式，清掉分配选择，下一次点击连接应重新 ConnectDriver 扫描建池。
+      if (this.isCameraAllocationRole(devicetype)) {
+        this.$bus.$emit('deleteDeviceTypeAllocationList', devicetype);
+        const disconnectedDevice = (this.devices || []).find(device => device && device.driverType === devicetype);
+        const allocationSelection = this.inlineCameraAllocationSelection[devicetype];
+        const allocationIndex = Number.parseInt(String(allocationSelection || '').split(':')[1], 10);
+        const hasSdkPoolSelection = Number.isInteger(allocationIndex) && allocationIndex < 0;
+        if (String(disconnectedDevice && disconnectedDevice.connectionMode || '').toUpperCase() === 'SDK' || hasSdkPoolSelection) {
+          this.clearExpiredSdkCameraAllocationState(devicetype);
+        }
+      } else {
         this.$bus.$emit('deleteDeviceTypeAllocationList', devicetype);
         this.clearInlineCameraAllocationState(devicetype);
       }
@@ -10333,8 +10385,12 @@ export default {
         }
       }
 
-      this.$bus.$emit('deleteDeviceTypeAllocationList', devicetype);
-      this.clearInlineCameraAllocationState(devicetype);
+      if (this.isCameraAllocationRole(devicetype)) {
+        this.$bus.$emit('deleteDeviceTypeAllocationList', devicetype);
+      } else {
+        this.$bus.$emit('deleteDeviceTypeAllocationList', devicetype);
+        this.clearInlineCameraAllocationState(devicetype);
+      }
       if (devicetype == "MainCamera") {
         this.$bus.$emit('MainCameraConnected', 0);
       } else if (devicetype == "Mount") {
@@ -10674,6 +10730,17 @@ export default {
       console.log('deleteDeviceAllocationList:', deviceName);
       this.$bus.$emit('deleteDeviceAllocationList', deviceName);
       this.removeInlineCameraAllocationCandidateByName(deviceName);
+    },
+    DeviceAllocation() {
+      this.$bus.$emit('toggleDeviceAllocationPanel');
+      this.nav = false;
+    },
+    UnBindingDevice(type, name) {
+      // 解绑只改变“绑定状态”，不应污染/清空 driverName（尤其是 SDK 模式下会导致后续逻辑错乱）
+      const dev = (this.devices || []).find(d => d && d.driverType === type);
+      const driverName = dev ? dev.driverName : '';
+      console.log('UnBindingDevice:', type, name, driverName);
+      this.updateDevicesConnect(type, '', driverName, false, { silent: true });
     },
     displayErrorImage() {
       console.error("image is error, load errorImage.svg");
