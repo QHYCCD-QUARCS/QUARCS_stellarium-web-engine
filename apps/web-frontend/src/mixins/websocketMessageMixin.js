@@ -493,6 +493,19 @@ export default {
                 }
                 break;
 
+              case 'CFWPosition':
+                if (parts.length === 2) {
+                  const pos1 = parseInt(parts[1], 10);
+                  if (!isNaN(pos1) && pos1 > 0) {
+                    this.cfwMenuCurrentIndex = pos1 - 1;
+                    this.cfwMenuLastConfirmedIndex = this.cfwMenuCurrentIndex;
+                    this.setCfwMenuButtonsDisabled(false);
+                    this.updateCfwMenuCurrentDisplay();
+                    this.$bus.$emit('CFWPosition', parts[1]);
+                  }
+                }
+                break;
+
               case 'SetCFWPositionFailed':
                 if (parts.length >= 2) {
                   // 失败原因里可能包含 ':'，这里做兼容拼回完整字符串

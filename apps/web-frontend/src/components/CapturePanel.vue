@@ -247,6 +247,7 @@ export default {
     this.$bus.$on('initExpTimeList', this.initExpTimeList);
     // this.$bus.$on('SetCFWPositionMax', this.SetCFWPositionMax);
     this.$bus.$on('SetCFWPositionSuccess', this.SetCFWPositionSuccess);
+    this.$bus.$on('CFWPosition', this.CFWPosition);
     this.$bus.$on('SetCFWPositionFailed', this.SetCFWPositionFailed);
 
     this.$bus.$on('initCFWList', this.initCFWList);
@@ -456,6 +457,15 @@ export default {
         this.lastConfirmedCFWIndex = this.currentCFWIndex;
       } else {
         // 若回包格式异常，则至少把当前 UI 位置视为已确认
+        this.lastConfirmedCFWIndex = this.currentCFWIndex;
+      }
+      this.finishCfwMoving();
+      this.cfwButtonsDisabled = false;
+    },
+    CFWPosition(num) {
+      const pos1 = parseInt(num, 10);
+      if (!isNaN(pos1) && pos1 > 0) {
+        this.currentCFWIndex = pos1 - 1;
         this.lastConfirmedCFWIndex = this.currentCFWIndex;
       }
       this.finishCfwMoving();
