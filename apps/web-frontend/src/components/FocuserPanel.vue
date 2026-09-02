@@ -96,8 +96,7 @@
           <img src="@/assets/images/svg/ui/arrow-left-circle.svg" height="20px" style="min-height: 20px; pointer-events: none;"></img>
         </div>
       </button> -->
-        <button :disabled="isBtnMoveDisabled" @mousedown="FocusMove('left')" @mouseup="FocusAbort"
-          :class="{ 'manual-calibration-allowed-btn': manualCalibrationMode }"
+        <button v-if="!manualCalibrationMode" :disabled="isBtnMoveDisabled" @mousedown="FocusMove('left')" @mouseup="FocusAbort"
           @touchstart.stop.prevent="FocusMove('left')" @touchend.stop.prevent="FocusAbort" @touchcancel.stop.prevent="FocusAbort" class="get-click btn-Left" data-testid="fp-btn-focus-move">
           <div style="display: flex; justify-content: center; align-items: center;">
             <img src="@/assets/images/svg/ui/arrow-left-circle.svg" height="20px"
@@ -139,8 +138,7 @@
           </div>
         </button> -->
 
-        <button :disabled="isBtnMoveDisabled" @mousedown="FocusMove('right')" @mouseup="FocusAbort"
-          :class="{ 'manual-calibration-allowed-btn': manualCalibrationMode }"
+        <button v-if="!manualCalibrationMode" :disabled="isBtnMoveDisabled" @mousedown="FocusMove('right')" @mouseup="FocusAbort"
           @touchstart.stop.prevent="FocusMove('right')" @touchend.stop.prevent="FocusAbort" @touchcancel.stop.prevent="FocusAbort" class="get-click btn-Right" data-testid="fp-btn-focus-move-2">
           <div style="display: flex; justify-content: center; align-items: center;">
             <img src="@/assets/images/svg/ui/arrow-right-circle.svg" height="20px"
@@ -190,6 +188,32 @@
           {{ $t('Right boundary') }}:
           <span>{{ manualCalibrationRightSet ? manualCalibrationRightValue : $t('Not set') }}</span>
         </div>
+        <div class="manual-calibration-move-actions">
+          <button
+            class="manual-calibration-icon-btn"
+            :disabled="isBtnMoveDisabled"
+            :title="$t('Move Left')"
+            @mousedown="FocusMove('left')"
+            @mouseup="FocusAbort"
+            @mouseleave="cancelFocusPress"
+            @touchstart.stop.prevent="FocusMove('left')"
+            @touchend.stop.prevent="FocusAbort"
+            @touchcancel.stop.prevent="FocusAbort">
+            <img src="@/assets/images/svg/ui/arrow-left-circle.svg" height="20px" style="min-height: 20px; pointer-events: none;"></img>
+          </button>
+          <button
+            class="manual-calibration-icon-btn"
+            :disabled="isBtnMoveDisabled"
+            :title="$t('Move Right')"
+            @mousedown="FocusMove('right')"
+            @mouseup="FocusAbort"
+            @mouseleave="cancelFocusPress"
+            @touchstart.stop.prevent="FocusMove('right')"
+            @touchend.stop.prevent="FocusAbort"
+            @touchcancel.stop.prevent="FocusAbort">
+            <img src="@/assets/images/svg/ui/arrow-right-circle.svg" height="20px" style="min-height: 20px; pointer-events: none;"></img>
+          </button>
+        </div>
         <div class="manual-calibration-actions">
           <button
             class="manual-calibration-btn"
@@ -204,6 +228,9 @@
             :title="$t('Set current position as right boundary (Max Limit)')"
             @click="setManualRightBoundary">
             {{ boundarySettingInProgress && boundarySettingSide === 'right' ? $t('Setting...') : $t('Set Right Boundary') }}
+          </button>
+          <button class="manual-calibration-btn" :disabled="boundarySettingInProgress" @click="resetManualCalibration">
+            {{ $t('Reset') }}
           </button>
           <button class="manual-calibration-btn manual-calibration-end-btn" @click="endCalibration">
             {{ $t('End manual focuser calibration') }}
@@ -545,6 +572,25 @@ export default {
       this.$stopFeature(['Focuser'], 'FocuserManualMove');
     },
 
+    cancelFocusPress() {
+      if (!this.isPressing) return;
+      this.removeLongPressCaptureListeners();
+      if (this.longPressTimer) {
+        clearTimeout(this.longPressTimer);
+        this.longPressTimer = null;
+      }
+      if (this.longPressTriggered) {
+        this.$bus.$emit('SendConsoleLogMsg', 'Focus Abort', 'info');
+        this.$bus.$emit('AppSendMessage', 'Vue_Command', 'focusMoveStop:false');
+      }
+      this.isPressing = false;
+      this.isMoveInProgress = false;
+      this.$bus.$emit('FocusInProgress', false);
+      this.longPressTriggered = false;
+      this.pressDirection = '';
+      this.$stopFeature(['Focuser'], 'FocuserManualMove');
+    },
+
     getFocuserMoveState() {
       this.$bus.$emit('AppSendMessage', 'Vue_Command', 'getFocuserMoveState:' + this.isMoveInProgress);
     },
@@ -861,6 +907,23 @@ export default {
       }
     },
 
+    resetManualCalibration() {
+      const min = this.hasSavedLimitValue(this.calibrationSnapshotMinLimit) ? this.calibrationSnapshotMinLimit : -1;
+      const max = this.hasSavedLimitValue(this.calibrationSnapshotMaxLimit) ? this.calibrationSnapshotMaxLimit : -1;
+      this.manualCalibrationLeftSet = false;
+      this.manualCalibrationRightSet = false;
+      this.manualCalibrationLeftValue = null;
+      this.manualCalibrationRightValue = null;
+      this.boundarySettingInProgress = false;
+      this.boundarySettingSide = '';
+      if (this.boundarySettingTimeoutId) {
+        clearTimeout(this.boundarySettingTimeoutId);
+        this.boundarySettingTimeoutId = null;
+      }
+      this.$bus.$emit('AppSendMessage', 'Vue_Command', `RestoreFocuserLimits:${min}:${max}`);
+      this.$bus.$emit('SendConsoleLogMsg', this.$t('Manual focuser calibration restored'), 'info');
+    },
+
     // 处理电调移动失败
     focusMoveFailed(errorMessage) {
       console.log('Focus move failed:', errorMessage);
@@ -1039,8 +1102,36 @@ export default {
 
 .manual-calibration-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   justify-content: flex-end;
+}
+
+.manual-calibration-move-actions {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  margin: 8px 0;
+}
+
+.manual-calibration-icon-btn {
+  width: 34px;
+  height: 34px;
+  user-select: none;
+  background-color: rgba(64, 64, 64, 0.7);
+  backdrop-filter: blur(5px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.manual-calibration-icon-btn:active {
+  transform: scale(0.95);
+  background-color: rgba(255, 255, 255, 0.28);
 }
 
 .manual-calibration-btn {
@@ -1063,11 +1154,6 @@ export default {
 
 .manual-calibration-end-btn:hover {
   background: rgba(255, 120, 120, 0.35);
-}
-
-.manual-calibration-allowed-btn {
-  position: relative;
-  z-index: 3100;
 }
 
 /* 自动对焦进度文本与动画：位于按钮下方，靠右对齐 */
