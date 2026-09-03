@@ -537,6 +537,11 @@
           </button>
         </div>
       </div>
+
+      <div class="trajectory-status-counter" data-testid="pa-trajectory-solve-stats">
+        <span class="panel-label">{{ $t('Solve Stats') }}:</span>
+        <span class="panel-value">{{ guidanceSolveStats.success }} / {{ guidanceSolveStats.total }}</span>
+      </div>
     </div>
 
     <!-- 轨迹画布：窗口模式 -->
@@ -571,6 +576,10 @@
 
       <div class="window-content" data-testid="pa-trajectory-window-content">
         <canvas ref="trajectoryCanvas" data-testid="pa-trajectory-canvas-windowed"></canvas>
+        <div class="trajectory-status-counter windowed" data-testid="pa-trajectory-solve-stats-windowed">
+          <span class="panel-label">{{ $t('Solve Stats') }}:</span>
+          <span class="panel-value">{{ guidanceSolveStats.success }} / {{ guidanceSolveStats.total }}</span>
+        </div>
       </div>
     </div>
 
@@ -870,6 +879,10 @@ export default {
       guidanceStarCount: -1, // 识别的星点数量
       guidanceStepStatus: 'normal', // 步骤状态: 'normal', 'success', 'error'
       guidanceStatusTimeout: null, // 状态动画定时器
+      guidanceSolveStats: {
+        success: 0,
+        total: 0
+      },
 
       // === 轨迹画布状态 ===
       showTrajectoryOverlay: false,
@@ -1127,6 +1140,7 @@ export default {
 
       // 监听指导调整阶段进度
       this.$bus.$on('PolarAlignmentGuidanceStepProgress', this.updateGuidanceStepProgress)
+      this.$bus.$on('PolarAlignmentGuidanceSolveStats', this.updateGuidanceSolveStats)
       this.$bus.$on('PoleMasterAlignmentState', this.updatePoleMasterAlignmentState)
       this.$bus.$on('PoleMasterAlignmentGuideData', this.updatePoleMasterGuideData)
       this.$bus.$on('PoleMasterAlignmentFrameData', this.updatePoleMasterFrameData)
@@ -1160,6 +1174,7 @@ export default {
       this.$bus.$off('GuiderFocalLength', this.onGuiderFocalLengthConfig)
       this.$bus.$off('PoleCameraFocalLength', this.onPoleCameraFocalLengthConfig)
       this.$bus.$off('PolarAlignmentGuidanceStepProgress', this.updateGuidanceStepProgress)
+      this.$bus.$off('PolarAlignmentGuidanceSolveStats', this.updateGuidanceSolveStats)
       this.$bus.$off('PoleMasterAlignmentState', this.updatePoleMasterAlignmentState)
       this.$bus.$off('PoleMasterAlignmentGuideData', this.updatePoleMasterGuideData)
       this.$bus.$off('PoleMasterAlignmentFrameData', this.updatePoleMasterFrameData)
@@ -3859,6 +3874,16 @@ export default {
         }
       },
 
+      updateGuidanceSolveStats(successCount, totalCount) {
+        const success = Number(successCount)
+        const total = Number(totalCount)
+        if (!Number.isFinite(success) || !Number.isFinite(total)) return
+        this.guidanceSolveStats = {
+          success: Math.max(0, Math.trunc(success)),
+          total: Math.max(0, Math.trunc(total))
+        }
+      },
+
       getGuidanceStepLabel(step) {
         const labels = {
           0: this.$t('Capturing'),
@@ -4359,6 +4384,28 @@ export default {
 .panel-btn { background: rgba(255,255,255,0.14); color: #fff; border: none; border-radius: 6px; padding: 6px 10px; cursor: pointer; }
 .panel-btn.small { padding: 4px 8px; font-size: 12px; }
 .panel-btn:hover { background: rgba(255,255,255,0.22); }
+.trajectory-status-counter {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 104px;
+  justify-content: space-between;
+  background: rgba(30, 30, 30, 0.72);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1;
+  pointer-events: none;
+}
+.trajectory-status-counter.windowed {
+  right: 10px;
+  bottom: 10px;
+}
 
 .trajectory-window {
   position: fixed;

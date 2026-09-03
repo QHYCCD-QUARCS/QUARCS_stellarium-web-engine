@@ -505,6 +505,7 @@
   "Switch to Windowed Mode": "切换为窗口模式",
   "Switch to Fullscreen Mode": "切换为全屏模式",
   "Trajectory": "轨迹",
+  "Solve Stats": "解析",
   "Focus": {
     "status": "对焦状态",
     "bestPosition": "最佳位置",

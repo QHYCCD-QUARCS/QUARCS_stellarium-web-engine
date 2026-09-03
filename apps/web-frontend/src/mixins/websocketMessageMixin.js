@@ -1882,6 +1882,13 @@ export default {
                   this.$bus.$emit('PolarAlignmentGuidanceStepProgress', step, message, starCount);
                 }
                 break;
+              case 'PolarAlignmentGuidanceSolveStats':
+                if (parts.length === 3) {
+                  const successCount = parseInt(parts[1], 10);
+                  const totalCount = parseInt(parts[2], 10);
+                  this.$bus.$emit('PolarAlignmentGuidanceSolveStats', successCount, totalCount);
+                }
+                break;
 
               case 'PoleMasterAlignmentState':
                 if (parts.length === 5) {

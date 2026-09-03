@@ -459,6 +459,17 @@ export function recordServerRawMessage(rawMessage) {
         completionEvidence: 'ws-message',
       }, { rawMessage: raw })
     }
+  } else if (raw.startsWith('PolarAlignmentGuidanceSolveStats:')) {
+    const parts = raw.split(':')
+    if (parts.length >= 3) {
+      op = upsertOperation(runtime, 'polar-axis-calibration', 'Mount', {
+        status: 'running',
+        message: raw,
+        solveSuccessCount: Number(parts[1]),
+        solveTotalCount: Number(parts[2]),
+        completionEvidence: 'ws-message',
+      }, { rawMessage: raw })
+    }
   } else if (raw.startsWith('GuiderStatus:')) {
     op = upsertOperation(runtime, 'guiding', 'Guider', {
       status: 'running',
