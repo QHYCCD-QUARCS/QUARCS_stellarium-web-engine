@@ -208,13 +208,7 @@ export default {
                 break;
 
               case 'AddScatterChartData':
-                if (parts.length === 3) {
-                  const Data_x = Number(parts[1]);
-                  const Data_y = Number(parts[2]);
-                  if (!Number.isFinite(Data_x) || !Number.isFinite(Data_y)) break;
-                  const newDataPoint = [Data_x, Data_y];
-                  this.$bus.$emit('AddScatterChartData', newDataPoint);
-                }
+                // 兼容旧后端：散点数据现由 AddLineChartData 同步派生，忽略重复消息。
                 break;
 
               case 'AddLineChartData':
@@ -226,6 +220,8 @@ export default {
                   const newDataPoint_Ra = [Data_x, Data_Ra];
                   const newDataPoint_Dec = [Data_x, Data_Dec];
                   this.$bus.$emit('AddLineChartData', newDataPoint_Ra, newDataPoint_Dec);
+                  // RA/DEC 已包含散点图所需的全部数据，避免后端为同一帧再发一条消息。
+                  this.$bus.$emit('AddScatterChartData', [Data_Ra, -Data_Dec]);
                 }
                 break;
 
